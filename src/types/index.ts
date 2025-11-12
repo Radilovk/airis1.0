@@ -54,6 +54,8 @@ export interface AnalysisReport {
   questionnaireData: QuestionnaireData
   leftIris: IrisAnalysis
   rightIris: IrisAnalysis
+  leftIrisImage: IrisImage
+  rightIrisImage: IrisImage
   recommendations: Recommendation[]
   summary: string
 }

@@ -3,37 +3,38 @@ import React from 'react'
 interface IridologyOverlayProps {
   size?: number
   className?: string
+  showLabels?: boolean
+  showInstructions?: boolean
 }
 
-/**
- * Futuristic iridology topographic overlay template
- * Shows the iris zones in a modern, biotechnological, professional style
- */
-export default function IridologyOverlay({ size = 400, className = '' }: IridologyOverlayProps) {
+export default function IridologyOverlay({ 
+  size = 400, 
+  className = '', 
+  showLabels = false,
+  showInstructions = false 
+}: IridologyOverlayProps) {
   const radius = size / 2
   const pupilRadius = radius * 0.3
   const innerRadius = radius * 0.55
   const middleRadius = radius * 0.75
   const outerRadius = radius * 0.95
   
-  // 12 main sectors (30 degrees each) for organ zones
   const sectors = 12
   const angleStep = 360 / sectors
   
-  // Zone labels for iridology chart
   const zoneLabels = [
-    'Мозък', // Brain
-    'Синуси', // Sinuses
-    'Щит. жлеза', // Thyroid
-    'Белодробни', // Lungs
-    'Сърце', // Heart
-    'Стомах', // Stomach
-    'Панкреас', // Pancreas
-    'Бъбреци', // Kidneys
-    'Черва', // Intestines
-    'Репрод. система', // Reproductive
-    'Гръбнак', // Spine
-    'Лимфна система' // Lymphatic
+    'Мозък',
+    'Синуси',
+    'Щит. жлеза',
+    'Белодробни',
+    'Сърце',
+    'Стомах',
+    'Панкреас',
+    'Бъбреци',
+    'Черва',
+    'Репрод. система',
+    'Гръбнак',
+    'Лимфна система'
   ]
 
   return (
@@ -154,7 +155,7 @@ export default function IridologyOverlay({ size = 400, className = '' }: Iridolo
       })}
       
       {/* Zone labels */}
-      {zoneLabels.map((label, i) => {
+      {showLabels && zoneLabels.map((label, i) => {
         const angle = (angleStep * i + angleStep / 2 - 90) * (Math.PI / 180)
         const labelRadius = (middleRadius + outerRadius) / 2
         const x = radius + labelRadius * Math.cos(angle)
@@ -237,18 +238,20 @@ export default function IridologyOverlay({ size = 400, className = '' }: Iridolo
       </circle>
       
       {/* Instructional text at top */}
-      <text
-        x={radius}
-        y="30"
-        fill="rgba(59, 130, 246, 0.7)"
-        fontSize="12"
-        fontWeight="600"
-        textAnchor="middle"
-        filter="url(#glow)"
-        style={{ fontFamily: 'Inter, sans-serif' }}
-      >
-        ПОЗИЦИОНИРАЙТЕ ИРИСА
-      </text>
+      {showInstructions && (
+        <text
+          x={radius}
+          y="30"
+          fill="rgba(59, 130, 246, 0.7)"
+          fontSize="12"
+          fontWeight="600"
+          textAnchor="middle"
+          filter="url(#glow)"
+          style={{ fontFamily: 'Inter, sans-serif' }}
+        >
+          ПОЗИЦИОНИРАЙТЕ ИРИСА
+        </text>
+      )}
     </svg>
   )
 }

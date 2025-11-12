@@ -16,6 +16,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { AnalysisReport } from '@/types'
 import IrisVisualization from '@/components/report/IrisVisualization'
+import IrisWithOverlay from '@/components/iris/IrisWithOverlay'
 import SystemScoresChart from '@/components/report/SystemScoresChart'
 import RecommendationCard from '@/components/report/RecommendationCard'
 
@@ -241,6 +242,13 @@ ${r.description}
                   <span className="text-2xl font-bold text-primary">{report.leftIris.overallHealth}/100</span>
                 </div>
               </div>
+              <div className="flex justify-center mb-6">
+                <IrisWithOverlay 
+                  imageDataUrl={report.leftIrisImage.dataUrl}
+                  side="left"
+                  size={400}
+                />
+              </div>
               <IrisVisualization analysis={report.leftIris} />
             </Card>
 
@@ -291,6 +299,13 @@ ${r.description}
                   <span className="text-sm text-muted-foreground">Здравословно състояние:</span>
                   <span className="text-2xl font-bold text-primary">{report.rightIris.overallHealth}/100</span>
                 </div>
+              </div>
+              <div className="flex justify-center mb-6">
+                <IrisWithOverlay 
+                  imageDataUrl={report.rightIrisImage.dataUrl}
+                  side="right"
+                  size={400}
+                />
               </div>
               <IrisVisualization analysis={report.rightIris} />
             </Card>

@@ -371,6 +371,8 @@ export default function AnalysisScreen({
         questionnaireData,
         leftIris: leftAnalysis,
         rightIris: rightAnalysis,
+        leftIrisImage: leftIris,
+        rightIrisImage: rightIris,
         recommendations,
         summary
       }
