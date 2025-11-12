@@ -57,3 +57,18 @@ export interface AnalysisReport {
   recommendations: Recommendation[]
   summary: string
 }
+
+export interface AIModelConfig {
+  provider: 'openai' | 'gemini'
+  model: string
+  apiKey: string
+  useCustomKey: boolean
+}
+
+export interface IridologyTextbook {
+  id: string
+  name: string
+  content: string
+  uploadDate: string
+  fileSize: number
+}

@@ -8,9 +8,10 @@ import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
 import AnalysisScreen from '@/components/screens/AnalysisScreen'
 import ReportScreen from '@/components/screens/ReportScreen'
 import HistoryScreen from '@/components/screens/HistoryScreen'
+import AdminScreen from '@/components/screens/AdminScreen'
 import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 
-type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history'
+type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'admin'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
@@ -26,6 +27,10 @@ function App() {
 
   const handleViewHistory = () => {
     setCurrentScreen('history')
+  }
+
+  const handleAdminAccess = () => {
+    setCurrentScreen('admin')
   }
 
   const handleQuestionnaireComplete = (data: QuestionnaireData) => {
@@ -70,7 +75,7 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} />
+            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} />
           </motion.div>
         )}
         {currentScreen === 'questionnaire' && (
@@ -135,6 +140,17 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <HistoryScreen onViewReport={handleViewReport} onBack={() => setCurrentScreen('welcome')} />
+          </motion.div>
+        )}
+        {currentScreen === 'admin' && (
+          <motion.div
+            key="admin"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <AdminScreen onBack={() => setCurrentScreen('welcome')} />
           </motion.div>
         )}
       </AnimatePresence>

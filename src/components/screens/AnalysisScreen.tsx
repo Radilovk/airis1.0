@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis } from '@/types'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, IridologyTextbook } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -31,6 +32,15 @@ export default function AnalysisScreen({
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  const [aiConfig] = useKV<AIModelConfig>('ai-model-config', {
+    provider: 'openai',
+    model: 'gpt-4o',
+    apiKey: '',
+    useCustomKey: false
+  })
+  
+  const [textbooks] = useKV<IridologyTextbook[]>('iridology-textbooks', [])
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
@@ -329,12 +339,23 @@ export default function AnalysisScreen({
       console.log(`📝 [ИРИС ${side}] BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] Цели: ${goalsText}`)
       
+      let textbookContext = ''
+      if (textbooks && textbooks.length > 0) {
+        addLog('info', `Зареждане на ${textbooks.length} учебника/учебници за контекст...`)
+        textbookContext = '\n\nРЕФЕРЕНТНИ МАТЕРИАЛИ ПО ИРИДОЛОГИЯ:\n\n'
+        textbooks.forEach((tb) => {
+          textbookContext += `--- ${tb.name} ---\n${tb.content.substring(0, 2000)}\n\n`
+        })
+        addLog('success', `Учебници заредени (${textbookContext.length} символа)`)
+      }
+      
       addLog('info', 'Подготовка на prompt за LLM...')
       const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си иридолог. Анализирай ${sideName} ирис.
 
 Пациент: Възраст ${questionnaire.age}, Пол ${genderName}, BMI ${bmi}
 Цели: ${goalsText}
 Оплаквания: ${complaintsText}
+${textbookContext}
 
 Анализирай 8-12 зони по часовника (12:00 горе): Мозък, Щитовидна, Белодробна, Черен дроб, Стомах, Дебело черво, Урогенитална, Бъбреци, Далак, Сърце, Ендокринна, Нервна.
 
@@ -365,8 +386,11 @@ JSON формат:
       console.log(`🤖 [ИРИС ${side}] Изпращане на prompt до LLM...`)
       console.log(`📄 [ИРИС ${side}] Prompt дължина: ${prompt.length} символа`)
       
+      const modelToUse = aiConfig?.model || 'gpt-4o'
+      addLog('info', `Използван модел: ${modelToUse}`)
+      
       addLog('warning', 'Изчакване на отговор от AI модела... (това може да отнеме 10-30 сек)')
-      const response = await callLLMWithRetry(prompt, 'gpt-4o', true)
+      const response = await callLLMWithRetry(prompt, modelToUse, true)
       
       addLog('success', `Получен отговор от LLM (${response.length} символа)`)
       console.log(`✅ [ИРИС ${side}] Получен отговор от LLM`)

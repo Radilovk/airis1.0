@@ -1,14 +1,31 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Eye, Sparkle, Activity, FileText, ClockClockwise } from '@phosphor-icons/react'
+import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
 
 interface WelcomeScreenProps {
   onStart: () => void
   onViewHistory: () => void
+  onAdmin: () => void
 }
 
-export default function WelcomeScreen({ onStart, onViewHistory }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onStart, onViewHistory, onAdmin }: WelcomeScreenProps) {
+  const [isOwner, setIsOwner] = useState(false)
+
+  useEffect(() => {
+    checkOwnership()
+  }, [])
+
+  const checkOwnership = async () => {
+    try {
+      const user = await window.spark.user()
+      setIsOwner(user?.isOwner || false)
+    } catch (error) {
+      console.error('Error checking ownership:', error)
+      setIsOwner(false)
+    }
+  }
   const features = [
     {
       icon: Eye,
@@ -98,6 +115,17 @@ export default function WelcomeScreen({ onStart, onViewHistory }: WelcomeScreenP
               <ClockClockwise size={20} weight="duotone" />
               История
             </Button>
+            {isOwner && (
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={onAdmin}
+                className="px-8 py-6 text-lg font-semibold gap-2"
+              >
+                <Gear size={20} weight="duotone" />
+                Настройки
+              </Button>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-4">
             Процесът отнема около 5-10 минути
