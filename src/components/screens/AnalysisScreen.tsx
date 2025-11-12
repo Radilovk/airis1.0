@@ -52,15 +52,15 @@ export default function AnalysisScreen({
     prompt: string,
     modelName: string = 'gpt-4o',
     jsonMode: boolean = true,
-    maxRetries: number = 3
+    maxRetries: number = 4
   ): Promise<string> => {
     let lastError: Error | null = null
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 1) {
-          const waitTime = Math.min(5000 * Math.pow(2, attempt - 1), 30000)
-          addLog('warning', `Изчакване ${(waitTime / 1000).toFixed(1)}s преди опит ${attempt}/${maxRetries}...`)
+          const waitTime = Math.min(8000 * Math.pow(2, attempt - 2), 60000)
+          addLog('warning', `Изчакване ${(waitTime / 1000).toFixed(0)}s преди опит ${attempt}/${maxRetries}...`)
           await sleep(waitTime)
         }
         
@@ -80,7 +80,7 @@ export default function AnalysisScreen({
         if (errorMsg.includes('429') || errorMsg.includes('Too many requests') || errorMsg.includes('rate limit')) {
           addLog('warning', `⏱️ Rate limit (429) - твърде много заявки! Опит ${attempt}/${maxRetries}`)
           if (attempt < maxRetries) {
-            const backoffTime = 30000 + (attempt * 10000)
+            const backoffTime = 45000 + (attempt * 15000)
             addLog('info', `⏳ Изчакване ${(backoffTime / 1000).toFixed(0)}s преди повторен опит поради rate limit...`)
             await sleep(backoffTime)
             continue
@@ -90,7 +90,7 @@ export default function AnalysisScreen({
         } else {
           addLog('error', `LLM грешка (опит ${attempt}): ${errorMsg}`)
           if (attempt < maxRetries) {
-            await sleep(3000)
+            await sleep(5000)
             continue
           }
         }
@@ -226,8 +226,8 @@ export default function AnalysisScreen({
       addLog('success', 'Ляв ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
       
-      addLog('info', '⏳ Изчакване 8 сек. за избягване на rate limit...')
-      await sleep(8000)
+      addLog('info', '⏳ Изчакване 15 сек. за избягване на rate limit...')
+      await sleep(15000)
       
       setProgress(40)
       setStatus('Анализиране на десен ирис...')
@@ -238,8 +238,8 @@ export default function AnalysisScreen({
       addLog('success', 'Десен ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
       
-      addLog('info', '⏳ Изчакване 8 сек. за избягване на rate limit...')
-      await sleep(8000)
+      addLog('info', '⏳ Изчакване 15 сек. за избягване на rate limit...')
+      await sleep(15000)
       
       setProgress(70)
       setStatus('Генериране на препоръки...')
@@ -254,8 +254,8 @@ export default function AnalysisScreen({
       addLog('success', `Препоръки генерирани успешно (${recommendations.length} бр.)`)
       console.log('✅ [АНАЛИЗ] Препоръки генерирани успешно:', recommendations)
       
-      addLog('info', '⏳ Изчакване 8 сек. за избягване на rate limit...')
-      await sleep(8000)
+      addLog('info', '⏳ Изчакване 15 сек. за избягване на rate limit...')
+      await sleep(15000)
       
       setProgress(90)
       setStatus('Подготовка на доклад...')
@@ -644,7 +644,7 @@ JSON:
                   </div>
                   <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      ℹ️ Процесът отнема 30-60 секунди. Приложението изчаква между заявките за избягване на лимити.
+                      ℹ️ Процесът отнема 60-90 секунди. Приложението изчаква 15 секунди между заявките за избягване на лимити.
                     </p>
                   </div>
                 </div>
