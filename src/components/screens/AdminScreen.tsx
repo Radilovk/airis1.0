@@ -20,10 +20,13 @@ import {
   Upload, 
   Trash, 
   CheckCircle,
-  Warning
+  Warning,
+  Image as ImageIcon,
+  Eye
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import type { AIModelConfig, IridologyTextbook } from '@/types'
+import type { AIModelConfig, IridologyTextbook, CustomOverlay } from '@/types'
+import IridologyOverlay from '@/components/iris/IridologyOverlay'
 
 interface AdminScreenProps {
   onBack: () => void
@@ -38,6 +41,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   })
   
   const [textbooks, setTextbooks] = useKV<IridologyTextbook[]>('iridology-textbooks', [])
+  const [customOverlay, setCustomOverlay] = useKV<CustomOverlay | null>('custom-overlay', null)
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   
@@ -48,6 +52,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   
   const [textbookName, setTextbookName] = useState('')
   const [textbookContent, setTextbookContent] = useState('')
+  const [showOverlayPreview, setShowOverlayPreview] = useState(false)
 
   useEffect(() => {
     checkOwnership()
@@ -156,6 +161,47 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+  }
+
+  const handleOverlayUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const fileType = file.type
+    if (!fileType.includes('svg') && !fileType.includes('png')) {
+      toast.error('Моля, качете SVG или PNG файл')
+      return
+    }
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string
+        const overlay: CustomOverlay = {
+          dataUrl,
+          type: fileType.includes('svg') ? 'svg' : 'png',
+          name: file.name,
+          uploadDate: new Date().toISOString()
+        }
+        
+        await setCustomOverlay(overlay)
+        toast.success('Overlay map е качен успешно')
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('Error uploading overlay:', error)
+      toast.error('Грешка при качване на overlay map')
+    }
+  }
+
+  const handleRemoveOverlay = async () => {
+    try {
+      await setCustomOverlay(null)
+      toast.success('Overlay map е премахнат. Използва се стандартния.')
+    } catch (error) {
+      console.error('Error removing overlay:', error)
+      toast.error('Грешка при премахване на overlay map')
+    }
   }
 
   if (loading) {
@@ -475,6 +521,149 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-primary" />
+                Иридологичен Overlay Map
+              </CardTitle>
+              <CardDescription>
+                Качете персонализиран overlay шаблон за използване при оразмеряване на изображения
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {customOverlay ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg border bg-card space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium">{customOverlay.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline">
+                            {customOverlay.type.toUpperCase()}
+                          </Badge>
+                          <span>•</span>
+                          <span>
+                            {new Date(customOverlay.uploadDate).toLocaleDateString('bg-BG')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowOverlayPreview(!showOverlayPreview)}
+                          className="gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          {showOverlayPreview ? 'Скрий' : 'Преглед'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveOverlay}
+                          className="gap-2 text-destructive hover:text-destructive"
+                        >
+                          <Trash className="w-4 h-4" />
+                          Премахни
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {showOverlayPreview && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 flex justify-center p-4 bg-black/5 rounded-lg"
+                      >
+                        <div className="relative w-64 h-64">
+                          <IridologyOverlay size={256} className="opacity-90" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                  
+                  <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground">
+                      💡 Персонализираният overlay се използва при оразмеряване на изображения и остава върху запазените снимки за визуализация.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                    <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                    <p className="text-sm font-medium mb-2">
+                      Използва се стандартния overlay шаблон
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Качете персонализиран SVG или PNG файл
+                    </p>
+                    <Label htmlFor="overlay-upload" className="cursor-pointer">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                        <Upload className="w-4 h-4" />
+                        Качи Overlay Map
+                      </div>
+                      <Input
+                        id="overlay-upload"
+                        type="file"
+                        accept=".svg,.png,image/svg+xml,image/png"
+                        onChange={handleOverlayUpload}
+                        className="hidden"
+                      />
+                    </Label>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Предварителен преглед на стандартния overlay:</p>
+                    <div className="flex justify-center p-4 bg-black/5 rounded-lg border">
+                      <div className="relative w-64 h-64">
+                        <IridologyOverlay size={256} className="opacity-90" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-secondary/50 rounded-lg">
+                    <p className="text-xs font-semibold mb-2">📋 Изисквания за overlay:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>• Формат: SVG (препоръчва се) или PNG</li>
+                      <li>• Квадратен формат с еднакви размери (напр. 800x800px)</li>
+                      <li>• Центриран дизайн с концентрични кръгове</li>
+                      <li>• Прозрачен фон или светъл overlay</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+              
+              {customOverlay && (
+                <div className="pt-4">
+                  <Label htmlFor="overlay-replace" className="cursor-pointer block">
+                    <Button variant="outline" className="w-full gap-2" asChild>
+                      <div>
+                        <Upload className="w-4 h-4" />
+                        Качи нов Overlay Map
+                      </div>
+                    </Button>
+                    <Input
+                      id="overlay-replace"
+                      type="file"
+                      accept=".svg,.png,image/svg+xml,image/png"
+                      onChange={handleOverlayUpload}
+                      className="hidden"
+                    />
+                  </Label>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

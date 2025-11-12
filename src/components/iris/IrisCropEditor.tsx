@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useKV } from '@github/spark/hooks'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowsClockwise, Check, X } from '@phosphor-icons/react'
 import IridologyOverlay from './IridologyOverlay'
 import { motion } from 'framer-motion'
+import type { CustomOverlay } from '@/types'
 
 interface IrisCropEditorProps {
   imageDataUrl: string
@@ -23,6 +25,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
+  const [customOverlay] = useKV<CustomOverlay | null>('custom-overlay', null)
   
   const [transform, setTransform] = useState<Transform>({
     scale: 1,
@@ -247,71 +250,90 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     
     cropCtx.restore()
     
-    const overlayDiv = document.createElement('div')
-    overlayDiv.style.position = 'absolute'
-    overlayDiv.style.left = '-9999px'
-    document.body.appendChild(overlayDiv)
-    
-    const root = document.createElement('div')
-    overlayDiv.appendChild(root)
-    
-    const svgContainer = document.createElement('div')
-    svgContainer.innerHTML = `
-      <svg width="${cropSize}" height="${cropSize}" viewBox="0 0 ${cropSize} ${cropSize}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="glowGradient" cx="50%" cy="50%">
-            <stop offset="0%" stop-color="rgba(59, 130, 246, 0.3)" />
-            <stop offset="50%" stop-color="rgba(59, 130, 246, 0.15)" />
-            <stop offset="100%" stop-color="rgba(59, 130, 246, 0.05)" />
-          </radialGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <pattern id="scanlines" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
-            <line x1="0" y1="0" x2="0" y2="4" stroke="rgba(59, 130, 246, 0.1)" stroke-width="1"/>
-          </pattern>
-        </defs>
-        ${generateOverlaySVGContent(cropSize)}
-      </svg>
-    `
-    
-    const svgElement = svgContainer.querySelector('svg')
-    if (!svgElement) {
-      document.body.removeChild(overlayDiv)
-      return
+    if (customOverlay) {
+      const overlayImg = new Image()
+      overlayImg.onload = () => {
+        cropCtx.globalAlpha = 0.6
+        cropCtx.drawImage(overlayImg, 0, 0, cropSize, cropSize)
+        cropCtx.globalAlpha = 1.0
+        
+        const croppedDataUrl = cropCanvas.toDataURL('image/png')
+        onSave(croppedDataUrl)
+      }
+      
+      overlayImg.onerror = () => {
+        const croppedDataUrl = cropCanvas.toDataURL('image/png')
+        onSave(croppedDataUrl)
+      }
+      
+      overlayImg.src = customOverlay.dataUrl
+    } else {
+      const overlayDiv = document.createElement('div')
+      overlayDiv.style.position = 'absolute'
+      overlayDiv.style.left = '-9999px'
+      document.body.appendChild(overlayDiv)
+      
+      const root = document.createElement('div')
+      overlayDiv.appendChild(root)
+      
+      const svgContainer = document.createElement('div')
+      svgContainer.innerHTML = `
+        <svg width="${cropSize}" height="${cropSize}" viewBox="0 0 ${cropSize} ${cropSize}" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="glowGradient" cx="50%" cy="50%">
+              <stop offset="0%" stop-color="rgba(59, 130, 246, 0.3)" />
+              <stop offset="50%" stop-color="rgba(59, 130, 246, 0.15)" />
+              <stop offset="100%" stop-color="rgba(59, 130, 246, 0.05)" />
+            </radialGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <pattern id="scanlines" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0" x2="0" y2="4" stroke="rgba(59, 130, 246, 0.1)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          ${generateOverlaySVGContent(cropSize)}
+        </svg>
+      `
+      
+      const svgElement = svgContainer.querySelector('svg')
+      if (!svgElement) {
+        document.body.removeChild(overlayDiv)
+        return
+      }
+      
+      const svgData = new XMLSerializer().serializeToString(svgElement)
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+      const svgUrl = URL.createObjectURL(svgBlob)
+      
+      const overlayImg = new Image()
+      overlayImg.onload = () => {
+        cropCtx.globalAlpha = 0.6
+        cropCtx.drawImage(overlayImg, 0, 0, cropSize, cropSize)
+        cropCtx.globalAlpha = 1.0
+        
+        const croppedDataUrl = cropCanvas.toDataURL('image/png')
+        
+        URL.revokeObjectURL(svgUrl)
+        document.body.removeChild(overlayDiv)
+        
+        onSave(croppedDataUrl)
+      }
+      
+      overlayImg.onerror = () => {
+        URL.revokeObjectURL(svgUrl)
+        document.body.removeChild(overlayDiv)
+        
+        const croppedDataUrl = cropCanvas.toDataURL('image/png')
+        onSave(croppedDataUrl)
+      }
+      
+      overlayImg.src = svgUrl
     }
-    
-    const svgData = new XMLSerializer().serializeToString(svgElement)
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-    const svgUrl = URL.createObjectURL(svgBlob)
-    
-    const overlayImg = new Image()
-    overlayImg.onload = () => {
-      cropCtx.globalAlpha = 0.6
-      cropCtx.drawImage(overlayImg, 0, 0, cropSize, cropSize)
-      cropCtx.globalAlpha = 1.0
-      
-      const croppedDataUrl = cropCanvas.toDataURL('image/png')
-      
-      URL.revokeObjectURL(svgUrl)
-      document.body.removeChild(overlayDiv)
-      
-      onSave(croppedDataUrl)
-    }
-    
-    overlayImg.onerror = () => {
-      URL.revokeObjectURL(svgUrl)
-      document.body.removeChild(overlayDiv)
-      
-      const croppedDataUrl = cropCanvas.toDataURL('image/png')
-      onSave(croppedDataUrl)
-    }
-    
-    overlayImg.src = svgUrl
   }
   
   const generateOverlaySVGContent = (size: number) => {
@@ -433,7 +455,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
               
               {/* Iridology overlay */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <IridologyOverlay size={canvasSize.width} className="opacity-80" showInstructions={true} />
+                <IridologyOverlay size={canvasSize.width} className="opacity-80" />
               </div>
             </div>
           </div>

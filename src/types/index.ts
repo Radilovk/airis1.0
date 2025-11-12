@@ -74,3 +74,10 @@ export interface IridologyTextbook {
   uploadDate: string
   fileSize: number
 }
+
+export interface CustomOverlay {
+  dataUrl: string
+  type: 'svg' | 'png'
+  name: string
+  uploadDate: string
+}

@@ -1,18 +1,30 @@
 import React from 'react'
+import { useKV } from '@github/spark/hooks'
 
 interface IridologyOverlayProps {
   size?: number
   className?: string
-  showLabels?: boolean
-  showInstructions?: boolean
 }
 
 export default function IridologyOverlay({ 
   size = 400, 
-  className = '', 
-  showLabels = false,
-  showInstructions = false 
+  className = ''
 }: IridologyOverlayProps) {
+  const [customOverlay] = useKV<{ dataUrl: string, type: 'svg' | 'png' } | null>('custom-overlay', null)
+  
+  if (customOverlay) {
+    return (
+      <img 
+        src={customOverlay.dataUrl}
+        alt="Iridology Overlay"
+        width={size}
+        height={size}
+        className={className}
+        style={{ pointerEvents: 'none' }}
+      />
+    )
+  }
+  
   const radius = size / 2
   const pupilRadius = radius * 0.3
   const innerRadius = radius * 0.55
@@ -21,21 +33,6 @@ export default function IridologyOverlay({
   
   const sectors = 12
   const angleStep = 360 / sectors
-  
-  const zoneLabels = [
-    'Мозък',
-    'Синуси',
-    'Щит. жлеза',
-    'Белодробни',
-    'Сърце',
-    'Стомах',
-    'Панкреас',
-    'Бъбреци',
-    'Черва',
-    'Репрод. система',
-    'Гръбнак',
-    'Лимфна система'
-  ]
 
   return (
     <svg 
@@ -154,36 +151,6 @@ export default function IridologyOverlay({
         )
       })}
       
-      {/* Zone labels */}
-      {showLabels && zoneLabels.map((label, i) => {
-        const angle = (angleStep * i + angleStep / 2 - 90) * (Math.PI / 180)
-        const labelRadius = (middleRadius + outerRadius) / 2
-        const x = radius + labelRadius * Math.cos(angle)
-        const y = radius + labelRadius * Math.sin(angle)
-        const rotation = angleStep * i + angleStep / 2
-        
-        return (
-          <text
-            key={`label-${i}`}
-            x={x}
-            y={y}
-            fill="rgba(59, 130, 246, 0.8)"
-            fontSize="10"
-            fontWeight="600"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            transform={`rotate(${rotation}, ${x}, ${y})`}
-            filter="url(#glow)"
-            style={{ 
-              textShadow: '0 0 10px rgba(59, 130, 246, 0.8)',
-              fontFamily: 'Inter, sans-serif'
-            }}
-          >
-            {label}
-          </text>
-        )
-      })}
-      
       {/* Central crosshair for alignment */}
       <line
         x1={radius - 10}
@@ -236,22 +203,6 @@ export default function IridologyOverlay({
           repeatCount="indefinite"
         />
       </circle>
-      
-      {/* Instructional text at top */}
-      {showInstructions && (
-        <text
-          x={radius}
-          y="30"
-          fill="rgba(59, 130, 246, 0.7)"
-          fontSize="12"
-          fontWeight="600"
-          textAnchor="middle"
-          filter="url(#glow)"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-        >
-          ПОЗИЦИОНИРАЙТЕ ИРИСА
-        </text>
-      )}
     </svg>
   )
 }
