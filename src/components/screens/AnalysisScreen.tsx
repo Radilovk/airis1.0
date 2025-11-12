@@ -46,6 +46,57 @@ export default function AnalysisScreen({
     console.log(`${emoji} [${timestamp}] ${message}`)
   }
 
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+  const callLLMWithRetry = async (
+    prompt: string,
+    modelName: string = 'gpt-4o',
+    jsonMode: boolean = true,
+    maxRetries: number = 3
+  ): Promise<string> => {
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 1) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
+          addLog('warning', `Изчакване ${waitTime}ms преди опит ${attempt}/${maxRetries}...`)
+          await sleep(waitTime)
+        }
+        
+        addLog('info', `LLM заявка (опит ${attempt}/${maxRetries})...`)
+        const response = await window.spark.llm(prompt, modelName, jsonMode)
+        
+        if (response && response.length > 0) {
+          addLog('success', `LLM отговори успешно (${response.length} символа)`)
+          return response
+        } else {
+          throw new Error('Празен отговор от LLM')
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        const errorMsg = lastError.message
+        
+        if (errorMsg.includes('429') || errorMsg.includes('Too many requests')) {
+          addLog('warning', `Rate limit (429) - твърде много заявки! Опит ${attempt}/${maxRetries}`)
+          if (attempt < maxRetries) {
+            const backoffTime = Math.min(2000 * Math.pow(2, attempt), 15000)
+            addLog('info', `Изчакване ${backoffTime}ms преди повторен опит...`)
+            await sleep(backoffTime)
+            continue
+          }
+        } else {
+          addLog('error', `LLM грешка (опит ${attempt}): ${errorMsg}`)
+          if (attempt < maxRetries) {
+            continue
+          }
+        }
+      }
+    }
+    
+    throw lastError || new Error('LLM заявката се провали след всички опити')
+  }
+
   const robustJSONParse = (response: string, context: string): any => {
     try {
       return JSON.parse(response)
@@ -96,6 +147,9 @@ export default function AnalysisScreen({
       addLog('success', 'Ляв ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
       
+      addLog('info', 'Изчакване 2 сек. преди следваща заявка...')
+      await sleep(2000)
+      
       setProgress(40)
       setStatus('Анализиране на десен ирис...')
       addLog('info', 'Започване анализ на десен ирис...')
@@ -104,6 +158,9 @@ export default function AnalysisScreen({
       const rightAnalysis = await analyzeIris(rightIris, 'right', questionnaireData)
       addLog('success', 'Десен ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
+      
+      addLog('info', 'Изчакване 2 сек. преди следваща заявка...')
+      await sleep(2000)
       
       setProgress(70)
       setStatus('Генериране на препоръки...')
@@ -117,6 +174,9 @@ export default function AnalysisScreen({
       )
       addLog('success', `Препоръки генерирани успешно (${recommendations.length} бр.)`)
       console.log('✅ [АНАЛИЗ] Препоръки генерирани успешно:', recommendations)
+      
+      addLog('info', 'Изчакване 2 сек. преди следваща заявка...')
+      await sleep(2000)
       
       setProgress(90)
       setStatus('Подготовка на доклад...')
@@ -149,8 +209,15 @@ export default function AnalysisScreen({
       const errorMessage = error instanceof Error ? error.message : String(error)
       const errorStack = error instanceof Error ? error.stack : 'Няма stack trace'
       
-      addLog('error', `Фатална грешка: ${errorMessage}`)
-      setError(`${errorMessage}\n\nStack: ${errorStack}`)
+      let userFriendlyMessage = errorMessage
+      if (errorMessage.includes('429') || errorMessage.includes('Too many requests')) {
+        userFriendlyMessage = '⏱️ Твърде много заявки към AI модела. Моля изчакайте 30 секунди и опитайте отново.'
+        addLog('error', 'Rate limit достигнат - твърде много заявки')
+      } else {
+        addLog('error', `Фатална грешка: ${errorMessage}`)
+      }
+      
+      setError(`${userFriendlyMessage}\n\n⚠️ Технически детайли:\n${errorMessage}\n\nStack: ${errorStack}`)
       
       console.error('❌ [ГРЕШКА] Фатална грешка при анализ:', error)
       console.error('❌ [ГРЕШКА] Име на грешка:', (error as Error)?.name)
@@ -159,7 +226,7 @@ export default function AnalysisScreen({
       console.error('❌ [ГРЕШКА] Текущ прогрес при грешка:', progress)
       console.error('❌ [ГРЕШКА] Текущ статус при грешка:', status)
       
-      setStatus(`Грешка: ${errorMessage}`)
+      setStatus(`Грешка: ${userFriendlyMessage}`)
       setShowDebug(true)
     }
   }
@@ -244,7 +311,7 @@ export default function AnalysisScreen({
       console.log(`📄 [ИРИС ${side}] Prompt дължина: ${prompt.length} символа`)
       
       addLog('warning', 'Изчакване на отговор от AI модела... (това може да отнеме 10-30 сек)')
-      const response = await window.spark.llm(prompt, 'gpt-4o', true)
+      const response = await callLLMWithRetry(prompt, 'gpt-4o', true)
       
       addLog('success', `Получен отговор от LLM (${response.length} символа)`)
       console.log(`✅ [ИРИС ${side}] Получен отговор от LLM`)
@@ -336,7 +403,7 @@ export default function AnalysisScreen({
       console.log('📄 [ПРЕПОРЪКИ] Prompt дължина:', prompt.length)
       
       addLog('warning', 'Изчакване на отговор от AI модела...')
-      const response = await window.spark.llm(prompt, 'gpt-4o', true)
+      const response = await callLLMWithRetry(prompt, 'gpt-4o', true)
       
       addLog('success', `Получен отговор (${response.length} символа)`)
       console.log('✅ [ПРЕПОРЪКИ] Получен отговор от LLM')
@@ -415,7 +482,7 @@ export default function AnalysisScreen({
       console.log('📄 [РЕЗЮМЕ] Prompt дължина:', prompt.length)
       
       addLog('warning', 'Изчакване на отговор от AI модела...')
-      const response = await window.spark.llm(prompt, 'gpt-4o', false)
+      const response = await callLLMWithRetry(prompt, 'gpt-4o', false)
       
       addLog('success', `Получено резюме (${response.length} символа)`)
       console.log('✅ [РЕЗЮМЕ] Получен отговор от LLM')
@@ -523,12 +590,22 @@ export default function AnalysisScreen({
 
             {error && (
               <>
-                <div className="mt-6 p-4 bg-destructive/10 rounded-lg text-left">
-                  <p className="text-sm text-destructive font-mono whitespace-pre-wrap">
-                    {error}
-                  </p>
+                <div className="mt-6 p-4 bg-destructive/10 rounded-lg text-left space-y-3">
+                  <div className="text-sm font-semibold text-destructive">
+                    {error.split('\n\n')[0]}
+                  </div>
+                  {error.includes('⚠️ Технически детайли:') && (
+                    <details className="text-xs text-destructive/80">
+                      <summary className="cursor-pointer hover:underline">
+                        Покажи технически детайли
+                      </summary>
+                      <pre className="mt-2 font-mono whitespace-pre-wrap">
+                        {error.split('⚠️ Технически детайли:')[1]}
+                      </pre>
+                    </details>
+                  )}
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 flex gap-2 justify-center">
                   <Button
                     onClick={() => {
                       setError(null)
@@ -541,6 +618,13 @@ export default function AnalysisScreen({
                   >
                     <Sparkle size={20} />
                     Опитай отново
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.reload()}
+                    className="gap-2"
+                  >
+                    Рестартирай приложението
                   </Button>
                 </div>
               </>
