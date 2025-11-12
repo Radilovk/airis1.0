@@ -484,8 +484,10 @@ JSON:
       console.log('🤖 [ПРЕПОРЪКИ] Изпращане на prompt до LLM...')
       console.log('📄 [ПРЕПОРЪКИ] Prompt дължина:', prompt.length)
       
+      const modelToUse = aiConfig?.model || 'gpt-4o'
+      addLog('info', `Използван модел за препоръки: ${modelToUse}`)
       addLog('warning', 'Изчакване на отговор от AI модела...')
-      const response = await callLLMWithRetry(prompt, 'gpt-4o', true)
+      const response = await callLLMWithRetry(prompt, modelToUse, true)
       
       addLog('success', `Получен отговор (${response.length} символа)`)
       console.log('✅ [ПРЕПОРЪКИ] Получен отговор от LLM')
@@ -563,8 +565,10 @@ JSON:
       console.log('🤖 [РЕЗЮМЕ] Изпращане на prompt до LLM...')
       console.log('📄 [РЕЗЮМЕ] Prompt дължина:', prompt.length)
       
+      const modelToUse = aiConfig?.model || 'gpt-4o'
+      addLog('info', `Използван модел за резюме: ${modelToUse}`)
       addLog('warning', 'Изчакване на отговор от AI модела...')
-      const response = await callLLMWithRetry(prompt, 'gpt-4o', false)
+      const response = await callLLMWithRetry(prompt, modelToUse, false)
       
       addLog('success', `Получено резюме (${response.length} символа)`)
       console.log('✅ [РЕЗЮМЕ] Получен отговор от LLM')
