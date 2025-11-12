@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { MagnifyingGlassPlus, MagnifyingGlassMinus, ArrowsClockwise, Check, X } from '@phosphor-icons/react'
@@ -36,17 +36,6 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 400, height: 400 })
   
-  // Load and initialize image
-  useEffect(() => {
-    const img = new Image()
-    img.onload = () => {
-      imageRef.current = img
-      // Center the image initially
-      drawCanvas()
-    }
-    img.src = imageDataUrl
-  }, [imageDataUrl])
-  
   // Responsive canvas size
   useEffect(() => {
     const updateSize = () => {
@@ -61,8 +50,17 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     return () => window.removeEventListener('resize', updateSize)
   }, [])
   
+  // Load and initialize image
+  useEffect(() => {
+    const img = new Image()
+    img.onload = () => {
+      imageRef.current = img
+    }
+    img.src = imageDataUrl
+  }, [imageDataUrl])
+  
   // Draw canvas with current transform
-  const drawCanvas = useCallback(() => {
+  useEffect(() => {
     const canvas = canvasRef.current
     const img = imageRef.current
     if (!canvas || !img) return
@@ -92,11 +90,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     
     // Restore context
     ctx.restore()
-  }, [transform])
-  
-  useEffect(() => {
-    drawCanvas()
-  }, [drawCanvas, canvasSize])
+  }, [transform, canvasSize])
   
   // Touch and mouse handlers
   const getTouchDistance = (touches: React.TouchList) => {
