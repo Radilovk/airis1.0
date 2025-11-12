@@ -226,6 +226,17 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               <CardDescription>
                 Изберете AI модел и конфигурирайте API достъп за анализ на ирисите
               </CardDescription>
+              {aiConfig && (
+                <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm font-medium text-primary">
+                    ✓ Активна конфигурация: {aiConfig.useCustomKey ? (
+                      <span className="font-mono">{aiConfig.provider} / {aiConfig.model}</span>
+                    ) : (
+                      <span className="font-mono">GitHub Spark (вграден модел)</span>
+                    )}
+                  </p>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
@@ -292,6 +303,15 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     />
                   </div>
 
+                  {!useCustomKey && (
+                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">
+                        ⚠️ <strong>Използва се GitHub Spark вграден модел</strong><br/>
+                        Анализът ще отнеме по-дълго време (90-150 сек.) и може да срещнете rate limit грешки при много заявки. За по-бързо и стабилно изпълнение, използвайте собствен API ключ.
+                      </p>
+                    </div>
+                  )}
+
                   {useCustomKey && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
@@ -317,6 +337,16 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                           : 'Вашият Google AI API ключ'
                         }
                       </p>
+                      <div className="mt-3 p-3 bg-accent/10 rounded-lg border border-accent/20">
+                        <p className="text-xs text-accent-foreground">
+                          💡 <strong>Предимства на собствен API ключ:</strong>
+                        </p>
+                        <ul className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-disc list-inside">
+                          <li>По-бързо време за анализ (30-60 сек. вместо 90-150 сек.)</li>
+                          <li>Без GitHub Spark rate limit ограничения</li>
+                          <li>Възможност за избор на различни модели (включително Gemini)</li>
+                        </ul>
+                      </div>
                     </motion.div>
                   )}
                 </div>

@@ -58,24 +58,108 @@ export default function AnalysisScreen({
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+  const callExternalAPI = async (
+    prompt: string,
+    provider: 'openai' | 'gemini',
+    model: string,
+    apiKey: string,
+    jsonMode: boolean = true
+  ): Promise<string> => {
+    addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}`)
+    
+    if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: jsonMode ? { type: 'json_object' } : undefined,
+          temperature: 0.7
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`OpenAI API грешка ${response.status}: ${errorText}`)
+      }
+
+      const data = await response.json()
+      return data.choices[0].message.content
+    } else {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: jsonMode 
+                ? `${prompt}\n\nВърни САМО валиден JSON обект, без допълнителен текст.`
+                : prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Gemini API грешка ${response.status}: ${errorText}`)
+      }
+
+      const data = await response.json()
+      return data.candidates[0].content.parts[0].text
+    }
+  }
+
   const callLLMWithRetry = async (
     prompt: string,
     modelName: string = 'gpt-4o',
     jsonMode: boolean = true,
-    maxRetries: number = 4
+    maxRetries: number = 3
   ): Promise<string> => {
     let lastError: Error | null = null
+    
+    const useCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey
+    const provider = aiConfig?.provider || 'openai'
+    const actualModel = aiConfig?.model || modelName
+    
+    if (useCustomAPI) {
+      addLog('info', `🔧 Режим: Собствен API (${provider} - ${actualModel})`)
+    } else {
+      addLog('info', `🔧 Режим: GitHub Spark вграден модел (${modelName})`)
+    }
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 1) {
-          const waitTime = Math.min(8000 * Math.pow(2, attempt - 2), 60000)
+          const waitTime = Math.min(10000 * Math.pow(2, attempt - 1), 60000)
           addLog('warning', `Изчакване ${(waitTime / 1000).toFixed(0)}s преди опит ${attempt}/${maxRetries}...`)
           await sleep(waitTime)
         }
         
         addLog('info', `LLM заявка (опит ${attempt}/${maxRetries})...`)
-        const response = await window.spark.llm(prompt, modelName, jsonMode)
+        
+        let response: string
+        if (useCustomAPI) {
+          response = await callExternalAPI(
+            prompt,
+            provider,
+            actualModel,
+            aiConfig!.apiKey,
+            jsonMode
+          )
+        } else {
+          response = await window.spark.llm(prompt, modelName, jsonMode)
+        }
         
         if (response && response.length > 0) {
           addLog('success', `LLM отговори успешно (${response.length} символа)`)
@@ -90,12 +174,12 @@ export default function AnalysisScreen({
         if (errorMsg.includes('429') || errorMsg.includes('Too many requests') || errorMsg.includes('rate limit')) {
           addLog('warning', `⏱️ Rate limit (429) - твърде много заявки! Опит ${attempt}/${maxRetries}`)
           if (attempt < maxRetries) {
-            const backoffTime = 45000 + (attempt * 15000)
+            const backoffTime = useCustomAPI ? 10000 : 90000
             addLog('info', `⏳ Изчакване ${(backoffTime / 1000).toFixed(0)}s преди повторен опит поради rate limit...`)
             await sleep(backoffTime)
             continue
           } else {
-            throw new Error('Rate limit достигнат след всички опити. Моля изчакайте 1-2 минути преди да опитате отново.')
+            throw new Error(`Rate limit достигнат след всички опити. ${useCustomAPI ? 'Проверете вашия API лимит.' : 'Моля изчакайте 2-3 минути преди да опитате отново.'}`)
           }
         } else {
           addLog('error', `LLM грешка (опит ${attempt}): ${errorMsg}`)
@@ -236,8 +320,9 @@ export default function AnalysisScreen({
       addLog('success', 'Ляв ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
       
-      addLog('info', '⏳ Изчакване 15 сек. за избягване на rate limit...')
-      await sleep(15000)
+      const waitTime = aiConfig?.useCustomKey ? 5000 : 30000
+      addLog('info', `⏳ Изчакване ${waitTime/1000} сек. за избягване на rate limit...`)
+      await sleep(waitTime)
       
       setProgress(40)
       setStatus('Анализиране на десен ирис...')
@@ -248,8 +333,9 @@ export default function AnalysisScreen({
       addLog('success', 'Десен ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
       
-      addLog('info', '⏳ Изчакване 15 сек. за избягване на rate limit...')
-      await sleep(15000)
+      const waitTime2 = aiConfig?.useCustomKey ? 5000 : 30000
+      addLog('info', `⏳ Изчакване ${waitTime2/1000} сек. за избягване на rate limit...`)
+      await sleep(waitTime2)
       
       setProgress(70)
       setStatus('Генериране на препоръки...')
@@ -264,8 +350,9 @@ export default function AnalysisScreen({
       addLog('success', `Препоръки генерирани успешно (${recommendations.length} бр.)`)
       console.log('✅ [АНАЛИЗ] Препоръки генерирани успешно:', recommendations)
       
-      addLog('info', '⏳ Изчакване 15 сек. за избягване на rate limit...')
-      await sleep(15000)
+      const waitTime3 = aiConfig?.useCustomKey ? 5000 : 30000
+      addLog('info', `⏳ Изчакване ${waitTime3/1000} сек. за избягване на rate limit...`)
+      await sleep(waitTime3)
       
       setProgress(90)
       setStatus('Подготовка на доклад...')
@@ -484,8 +571,9 @@ JSON:
       console.log('🤖 [ПРЕПОРЪКИ] Изпращане на prompt до LLM...')
       console.log('📄 [ПРЕПОРЪКИ] Prompt дължина:', prompt.length)
       
-      const modelToUse = aiConfig?.model || 'gpt-4o'
-      addLog('info', `Използван модел за препоръки: ${modelToUse}`)
+      const modelToUse = aiConfig?.useCustomKey ? (aiConfig?.model || 'gpt-4o') : 'gpt-4o'
+      const providerToUse = aiConfig?.provider || 'openai'
+      addLog('info', `📊 Конфигурация за препоръки: Provider=${providerToUse}, Model=${modelToUse}`)
       addLog('warning', 'Изчакване на отговор от AI модела...')
       const response = await callLLMWithRetry(prompt, modelToUse, true)
       
@@ -565,8 +653,9 @@ JSON:
       console.log('🤖 [РЕЗЮМЕ] Изпращане на prompt до LLM...')
       console.log('📄 [РЕЗЮМЕ] Prompt дължина:', prompt.length)
       
-      const modelToUse = aiConfig?.model || 'gpt-4o'
-      addLog('info', `Използван модел за резюме: ${modelToUse}`)
+      const modelToUse = aiConfig?.useCustomKey ? (aiConfig?.model || 'gpt-4o') : 'gpt-4o'
+      const providerToUse = aiConfig?.provider || 'openai'
+      addLog('info', `📊 Конфигурация за резюме: Provider=${providerToUse}, Model=${modelToUse}`)
       addLog('warning', 'Изчакване на отговор от AI модела...')
       const response = await callLLMWithRetry(prompt, modelToUse, false)
       
@@ -672,7 +761,9 @@ JSON:
                   </div>
                   <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      ℹ️ Процесът отнема 60-90 секунди. Приложението изчаква 15 секунди между заявките за избягване на лимити.
+                      ℹ️ {aiConfig?.useCustomKey 
+                        ? 'Процесът с ваш API ключ отнема 30-60 секунди.' 
+                        : 'Процесът с GitHub Spark модела отнема 90-150 секунди. Приложението изчаква 30 секунди между заявките за избягване на лимити.'}
                     </p>
                   </div>
                 </div>
