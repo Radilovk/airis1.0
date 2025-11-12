@@ -122,7 +122,6 @@ export default function AnalysisScreen({
 
   const callLLMWithRetry = async (
     prompt: string,
-    modelName: string = 'gpt-4o',
     jsonMode: boolean = true,
     maxRetries: number = 3
   ): Promise<string> => {
@@ -130,18 +129,18 @@ export default function AnalysisScreen({
     
     const useCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey
     const provider = aiConfig?.provider || 'openai'
-    const actualModel = aiConfig?.model || modelName
+    const actualModel = aiConfig?.model || 'gpt-4o'
     
     if (useCustomAPI) {
       addLog('info', `🔧 Режим: Собствен API (${provider} - ${actualModel})`)
     } else {
-      addLog('info', `🔧 Режим: GitHub Spark вграден модел (${modelName})`)
+      addLog('info', `🔧 Режим: GitHub Spark вграден модел (gpt-4o-mini за по-малко заявки)`)
     }
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 1) {
-          const waitTime = Math.min(10000 * Math.pow(2, attempt - 1), 60000)
+          const waitTime = useCustomAPI ? 5000 : Math.min(30000 * attempt, 120000)
           addLog('warning', `Изчакване ${(waitTime / 1000).toFixed(0)}s преди опит ${attempt}/${maxRetries}...`)
           await sleep(waitTime)
         }
@@ -158,7 +157,7 @@ export default function AnalysisScreen({
             jsonMode
           )
         } else {
-          response = await window.spark.llm(prompt, modelName, jsonMode)
+          response = await window.spark.llm(prompt, 'gpt-4o-mini', jsonMode)
         }
         
         if (response && response.length > 0) {
@@ -174,12 +173,12 @@ export default function AnalysisScreen({
         if (errorMsg.includes('429') || errorMsg.includes('Too many requests') || errorMsg.includes('rate limit')) {
           addLog('warning', `⏱️ Rate limit (429) - твърде много заявки! Опит ${attempt}/${maxRetries}`)
           if (attempt < maxRetries) {
-            const backoffTime = useCustomAPI ? 10000 : 90000
+            const backoffTime = useCustomAPI ? 15000 : 120000
             addLog('info', `⏳ Изчакване ${(backoffTime / 1000).toFixed(0)}s преди повторен опит поради rate limit...`)
             await sleep(backoffTime)
             continue
           } else {
-            throw new Error(`Rate limit достигнат след всички опити. ${useCustomAPI ? 'Проверете вашия API лимит.' : 'Моля изчакайте 2-3 минути преди да опитате отново.'}`)
+            throw new Error(`Rate limit достигнат след всички опити. ${useCustomAPI ? 'Проверете вашия API лимит.' : 'Моля изчакайте 3-5 минути преди да опитате отново.'}`)
           }
         } else {
           addLog('error', `LLM грешка (опит ${attempt}): ${errorMsg}`)
@@ -320,7 +319,7 @@ export default function AnalysisScreen({
       addLog('success', 'Ляв ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
       
-      const waitTime = aiConfig?.useCustomKey ? 5000 : 30000
+      const waitTime = aiConfig?.useCustomKey ? 3000 : 60000
       addLog('info', `⏳ Изчакване ${waitTime/1000} сек. за избягване на rate limit...`)
       await sleep(waitTime)
       
@@ -333,7 +332,7 @@ export default function AnalysisScreen({
       addLog('success', 'Десен ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
       
-      const waitTime2 = aiConfig?.useCustomKey ? 5000 : 30000
+      const waitTime2 = aiConfig?.useCustomKey ? 3000 : 60000
       addLog('info', `⏳ Изчакване ${waitTime2/1000} сек. за избягване на rate limit...`)
       await sleep(waitTime2)
       
@@ -350,7 +349,7 @@ export default function AnalysisScreen({
       addLog('success', `Препоръки генерирани успешно (${recommendations.length} бр.)`)
       console.log('✅ [АНАЛИЗ] Препоръки генерирани успешно:', recommendations)
       
-      const waitTime3 = aiConfig?.useCustomKey ? 5000 : 30000
+      const waitTime3 = aiConfig?.useCustomKey ? 3000 : 60000
       addLog('info', `⏳ Изчакване ${waitTime3/1000} сек. за избягване на rate limit...`)
       await sleep(waitTime3)
       
@@ -473,11 +472,8 @@ JSON формат:
       console.log(`🤖 [ИРИС ${side}] Изпращане на prompt до LLM...`)
       console.log(`📄 [ИРИС ${side}] Prompt дължина: ${prompt.length} символа`)
       
-      const modelToUse = aiConfig?.model || 'gpt-4o'
-      addLog('info', `Използван модел: ${modelToUse}`)
-      
       addLog('warning', 'Изчакване на отговор от AI модела... (това може да отнеме 10-30 сек)')
-      const response = await callLLMWithRetry(prompt, modelToUse, true)
+      const response = await callLLMWithRetry(prompt, true)
       
       addLog('success', `Получен отговор от LLM (${response.length} символа)`)
       console.log(`✅ [ИРИС ${side}] Получен отговор от LLM`)
@@ -571,11 +567,8 @@ JSON:
       console.log('🤖 [ПРЕПОРЪКИ] Изпращане на prompt до LLM...')
       console.log('📄 [ПРЕПОРЪКИ] Prompt дължина:', prompt.length)
       
-      const modelToUse = aiConfig?.useCustomKey ? (aiConfig?.model || 'gpt-4o') : 'gpt-4o'
-      const providerToUse = aiConfig?.provider || 'openai'
-      addLog('info', `📊 Конфигурация за препоръки: Provider=${providerToUse}, Model=${modelToUse}`)
       addLog('warning', 'Изчакване на отговор от AI модела...')
-      const response = await callLLMWithRetry(prompt, modelToUse, true)
+      const response = await callLLMWithRetry(prompt, true)
       
       addLog('success', `Получен отговор (${response.length} символа)`)
       console.log('✅ [ПРЕПОРЪКИ] Получен отговор от LLM')
@@ -653,11 +646,8 @@ JSON:
       console.log('🤖 [РЕЗЮМЕ] Изпращане на prompt до LLM...')
       console.log('📄 [РЕЗЮМЕ] Prompt дължина:', prompt.length)
       
-      const modelToUse = aiConfig?.useCustomKey ? (aiConfig?.model || 'gpt-4o') : 'gpt-4o'
-      const providerToUse = aiConfig?.provider || 'openai'
-      addLog('info', `📊 Конфигурация за резюме: Provider=${providerToUse}, Model=${modelToUse}`)
       addLog('warning', 'Изчакване на отговор от AI модела...')
-      const response = await callLLMWithRetry(prompt, modelToUse, false)
+      const response = await callLLMWithRetry(prompt, false)
       
       addLog('success', `Получено резюме (${response.length} символа)`)
       console.log('✅ [РЕЗЮМЕ] Получен отговор от LLM')
@@ -762,8 +752,8 @@ JSON:
                   <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       ℹ️ {aiConfig?.useCustomKey 
-                        ? 'Процесът с ваш API ключ отнема 30-60 секунди.' 
-                        : 'Процесът с GitHub Spark модела отнема 90-150 секунди. Приложението изчаква 30 секунди между заявките за избягване на лимити.'}
+                        ? `Процесът с вашия ${aiConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI'} API ключ отнема 30-60 секунди.` 
+                        : 'Процесът с GitHub Spark модела (gpt-4o-mini) отнема 4-6 минути. Приложението изчаква 60 секунди между заявките за избягване на rate limit.'}
                     </p>
                   </div>
                 </div>
