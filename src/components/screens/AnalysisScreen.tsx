@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, IridologyTextbook } from '@/types'
+import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -39,8 +40,6 @@ export default function AnalysisScreen({
     apiKey: '',
     useCustomKey: false
   })
-  
-  const [textbooks] = useKV<IridologyTextbook[]>('iridology-textbooks', [])
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
@@ -458,15 +457,21 @@ ${response}
       console.log(`📝 [ИРИС ${side}] BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] Цели: ${goalsText}`)
       
-      let textbookContext = ''
-      if (textbooks && textbooks.length > 0) {
-        addLog('info', `Зареждане на ${textbooks.length} учебника/учебници за контекст...`)
-        textbookContext = '\n\nРЕФЕРЕНТНИ МАТЕРИАЛИ ПО ИРИДОЛОГИЯ:\n\n'
-        textbooks.forEach((tb) => {
-          textbookContext += `--- ${tb.name} ---\n${tb.content.substring(0, 2000)}\n\n`
-        })
-        addLog('success', `Учебници заредени (${textbookContext.length} символа)`)
-      }
+      addLog('info', 'Използване на AIRIS база знания за контекст...')
+      const knowledgeContext = `
+РЕФЕРЕНТНА КАРТА НА ИРИСА (по часовника):
+${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}: ${z.organ} (${z.system})`).join(', ')}
+
+АРТЕФАКТИ И ТЕХНИТЕ ЗНАЧЕНИЯ:
+${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}: ${a.interpretation}`).join('\n')}
+
+ПРЕПОРЪКИ ЗА СИСТЕМИ:
+Храносмилателна: ${AIRIS_KNOWLEDGE.systemAnalysis.digestive.recommendations.join(', ')}
+Имунна: ${AIRIS_KNOWLEDGE.systemAnalysis.immune.recommendations.join(', ')}
+Нервна: ${AIRIS_KNOWLEDGE.systemAnalysis.nervous.recommendations.join(', ')}
+Детоксикация: ${AIRIS_KNOWLEDGE.systemAnalysis.detox.recommendations.join(', ')}
+`
+      addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
       addLog('info', 'Подготовка на prompt за LLM...')
       const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си иридолог. Анализирай ${sideName} ирис.
@@ -474,7 +479,8 @@ ${response}
 Пациент: Възраст ${questionnaire.age}, Пол ${genderName}, BMI ${bmi}
 Цели: ${goalsText}
 Оплаквания: ${complaintsText}
-${textbookContext}
+
+${knowledgeContext}
 
 Анализирай 8-12 зони по часовника (12:00 горе): Мозък, Щитовидна, Белодробна, Черен дроб, Стомах, Дебело черво, Урогенитална, Бъбреци, Далак, Сърце, Ендокринна, Нервна.
 
