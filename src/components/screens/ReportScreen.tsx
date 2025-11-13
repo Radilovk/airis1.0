@@ -11,7 +11,7 @@ import {
   ClipboardText
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { jsPDF } from 'jspdf'
+import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import OverviewTab from '@/components/report/tabs/OverviewTab'
 import IridologyTab from '@/components/report/tabs/IridologyTab'
@@ -26,8 +26,9 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
   const [activeTab, setActiveTab] = useState('overview')
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
+      const jsPDF = (await import('jspdf')).jsPDF
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
       const margin = 20
@@ -77,7 +78,7 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
 
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      const summaryLines = doc.splitTextToSize(report.summary, pageWidth - 2 * margin)
+      const summaryLines = doc.splitTextToSize(report.briefSummary || report.summary, pageWidth - 2 * margin)
       summaryLines.forEach((line: string) => {
         if (yPos > 270) {
           doc.addPage()
@@ -179,33 +180,52 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
         yPos = 20
       }
 
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ПРЕПОРЪКИ', margin, yPos)
-      yPos += 7
-
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      report.recommendations.forEach((rec) => {
-        if (yPos > 270) {
-          doc.addPage()
-          yPos = 20
-        }
+      if (report.detailedPlan) {
+        doc.setFontSize(12)
         doc.setFont('helvetica', 'bold')
-        doc.text(`${rec.title} (${rec.category === 'diet' ? 'Хранене' : rec.category === 'supplement' ? 'Добавка' : 'Начин на живот'})`, margin, yPos)
-        yPos += 4
-        doc.setFont('helvetica', 'normal')
-        const recLines = doc.splitTextToSize(rec.description, pageWidth - 2 * margin - 5)
-        recLines.forEach((line: string) => {
-          if (yPos > 270) {
+        doc.text('ХРАНИТЕЛНИ ПРЕПОРЪКИ', margin, yPos)
+        yPos += 7
+
+        if (report.detailedPlan.recommendedFoods.length > 0) {
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'bold')
+          doc.text('Препоръчителни храни:', margin, yPos)
+          yPos += 5
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'normal')
+          report.detailedPlan.recommendedFoods.slice(0, 10).forEach((food) => {
+            if (yPos > 270) {
+              doc.addPage()
+              yPos = 20
+            }
+            doc.text(`✓ ${food}`, margin + 5, yPos)
+            yPos += 4
+          })
+          yPos += 3
+        }
+
+        if (report.detailedPlan.avoidFoods.length > 0) {
+          if (yPos > 250) {
             doc.addPage()
             yPos = 20
           }
-          doc.text(line, margin + 5, yPos)
-          yPos += 4
-        })
-        yPos += 2
-      })
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'bold')
+          doc.text('Храни за избягване:', margin, yPos)
+          yPos += 5
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'normal')
+          report.detailedPlan.avoidFoods.slice(0, 10).forEach((food) => {
+            if (yPos > 270) {
+              doc.addPage()
+              yPos = 20
+            }
+            doc.text(`✗ ${food}`, margin + 5, yPos)
+            yPos += 4
+          })
+          yPos += 5
+        }
+      }
 
       if (yPos > 260) {
         doc.addPage()
@@ -244,62 +264,112 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <FileText size={20} weight="duotone" className="text-primary" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-base font-bold truncate">Иридологичен Доклад</h1>
-                <p className="text-xs text-muted-foreground truncate">
-                  {new Date(report.timestamp).toLocaleDateString('bg-BG', { 
-                    day: 'numeric', 
-                    month: 'short'
-                  })}
-                </p>
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-20">
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
+        <div className="container max-w-5xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <motion.div 
+                className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center flex-shrink-0 shadow-lg"
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
+                <FileText size={24} weight="duotone" className="text-primary-foreground" />
+              </motion.div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  Иридологичен Доклад
+                </h1>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{report.questionnaireData.name}</span>
+                  <span>•</span>
+                  <span>
+                    {new Date(report.timestamp).toLocaleDateString('bg-BG', { 
+                      day: 'numeric', 
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex gap-1.5 flex-shrink-0">
-              <Button variant="ghost" size="sm" onClick={handleShare} className="h-8 w-8 p-0">
-                <Share size={16} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleExport} className="h-8 w-8 p-0">
-                <Download size={16} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={onRestart} className="h-8 w-8 p-0">
-                <ArrowClockwise size={16} />
-              </Button>
+            <div className="flex gap-2 flex-shrink-0">
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleShare} 
+                  className="h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
+                >
+                  <Share size={18} />
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleExport} 
+                  className="h-9 w-9 p-0 hover:bg-accent/10 hover:text-accent transition-colors"
+                >
+                  <Download size={18} />
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onRestart} 
+                  className="h-9 w-9 p-0 hover:bg-muted transition-colors"
+                >
+                  <ArrowClockwise size={18} />
+                </Button>
+              </motion.div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container max-w-4xl mx-auto px-4 py-6">
+      <div className="container max-w-5xl mx-auto px-4 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/20 to-primary/10 mb-4 shadow-lg">
+              <span className="text-3xl font-bold bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent">
+                {avgHealth}
+              </span>
+            </div>
+            <h2 className="text-xl font-bold mb-2">Общо здравословно състояние</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Вашият иридологичен профил е анализиран и оценен на база множество здравни показатели
+            </p>
+          </div>
+        </motion.div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50">
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1.5 bg-muted/50 rounded-xl shadow-inner">
             <TabsTrigger 
               value="overview" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
-              <Target size={20} weight="duotone" />
-              <span className="text-xs font-medium">Общо състояние</span>
+              <Target size={22} weight="duotone" />
+              <span className="text-xs font-semibold">Общо състояние</span>
             </TabsTrigger>
             <TabsTrigger 
               value="iridology" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
-              <Activity size={20} weight="duotone" />
-              <span className="text-xs font-medium">Анализ</span>
+              <Activity size={22} weight="duotone" />
+              <span className="text-xs font-semibold">Анализ</span>
             </TabsTrigger>
             <TabsTrigger 
               value="plan" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
             >
-              <ClipboardText size={20} weight="duotone" />
-              <span className="text-xs font-medium">План</span>
+              <ClipboardText size={22} weight="duotone" />
+              <span className="text-xs font-semibold">План</span>
             </TabsTrigger>
           </TabsList>
 

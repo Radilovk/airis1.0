@@ -15,7 +15,9 @@ import {
   Flask,
   Lightbulb,
   AppleLogo,
-  WarningCircle
+  WarningCircle,
+  CheckCircle,
+  XCircle
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AnalysisReport, SupplementRecommendation } from '@/types'
@@ -74,9 +76,9 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'general',
-                title: 'Общи Препоръки',
+                title: 'Общи Препоръки (топ 3)',
                 icon: Lightbulb,
-                content: detailedPlan.generalRecommendations
+                content: detailedPlan.generalRecommendations.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -101,7 +103,7 @@ export default function PlanTab({ report }: PlanTabProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
-            <SupplementsSection supplements={detailedPlan.supplements} />
+            <SupplementsSection supplements={detailedPlan.supplements.slice(0, 3)} />
           </motion.div>
         )}
 
@@ -114,9 +116,9 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'psychological',
-                title: 'Психологически Препоръки',
+                title: 'Психологически Препоръки (топ 3)',
                 icon: Brain,
-                content: detailedPlan.psychologicalRecommendations
+                content: detailedPlan.psychologicalRecommendations.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -131,9 +133,9 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'special',
-                title: 'Специални (Индивидуални) Препоръки',
+                title: 'Специални (Индивидуални) Препоръки (топ 3)',
                 icon: Leaf,
-                content: detailedPlan.specialRecommendations
+                content: detailedPlan.specialRecommendations.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -148,9 +150,9 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'tests',
-                title: 'Препоръчителни Конкретни Изследвания',
+                title: 'Препоръчителни Конкретни Изследвания (топ 3)',
                 icon: Flask,
-                content: detailedPlan.recommendedTests
+                content: detailedPlan.recommendedTests.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -283,6 +285,9 @@ function FoodRecommendationsSection({
   avoidFoods: string[] 
 }) {
   const [isOpen, setIsOpen] = useState(true)
+  
+  const topRecommended = recommendedFoods.slice(0, 3)
+  const topAvoid = avoidFoods.slice(0, 3)
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -308,44 +313,44 @@ function FoodRecommendationsSection({
         
         <CollapsibleContent>
           <div className="px-4 pb-4 pt-2 space-y-4">
-            {recommendedFoods.length > 0 && (
+            {topRecommended.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-md bg-green-100 flex items-center justify-center flex-shrink-0">
-                    <AppleLogo size={14} weight="duotone" className="text-green-700" />
+                    <CheckCircle size={16} weight="fill" className="text-green-700" />
                   </div>
-                  <h5 className="font-semibold text-sm text-green-900">Препоръчителни Храни</h5>
+                  <h5 className="font-semibold text-sm text-green-900">Препоръчителни Храни (топ 3)</h5>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {recommendedFoods.map((food, idx) => (
+                <div className="space-y-2">
+                  {topRecommended.map((food, idx) => (
                     <div 
                       key={idx} 
-                      className="flex items-center gap-2 p-2.5 bg-green-50 rounded-lg border border-green-100"
+                      className="flex items-start gap-2.5 p-3 bg-green-50 rounded-lg border border-green-200"
                     >
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-600 flex-shrink-0" />
-                      <span className="text-xs text-green-900 leading-tight">{food}</span>
+                      <CheckCircle size={18} weight="fill" className="text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-green-900 leading-relaxed">{food}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
             
-            {avoidFoods.length > 0 && (
+            {topAvoid.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-md bg-red-100 flex items-center justify-center flex-shrink-0">
-                    <WarningCircle size={14} weight="duotone" className="text-red-700" />
+                    <XCircle size={16} weight="fill" className="text-red-700" />
                   </div>
-                  <h5 className="font-semibold text-sm text-red-900">Храни за Избягване</h5>
+                  <h5 className="font-semibold text-sm text-red-900">Храни за Избягване (топ 3)</h5>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {avoidFoods.map((food, idx) => (
+                <div className="space-y-2">
+                  {topAvoid.map((food, idx) => (
                     <div 
                       key={idx} 
-                      className="flex items-center gap-2 p-2.5 bg-red-50 rounded-lg border border-red-100"
+                      className="flex items-start gap-2.5 p-3 bg-red-50 rounded-lg border border-red-200"
                     >
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-600 flex-shrink-0" />
-                      <span className="text-xs text-red-900 leading-tight">{food}</span>
+                      <XCircle size={18} weight="fill" className="text-red-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-red-900 leading-relaxed">{food}</span>
                     </div>
                   ))}
                 </div>
