@@ -18,6 +18,49 @@ export interface QuestionnaireData {
   allergies: string
   medications: string
   complaints: string
+  healthStatus: string[]
+  uploadedDocuments?: UploadedDocument[]
+  customAnswers?: Record<string, any>
+}
+
+export interface UploadedDocument {
+  id: string
+  name: string
+  dataUrl: string
+  type: string
+  size: number
+  uploadDate: string
+}
+
+export type QuestionType = 'text' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'dropdown' | 'slider' | 'file'
+
+export interface QuestionOption {
+  value: string
+  label: string
+}
+
+export interface QuestionConfig {
+  id: string
+  type: QuestionType
+  question: string
+  description?: string
+  required: boolean
+  options?: QuestionOption[]
+  allowOther?: boolean
+  validation?: {
+    min?: number
+    max?: number
+    pattern?: string
+  }
+  conditionalOn?: {
+    questionId: string
+    value: any
+  }
+}
+
+export interface QuestionnaireConfig {
+  questions: QuestionConfig[]
+  version: string
 }
 
 export interface IrisImage {

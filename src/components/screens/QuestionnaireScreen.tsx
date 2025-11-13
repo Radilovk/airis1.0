@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useKV } from '@github/spark/hooks'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -8,656 +9,537 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { 
   ArrowRight, 
   ArrowLeft, 
-  User, 
-  Target, 
-  Activity,
-  Heartbeat,
-  ForkKnife,
-  Pill
+  CheckCircle,
+  Upload,
+  X,
+  File
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import type { QuestionnaireData } from '@/types'
+import type { QuestionnaireData, QuestionConfig, QuestionnaireConfig, UploadedDocument } from '@/types'
+import { defaultQuestions } from '@/lib/defaultQuestions'
 
 interface QuestionnaireScreenProps {
   onComplete: (data: QuestionnaireData) => void
   initialData: QuestionnaireData | null
 }
 
-const defaultData: Partial<QuestionnaireData> = {
-  name: '',
-  goals: [],
-  dietaryProfile: [],
-  dietaryHabits: [],
-  complaints: '',
-  medicalConditions: '',
-  familyHistory: '',
-  foodIntolerances: '',
-  allergies: '',
-  medications: '',
-  activityLevel: 'moderate',
-  stressLevel: 'moderate',
-  sleepHours: 7,
-  sleepQuality: 'good',
-  hydration: 8
-}
-
 export default function QuestionnaireScreen({ onComplete, initialData }: QuestionnaireScreenProps) {
-  const [step, setStep] = useState(1)
-  const [data, setData] = useState<Partial<QuestionnaireData>>(initialData || defaultData)
+  const [questionnaireConfig] = useKV<QuestionnaireConfig>('questionnaire-config', {
+    questions: defaultQuestions,
+    version: '1.0'
+  })
 
-  const healthGoals = [
-    'Отслабване',
-    'Общ тонус',
-    'Антиейджинг',
-    'Здраве',
-    'Увеличаване на енергията',
-    'Укрепване на имунната система',
-    'Намаляване на стреса',
-    'Подобряване на съня',
-    'Детоксикация',
-    'Подобряване на храносмилането'
-  ]
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, any>>(() => {
+    if (initialData) {
+      return {
+        ...initialData,
+        customAnswers: initialData.customAnswers || {},
+        uploadedDocuments: initialData.uploadedDocuments || []
+      }
+    }
+    return {}
+  })
+  const [otherValues, setOtherValues] = useState<Record<string, string>>({})
+  const [showOther, setShowOther] = useState<Record<string, boolean>>({})
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedDocument[]>(
+    initialData?.uploadedDocuments || []
+  )
 
-  const dietaryProfiles = [
-    'Вегетариански',
-    'Веган',
-    'Интермитентен фастинг',
-    'Кето',
-    'Средиземноморска',
-    'Безглутенова',
-    'Нисковъглехидратна',
-    'Друго'
-  ]
+  const questions = questionnaireConfig?.questions || defaultQuestions
+  const currentQuestion = questions[currentQuestionIndex]
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100
 
-  const dietaryHabits = [
-    'Бърза храна',
-    'Сладки храни',
-    'Алкохол',
-    'Нередовност в храненето',
-    'Прескачане на закуска',
-    'Късно хранене',
-    'Газирани напитки'
-  ]
+  const validateAnswer = (question: QuestionConfig, value: any): boolean => {
+    if (question.type === 'file') {
+      return true
+    }
 
-  const totalSteps = 6
-  const progress = (step / totalSteps) * 100
+    if (question.required && (value === undefined || value === null || value === '')) {
+      toast.error('Това поле е задължително')
+      return false
+    }
+
+    if (question.required && Array.isArray(value) && value.length === 0) {
+      toast.error('Моля, изберете поне една опция')
+      return false
+    }
+
+    if (question.type === 'number' && question.validation) {
+      const numValue = Number(value)
+      if (question.validation.min !== undefined && numValue < question.validation.min) {
+        toast.error(`Стойността трябва да бъде поне ${question.validation.min}`)
+        return false
+      }
+      if (question.validation.max !== undefined && numValue > question.validation.max) {
+        toast.error(`Стойността трябва да бъде максимум ${question.validation.max}`)
+        return false
+      }
+    }
+
+    if (question.type === 'text' && question.validation?.min) {
+      const textValue = String(value || '')
+      if (textValue.length < question.validation.min) {
+        toast.error(`Моля, въведете поне ${question.validation.min} символа`)
+        return false
+      }
+    }
+
+    return true
+  }
 
   const handleNext = () => {
-    if (step === 1) {
-      if (!data.name || !data.age || !data.gender || !data.weight || !data.height) {
-        toast.error('Моля, попълнете всички задължителни полета')
-        return
-      }
-      if (data.age < 1 || data.age > 120) {
-        toast.error('Моля, въведете валидна възраст')
-        return
-      }
-      if (data.weight < 20 || data.weight > 300) {
-        toast.error('Моля, въведете валидно тегло')
-        return
-      }
-      if (data.height < 50 || data.height > 250) {
-        toast.error('Моля, въведете валиден ръст')
-        return
+    const answer = answers[currentQuestion.id]
+    
+    if (!validateAnswer(currentQuestion, answer)) {
+      return
+    }
+
+    if (showOther[currentQuestion.id] && otherValues[currentQuestion.id]) {
+      const otherValue = otherValues[currentQuestion.id]
+      if (Array.isArray(answer)) {
+        setAnswers({
+          ...answers,
+          [currentQuestion.id]: [...answer.filter(v => v !== 'other'), otherValue]
+        })
       }
     }
 
-    if (step === 2) {
-      if (!data.goals || data.goals.length === 0) {
-        toast.error('Моля, изберете поне една цел')
-        return
-      }
-    }
-
-    if (step < totalSteps) {
-      setStep(step + 1)
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
     } else {
-      onComplete(data as QuestionnaireData)
+      completeQuestionnaire()
     }
   }
 
-  const toggleArrayItem = (array: string[] | undefined, item: string) => {
-    const current = array || []
-    if (current.includes(item)) {
-      return current.filter(i => i !== item)
+  const handleBack = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1)
+    }
+  }
+
+  const completeQuestionnaire = () => {
+    const finalData: QuestionnaireData = {
+      name: answers.name || '',
+      age: Number(answers.age) || 0,
+      gender: answers.gender || 'other',
+      weight: Number(answers.weight) || 0,
+      height: Number(answers.height) || 0,
+      goals: answers.goals || [],
+      healthStatus: answers.healthStatus || [],
+      complaints: answers.complaints || '',
+      medicalConditions: answers.medicalConditions || '',
+      familyHistory: answers.familyHistory || '',
+      activityLevel: answers.activityLevel || 'moderate',
+      stressLevel: answers.stressLevel || 'moderate',
+      sleepHours: Number(answers.sleepHours) || 7,
+      sleepQuality: answers.sleepQuality || 'good',
+      hydration: Number(answers.hydration) || 8,
+      dietaryProfile: answers.dietaryProfile || [],
+      dietaryHabits: answers.dietaryHabits || [],
+      foodIntolerances: answers.foodIntolerances || '',
+      allergies: answers.allergies || '',
+      medications: answers.medications || '',
+      uploadedDocuments: uploadedFiles,
+      customAnswers: answers
+    }
+
+    onComplete(finalData)
+  }
+
+  const handleCheckboxChange = (questionId: string, value: string, checked: boolean) => {
+    const current = (answers[questionId] || []) as string[]
+    
+    if (value === 'other') {
+      setShowOther({ ...showOther, [questionId]: checked })
+      if (!checked) {
+        setOtherValues({ ...otherValues, [questionId]: '' })
+      }
+    }
+    
+    if (checked) {
+      setAnswers({ ...answers, [questionId]: [...current, value] })
     } else {
-      return [...current, item]
+      setAnswers({ ...answers, [questionId]: current.filter(v => v !== value) })
     }
   }
 
-  const getStepIcon = () => {
-    switch (step) {
-      case 1: return <User size={24} weight="duotone" className="text-primary" />
-      case 2: return <Target size={24} weight="duotone" className="text-primary" />
-      case 3: return <Heartbeat size={24} weight="duotone" className="text-primary" />
-      case 4: return <Activity size={24} weight="duotone" className="text-primary" />
-      case 5: return <ForkKnife size={24} weight="duotone" className="text-primary" />
-      case 6: return <Pill size={24} weight="duotone" className="text-primary" />
-      default: return <User size={24} weight="duotone" className="text-primary" />
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    const newFiles: UploadedDocument[] = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`Файлът ${file.name} е твърде голям (макс. 10MB)`)
+        continue
+      }
+
+      try {
+        const reader = new FileReader()
+        const fileData = await new Promise<string>((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target?.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+        const doc: UploadedDocument = {
+          id: `doc-${Date.now()}-${i}`,
+          name: file.name,
+          dataUrl: fileData,
+          type: file.type,
+          size: file.size,
+          uploadDate: new Date().toISOString()
+        }
+
+        newFiles.push(doc)
+      } catch (error) {
+        console.error('Error reading file:', error)
+        toast.error(`Грешка при четене на ${file.name}`)
+      }
+    }
+
+    setUploadedFiles([...uploadedFiles, ...newFiles])
+    toast.success(`Качени ${newFiles.length} файла`)
+  }
+
+  const removeFile = (id: string) => {
+    setUploadedFiles(uploadedFiles.filter(f => f.id !== id))
+    toast.success('Файлът е премахнат')
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  const renderQuestion = () => {
+    const question = currentQuestion
+    const value = answers[question.id]
+
+    switch (question.type) {
+      case 'text':
+        return (
+          <div className="space-y-2">
+            <Input
+              id={question.id}
+              type="text"
+              placeholder="Въведете отговор..."
+              value={value || ''}
+              onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+              className="text-lg h-12"
+              autoFocus
+            />
+          </div>
+        )
+
+      case 'number':
+        return (
+          <div className="space-y-2">
+            <Input
+              id={question.id}
+              type="number"
+              placeholder="Въведете число..."
+              value={value || ''}
+              onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+              className="text-lg h-12"
+              autoFocus
+              min={question.validation?.min}
+              max={question.validation?.max}
+            />
+          </div>
+        )
+
+      case 'textarea':
+        return (
+          <div className="space-y-2">
+            <Textarea
+              id={question.id}
+              placeholder="Въведете отговор..."
+              value={value || ''}
+              onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+              className="min-h-[150px] text-base resize-none"
+              autoFocus
+            />
+          </div>
+        )
+
+      case 'radio':
+        return (
+          <RadioGroup
+            value={value}
+            onValueChange={(val) => setAnswers({ ...answers, [question.id]: val })}
+            className="space-y-3"
+          >
+            {question.options?.map((option) => (
+              <div
+                key={option.value}
+                className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  value === option.value
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                }`}
+                onClick={() => setAnswers({ ...answers, [question.id]: option.value })}
+              >
+                <RadioGroupItem value={option.value} id={option.value} className="mt-0.5" />
+                <Label htmlFor={option.value} className="font-normal cursor-pointer flex-1 leading-snug">
+                  {option.label}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        )
+
+      case 'checkbox':
+        return (
+          <div className="space-y-3">
+            {question.options?.map((option) => (
+              <div
+                key={option.value}
+                className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  (value as string[])?.includes(option.value)
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                }`}
+                onClick={() => {
+                  const isChecked = (value as string[])?.includes(option.value)
+                  handleCheckboxChange(question.id, option.value, !isChecked)
+                }}
+              >
+                <Checkbox
+                  checked={(value as string[])?.includes(option.value)}
+                  className="mt-0.5"
+                  onCheckedChange={(checked) => handleCheckboxChange(question.id, option.value, !!checked)}
+                />
+                <Label className="font-normal cursor-pointer flex-1 leading-snug">
+                  {option.label}
+                </Label>
+              </div>
+            ))}
+            
+            {question.allowOther && (
+              <>
+                <div
+                  className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    showOther[question.id]
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                  }`}
+                  onClick={() => handleCheckboxChange(question.id, 'other', !showOther[question.id])}
+                >
+                  <Checkbox
+                    checked={showOther[question.id]}
+                    className="mt-0.5"
+                    onCheckedChange={(checked) => handleCheckboxChange(question.id, 'other', !!checked)}
+                  />
+                  <Label className="font-normal cursor-pointer flex-1 leading-snug">
+                    Друго
+                  </Label>
+                </div>
+                
+                {showOther[question.id] && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="pl-10"
+                  >
+                    <Input
+                      placeholder="Опишете..."
+                      value={otherValues[question.id] || ''}
+                      onChange={(e) => setOtherValues({ ...otherValues, [question.id]: e.target.value })}
+                      className="mt-2"
+                    />
+                  </motion.div>
+                )}
+              </>
+            )}
+          </div>
+        )
+
+      case 'slider':
+        const sliderValue = value !== undefined ? Number(value) : (question.validation?.min || 0)
+        return (
+          <div className="space-y-6 pt-4">
+            <div className="flex items-center justify-center">
+              <div className="text-5xl font-bold text-primary">
+                {sliderValue}
+              </div>
+            </div>
+            <Slider
+              value={[sliderValue]}
+              onValueChange={(val) => setAnswers({ ...answers, [question.id]: val[0] })}
+              min={question.validation?.min || 0}
+              max={question.validation?.max || 100}
+              step={0.5}
+              className="py-4"
+            />
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{question.validation?.min || 0}</span>
+              <span>{question.validation?.max || 100}</span>
+            </div>
+          </div>
+        )
+
+      case 'file':
+        return (
+          <div className="space-y-4">
+            <Label htmlFor="file-upload" className="cursor-pointer">
+              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-all">
+                <Upload className="w-12 h-12 text-muted-foreground mb-3" />
+                <p className="text-sm font-medium mb-1">Качете файлове</p>
+                <p className="text-xs text-muted-foreground">PDF, JPG, PNG (макс. 10MB)</p>
+              </div>
+              <Input
+                id="file-upload"
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </Label>
+
+            {uploadedFiles.length > 0 && (
+              <ScrollArea className="h-[200px] rounded-lg border p-3">
+                <div className="space-y-2">
+                  {uploadedFiles.map((file) => (
+                    <motion.div
+                      key={file.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <File className="w-8 h-8 text-primary flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{file.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              {formatFileSize(file.size)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFile(file.id)}
+                        className="flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        )
+
+      default:
+        return null
     }
   }
 
-  const getStepTitle = () => {
-    switch (step) {
-      case 1: return 'Лични Данни'
-      case 2: return 'Цели'
-      case 3: return 'Здравен Статус'
-      case 4: return 'Начин на Живот'
-      case 5: return 'Хранителен Профил'
-      case 6: return 'Медикаменти'
-      default: return 'Въпросник'
-    }
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="p-8 max-w-md w-full text-center">
+          <p className="text-muted-foreground">Зареждане на въпросника...</p>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
-      <div className="max-w-3xl w-full">
+      <div className="max-w-2xl w-full">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              {getStepIcon()}
-            </div>
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-2xl font-bold">{getStepTitle()}</h2>
-              <p className="text-muted-foreground">Стъпка {step} от {totalSteps}</p>
+              <p className="text-sm text-muted-foreground">
+                Въпрос {currentQuestionIndex + 1} от {questions.length}
+              </p>
             </div>
+            <Badge variant="outline" className="gap-1">
+              <CheckCircle className="w-3 h-3" />
+              {currentQuestionIndex} / {questions.length}
+            </Badge>
           </div>
           <Progress value={progress} className="h-2" />
         </motion.div>
 
         <Card className="p-6 md:p-8">
           <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">Основна Информация</h3>
-                  <p className="text-sm text-muted-foreground">Въведете вашите основни данни</p>
-                </div>
+            <motion.div
+              key={currentQuestion.id}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              <div className="space-y-2">
+                <h2 className="text-2xl md:text-3xl font-bold">
+                  {currentQuestion.question}
+                  {currentQuestion.required && <span className="text-destructive ml-1">*</span>}
+                </h2>
+                {currentQuestion.description && (
+                  <p className="text-muted-foreground">{currentQuestion.description}</p>
+                )}
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="name">Име *</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Вашето име"
-                    value={data.name || ''}
-                    onChange={(e) => setData({ ...data, name: e.target.value })}
-                    className="text-base"
-                  />
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Възраст *</Label>
-                    <Input
-                      id="age"
-                      type="number"
-                      placeholder="напр. 35"
-                      value={data.age || ''}
-                      onChange={(e) => setData({ ...data, age: parseInt(e.target.value) || 0 })}
-                      className="text-base"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Пол *</Label>
-                    <RadioGroup
-                      value={data.gender}
-                      onValueChange={(value) => setData({ ...data, gender: value as any })}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="male" id="male" />
-                        <Label htmlFor="male" className="font-normal cursor-pointer">Мъж</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="female" id="female" />
-                        <Label htmlFor="female" className="font-normal cursor-pointer">Жена</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="other" id="other" />
-                        <Label htmlFor="other" className="font-normal cursor-pointer">Друго</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Тегло (кг) *</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      placeholder="напр. 70"
-                      value={data.weight || ''}
-                      onChange={(e) => setData({ ...data, weight: parseInt(e.target.value) || 0 })}
-                      className="text-base"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Ръст (см) *</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      placeholder="напр. 175"
-                      value={data.height || ''}
-                      onChange={(e) => setData({ ...data, height: parseInt(e.target.value) || 0 })}
-                      className="text-base"
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">Здравни Цели</h3>
-                  <p className="text-sm text-muted-foreground">Изберете една или повече цели *</p>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-3">
-                  {healthGoals.map((goal) => (
-                    <div
-                      key={goal}
-                      className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.goals?.includes(goal)
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50 hover:bg-muted/30'
-                      }`}
-                      onClick={() => setData({ ...data, goals: toggleArrayItem(data.goals, goal) })}
-                    >
-                      <Checkbox
-                        checked={data.goals?.includes(goal)}
-                        className="mt-0.5"
-                      />
-                      <Label className="font-normal cursor-pointer leading-snug flex-1">
-                        {goal}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
-            {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">Здравен Статус</h3>
-                  <p className="text-sm text-muted-foreground">Споделете информация за вашето здраве</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="medicalConditions">Медицински и Здравен Статус</Label>
-                  <Textarea
-                    id="medicalConditions"
-                    placeholder="напр. Хипертония, диабет, хормонални проблеми..."
-                    value={data.medicalConditions || ''}
-                    onChange={(e) => setData({ ...data, medicalConditions: e.target.value })}
-                    rows={3}
-                    className="resize-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="familyHistory">Фамилна Обремененост</Label>
-                  <Textarea
-                    id="familyHistory"
-                    placeholder="напр. Сърдечни заболявания, диабет в семейството..."
-                    value={data.familyHistory || ''}
-                    onChange={(e) => setData({ ...data, familyHistory: e.target.value })}
-                    rows={3}
-                    className="resize-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="complaints">Текущи Оплаквания</Label>
-                  <Textarea
-                    id="complaints"
-                    placeholder="напр. Често уморен, главоболие, проблеми със съня..."
-                    value={data.complaints || ''}
-                    onChange={(e) => setData({ ...data, complaints: e.target.value })}
-                    rows={3}
-                    className="resize-none"
-                  />
-                </div>
-              </motion.div>
-            )}
-
-            {step === 4 && (
-              <motion.div
-                key="step4"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">Начин на Живот</h3>
-                  <p className="text-sm text-muted-foreground">Информация за вашата дневна активност</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <Label>Ниво на Активност</Label>
-                    <RadioGroup
-                      value={data.activityLevel}
-                      onValueChange={(value) => setData({ ...data, activityLevel: value as any })}
-                      className="grid grid-cols-2 md:grid-cols-3 gap-3"
-                    >
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.activityLevel === 'sedentary' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="sedentary" id="sedentary" />
-                        <Label htmlFor="sedentary" className="font-normal cursor-pointer text-sm">Заседнал</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.activityLevel === 'light' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="light" id="light" />
-                        <Label htmlFor="light" className="font-normal cursor-pointer text-sm">Лека</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.activityLevel === 'moderate' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="moderate" id="moderate" />
-                        <Label htmlFor="moderate" className="font-normal cursor-pointer text-sm">Умерена</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.activityLevel === 'active' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="active" id="active" />
-                        <Label htmlFor="active" className="font-normal cursor-pointer text-sm">Активна</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.activityLevel === 'very-active' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="very-active" id="very-active" />
-                        <Label htmlFor="very-active" className="font-normal cursor-pointer text-sm">Много активна</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Ниво на Стрес</Label>
-                    <RadioGroup
-                      value={data.stressLevel}
-                      onValueChange={(value) => setData({ ...data, stressLevel: value as any })}
-                      className="grid grid-cols-2 md:grid-cols-4 gap-3"
-                    >
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.stressLevel === 'low' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="low" id="low" />
-                        <Label htmlFor="low" className="font-normal cursor-pointer text-sm">Нисък</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.stressLevel === 'moderate' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="moderate" id="stress-moderate" />
-                        <Label htmlFor="stress-moderate" className="font-normal cursor-pointer text-sm">Умерен</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.stressLevel === 'high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="high" id="high" />
-                        <Label htmlFor="high" className="font-normal cursor-pointer text-sm">Висок</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.stressLevel === 'very-high' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="very-high" id="very-high" />
-                        <Label htmlFor="very-high" className="font-normal cursor-pointer text-sm">Много висок</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="sleepHours">Часове Сън на Нощ</Label>
-                      <span className="text-lg font-semibold text-primary">{data.sleepHours || 7}ч</span>
-                    </div>
-                    <Slider
-                      id="sleepHours"
-                      min={3}
-                      max={12}
-                      step={0.5}
-                      value={[data.sleepHours || 7]}
-                      onValueChange={(value) => setData({ ...data, sleepHours: value[0] })}
-                      className="py-4"
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Качество на Съня</Label>
-                    <RadioGroup
-                      value={data.sleepQuality}
-                      onValueChange={(value) => setData({ ...data, sleepQuality: value as any })}
-                      className="grid grid-cols-2 md:grid-cols-4 gap-3"
-                    >
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.sleepQuality === 'poor' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="poor" id="poor" />
-                        <Label htmlFor="poor" className="font-normal cursor-pointer text-sm">Лошо</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.sleepQuality === 'fair' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="fair" id="fair" />
-                        <Label htmlFor="fair" className="font-normal cursor-pointer text-sm">Средно</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.sleepQuality === 'good' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="good" id="good" />
-                        <Label htmlFor="good" className="font-normal cursor-pointer text-sm">Добро</Label>
-                      </div>
-                      <div className={`relative flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        data.sleepQuality === 'excellent' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}>
-                        <RadioGroupItem value="excellent" id="excellent" />
-                        <Label htmlFor="excellent" className="font-normal cursor-pointer text-sm">Отлично</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="hydration">Дневна Хидратация (чаши вода)</Label>
-                      <span className="text-lg font-semibold text-primary">{data.hydration || 8}</span>
-                    </div>
-                    <Slider
-                      id="hydration"
-                      min={0}
-                      max={15}
-                      step={1}
-                      value={[data.hydration || 8]}
-                      onValueChange={(value) => setData({ ...data, hydration: value[0] })}
-                      className="py-4"
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 5 && (
-              <motion.div
-                key="step5"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">Хранителен Профил</h3>
-                  <p className="text-sm text-muted-foreground">Информация за вашето хранене</p>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Хранителен Режим</Label>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {dietaryProfiles.map((profile) => (
-                      <div
-                        key={profile}
-                        className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          data.dietaryProfile?.includes(profile)
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50 hover:bg-muted/30'
-                        }`}
-                        onClick={() => setData({ ...data, dietaryProfile: toggleArrayItem(data.dietaryProfile, profile) })}
-                      >
-                        <Checkbox
-                          checked={data.dietaryProfile?.includes(profile)}
-                          className="mt-0.5"
-                        />
-                        <Label className="font-normal cursor-pointer leading-snug flex-1 text-sm">
-                          {profile}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Хранителни Навици</Label>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {dietaryHabits.map((habit) => (
-                      <div
-                        key={habit}
-                        className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          data.dietaryHabits?.includes(habit)
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50 hover:bg-muted/30'
-                        }`}
-                        onClick={() => setData({ ...data, dietaryHabits: toggleArrayItem(data.dietaryHabits, habit) })}
-                      >
-                        <Checkbox
-                          checked={data.dietaryHabits?.includes(habit)}
-                          className="mt-0.5"
-                        />
-                        <Label className="font-normal cursor-pointer leading-snug flex-1 text-sm">
-                          {habit}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="foodIntolerances">Хранителна Непоносимост</Label>
-                  <Textarea
-                    id="foodIntolerances"
-                    placeholder="напр. Лактоза, глутен..."
-                    value={data.foodIntolerances || ''}
-                    onChange={(e) => setData({ ...data, foodIntolerances: e.target.value })}
-                    rows={2}
-                    className="resize-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="allergies">Алергии</Label>
-                  <Textarea
-                    id="allergies"
-                    placeholder="напр. Ядки, морски дарове, пчелни продукти..."
-                    value={data.allergies || ''}
-                    onChange={(e) => setData({ ...data, allergies: e.target.value })}
-                    rows={2}
-                    className="resize-none"
-                  />
-                </div>
-              </motion.div>
-            )}
-
-            {step === 6 && (
-              <motion.div
-                key="step6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">Медикаменти</h3>
-                  <p className="text-sm text-muted-foreground">Информация за приемани лекарства и добавки</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="medications">Прием на Медикаменти и Хранителни Добавки</Label>
-                  <Textarea
-                    id="medications"
-                    placeholder="напр. Витамин D 2000 IU, Магнезий 400mg, Омега-3..."
-                    value={data.medications || ''}
-                    onChange={(e) => setData({ ...data, medications: e.target.value })}
-                    rows={6}
-                    className="resize-none"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Включете и безрецептурни лекарства, витамини, минерали и други добавки
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold">Забележка:</span> Информацията от този въпросник ще бъде използвана само за иридологичния анализ и няма да бъде споделена с трети страни.
-                  </p>
-                </div>
-              </motion.div>
-            )}
+              <div className="pt-4">
+                {renderQuestion()}
+              </div>
+            </motion.div>
           </AnimatePresence>
 
-          <div className="flex justify-between mt-8 pt-6 border-t">
-            {step > 1 && (
+          <div className="flex justify-between items-center mt-8 pt-6 border-t gap-4">
+            {currentQuestionIndex > 0 ? (
               <Button
                 variant="outline"
-                onClick={() => setStep(step - 1)}
+                onClick={handleBack}
                 className="gap-2"
               >
                 <ArrowLeft size={16} weight="bold" />
                 Назад
               </Button>
+            ) : (
+              <div />
             )}
+            
             <Button
               onClick={handleNext}
-              className="ml-auto gap-2"
+              className="gap-2 ml-auto"
             >
-              {step === totalSteps ? 'Напред към Снимките' : 'Напред'}
-              <ArrowRight size={16} weight="bold" />
+              {currentQuestionIndex === questions.length - 1 ? (
+                <>
+                  Напред към Снимките
+                  <CheckCircle size={16} weight="bold" />
+                </>
+              ) : (
+                <>
+                  Напред
+                  <ArrowRight size={16} weight="bold" />
+                </>
+              )}
             </Button>
           </div>
         </Card>
