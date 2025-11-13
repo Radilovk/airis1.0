@@ -40,7 +40,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     apiKey: '',
     useCustomKey: false,
     requestDelay: 30000,
-    requestCount: 4
+    requestCount: 8
   })
   
   const [textbooks, setTextbooks] = useKV<IridologyTextbook[]>('iridology-textbooks', [])
@@ -53,7 +53,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || 30000)
-  const [requestCount, setRequestCount] = useState(aiConfig?.requestCount || 4)
+  const [requestCount, setRequestCount] = useState(aiConfig?.requestCount || 8)
   
   const [textbookName, setTextbookName] = useState('')
   const [textbookContent, setTextbookContent] = useState('')
@@ -70,7 +70,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setApiKey(aiConfig.apiKey)
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 30000)
-      setRequestCount(aiConfig.requestCount || 4)
+      setRequestCount(aiConfig.requestCount || 8)
     }
   }, [aiConfig])
 
@@ -292,7 +292,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Забавяне между заявки: {aiConfig.requestDelay || 30000}ms | Брой заявки: {aiConfig.requestCount || 4}
+                    Забавяне: {aiConfig.requestDelay || 30000}ms | Заявки: {aiConfig.requestCount || 8} | 
+                    Очаквано време: ~{Math.round((aiConfig.requestDelay || 30000) * (aiConfig.requestCount || 8) / 60000)} мин
                   </p>
                 </div>
               )}
@@ -386,18 +387,21 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   <div>
                     <Label htmlFor="request-count" className="text-base">Брой AI заявки</Label>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Общ брой заявки за пълен анализ (ляв ирис, десен ирис, препоръки, резюме)
+                      Общ брой заявки за пълен задълбочен анализ
                     </p>
-                    <Input 
-                      id="request-count"
-                      type="number"
-                      value={requestCount}
-                      onChange={(e) => setRequestCount(parseInt(e.target.value) || 4)}
-                      min={3}
-                      max={10}
-                    />
+                    <Select value={requestCount.toString()} onValueChange={(v) => setRequestCount(parseInt(v))}>
+                      <SelectTrigger id="request-count">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="4">4 заявки - Базов анализ</SelectItem>
+                        <SelectItem value="6">6 заявки - Разширен анализ</SelectItem>
+                        <SelectItem value="8">8 заявки - Пълен анализ (препоръчително)</SelectItem>
+                        <SelectItem value="10">10 заявки - Детайлен анализ</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Стандартно: 4 заявки (ляв ирис, десен ирис, препоръки, резюме)
+                      8 заявки включва: ляв ирис, десен ирис, хранителен план, добавки, психология, специални препоръки, изследвания, детайлен анализ
                     </p>
                   </div>
                 </div>

@@ -97,9 +97,20 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
             </div>
 
             <div className="prose prose-sm max-w-none">
-              <p className="text-sm leading-relaxed text-foreground/90">
-                {report.summary}
-              </p>
+              {report.briefSummary ? (
+                <div className="space-y-2">
+                  {report.briefSummary.split('\n').filter(line => line.trim()).map((point, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                      <p className="text-sm leading-relaxed text-foreground/90">{point.replace(/^•\s*/, '')}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {report.summary.substring(0, 300)}...
+                </p>
+              )}
             </div>
           </div>
         </Card>

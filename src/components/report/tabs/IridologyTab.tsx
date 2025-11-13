@@ -219,6 +219,28 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {report.detailedAnalysis && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+        >
+          <Card className="p-5">
+            <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+              <Eye size={20} weight="duotone" className="text-primary" />
+              Детайлен Иридологичен Анализ
+            </h3>
+            <div className="prose prose-sm max-w-none">
+              {report.detailedAnalysis.split('\n\n').map((paragraph, idx) => (
+                <p key={idx} className="text-sm leading-relaxed text-foreground/90 mb-3">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+      )}
     </div>
   )
 }

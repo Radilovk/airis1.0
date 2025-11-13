@@ -115,17 +115,25 @@ export interface AnalysisReport {
   rightIrisImage: IrisImage
   recommendations: Recommendation[]
   summary: string
-  briefSummary?: string
-  detailedPlan?: {
+  briefSummary: string
+  detailedAnalysis: string
+  motivationalSummary: string
+  detailedPlan: {
     generalRecommendations: string[]
     recommendedFoods: string[]
     avoidFoods: string[]
-    supplements: string[]
-    dosageInstructions: string[]
+    supplements: SupplementRecommendation[]
     psychologicalRecommendations: string[]
     specialRecommendations: string[]
     recommendedTests: string[]
   }
+}
+
+export interface SupplementRecommendation {
+  name: string
+  dosage: string
+  timing: string
+  notes?: string
 }
 
 export interface AIModelConfig {

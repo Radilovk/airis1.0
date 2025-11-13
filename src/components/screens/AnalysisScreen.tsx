@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig } from '@/types'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -40,7 +40,7 @@ export default function AnalysisScreen({
     apiKey: '',
     useCustomKey: false,
     requestDelay: 30000,
-    requestCount: 4
+    requestCount: 8
   })
 
   const addLog = (level: LogEntry['level'], message: string) => {
@@ -343,8 +343,13 @@ ${response}
       console.log('🚀 [АНАЛИЗ] Стартиране на анализ...')
       console.log('📊 [АНАЛИЗ] Данни от въпросник:', questionnaireData)
       
-      setProgress(10)
-      setStatus('Анализиране на ляв ирис...')
+      const requestDelay = aiConfig?.requestDelay || 30000
+      const requestCount = aiConfig?.requestCount || 8
+      const progressPerStep = 90 / requestCount
+      let currentProgress = 5
+      
+      setProgress(currentProgress)
+      setStatus('Анализиране на ляв ирис - структура...')
       addLog('info', 'Започване анализ на ляв ирис...')
       console.log('👁️ [АНАЛИЗ] Започване анализ на ляв ирис...')
       
@@ -352,12 +357,12 @@ ${response}
       addLog('success', 'Ляв ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
       
-      const requestDelay = aiConfig?.requestDelay || 30000
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
       addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
       await sleep(requestDelay)
       
-      setProgress(40)
-      setStatus('Анализиране на десен ирис...')
+      setStatus('Анализиране на десен ирис - структура...')
       addLog('info', 'Започване анализ на десен ирис...')
       console.log('👁️ [АНАЛИЗ] Започване анализ на десен ирис...')
       
@@ -365,33 +370,99 @@ ${response}
       addLog('success', 'Десен ирис анализиран успешно')
       console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
       
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
       addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
       await sleep(requestDelay)
       
-      setProgress(70)
-      setStatus('Генериране на препоръки...')
-      addLog('info', 'Започване генериране на препоръки...')
-      console.log('💊 [АНАЛИЗ] Започване генериране на препоръки...')
+      setStatus('Генериране на детайлен план за храни...')
+      addLog('info', 'Започване генериране на хранителен план...')
+      console.log('🍎 [АНАЛИЗ] Започване генериране на хранителен план...')
       
-      const recommendations = await generateRecommendations(
-        leftAnalysis,
-        rightAnalysis,
-        questionnaireData
-      )
-      addLog('success', `Препоръки генерирани успешно (${recommendations.length} бр.)`)
-      console.log('✅ [АНАЛИЗ] Препоръки генерирани успешно:', recommendations)
+      const foodPlan = await generateFoodPlan(leftAnalysis, rightAnalysis, questionnaireData)
+      addLog('success', 'Хранителен план генериран успешно')
+      console.log('✅ [АНАЛИЗ] Хранителен план генериран успешно:', foodPlan)
       
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
       addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
       await sleep(requestDelay)
       
-      setProgress(90)
-      setStatus('Подготовка на доклад...')
-      addLog('info', 'Започване генериране на резюме...')
-      console.log('📝 [АНАЛИЗ] Започване генериране на резюме...')
+      setStatus('Генериране на препоръки за добавки...')
+      addLog('info', 'Започване генериране на хранителни добавки...')
+      console.log('💊 [АНАЛИЗ] Започване генериране на хранителни добавки...')
       
-      const summary = await generateSummary(leftAnalysis, rightAnalysis, questionnaireData)
-      addLog('success', 'Резюме генерирано успешно')
-      console.log('✅ [АНАЛИЗ] Резюме генерирано успешно:', summary)
+      const supplements = await generateSupplements(leftAnalysis, rightAnalysis, questionnaireData)
+      addLog('success', `Добавки генерирани успешно (${supplements.length} бр.)`)
+      console.log('✅ [АНАЛИЗ] Добавки генерирани успешно:', supplements)
+      
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
+      addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+      await sleep(requestDelay)
+      
+      setStatus('Генериране на психологически препоръки...')
+      addLog('info', 'Започване генериране на психологически препоръки...')
+      console.log('🧠 [АНАЛИЗ] Започване генериране на психологически препоръки...')
+      
+      const psychRecs = await generatePsychologicalRecommendations(leftAnalysis, rightAnalysis, questionnaireData)
+      addLog('success', 'Психологически препоръки генерирани успешно')
+      console.log('✅ [АНАЛИЗ] Психологически препоръки генерирани успешно:', psychRecs)
+      
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
+      addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+      await sleep(requestDelay)
+      
+      setStatus('Генериране на специални препоръки...')
+      addLog('info', 'Започване генериране на специални препоръки...')
+      console.log('⭐ [АНАЛИЗ] Започване генериране на специални препоръки...')
+      
+      const specialRecs = await generateSpecialRecommendations(leftAnalysis, rightAnalysis, questionnaireData)
+      addLog('success', 'Специални препоръки генерирани успешно')
+      console.log('✅ [АНАЛИЗ] Специални препоръки генерирани успешно:', specialRecs)
+      
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
+      addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+      await sleep(requestDelay)
+      
+      setStatus('Генериране на препоръки за изследвания...')
+      addLog('info', 'Започване генериране на препоръки за изследвания...')
+      console.log('🔬 [АНАЛИЗ] Започване генериране на препоръки за изследвания...')
+      
+      const testRecs = await generateTestRecommendations(leftAnalysis, rightAnalysis, questionnaireData)
+      addLog('success', 'Препоръки за изследвания генерирани успешно')
+      console.log('✅ [АНАЛИЗ] Препоръки за изследвания генерирани успешно:', testRecs)
+      
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
+      addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+      await sleep(requestDelay)
+      
+      setStatus('Генериране на детайлен анализ...')
+      addLog('info', 'Започване генериране на детайлен анализ...')
+      console.log('📝 [АНАЛИЗ] Започване генериране на детайлен анализ...')
+      
+      const detailedAnalysis = await generateDetailedAnalysis(leftAnalysis, rightAnalysis, questionnaireData)
+      addLog('success', 'Детайлен анализ генериран успешно')
+      console.log('✅ [АНАЛИЗ] Детайлен анализ генериран успешно:', detailedAnalysis)
+      
+      currentProgress += progressPerStep
+      setProgress(currentProgress)
+      addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+      await sleep(requestDelay)
+      
+      setProgress(95)
+      setStatus('Финализиране на доклад...')
+      addLog('info', 'Започване генериране на резюмета...')
+      console.log('📝 [АНАЛИЗ] Започване генериране на резюмета...')
+      
+      const { briefSummary, motivationalSummary } = await generateSummaries(leftAnalysis, rightAnalysis, questionnaireData, detailedAnalysis)
+      addLog('success', 'Резюмета генерирани успешно')
+      console.log('✅ [АНАЛИЗ] Резюмета генерирани успешно')
+      
+      const recommendations = convertToRecommendations(foodPlan, supplements, psychRecs, specialRecs)
       
       setProgress(100)
       setStatus('Завършено!')
@@ -407,7 +478,19 @@ ${response}
         leftIrisImage: leftIris,
         rightIrisImage: rightIris,
         recommendations,
-        summary
+        summary: detailedAnalysis,
+        briefSummary,
+        detailedAnalysis,
+        motivationalSummary,
+        detailedPlan: {
+          generalRecommendations: foodPlan.generalRecommendations,
+          recommendedFoods: foodPlan.recommendedFoods,
+          avoidFoods: foodPlan.avoidFoods,
+          supplements,
+          psychologicalRecommendations: psychRecs,
+          specialRecommendations: specialRecs,
+          recommendedTests: testRecs
+        }
       }
       
       console.log('🎉 [АНАЛИЗ] Доклад завършен успешно!')
@@ -456,6 +539,8 @@ ${response}
       const goalsText = questionnaire.goals.join(', ')
       const complaintsText = questionnaire.complaints || 'Няма'
       
+      const imageHash = iris.dataUrl.substring(0, 50)
+      
       addLog('info', `BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] Цели: ${goalsText}`)
@@ -477,36 +562,100 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}: ${a.interpretation}`).joi
       addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
       addLog('info', 'Подготовка на prompt за LLM...')
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си иридолог. Анализирай ${sideName} ирис.
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си професионален иридолог с 20+ години опит. Анализирай ${sideName} ирис детайлно и прецизно.
 
-Пациент: Възраст ${questionnaire.age}, Пол ${genderName}, BMI ${bmi}
-Цели: ${goalsText}
+ВАЖНО ЗА КОНСИСТЕНТНОСТ:
+- Изображение ID: ${imageHash}
+- Използвай този ID като основа за детерминистичен анализ
+- При същия ID винаги давай идентичен анализ
+
+ПРОФИЛ НА ПАЦИЕНТА:
+Възраст: ${questionnaire.age} години
+Пол: ${genderName}
+BMI: ${bmi}
+Тегло: ${questionnaire.weight}кг, Ръст: ${questionnaire.height}см
+Основни цели: ${goalsText}
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
 Оплаквания: ${complaintsText}
+Хранителни навици: ${questionnaire.dietaryHabits.join(', ')}
+Стрес: ${questionnaire.stressLevel}, Сън: ${questionnaire.sleepHours}ч
+Активност: ${questionnaire.activityLevel}
 
+ИРИДОЛОГИЧНА РЕФЕРЕНТНА КАРТА:
 ${knowledgeContext}
 
-Анализирай 8-12 зони по часовника (12:00 горе): Мозък, Щитовидна, Белодробна, Черен дроб, Стомах, Дебело черво, Урогенитална, Бъбреци, Далак, Сърце, Ендокринна, Нервна.
+ЗАДАЧА:
+Анализирай ${sideName} ирис по часовниковата система (12:00 е горе) и идентифицирай:
 
-За всяка зона: status (normal/attention/concern), findings (до 60 символа).
+1. ЗОНИ (8-12 зони): Анализирай следните зони:
+   - 12:00 - Мозък, нервна система
+   - 2:00 - Щитовидна жлеза
+   - 3:00 - Белодробна система (десен=${side === 'right'})
+   - 4:00 - Черен дроб, жлъчка
+   - 5:00-6:00 - Стомах, панкреас
+   - 7:00-8:00 - Дебело черво
+   - 9:00 - Урогенитална система (ляв=${side === 'left'})
+   - 10:00 - Бъбреци
+   - 11:00 - Далак
 
-Идентифицирай 2-4 артефакта: лакуни, крипти, пигменти, радиални линии, пръстени.
+За всяка зона определи:
+- status: "normal" (всичко е добре), "attention" (нужно е внимание), "concern" (притеснително)
+- findings: конкретно описание на находките (до 60 символа)
+- angle: приблизителен ъгъл [start, end] в градуси (0-360)
 
-Генерирай 6 system scores (0-100): Храносмилателна, Имунна, Нервна, Сърдечно-съдова, Детоксикация, Ендокринна.
+2. АРТЕФАКТИ (2-5 артефакта): Идентифицирай специфични белези:
+   - Лакуни (празнини в ириса)
+   - Крипти (малки дупки)
+   - Пигментни петна
+   - Радиални линии
+   - Автономен пръстен
+   
+За всеки:
+- type: точен тип артефакт
+- location: позиция по часовника (напр. "3:00-4:00")
+- description: значение за здравето (до 60 символа)
+- severity: "low", "medium", "high"
 
-ВАЖНО:
-- Върни САМО валиден JSON
-- Кратки описания (до 60 символа)
-- БЕЗ нови редове (\\n) в текстове
-- БЕЗ вътрешни двойни кавички
-- Използвай единични кавички ' вместо двойни " в текстове
+3. ОБЩО ЗДРАВЕ (overallHealth): Цяло число 0-100 базирано на:
+   - Състояние на зони
+   - Брой и тежест на артефакти
+   - Възраст и здравен статус
+   - Конституционен тип
 
-JSON формат:
+4. СИСТЕМНИ ОЦЕНКИ (systemScores): 6 системи, всяка с оценка 0-100:
+   - Храносмилателна система
+   - Имунна система
+   - Нервна система
+   - Сърдечно-съдова система
+   - Детоксикационна система
+   - Ендокринна система
+
+За всяка система:
+- score: числова оценка
+- description: кратко състояние (до 60 символа)
+
+ПРАВИЛА ЗА КОНСИСТЕНТНОСТ:
+- Базирай анализа на Image ID за детерминистични резултати
+- Използвай точна медицинска терминология
+- Бъди специфичен и обективен
+- Свържи находките с профила на пациента
+- БЕЗ нови редове в текстове
+- БЕЗ двойни кавички вътре в текстове
+- Използвай единични кавички при нужда
+
+ВЪРНИ САМО ВАЛИДЕН JSON:
 {
   "analysis": {
-    "zones": [{"id": 1, "name": "име", "organ": "орган", "status": "normal", "findings": "текст до 60 символа", "angle": [0, 30]}],
-    "artifacts": [{"type": "тип", "location": "локация", "description": "текст до 60 символа", "severity": "low"}],
+    "zones": [
+      {"id": 1, "name": "име на зона", "organ": "засегнат орган", "status": "normal/attention/concern", "findings": "описание до 60 символа", "angle": [0, 30]}
+    ],
+    "artifacts": [
+      {"type": "тип", "location": "3:00-4:00", "description": "значение до 60 символа", "severity": "low/medium/high"}
+    ],
     "overallHealth": 75,
-    "systemScores": [{"system": "система", "score": 80, "description": "текст до 60 символа"}]
+    "systemScores": [
+      {"system": "Храносмилателна система", "score": 80, "description": "състояние до 60 символа"}
+    ]
   }
 }`
 
@@ -643,6 +792,395 @@ JSON:
       console.error('❌ [ПРЕПОРЪКИ] Stack:', (error as Error)?.stack)
       throw error
     }
+  }
+
+  const generateFoodPlan = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData
+  ) => {
+    try {
+      addLog('info', 'Генериране на персонализиран хранителен план...')
+      
+      const concernedOrgans = [
+        ...leftAnalysis.zones.filter(z => z.status !== 'normal').map(z => z.organ),
+        ...rightAnalysis.zones.filter(z => z.status !== 'normal').map(z => z.organ)
+      ]
+      const uniqueOrgans = [...new Set(concernedOrgans)].join(', ')
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай детайлен персонализиран хранителен план на български език за пациент с:
+
+ИРИДОЛОГИЧНИ НАХОДКИ:
+Проблемни органи/системи: ${uniqueOrgans}
+Общо здраве: Ляв ${leftAnalysis.overallHealth}/100, Десен ${rightAnalysis.overallHealth}/100
+
+ПАЦИЕНТ ПРОФИЛ:
+Възраст: ${questionnaire.age}
+Тегло: ${questionnaire.weight}кг, Ръст: ${questionnaire.height}см
+Цели: ${questionnaire.goals.join(', ')}
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Хранителен профил: ${questionnaire.dietaryProfile.join(', ')}
+Алергии/непоносимост: ${questionnaire.foodIntolerances || 'Няма'}
+
+Създай JSON с:
+1. generalRecommendations - масив от 5-7 общи хранителни принципа (кратки изречения)
+2. recommendedFoods - масив от 15-20 конкретни храни за консумация (само имена на храни)
+3. avoidFoods - масив от 10-15 храни за избягване (само имена на храни)
+
+ВАЖНО:
+- Всички препоръки да са базирани на иридологичните находки
+- Храните да са конкретни и специфични
+- Вземи предвид алергии и хранителен профил
+- Върни САМО валиден JSON без допълнителен текст
+
+JSON формат:
+{
+  "foodPlan": {
+    "generalRecommendations": ["препоръка 1", "препоръка 2"],
+    "recommendedFoods": ["храна 1", "храна 2"],
+    "avoidFoods": ["храна 1", "храна 2"]
+  }
+}`
+
+      const response = await callLLMWithRetry(prompt, true)
+      const parsed = await robustJSONParse(response, 'FOOD PLAN')
+      
+      addLog('success', 'Хранителен план генериран успешно')
+      return parsed.foodPlan
+    } catch (error) {
+      addLog('error', `Грешка при хранителен план: ${error}`)
+      throw error
+    }
+  }
+
+  const generateSupplements = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData
+  ) => {
+    try {
+      addLog('info', 'Генериране на препоръки за хранителни добавки...')
+      
+      const systemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+      const weakSystems = systemScores.filter(s => s.score < 70).map(s => s.system).join(', ')
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Препоръчай хранителни добавки с точна дозировка и прием на български език за:
+
+СЛАБИ СИСТЕМИ: ${weakSystems}
+ЗДРАВЕН СТАТУС: ${questionnaire.healthStatus.join(', ')}
+ВЪЗРАСТ: ${questionnaire.age}
+МЕДИКАМЕНТИ: ${questionnaire.medications || 'Няма'}
+
+Създай 8-12 персонализирани препоръки за хранителни добавки с:
+- name: пълно име на добавката
+- dosage: точна дозировка (напр. "1000-2000мг")
+- timing: кога и как да се приема (напр. "Сутрин на гладно с вода")
+- notes: допълнителни бележки ако е нужно (опционално)
+
+Вземи предвид взаимодействия с медикаменти и здравен статус.
+
+Върни САМО валиден JSON:
+{
+  "supplements": [
+    {"name": "име", "dosage": "доза", "timing": "прием", "notes": "бележки"}
+  ]
+}`
+
+      const response = await callLLMWithRetry(prompt, true)
+      const parsed = await robustJSONParse(response, 'SUPPLEMENTS')
+      
+      addLog('success', `${parsed.supplements.length} добавки генерирани успешно`)
+      return parsed.supplements
+    } catch (error) {
+      addLog('error', `Грешка при добавки: ${error}`)
+      throw error
+    }
+  }
+
+  const generatePsychologicalRecommendations = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData
+  ) => {
+    try {
+      addLog('info', 'Генериране на психологически препоръки...')
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай психологически и емоционални препоръки на български език за:
+
+ПРОФИЛ:
+Стрес: ${questionnaire.stressLevel}
+Сън: ${questionnaire.sleepHours}ч, качество: ${questionnaire.sleepQuality}
+Цели: ${questionnaire.goals.join(', ')}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
+
+Създай 6-10 конкретни, практични психологически препоръки за:
+- Управление на стреса
+- Подобряване на съня
+- Емоционален баланс
+- Мотивация към целите
+- Mindfulness и медитация
+
+Върни масив от изречения на български.
+
+JSON формат:
+{
+  "recommendations": ["препоръка 1", "препоръка 2"]
+}`
+
+      const response = await callLLMWithRetry(prompt, true)
+      const parsed = await robustJSONParse(response, 'PSYCHOLOGICAL')
+      
+      addLog('success', 'Психологически препоръки генерирани успешно')
+      return parsed.recommendations
+    } catch (error) {
+      addLog('error', `Грешка при психологически препоръки: ${error}`)
+      throw error
+    }
+  }
+
+  const generateSpecialRecommendations = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData
+  ) => {
+    try {
+      addLog('info', 'Генериране на специални индивидуални препоръки...')
+      
+      const uniqueFindings = [
+        ...leftAnalysis.artifacts.map(a => `${a.type} в ${a.location}`),
+        ...rightAnalysis.artifacts.map(a => `${a.type} в ${a.location}`)
+      ]
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай високо персонализирани специални препоръки на български език базирани на:
+
+УНИКАЛНИ ИРИДОЛОГИЧНИ НАХОДКИ:
+${uniqueFindings.join('\n')}
+
+СПЕЦИФИЧНИ ЦЕЛИ:
+${questionnaire.goals.join(', ')}
+
+ЗДРАВЕН СТАТУС:
+${questionnaire.healthStatus.join(', ')}
+
+АКТИВНОСТ: ${questionnaire.activityLevel}
+
+Създай 6-10 специални, индивидуални препоръки които:
+- Адресират конкретните иридологични находки
+- Са фокусирани към личните цели
+- Включват специфични протоколи и практики
+- Са уникални за този пациент
+
+Върни масив от детайлни изречения.
+
+JSON формат:
+{
+  "recommendations": ["препоръка 1", "препоръка 2"]
+}`
+
+      const response = await callLLMWithRetry(prompt, true)
+      const parsed = await robustJSONParse(response, 'SPECIAL')
+      
+      addLog('success', 'Специални препоръки генерирани успешно')
+      return parsed.recommendations
+    } catch (error) {
+      addLog('error', `Грешка при специални препоръки: ${error}`)
+      throw error
+    }
+  }
+
+  const generateTestRecommendations = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData
+  ) => {
+    try {
+      addLog('info', 'Генериране на препоръки за медицински изследвания...')
+      
+      const concernZones = [
+        ...leftAnalysis.zones.filter(z => z.status === 'concern'),
+        ...rightAnalysis.zones.filter(z => z.status === 'concern')
+      ]
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Препоръчай медицински изследвания на български език за:
+
+ЗОНИ С ПРИТЕСНЕНИЯ:
+${concernZones.map(z => `${z.organ}: ${z.findings}`).join('\n')}
+
+ЗДРАВЕН СТАТУС: ${questionnaire.healthStatus.join(', ')}
+ВЪЗРАСТ: ${questionnaire.age}
+ОПЛАКВАНИЯ: ${questionnaire.complaints || 'Няма'}
+
+Препоръчай 8-15 конкретни медицински изследвания/тестове които:
+- Са релевантни към иридологичните находки
+- Помагат за верификация на състоянията
+- Са практични и достъпни
+- Включват кръвни тестове, хормонални панели, образна диагностика
+
+Върни масив от имена на изследвания.
+
+JSON формат:
+{
+  "tests": ["изследване 1", "изследване 2"]
+}`
+
+      const response = await callLLMWithRetry(prompt, true)
+      const parsed = await robustJSONParse(response, 'TESTS')
+      
+      addLog('success', 'Препоръки за изследвания генерирани успешно')
+      return parsed.tests
+    } catch (error) {
+      addLog('error', `Грешка при изследвания: ${error}`)
+      throw error
+    }
+  }
+
+  const generateDetailedAnalysis = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData
+  ) => {
+    try {
+      addLog('info', 'Генериране на детайлен иридологичен анализ...')
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай задълбочен, детайлен иридологичен анализ на български език (800-1200 думи).
+
+ДАННИ ЗА АНАЛИЗ:
+Ляв ирис - Здраве: ${leftAnalysis.overallHealth}/100
+Зони: ${JSON.stringify(leftAnalysis.zones.map(z => ({organ: z.organ, status: z.status, findings: z.findings})))}
+Артефакти: ${JSON.stringify(leftAnalysis.artifacts)}
+Системи: ${JSON.stringify(leftAnalysis.systemScores)}
+
+Десен ирис - Здраве: ${rightAnalysis.overallHealth}/100
+Зони: ${JSON.stringify(rightAnalysis.zones.map(z => ({organ: z.organ, status: z.status, findings: z.findings})))}
+Артефакти: ${JSON.stringify(rightAnalysis.artifacts)}
+Системи: ${JSON.stringify(rightAnalysis.systemScores)}
+
+ПАЦИЕНТ:
+Възраст: ${questionnaire.age}, Пол: ${questionnaire.gender}
+BMI: ${(questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)}
+Цели: ${questionnaire.goals.join(', ')}
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Оплаквания: ${questionnaire.complaints}
+
+Създай професионален, задълбочен анализ който включва:
+
+1. ОБЩ ПРЕГЛЕД (2-3 параграфа)
+   - Обща оценка на здравословното състояние
+   - Конституционен тип на ириса
+   - Генетична предразположеност
+
+2. ДЕТАЙЛЕН АНАЛИЗ ПО ЗОНИ (4-5 параграфа)
+   - Подробно описание на всяка проблемна зона
+   - Връзки между зони и системи
+   - Патологични индикатори
+
+3. АРТЕФАКТИ И ЗНАЧЕНИЯ (2-3 параграфа)
+   - Интерпретация на лакуни, крипти, пигменти
+   - Значение за здравето
+   - Хронология на състоянията
+
+4. СИСТЕМЕН АНАЛИЗ (3-4 параграфа)
+   - Детайлна оценка на всяка система
+   - Взаимовръзки между системите
+   - Компенсаторни механизми
+
+5. ПЕРСОНАЛИЗИРАНИ ИЗВОДИ (2-3 параграфа)
+   - Връзка с целите на пациента
+   - Специфични рискови фактори
+   - Прогноза и потенциал за подобрение
+
+Текстът да е професионален, но разбираем за пациента.
+Върни само текста (не JSON), добре структуриран с параграфи.`
+
+      const response = await callLLMWithRetry(prompt, false)
+      
+      addLog('success', `Детайлен анализ генериран (${response.length} символа)`)
+      return response
+    } catch (error) {
+      addLog('error', `Грешка при детайлен анализ: ${error}`)
+      throw error
+    }
+  }
+
+  const generateSummaries = async (
+    leftAnalysis: IrisAnalysis,
+    rightAnalysis: IrisAnalysis,
+    questionnaire: QuestionnaireData,
+    detailedAnalysis: string
+  ) => {
+    try {
+      addLog('info', 'Генериране на резюмета...')
+      
+      const avgHealth = Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай ДВЕ резюмета на български език:
+
+1. КРАТКО РЕЗЮМЕ (briefSummary) - 3-5 КЛЮЧОВИ ТОЧКИ като масив
+   - Много кратки, ясни изречения
+   - Само най-важната информация
+   - Фокус върху общото състояние и основни находки
+
+2. МОТИВАЦИОННО РЕЗЮМЕ (motivationalSummary) - 1-2 изречения
+   - Оптимистично и мотивиращо
+   - Обобщава основната идея на плана
+   - Дава увереност и насърчение
+
+ДАННИ:
+Общо здраве: ${avgHealth}/100
+Цели: ${questionnaire.goals.join(', ')}
+Основни находки: ${detailedAnalysis.substring(0, 500)}...
+
+Върни САМО валиден JSON:
+{
+  "briefSummary": ["точка 1", "точка 2", "точка 3"],
+  "motivationalSummary": "мотивиращ текст"
+}`
+
+      const response = await callLLMWithRetry(prompt, true)
+      const parsed = await robustJSONParse(response, 'SUMMARIES')
+      
+      addLog('success', 'Резюмета генерирани успешно')
+      return {
+        briefSummary: parsed.briefSummary.join('\n• '),
+        motivationalSummary: parsed.motivationalSummary
+      }
+    } catch (error) {
+      addLog('error', `Грешка при резюмета: ${error}`)
+      throw error
+    }
+  }
+
+  const convertToRecommendations = (foodPlan: any, supplements: any[], psychRecs: string[], specialRecs: string[]): Recommendation[] => {
+    const recs: Recommendation[] = []
+    
+    foodPlan.generalRecommendations.forEach((rec: string) => {
+      recs.push({
+        category: 'diet',
+        title: 'Хранителна препоръка',
+        description: rec,
+        priority: 'high'
+      })
+    })
+    
+    supplements.forEach((supp: any) => {
+      recs.push({
+        category: 'supplement',
+        title: supp.name,
+        description: `${supp.dosage} - ${supp.timing}`,
+        priority: 'high'
+      })
+    })
+    
+    psychRecs.forEach((rec: string) => {
+      recs.push({
+        category: 'lifestyle',
+        title: 'Психологическа препоръка',
+        description: rec,
+        priority: 'medium'
+      })
+    })
+    
+    return recs
   }
 
   const generateSummary = async (
