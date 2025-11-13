@@ -387,7 +387,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   <div>
                     <Label htmlFor="request-count" className="text-base">Брой AI заявки</Label>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Общ брой заявки за пълен задълбочен анализ
+                      Общ брой заявки за задълбочен мултивалентен анализ с корелация
                     </p>
                     <Select value={requestCount.toString()} onValueChange={(v) => setRequestCount(parseInt(v))}>
                       <SelectTrigger id="request-count">
@@ -396,12 +396,14 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       <SelectContent>
                         <SelectItem value="4">4 заявки - Базов анализ</SelectItem>
                         <SelectItem value="6">6 заявки - Разширен анализ</SelectItem>
-                        <SelectItem value="8">8 заявки - Пълен анализ (препоръчително)</SelectItem>
-                        <SelectItem value="10">10 заявки - Детайлен анализ</SelectItem>
+                        <SelectItem value="8">8 заявки - Пълен корелиран анализ (препоръчително)</SelectItem>
+                        <SelectItem value="10">10 заявки - Максимално детайлен анализ</SelectItem>
+                        <SelectItem value="12">12 заявки - Изключително задълбочен анализ</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
-                      8 заявки включва: ляв ирис, десен ирис, хранителен план, добавки, психология, специални препоръки, изследвания, детайлен анализ
+                      Повече заявки = по-прецизен, задълбочен и персонализиран анализ с множество слоеве на корелация между иридологични находки и данни от въпросника. 
+                      8 заявки включва: ляв ирис, десен ирис, хранителен план, добавки, психология, специални препоръки, изследвания, детайлен анализ + резюмета.
                     </p>
                   </div>
                 </div>

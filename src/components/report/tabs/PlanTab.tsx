@@ -82,36 +82,15 @@ export default function PlanTab({ report }: PlanTabProps) {
           </motion.div>
         )}
 
-        {detailedPlan.recommendedFoods.length > 0 && (
+        {(detailedPlan.recommendedFoods.length > 0 || detailedPlan.avoidFoods.length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <CollapsibleSection 
-              section={{
-                id: 'recommended-foods',
-                title: 'Препоръчителни Храни',
-                icon: AppleLogo,
-                content: detailedPlan.recommendedFoods
-              }} 
-            />
-          </motion.div>
-        )}
-
-        {detailedPlan.avoidFoods.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.15 }}
-          >
-            <CollapsibleSection 
-              section={{
-                id: 'avoid-foods',
-                title: 'Храни за Избягване',
-                icon: WarningCircle,
-                content: detailedPlan.avoidFoods
-              }} 
+            <FoodRecommendationsSection 
+              recommendedFoods={detailedPlan.recommendedFoods}
+              avoidFoods={detailedPlan.avoidFoods}
             />
           </motion.div>
         )}
@@ -289,6 +268,89 @@ function CollapsibleSection({ section }: { section: PlanSection }) {
                 <p className="text-sm leading-relaxed">{item}</p>
               </div>
             ))}
+          </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  )
+}
+
+function FoodRecommendationsSection({ 
+  recommendedFoods, 
+  avoidFoods 
+}: { 
+  recommendedFoods: string[]
+  avoidFoods: string[] 
+}) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="overflow-hidden transition-all">
+        <CollapsibleTrigger className="w-full p-4 flex items-center justify-between gap-3 hover:bg-muted/50 transition-colors">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10">
+              <AppleLogo size={18} weight="duotone" className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <h4 className="font-semibold text-sm">Хранителни Препоръки</h4>
+              <p className="text-xs text-muted-foreground">Препоръчителни и забранени храни</p>
+            </div>
+          </div>
+          <CaretDown 
+            size={18} 
+            className={cn(
+              "text-muted-foreground transition-transform duration-200",
+              isOpen && "transform rotate-180"
+            )}
+          />
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <div className="px-4 pb-4 pt-2 space-y-4">
+            {recommendedFoods.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-md bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <AppleLogo size={14} weight="duotone" className="text-green-700" />
+                  </div>
+                  <h5 className="font-semibold text-sm text-green-900">Препоръчителни Храни</h5>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {recommendedFoods.map((food, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-center gap-2 p-2.5 bg-green-50 rounded-lg border border-green-100"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-600 flex-shrink-0" />
+                      <span className="text-xs text-green-900 leading-tight">{food}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {avoidFoods.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-md bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <WarningCircle size={14} weight="duotone" className="text-red-700" />
+                  </div>
+                  <h5 className="font-semibold text-sm text-red-900">Храни за Избягване</h5>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {avoidFoods.map((food, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-center gap-2 p-2.5 bg-red-50 rounded-lg border border-red-100"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-600 flex-shrink-0" />
+                      <span className="text-xs text-red-900 leading-tight">{food}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </CollapsibleContent>
       </Card>

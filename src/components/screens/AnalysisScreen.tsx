@@ -562,12 +562,15 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}: ${a.interpretation}`).joi
       addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
       addLog('info', 'Подготовка на prompt за LLM...')
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си професионален иридолог с 20+ години опит. Анализирай ${sideName} ирис детайлно и прецизно.
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си професионален иридолог с 20+ години опит. Анализирай ${sideName} ирис детайлно и прецизно като ВИНАГИ КОРЕЛИРАШ находките с данните от въпросника.
 
-ВАЖНО ЗА КОНСИСТЕНТНОСТ:
-- Изображение ID: ${imageHash}
-- Използвай този ID като основа за детерминистичен анализ
-- При същия ID винаги давай идентичен анализ
+КРИТИЧНО ВАЖНО - ПРАВИЛА ЗА ВАЛИДНОСТ НА ИЗВОДИТЕ:
+1. ВИСОК ПРИОРИТЕТ И ЗНАЧИМОСТ: Находки в ириса които СЕ ПОТВЪРЖДАВАТ от данните във въпросника (оплаквания, здравен статус, навици)
+2. СРЕДЕН ПРИОРИТЕТ: Находки които се виждат в ириса НО не се споменават във въпросника (нито потвърждават, нито противоречат)
+3. НУЛЕВ ПРИОРИТЕТ: ИГНОРИРАЙ находки в ириса които ПРОТИВОРЕЧАТ на въпросника и цялостната информация за клиента
+
+ИЗОБРАЖЕНИЕ ID ЗА КОНСИСТЕНТНОСТ: ${imageHash}
+При същия ID + същи въпросник = ИДЕНТИЧЕН анализ
 
 ПРОФИЛ НА ПАЦИЕНТА:
 Възраст: ${questionnaire.age} години
@@ -578,14 +581,16 @@ BMI: ${bmi}
 Здравен статус: ${questionnaire.healthStatus.join(', ')}
 Оплаквания: ${complaintsText}
 Хранителни навици: ${questionnaire.dietaryHabits.join(', ')}
-Стрес: ${questionnaire.stressLevel}, Сън: ${questionnaire.sleepHours}ч
+Стрес: ${questionnaire.stressLevel}, Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality})
 Активност: ${questionnaire.activityLevel}
+Медикаменти: ${questionnaire.medications || 'Няма'}
+Алергии: ${questionnaire.allergies || 'Няма'}
 
 ИРИДОЛОГИЧНА РЕФЕРЕНТНА КАРТА:
 ${knowledgeContext}
 
 ЗАДАЧА:
-Анализирай ${sideName} ирис по часовниковата система (12:00 е горе) и идентифицирай:
+Анализирай ${sideName} ирис по часовниковата система (12:00 е горе) като ЗАДЪЛЖИТЕЛНО КОРЕЛИРАШ всяка находка с данните от въпросника:
 
 1. ЗОНИ (8-12 зони): Анализирай следните зони:
    - 12:00 - Мозък, нервна система
@@ -803,42 +808,92 @@ JSON:
       addLog('info', 'Генериране на персонализиран хранителен план...')
       
       const concernedOrgans = [
-        ...leftAnalysis.zones.filter(z => z.status !== 'normal').map(z => z.organ),
-        ...rightAnalysis.zones.filter(z => z.status !== 'normal').map(z => z.organ)
+        ...leftAnalysis.zones.filter(z => z.status !== 'normal').map(z => ({ organ: z.organ, findings: z.findings })),
+        ...rightAnalysis.zones.filter(z => z.status !== 'normal').map(z => ({ organ: z.organ, findings: z.findings }))
       ]
-      const uniqueOrgans = [...new Set(concernedOrgans)].join(', ')
+      const uniqueOrgans = [...new Set(concernedOrgans.map(o => o.organ))].join(', ')
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай детайлен персонализиран хранителен план на български език за пациент с:
+      const allSystemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+      const systemAverages = new Map<string, number[]>()
+      allSystemScores.forEach(s => {
+        const current = systemAverages.get(s.system) || []
+        systemAverages.set(s.system, [...current, s.score])
+      })
+      const weakSystems = Array.from(systemAverages.entries())
+        .map(([system, scores]) => ({
+          system,
+          score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        }))
+        .filter(s => s.score < 70)
+        .map(s => s.system)
+        .join(', ')
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай ИЗКЛЮЧИТЕЛНО ДЕТАЙЛЕН и ПЕРСОНАЛИЗИРАН хранителен план на български език базиран на МУЛТИВАЛЕНТНА КОРЕЛАЦИЯ.
+
+КРИТИЧНО ВАЖНО - ПРАВИЛА ЗА ПРЕПОРЪКИ:
+1. Всяка препоръка ТРЯБВА да е базирана на КОРЕЛАЦИЯ между:
+   - Иридологични находки (органи, системи)
+   - Данни от въпросника (оплаквания, навици, статус)
+   - Цели на клиента
+   - Алергии и непоносимости
+
+2. НЕ препоръчвай храни които:
+   - Противоречат на здравния статус
+   - Са в списъка с алергии/непоносимости
+   - Не са релевантни към проблемните зони
 
 ИРИДОЛОГИЧНИ НАХОДКИ:
 Проблемни органи/системи: ${uniqueOrgans}
+Слаби системи (под 70): ${weakSystems || 'Няма'}
 Общо здраве: Ляв ${leftAnalysis.overallHealth}/100, Десен ${rightAnalysis.overallHealth}/100
+Детайлни находки: ${JSON.stringify(concernedOrgans.slice(0, 5))}
 
 ПАЦИЕНТ ПРОФИЛ:
 Възраст: ${questionnaire.age}
 Тегло: ${questionnaire.weight}кг, Ръст: ${questionnaire.height}см
+BMI: ${(questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)}
 Цели: ${questionnaire.goals.join(', ')}
 Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
 Хранителен профил: ${questionnaire.dietaryProfile.join(', ')}
+Хранителни навици: ${questionnaire.dietaryHabits.join(', ')}
 Алергии/непоносимост: ${questionnaire.foodIntolerances || 'Няма'}
+Медикаменти: ${questionnaire.medications || 'Няма'}
+Активност: ${questionnaire.activityLevel}
+Хидратация: ${questionnaire.hydration}л
 
 Създай JSON с:
-1. generalRecommendations - масив от 5-7 общи хранителни принципа (кратки изречения)
-2. recommendedFoods - масив от 15-20 конкретни храни за консумация (само имена на храни)
-3. avoidFoods - масив от 10-15 храни за избягване (само имена на храни)
+
+1. generalRecommendations - масив от 7-10 КОНКРЕТНИ хранителни принципа:
+   - Всеки принцип да е свързан с конкретна находка от ириса + въпросника
+   - Обясни ЗАЩО този принцип е важен за ТОЗИ конкретен пациент
+   - Включи препоръки за време на хранене, комбинации, начин на приготвяне
+   
+2. recommendedFoods - масив от 20-30 конкретни храни за консумация:
+   - Специфични имена (не общи категории)
+   - Базирани на проблемни системи/органи
+   - Съобразени с цели, активност, възраст
+   - Взети предвид алергии и непоносимости
+   
+3. avoidFoods - масив от 15-20 храни за избягване:
+   - Специфични имена
+   - Базирани на иридологични находки + здравен статус
+   - Храни които влошават състоянието на слабите системи
+   - Взети предвид медикаменти (взаимодействия)
 
 ВАЖНО:
-- Всички препоръки да са базирани на иридологичните находки
-- Храните да са конкретни и специфични
-- Вземи предвид алергии и хранителен профил
+- Храните да са КОНКРЕТНИ (напр. "Диворастъща сьомга" вместо "риба")
+- Всяка препоръка да е ПЕРСОНАЛИЗИРАНА за този пациент
+- Корелирай находките с целите
+- Вземи предвид ВСИЧКИ данни от въпросника
 - Върни САМО валиден JSON без допълнителен текст
 
 JSON формат:
 {
   "foodPlan": {
-    "generalRecommendations": ["препоръка 1", "препоръка 2"],
-    "recommendedFoods": ["храна 1", "храна 2"],
-    "avoidFoods": ["храна 1", "храна 2"]
+    "generalRecommendations": ["детайлна препоръка 1", "детайлна препоръка 2"],
+    "recommendedFoods": ["конкретна храна 1", "конкретна храна 2"],
+    "avoidFoods": ["конкретна храна 1", "конкретна храна 2"]
   }
 }`
 
@@ -861,28 +916,81 @@ JSON формат:
     try {
       addLog('info', 'Генериране на препоръки за хранителни добавки...')
       
-      const systemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
-      const weakSystems = systemScores.filter(s => s.score < 70).map(s => s.system).join(', ')
+      const allSystemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+      const systemAverages = new Map<string, number[]>()
+      allSystemScores.forEach(s => {
+        const current = systemAverages.get(s.system) || []
+        systemAverages.set(s.system, [...current, s.score])
+      })
+      const weakSystemsDetailed = Array.from(systemAverages.entries())
+        .map(([system, scores]) => ({
+          system,
+          score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        }))
+        .filter(s => s.score < 75)
+        .sort((a, b) => a.score - b.score)
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Препоръчай хранителни добавки с точна дозировка и прием на български език за:
+      const concernedZones = [
+        ...leftAnalysis.zones.filter(z => z.status !== 'normal'),
+        ...rightAnalysis.zones.filter(z => z.status !== 'normal')
+      ]
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Препоръчай ДЕТАЙЛНИ хранителни добавки с точна дозировка и прием на български език.
 
-СЛАБИ СИСТЕМИ: ${weakSystems}
-ЗДРАВЕН СТАТУС: ${questionnaire.healthStatus.join(', ')}
-ВЪЗРАСТ: ${questionnaire.age}
-МЕДИКАМЕНТИ: ${questionnaire.medications || 'Няма'}
+КРИТИЧНО ВАЖНО - КОРЕЛАЦИЯ И БЕЗОПАСНОСТ:
+1. Всяка добавка ТРЯБВА да е базирана на КОРЕЛАЦИЯ между:
+   - Слаби системи от ириса
+   - Оплаквания и здравен статус от въпросника
+   - Цели на клиента
+   
+2. ВНИМАНИЕ към взаимодействия:
+   - Провери медикаменти за контраиндикации
+   - Вземи предвид здравни състояния
+   - Избягвай добавки които противоречат на данните
 
-Създай 8-12 персонализирани препоръки за хранителни добавки с:
-- name: пълно име на добавката
-- dosage: точна дозировка (напр. "1000-2000мг")
-- timing: кога и как да се приема (напр. "Сутрин на гладно с вода")
-- notes: допълнителни бележки ако е нужно (опционално)
+ИРИДОЛОГИЧНИ НАХОДКИ:
+Слаби системи (детайлно): ${weakSystemsDetailed.map(s => `${s.system}: ${s.score}/100`).join(', ')}
+Засегнати зони: ${concernedZones.map(z => `${z.organ} (${z.status})`).join(', ')}
+Общо здраве: ${Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)}/100
 
-Вземи предвид взаимодействия с медикаменти и здравен статус.
+ДАННИ ОТ ВЪПРОСНИК:
+Възраст: ${questionnaire.age}
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
+Цели: ${questionnaire.goals.join(', ')}
+Медикаменти: ${questionnaire.medications || 'Няма'}
+Алергии: ${questionnaire.allergies || 'Няма'}
+Хранителен профил: ${questionnaire.dietaryProfile.join(', ')}
+Активност: ${questionnaire.activityLevel}
+Стрес: ${questionnaire.stressLevel}
+Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality})
+
+Създай 10-15 ПЕРСОНАЛИЗИРАНИ препоръки за хранителни добавки с:
+
+- name: пълно име на добавката (напр. "Магнезий Бисглицинат", "Витамин D3 + K2")
+- dosage: КОНКРЕТНА дозировка базирана на възраст и състояние (напр. "500-1000мг дневно")
+- timing: ДЕТАЙЛНО кога и как да се приема (напр. "Сутрин на гладно, 30 мин преди закуска, с вода")
+- notes: Допълнителни бележки за:
+  * Защо ИМЕННО тази добавка е важна за ТОЗИ пациент
+  * Връзка с иридологичните находки
+  * Взаимодействия с медикаменти ако има
+  * Специални указания
+
+ВАЖНО:
+- Дозировките да са БЕЗОПАСНИ и подходящи за възрастта
+- Вземи предвид ВСИЧКИ медикаменти и взаимодействия
+- Фокусирай се на добавки които адресират КОРЕЛИРАНИ проблеми
+- Избягвай добавки които противоречат на здравния статус
 
 Върни САМО валиден JSON:
 {
   "supplements": [
-    {"name": "име", "dosage": "доза", "timing": "прием", "notes": "бележки"}
+    {
+      "name": "име на добавката", 
+      "dosage": "конкретна доза", 
+      "timing": "детайлен прием", 
+      "notes": "персонализирани бележки с обяснение защо"
+    }
   ]
 }`
 
@@ -905,26 +1013,75 @@ JSON формат:
     try {
       addLog('info', 'Генериране на психологически препоръки...')
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай психологически и емоционални препоръки на български език за:
+      const nervousSystem = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+        .filter(s => s.system.toLowerCase().includes('нервна'))
+      const avgNervousScore = nervousSystem.length > 0 
+        ? Math.round(nervousSystem.reduce((sum, s) => sum + s.score, 0) / nervousSystem.length)
+        : 70
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай психологически и емоционални препоръки на български език базирани на КОРЕЛАЦИЯ между иридологичен анализ и психо-емоционално състояние.
 
-ПРОФИЛ:
-Стрес: ${questionnaire.stressLevel}
+КРИТИЧНО ВАЖНО - КОРЕЛАЦИЯ:
+Всяка препоръка ТРЯБВА да е базирана на връзката между:
+- Състояние на нервната система от ириса
+- Стрес, сън, емоционално състояние от въпросника
+- Цели и оплаквания на клиента
+- Активност и навици
+
+ИРИДОЛОГИЧНИ НАХОДКИ:
+Нервна система оценка: ${avgNervousScore}/100
+Общо здраве: ${Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)}/100
+Артефакти в нервни зони: ${[...leftAnalysis.artifacts, ...rightAnalysis.artifacts]
+  .filter(a => a.description.toLowerCase().includes('нерв') || a.description.toLowerCase().includes('стрес'))
+  .length} бр.
+
+ПСИХО-ЕМОЦИОНАЛЕН ПРОФИЛ:
+Стрес ниво: ${questionnaire.stressLevel}
 Сън: ${questionnaire.sleepHours}ч, качество: ${questionnaire.sleepQuality}
 Цели: ${questionnaire.goals.join(', ')}
 Оплаквания: ${questionnaire.complaints || 'Няма'}
+Активност: ${questionnaire.activityLevel}
+Хранителни навици: ${questionnaire.dietaryHabits.join(', ')}
+Възраст: ${questionnaire.age}
 
-Създай 6-10 конкретни, практични психологически препоръки за:
-- Управление на стреса
-- Подобряване на съня
-- Емоционален баланс
-- Мотивация към целите
-- Mindfulness и медитация
+Създай 8-12 КОНКРЕТНИ, ПРАКТИЧНИ и ПЕРСОНАЛИЗИРАНИ психологически препоръки за:
 
-Върни масив от изречения на български.
+1. УПРАВЛЕНИЕ НА СТРЕСА (2-3 препоръки):
+   - Специфични техники базирани на стрес нивото
+   - Корелирани с находките в нервната система
+   - Адаптирани към активността и възрастта
+
+2. ПОДОБРЯВАНЕ НА СЪНЯ (2-3 препоръки):
+   - Конкретни протоколи за текущото качество на сън
+   - Връзка с иридологичните находки
+   - Специфични за навиците на клиента
+
+3. ЕМОЦИОНАЛЕН БАЛАНС (2-3 препоръки):
+   - Техники за емоционална регулация
+   - Базирани на здравното състояние
+   - Връзка с целите
+
+4. МОТИВАЦИЯ И ЦЕЛИ (1-2 препоръки):
+   - Конкретни стратегии за постигане на целите
+   - Реалистични очаквания базирани на анализа
+   - Насърчаващи и мотивиращи
+
+5. MINDFULNESS И МЕДИТАЦИЯ (1-2 препоръки):
+   - Специфични практики подходящи за клиента
+   - Времетраене и честота
+   - Адаптирани към начина на живот
+
+ВАЖНО:
+- Всяка препоръка да е КОНКРЕТНА и ПРИЛОЖИМА
+- Да включва КАК точно да се прилага
+- Базирана на КОРЕЛАЦИЯ ирис + въпросник
+- Персонализирана за ТОЗИ клиент
+
+Върни масив от детайлни изречения (всяко 2-3 изречения).
 
 JSON формат:
 {
-  "recommendations": ["препоръка 1", "препоръка 2"]
+  "recommendations": ["детайлна препоръка 1", "детайлна препоръка 2"]
 }`
 
       const response = await callLLMWithRetry(prompt, true)
@@ -947,34 +1104,76 @@ JSON формат:
       addLog('info', 'Генериране на специални индивидуални препоръки...')
       
       const uniqueFindings = [
-        ...leftAnalysis.artifacts.map(a => `${a.type} в ${a.location}`),
-        ...rightAnalysis.artifacts.map(a => `${a.type} в ${a.location}`)
+        ...leftAnalysis.artifacts.map(a => ({ type: a.type, location: a.location, description: a.description, severity: a.severity })),
+        ...rightAnalysis.artifacts.map(a => ({ type: a.type, location: a.location, description: a.description, severity: a.severity }))
       ]
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай високо персонализирани специални препоръки на български език базирани на:
+      const highPriorityZones = [
+        ...leftAnalysis.zones.filter(z => z.status === 'concern'),
+        ...rightAnalysis.zones.filter(z => z.status === 'concern')
+      ]
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай ВИСОКО ПЕРСОНАЛИЗИРАНИ специални препоръки на български език базирани на УНИКАЛНАТА комбинация от данни.
+
+КРИТИЧНО ВАЖНО - МУЛТИВАЛЕНТНА ПЕРСОНАЛИЗАЦИЯ:
+Всяка препоръка ТРЯБВА да е УНИКАЛНА за този клиент и базирана на:
+- СПЕЦИФИЧНИ иридологични находки (артефакти, притеснителни зони)
+- СПЕЦИФИЧНИ цели и оплаквания
+- СПЕЦИФИЧНИ навици и начин на живот
+- Комбинацията от ВСИЧКИ данни
 
 УНИКАЛНИ ИРИДОЛОГИЧНИ НАХОДКИ:
-${uniqueFindings.join('\n')}
+Артефакти (детайлно): ${JSON.stringify(uniqueFindings)}
+Притеснителни зони: ${highPriorityZones.map(z => `${z.organ}: ${z.findings}`).join('; ')}
+Общо здраве: ${Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)}/100
 
 СПЕЦИФИЧНИ ЦЕЛИ:
-${questionnaire.goals.join(', ')}
+${questionnaire.goals.map((g, i) => `${i+1}. ${g}`).join('\n')}
 
-ЗДРАВЕН СТАТУС:
-${questionnaire.healthStatus.join(', ')}
+ДЕТАЙЛЕН ПРОФИЛ:
+Възраст: ${questionnaire.age}
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
+Активност: ${questionnaire.activityLevel}
+Хранене: ${questionnaire.dietaryHabits.join(', ')}
+Хранителен профил: ${questionnaire.dietaryProfile.join(', ')}
+Стрес: ${questionnaire.stressLevel}
+Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality})
+Медикаменти: ${questionnaire.medications || 'Няма'}
 
-АКТИВНОСТ: ${questionnaire.activityLevel}
+Създай 8-12 СПЕЦИАЛНИ, ИНДИВИДУАЛНИ препоръки които:
 
-Създай 6-10 специални, индивидуални препоръки които:
-- Адресират конкретните иридологични находки
-- Са фокусирани към личните цели
-- Включват специфични протоколи и практики
-- Са уникални за този пациент
+1. АДРЕСИРАТ конкретните иридологични находки:
+   - За всеки значим артефакт - специфичен протокол
+   - За всяка притеснителна зона - специфични действия
+   - Корелирай с оплакванията
 
-Върни масив от детайлни изречения.
+2. ФОКУСИРАНИ към личните цели:
+   - Конкретни стъпки за постигане на всяка цел
+   - Базирани на реалното състояние от ириса
+   - Реалистична времева рамка
+
+3. ВКЛЮЧВАТ специфични протоколи и практики:
+   - Детайлни инструкции (не общи съвети)
+   - Време, честота, начин на изпълнение
+   - Специфични техники/методи
+
+4. УНИКАЛНИ за този пациент:
+   - Комбинират множество аспекти
+   - Адаптирани към начина на живот
+   - Нещо което няма да се препоръча на друг клиент
+
+ВАЖНО:
+- Всяка препоръка да е ДЕТАЙЛНА (3-5 изречения)
+- Да включва КОНКРЕТНИ действия и протоколи
+- Да е базирана на КОРЕЛАЦИЯ между всички данни
+- Да е УНИКАЛНА и ПЕРСОНАЛИЗИРАНА
+
+Върни масив от детайлни препоръки.
 
 JSON формат:
 {
-  "recommendations": ["препоръка 1", "препоръка 2"]
+  "recommendations": ["детайлна уникална препоръка 1", "детайлна уникална препоръка 2"]
 }`
 
       const response = await callLLMWithRetry(prompt, true)
@@ -997,30 +1196,75 @@ JSON формат:
       addLog('info', 'Генериране на препоръки за медицински изследвания...')
       
       const concernZones = [
-        ...leftAnalysis.zones.filter(z => z.status === 'concern'),
-        ...rightAnalysis.zones.filter(z => z.status === 'concern')
+        ...leftAnalysis.zones.filter(z => z.status === 'concern' || z.status === 'attention'),
+        ...rightAnalysis.zones.filter(z => z.status === 'concern' || z.status === 'attention')
       ]
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Препоръчай медицински изследвания на български език за:
+      const allSystemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+      const systemAverages = new Map<string, number[]>()
+      allSystemScores.forEach(s => {
+        const current = systemAverages.get(s.system) || []
+        systemAverages.set(s.system, [...current, s.score])
+      })
+      const weakSystems = Array.from(systemAverages.entries())
+        .map(([system, scores]) => ({
+          system,
+          score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        }))
+        .filter(s => s.score < 70)
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Препоръчай медицински изследвания на български език базирани на КОРЕЛАЦИЯ между иридологични находки и данни от въпросника.
 
-ЗОНИ С ПРИТЕСНЕНИЯ:
-${concernZones.map(z => `${z.organ}: ${z.findings}`).join('\n')}
+КРИТИЧНО ВАЖНО - ЦЕЛЕНАСОЧЕНИ ИЗСЛЕДВАНИЯ:
+Препоръчвай САМО изследвания които:
+- ВЕРИФИЦИРАТ конкретни иридологични находки
+- Са РЕЛЕВАНТНИ към оплакванията от въпросника
+- Помагат за ПОТВЪРЖДЕНИЕ на корелираните състояния
+- Са ПРАКТИЧНИ и достъпни
 
-ЗДРАВЕН СТАТУС: ${questionnaire.healthStatus.join(', ')}
-ВЪЗРАСТ: ${questionnaire.age}
-ОПЛАКВАНИЯ: ${questionnaire.complaints || 'Няма'}
+ИРИДОЛОГИЧНИ НАХОДКИ:
+Зони с притеснения/внимание: ${concernZones.map(z => `${z.organ}: ${z.findings}`).join('; ')}
+Слаби системи: ${weakSystems.map(s => `${s.system} (${s.score}/100)`).join(', ')}
 
-Препоръчай 8-15 конкретни медицински изследвания/тестове които:
-- Са релевантни към иридологичните находки
-- Помагат за верификация на състоянията
-- Са практични и достъпни
-- Включват кръвни тестове, хормонални панели, образна диагностика
+ДАННИ ОТ ВЪПРОСНИК:
+Възраст: ${questionnaire.age}
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
+Медикаменти: ${questionnaire.medications || 'Няма'}
+Цели: ${questionnaire.goals.join(', ')}
 
-Върни масив от имена на изследвания.
+Препоръчай 12-20 КОНКРЕТНИ медицински изследвания/тестове които:
+
+1. КРЪВНИ ТЕСТОВЕ (базирани на слаби системи):
+   - Пълна кръвна картина
+   - Биохимични показатели
+   - Хормонални панели (ако има индикации)
+   - Витамини и минерали (при конкретни находки)
+
+2. ОБРАЗНА ДИАГНОСТИКА (при притеснителни зони):
+   - Ехография на засегнати органи
+   - Рентген/CT/MRI (при нужда)
+
+3. ФУНКЦИОНАЛНИ ТЕСТОВЕ:
+   - За засегнати системи/органи
+   - Базирани на оплакванията
+
+4. СПЕЦИАЛИЗИРАНИ ИЗСЛЕДВАНИЯ:
+   - Алергични тестове (при индикации)
+   - Хормонални профили
+   - Имунологични изследвания
+
+ВАЖНО:
+- Всяко изследване да има ЯСНА връзка с находка от ириса + въпросника
+- Да е КОНКРЕТНО име на изследване (не общо)
+- Да е ПРАКТИЧНО и достъпно
+- Приоритет на изследвания които потвърждават КОРЕЛИРАНИ находки
+
+Върни масив от конкретни имена на изследвания.
 
 JSON формат:
 {
-  "tests": ["изследване 1", "изследване 2"]
+  "tests": ["конкретно изследване 1", "конкретно изследване 2"]
 }`
 
       const response = await callLLMWithRetry(prompt, true)
@@ -1042,54 +1286,97 @@ JSON формат:
     try {
       addLog('info', 'Генериране на детайлен иридологичен анализ...')
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай задълбочен, детайлен иридологичен анализ на български език (800-1200 думи).
+      const allSystemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+      const systemAverages = new Map<string, number[]>()
+      allSystemScores.forEach(s => {
+        const current = systemAverages.get(s.system) || []
+        systemAverages.set(s.system, [...current, s.score])
+      })
+      const avgSystemScores = Array.from(systemAverages.entries()).map(([system, scores]) => ({
+        system,
+        score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      })).sort((a, b) => a.score - b.score)
+      
+      const concernedZones = [
+        ...leftAnalysis.zones.filter(z => z.status !== 'normal'),
+        ...rightAnalysis.zones.filter(z => z.status !== 'normal')
+      ]
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай задълбочен, детайлен иридологичен анализ на български език (1000-1500 думи).
 
-ДАННИ ЗА АНАЛИЗ:
+КРИТИЧНО ВАЖНО - МУЛТИВАЛЕНТНА КОРЕЛАЦИЯ:
+ВСЕКИ извод, индекс, заключение ТРЯБВА да е базиран на СЛОЖНА ВЗАИМОВРЪЗКА между:
+- Иридологични находки (зони, артефакти, системи)
+- Данни от въпросника (оплаквания, навици, здравен статус)
+- Биометрични данни (възраст, BMI, активност)
+- Целите на клиента
+
+ПРАВИЛА ЗА ЗНАЧИМОСТ:
+1. НАЙ-ВИСОК ПРИОРИТЕТ: Находки които се ПОТВЪРЖДАВАТ от ирис + въпросник + биометрия (пълна корелация)
+2. СРЕДЕН ПРИОРИТЕТ: Находки открояващи се в ириса БЕЗ противоречие с останалата информация
+3. НЕ включвай: Находки от ириса които противоречат на въпросника и общата информация
+
+ИРИДОЛОГИЧНИ ДАННИ:
 Ляв ирис - Здраве: ${leftAnalysis.overallHealth}/100
 Зони: ${JSON.stringify(leftAnalysis.zones.map(z => ({organ: z.organ, status: z.status, findings: z.findings})))}
 Артефакти: ${JSON.stringify(leftAnalysis.artifacts)}
-Системи: ${JSON.stringify(leftAnalysis.systemScores)}
 
 Десен ирис - Здраве: ${rightAnalysis.overallHealth}/100
 Зони: ${JSON.stringify(rightAnalysis.zones.map(z => ({organ: z.organ, status: z.status, findings: z.findings})))}
 Артефакти: ${JSON.stringify(rightAnalysis.artifacts)}
-Системи: ${JSON.stringify(rightAnalysis.systemScores)}
 
-ПАЦИЕНТ:
+Системни оценки (средни): ${avgSystemScores.map(s => `${s.system}: ${s.score}/100`).join(', ')}
+
+ДАННИ ОТ ВЪПРОСНИК:
 Възраст: ${questionnaire.age}, Пол: ${questionnaire.gender}
 BMI: ${(questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)}
 Цели: ${questionnaire.goals.join(', ')}
 Здравен статус: ${questionnaire.healthStatus.join(', ')}
-Оплаквания: ${questionnaire.complaints}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
+Стрес: ${questionnaire.stressLevel}, Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality})
+Активност: ${questionnaire.activityLevel}
+Хранене: ${questionnaire.dietaryHabits.join(', ')}
+Хидратация: ${questionnaire.hydration}л
+Медикаменти: ${questionnaire.medications || 'Няма'}
 
-Създай професионален, задълбочен анализ който включва:
+Засегнати зони (корелирани): ${concernedZones.map(z => z.organ).join(', ')}
+
+СТРУКТУРА НА АНАЛИЗА:
 
 1. ОБЩ ПРЕГЛЕД (2-3 параграфа)
-   - Обща оценка на здравословното състояние
-   - Конституционен тип на ириса
-   - Генетична предразположеност
+   - НЕ споменавай "ляв" или "десен" ирис отделно
+   - Интегрирана оценка на общото здравословно състояние
+   - Конституционен тип базиран на ирис + биометрия + навици
+   - Генетична предразположеност в контекста на семейната история
 
-2. ДЕТАЙЛЕН АНАЛИЗ ПО ЗОНИ (4-5 параграфа)
-   - Подробно описание на всяка проблемна зона
-   - Връзки между зони и системи
-   - Патологични индикатори
+2. КОРЕЛИРАН СИСТЕМЕН АНАЛИЗ (4-5 параграфа)
+   - За всяка слаба система: свържи иридологичните находки с данните от въпросника
+   - Посочи КОНКРЕТНО какви данни от въпросника ПОТВЪРЖДАВАТ находките в ириса
+   - Обясни взаимовръзките между системите
+   - Фокусирай се на системи важни за целите на клиента
 
-3. АРТЕФАКТИ И ЗНАЧЕНИЯ (2-3 параграфа)
+3. ДЕТАЙЛЕН АНАЛИЗ НА ЗАСЕГНАТИ ЗОНИ (3-4 параграфа)
+   - Описание на проблемни зони само ако има КОРЕЛАЦИЯ с въпросника
+   - Обясни връзките между зони, симптоми и оплаквания
+   - Патологични индикатори само ако са ПОТВЪРДЕНИ от множество източници
+
+4. АРТЕФАКТИ И ТЯХНОТО ЗНАЧЕНИЕ (2-3 параграфа)
    - Интерпретация на лакуни, крипти, пигменти
-   - Значение за здравето
-   - Хронология на състоянията
+   - Корелация с хронични състояния от въпросника
+   - Значение в контекста на възраст и здравна история
 
-4. СИСТЕМЕН АНАЛИЗ (3-4 параграфа)
-   - Детайлна оценка на всяка система
-   - Взаимовръзки между системите
-   - Компенсаторни механизми
+5. ПЕРСОНАЛИЗИРАНИ ИЗВОДИ БАЗИРАНИ НА ЦЕЛИТЕ (2-3 параграфа)
+   - Директна връзка между находките и целите на клиента
+   - Какви системи/органи са ключови за постигане на целите
+   - Реалистична прогноза базирана на корелираните данни
+   - Потенциал за подобрение с конкретни обосновки
 
-5. ПЕРСОНАЛИЗИРАНИ ИЗВОДИ (2-3 параграфа)
-   - Връзка с целите на пациента
-   - Специфични рискови фактори
-   - Прогноза и потенциал за подобрение
+Текстът да е:
+- Професионален но разбираем
+- Задълбочен и персонализиран
+- Всеки извод обоснован с корелация
+- Без споменаване на "ляв"/"десен" освен ако не е абсолютно необходимо
 
-Текстът да е професионален, но разбираем за пациента.
 Върни само текста (не JSON), добре структуриран с параграфи.`
 
       const response = await callLLMWithRetry(prompt, false)
@@ -1113,22 +1400,65 @@ BMI: ${(questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)}
       
       const avgHealth = Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай ДВЕ резюмета на български език:
+      const allSystemScores = [...leftAnalysis.systemScores, ...rightAnalysis.systemScores]
+      const systemAverages = new Map<string, number[]>()
+      allSystemScores.forEach(s => {
+        const current = systemAverages.get(s.system) || []
+        systemAverages.set(s.system, [...current, s.score])
+      })
+      const avgSystemScores = Array.from(systemAverages.entries()).map(([system, scores]) => ({
+        system,
+        score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      })).sort((a, b) => a.score - b.score)
+      
+      const concernedZones = [
+        ...leftAnalysis.zones.filter(z => z.status !== 'normal'),
+        ...rightAnalysis.zones.filter(z => z.status !== 'normal')
+      ]
+      const uniqueOrgans = [...new Set(concernedZones.map(z => z.organ))]
+      
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Създай ДВЕ резюмета на български език базирани на КОРЕЛАЦИЯ между иридологичен анализ И данни от въпросника:
 
-1. КРАТКО РЕЗЮМЕ (briefSummary) - 3-5 КЛЮЧОВИ ТОЧКИ като масив
-   - Много кратки, ясни изречения
-   - Само най-важната информация
-   - Фокус върху общото състояние и основни находки
+КРИТИЧНО ВАЖНО - ПРАВИЛА ЗА ВАЛИДНОСТ НА ИЗВОДИТЕ:
+- ВИСОК ПРИОРИТЕТ: Изводи които се потвърждават И от ирис анализа И от въпросника (взаимна корелация)
+- СРЕДЕН ПРИОРИТЕТ: Находки които се виждат само в ириса (без противоречие с въпросника)
+- НУЛЕВ ПРИОРИТЕТ: Игнорирай находки от ириса които ПРОТИВОРЕЧАТ на въпросника и общата информация за клиента
 
-2. МОТИВАЦИОННО РЕЗЮМЕ (motivationalSummary) - 1-2 изречения
-   - Оптимистично и мотивиращо
-   - Обобщава основната идея на плана
-   - Дава увереност и насърчение
+ВАЖНО: В резюмето НЕ споменавай "ляв ирис" или "десен ирис". Фокусирай се на:
+1. Общо здравословно състояние (интегрирана оценка)
+2. Най-засегнати системи по важност към общото здраве
+3. Състояние на системи с пряка важност към целите на клиента
 
-ДАННИ:
+ДАННИ ЗА КОРЕЛАЦИЯ:
+
+ИРИДОЛОГИЧНИ НАХОДКИ:
 Общо здраве: ${avgHealth}/100
+Засегнати органи: ${uniqueOrgans.join(', ')}
+Системни оценки (по важност): ${avgSystemScores.slice(0, 3).map(s => `${s.system}: ${s.score}/100`).join(', ')}
+
+ДАННИ ОТ ВЪПРОСНИК:
+Възраст: ${questionnaire.age}
 Цели: ${questionnaire.goals.join(', ')}
-Основни находки: ${detailedAnalysis.substring(0, 500)}...
+Здравен статус: ${questionnaire.healthStatus.join(', ')}
+Оплаквания: ${questionnaire.complaints || 'Няма'}
+Стрес: ${questionnaire.stressLevel}, Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality})
+Активност: ${questionnaire.activityLevel}
+Хранене: ${questionnaire.dietaryHabits.join(', ')}
+
+ЗАДАЧА:
+
+1. КРАТКО РЕЗЮМЕ (briefSummary) - 3-5 КЛЮЧОВИ ТОЧКИ като масив:
+   - Започни с ОБЩО здраве (не споменавай ляв/десен)
+   - Посочи 2-3 най-засегнати системи които са ВАЖНИ за общото здраве
+   - Посочи системи които имат ПРЯКА връзка с целите на клиента
+   - Всеки извод да е базиран на КОРЕЛАЦИЯ ирис + въпросник
+   - Много кратки, ясни изречения
+
+2. МОТИВАЦИОННО РЕЗЮМЕ (motivationalSummary) - 1-2 изречения:
+   - Оптимистично и мотивиращо
+   - Обобщава основната идея на плана за действие
+   - Дава увереност и насърчение
+   - Базирано на реалистични възможности от анализа
 
 Върни САМО валиден JSON:
 {
