@@ -1,9 +1,22 @@
 export interface QuestionnaireData {
+  name: string
   age: number
   gender: 'male' | 'female' | 'other'
   weight: number
   height: number
   goals: string[]
+  medicalConditions: string
+  familyHistory: string
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active'
+  stressLevel: 'low' | 'moderate' | 'high' | 'very-high'
+  sleepHours: number
+  sleepQuality: 'poor' | 'fair' | 'good' | 'excellent'
+  hydration: number
+  dietaryProfile: string[]
+  dietaryHabits: string[]
+  foodIntolerances: string
+  allergies: string
+  medications: string
   complaints: string
 }
 
