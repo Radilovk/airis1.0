@@ -240,21 +240,59 @@ export default function AnalysisScreen({
             
             addLog('info', 'Опит за поправка на незатворени кавички и скоби...')
             
+            extracted = extracted
+              .replace(/,\s*$/, '')
+              .replace(/,(\s*[}\]])/g, '$1')
+            
             try {
               let fixed = extracted
+              
+              let quoteCount = 0
+              let inString = false
+              const fixedChars: string[] = []
+              
+              for (let i = 0; i < fixed.length; i++) {
+                const char = fixed[i]
+                const prevChar = i > 0 ? fixed[i - 1] : ''
+                
+                if (char === '"' && prevChar !== '\\') {
+                  quoteCount++
+                  inString = !inString
+                }
+                fixedChars.push(char)
+              }
+              
+              if (quoteCount % 2 !== 0) {
+                addLog('warning', 'Незатворен string - добавяне на затваряща кавичка')
+                fixedChars.push('"')
+                inString = false
+              }
+              
+              fixed = fixedChars.join('')
               
               const openBraces = (fixed.match(/\{/g) || []).length
               const closeBraces = (fixed.match(/\}/g) || []).length
               const openBrackets = (fixed.match(/\[/g) || []).length
               const closeBrackets = (fixed.match(/\]/g) || []).length
               
-              if (openBraces > closeBraces) {
-                addLog('warning', `Липсват ${openBraces - closeBraces} затварящи скоби }`)
-                fixed += '}'.repeat(openBraces - closeBraces)
-              }
-              if (openBrackets > closeBrackets) {
-                addLog('warning', `Липсват ${openBrackets - closeBrackets} затварящи скоби ]`)
-                fixed += ']'.repeat(openBrackets - closeBrackets)
+              const missingBraces = openBraces - closeBraces
+              const missingBrackets = openBrackets - closeBrackets
+              
+              if (missingBrackets > 0 || missingBraces > 0) {
+                addLog('warning', `Липсват ${missingBrackets} затварящи скоби ] и ${missingBraces} затварящи скоби }`)
+                
+                const lastChar = fixed.trim().slice(-1)
+                const needsComma = lastChar !== ',' && lastChar !== '[' && lastChar !== '{'
+                
+                if (missingBrackets > 0) {
+                  if (needsComma && (lastChar === '"' || lastChar === '}')) {
+                    fixed = fixed.trimEnd()
+                  }
+                  fixed += ']'.repeat(missingBrackets)
+                }
+                if (missingBraces > 0) {
+                  fixed += '}'.repeat(missingBraces)
+                }
               }
               
               const result = JSON.parse(fixed)
@@ -273,11 +311,14 @@ export default function AnalysisScreen({
                 const openBrackets = (aggressive.match(/\[/g) || []).length
                 const closeBrackets = (aggressive.match(/\]/g) || []).length
                 
-                if (openBrackets > closeBrackets) {
-                  aggressive += ']'.repeat(openBrackets - closeBrackets)
+                const missingBrackets = openBrackets - closeBrackets
+                const missingBraces = openBraces - closeBraces
+                
+                if (missingBrackets > 0) {
+                  aggressive += ']'.repeat(missingBrackets)
                 }
-                if (openBraces > closeBraces) {
-                  aggressive += '}'.repeat(openBraces - closeBraces)
+                if (missingBraces > 0) {
+                  aggressive += '}'.repeat(missingBraces)
                 }
                 
                 const result = JSON.parse(aggressive)
