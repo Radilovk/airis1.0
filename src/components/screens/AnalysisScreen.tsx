@@ -139,25 +139,41 @@ export default function AnalysisScreen({
     
     const provider = aiConfig?.provider || 'github-spark'
     const configuredModel = aiConfig?.model || 'gpt-4o'
-    const useCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && provider !== 'github-spark'
     const requestDelay = aiConfig?.requestDelay || 60000
     
+    const hasCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
+    const useCustomAPI = hasCustomAPI && provider !== 'github-spark'
+    
+    console.log(`🔍 [LLM CONFIG DEBUG] Provider от конфигурация: "${provider}"`)
+    console.log(`🔍 [LLM CONFIG DEBUG] Model от конфигурация: "${configuredModel}"`)
+    console.log(`🔍 [LLM CONFIG DEBUG] useCustomKey flag: ${aiConfig?.useCustomKey}`)
+    console.log(`🔍 [LLM CONFIG DEBUG] Has API key: ${!!(aiConfig?.apiKey && aiConfig.apiKey.trim() !== '')}`)
+    console.log(`🔍 [LLM CONFIG DEBUG] hasCustomAPI: ${hasCustomAPI}`)
+    console.log(`🔍 [LLM CONFIG DEBUG] useCustomAPI (final): ${useCustomAPI}`)
+    
     let actualModel: string
-    if (provider === 'github-spark') {
+    let actualProvider: string = provider
+    
+    if (!useCustomAPI) {
+      actualProvider = 'github-spark'
       actualModel = getValidSparkModel(configuredModel)
-      console.log(`🎯 [LLM CONFIG] Provider: ${provider}`)
+      console.log(`🎯 [LLM CONFIG] Fallback към GitHub Spark`)
+      console.log(`🎯 [LLM CONFIG] Provider (актуален): ${actualProvider}`)
       console.log(`🎯 [LLM CONFIG] Избран модел от настройки: "${configuredModel}"`)
       console.log(`🎯 [LLM CONFIG] Валидиран модел за Spark: "${actualModel}"`)
-      addLog('info', `✓ AI Конфигурация заредена: ${provider} / ${actualModel}`)
+      addLog('info', `✓ AI Конфигурация заредена: ${actualProvider} / ${actualModel}`)
     } else {
       actualModel = configuredModel
-      console.log(`🎯 [LLM CONFIG] Provider: ${provider}, useCustomAPI: ${useCustomAPI}`)
-      console.log(`🎯 [LLM CONFIG] Избран модел: "${actualModel}"`)
+      actualProvider = provider
+      console.log(`🎯 [LLM CONFIG] Използване на собствен API`)
+      console.log(`🎯 [LLM CONFIG] Provider: ${actualProvider}`)
+      console.log(`🎯 [LLM CONFIG] Model: ${actualModel}`)
+      addLog('info', `✓ AI Конфигурация заредена: ${actualProvider} / ${actualModel}`)
     }
     
     if (useCustomAPI) {
-      addLog('info', `🔧 Режим: Собствен API (${provider} - ${actualModel}) | Забавяне: ${requestDelay}ms`)
-      console.log(`🔧 [LLM] Използване на собствен ${provider} API с модел: ${actualModel}`)
+      addLog('info', `🔧 Режим: Собствен API (${actualProvider} - ${actualModel}) | Забавяне: ${requestDelay}ms`)
+      console.log(`🔧 [LLM] Използване на собствен ${actualProvider} API с модел: ${actualModel}`)
     } else {
       addLog('info', `🔧 Режим: GitHub Spark вграден модел (${actualModel}) | Забавяне: ${requestDelay}ms`)
       console.log(`🔧 [LLM] Използване на GitHub Spark API с модел: ${actualModel}`)
@@ -171,15 +187,15 @@ export default function AnalysisScreen({
           await sleep(waitTime)
         }
         
-        addLog('info', `LLM заявка (опит ${attempt}/${maxRetries}) към ${provider}/${actualModel}...`)
-        console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${provider} с модел ${actualModel}`)
+        addLog('info', `LLM заявка (опит ${attempt}/${maxRetries}) към ${actualProvider}/${actualModel}...`)
+        console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${actualProvider} с модел ${actualModel}`)
         
         let response: string
         if (useCustomAPI) {
-          addLog('info', `→ Извикване на външен API: ${provider}/${actualModel}`)
+          addLog('info', `→ Извикване на външен API: ${actualProvider}/${actualModel}`)
           response = await callExternalAPI(
             prompt,
-            provider as 'openai' | 'gemini',
+            actualProvider as 'openai' | 'gemini',
             actualModel,
             aiConfig!.apiKey,
             jsonMode
@@ -192,7 +208,7 @@ export default function AnalysisScreen({
         
         if (response && response.length > 0) {
           addLog('success', `LLM отговори успешно (${response.length} символа)`)
-          console.log(`✅ [LLM] Успешен отговор от ${provider}/${actualModel}`)
+          console.log(`✅ [LLM] Успешен отговор от ${actualProvider}/${actualModel}`)
           return response
         } else {
           throw new Error('Празен отговор от LLM')
@@ -405,19 +421,25 @@ ${response}
     if (aiConfig && !analysisStarted) {
       setAnalysisStarted(true)
       
-      const useCustomAPI = aiConfig.useCustomKey && aiConfig.apiKey && aiConfig.provider !== 'github-spark'
-      let modelToUse: string
+      const hasCustomAPI = aiConfig.useCustomKey && aiConfig.apiKey && aiConfig.apiKey.trim() !== ''
+      const useCustomAPI = hasCustomAPI && aiConfig.provider !== 'github-spark'
       
-      if (aiConfig.provider === 'github-spark' || !useCustomAPI) {
+      let modelToUse: string
+      let providerToUse: string
+      
+      if (!useCustomAPI) {
+        providerToUse = 'github-spark'
         modelToUse = getValidSparkModel(aiConfig.model)
-        console.log(`🔧 [CONFIG] GitHub Spark режим - Конфигуриран модел: "${aiConfig.model}", валиден Spark модел: "${modelToUse}"`)
+        console.log(`🔧 [CONFIG] Fallback към GitHub Spark - Конфигуриран модел: "${aiConfig.model}", валиден Spark модел: "${modelToUse}"`)
       } else {
+        providerToUse = aiConfig.provider
         modelToUse = aiConfig.model
-        console.log(`🔧 [CONFIG] Собствен API режим - Provider: ${aiConfig.provider}, модел: "${modelToUse}"`)
+        console.log(`🔧 [CONFIG] Собствен API режим - Provider: ${providerToUse}, модел: "${modelToUse}"`)
       }
       
-      addLog('info', `✓ AI Конфигурация заредена: ${aiConfig.provider} / ${modelToUse}`)
+      addLog('info', `✓ AI Конфигурация заредена: ${providerToUse} / ${modelToUse}`)
       console.log('🔧 [CONFIG] AI конфигурация заредена:', aiConfig)
+      console.log('🎯 [CONFIG] Provider който ще се използва:', providerToUse)
       console.log('🎯 [CONFIG] Модел който ще се използва:', modelToUse)
       performAnalysis()
     }
@@ -425,31 +447,38 @@ ${response}
 
   const performAnalysis = async () => {
     try {
-      const useCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig?.provider !== 'github-spark'
       const provider = aiConfig?.provider || 'github-spark'
-      let modelToUse: string
+      const configuredModel = aiConfig?.model || 'gpt-4o'
+      const requestDelay = aiConfig?.requestDelay || 60000
+      const requestCount = aiConfig?.requestCount || 8
       
-      if (provider === 'github-spark' || !useCustomAPI) {
-        const configuredModel = aiConfig?.model || 'gpt-4o'
-        modelToUse = getValidSparkModel(configuredModel)
-        console.log(`🚀 [АНАЛИЗ] GitHub Spark режим - Конфигуриран: "${configuredModel}", валиден: "${modelToUse}"`)
+      const hasCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
+      const useCustomAPI = hasCustomAPI && provider !== 'github-spark'
+      
+      let actualModel: string
+      let actualProvider: string = provider
+      
+      if (!useCustomAPI) {
+        actualProvider = 'github-spark'
+        actualModel = getValidSparkModel(configuredModel)
+        console.log(`🚀 [АНАЛИЗ] Fallback към GitHub Spark - Конфигуриран: "${configuredModel}", валиден: "${actualModel}"`)
       } else {
-        modelToUse = aiConfig?.model || 'gpt-4o'
-        console.log(`🚀 [АНАЛИЗ] Собствен API режим - Provider: ${provider}, модел: "${modelToUse}"`)
+        actualModel = configuredModel
+        actualProvider = provider
+        console.log(`🚀 [АНАЛИЗ] Собствен API режим - Provider: ${actualProvider}, модел: "${actualModel}"`)
       }
       
       addLog('info', 'Стартиране на анализ...')
-      addLog('info', `⚙️ AI Настройки: Provider=${provider}, Model=${modelToUse}, CustomAPI=${useCustomAPI}`)
-      addLog('info', `⚙️ Параметри: Забавяне=${aiConfig?.requestDelay || 60000}ms, Заявки=${aiConfig?.requestCount || 8}`)
+      addLog('info', `⚙️ AI Настройки: Provider=${actualProvider}, Model=${actualModel}, CustomAPI=${useCustomAPI}`)
+      addLog('info', `⚙️ Параметри: Забавяне=${requestDelay}ms, Заявки=${requestCount}`)
       addLog('info', `Данни от въпросник: Възраст ${questionnaireData.age}, Пол ${questionnaireData.gender}`)
       addLog('info', `Здравни цели: ${questionnaireData.goals.join(', ')}`)
       console.log('🚀 [АНАЛИЗ] Стартиране на анализ...')
       console.log('⚙️ [АНАЛИЗ] AI Конфигурация:', aiConfig)
-      console.log('🎯 [АНАЛИЗ] Модел който ще се използва:', modelToUse)
+      console.log('🎯 [АНАЛИЗ] Provider който ще се използва:', actualProvider)
+      console.log('🎯 [АНАЛИЗ] Модел който ще се използва:', actualModel)
       console.log('📊 [АНАЛИЗ] Данни от въпросник:', questionnaireData)
       
-      const requestDelay = aiConfig?.requestDelay || 60000
-      const requestCount = aiConfig?.requestCount || 8
       const progressPerStep = 90 / requestCount
       let currentProgress = 5
       
