@@ -141,13 +141,16 @@ export default function AnalysisScreen({
     const configuredModel = aiConfig?.model || 'gpt-4o'
     const requestDelay = aiConfig?.requestDelay || 60000
     
-    const hasCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
-    const useCustomAPI = hasCustomAPI && (provider === 'gemini' || provider === 'openai')
+    const hasAPIKey = aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
+    const isExternalProvider = provider === 'gemini' || provider === 'openai'
+    const hasCustomAPI = hasAPIKey && isExternalProvider
+    const useCustomAPI = hasCustomAPI || (aiConfig?.useCustomKey && hasAPIKey && isExternalProvider)
     
     console.log(`🔍 [LLM CONFIG DEBUG] Provider от конфигурация: "${provider}"`)
     console.log(`🔍 [LLM CONFIG DEBUG] Model от конфигурация: "${configuredModel}"`)
     console.log(`🔍 [LLM CONFIG DEBUG] useCustomKey flag: ${aiConfig?.useCustomKey}`)
-    console.log(`🔍 [LLM CONFIG DEBUG] Has API key: ${!!(aiConfig?.apiKey && aiConfig.apiKey.trim() !== '')}`)
+    console.log(`🔍 [LLM CONFIG DEBUG] Has API key: ${hasAPIKey}`)
+    console.log(`🔍 [LLM CONFIG DEBUG] isExternalProvider: ${isExternalProvider}`)
     console.log(`🔍 [LLM CONFIG DEBUG] hasCustomAPI: ${hasCustomAPI}`)
     console.log(`🔍 [LLM CONFIG DEBUG] useCustomAPI (final): ${useCustomAPI}`)
     
@@ -418,11 +421,19 @@ ${response}
     if (aiConfig && !analysisStarted) {
       setAnalysisStarted(true)
       
-      const hasCustomAPI = aiConfig.useCustomKey && aiConfig.apiKey && aiConfig.apiKey.trim() !== ''
-      const useCustomAPI = hasCustomAPI && (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai')
+      const hasAPIKey = aiConfig.apiKey && aiConfig.apiKey.trim() !== ''
+      const isExternalProvider = aiConfig.provider === 'gemini' || aiConfig.provider === 'openai'
+      const hasCustomAPI = hasAPIKey && isExternalProvider
+      const useCustomAPI = hasCustomAPI || (aiConfig.useCustomKey && hasAPIKey && isExternalProvider)
       
       let modelToUse: string
       let providerToUse: string
+      
+      console.log('🔍 [CONFIG DEBUG] aiConfig:', aiConfig)
+      console.log('🔍 [CONFIG DEBUG] hasAPIKey:', hasAPIKey)
+      console.log('🔍 [CONFIG DEBUG] isExternalProvider:', isExternalProvider)
+      console.log('🔍 [CONFIG DEBUG] hasCustomAPI:', hasCustomAPI)
+      console.log('🔍 [CONFIG DEBUG] useCustomAPI (final):', useCustomAPI)
       
       if (!useCustomAPI) {
         providerToUse = 'github-spark'
@@ -449,8 +460,10 @@ ${response}
       const requestDelay = aiConfig?.requestDelay || 60000
       const requestCount = aiConfig?.requestCount || 8
       
-      const hasCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
-      const useCustomAPI = hasCustomAPI && (provider === 'gemini' || provider === 'openai')
+      const hasAPIKey = aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
+      const isExternalProvider = provider === 'gemini' || provider === 'openai'
+      const hasCustomAPI = hasAPIKey && isExternalProvider
+      const useCustomAPI = hasCustomAPI || (aiConfig?.useCustomKey && hasAPIKey && isExternalProvider)
       
       let actualModel: string
       let actualProvider: string = provider
