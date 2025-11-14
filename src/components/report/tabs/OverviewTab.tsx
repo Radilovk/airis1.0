@@ -251,30 +251,77 @@ function calculateGoalAchievability(report: AnalysisReport): Record<string, numb
 
 function getSupportingFactors(report: AnalysisReport): string[] {
   const factors: string[] = []
-
-  if (report.questionnaireData.sleepHours >= 7 && report.questionnaireData.sleepQuality === 'good' || report.questionnaireData.sleepQuality === 'excellent') {
-    factors.push('Добро качество на съня')
-  }
-
-  if (report.questionnaireData.hydration >= 2) {
-    factors.push('Адекватна хидратация')
-  }
-
-  if (report.questionnaireData.activityLevel === 'active' || report.questionnaireData.activityLevel === 'very-active') {
-    factors.push('Висока физическа активност')
-  }
-
-  if (report.questionnaireData.stressLevel === 'low' || report.questionnaireData.stressLevel === 'moderate') {
-    factors.push('Управляем стрес')
-  }
-
   const avgHealth = (report.leftIris.overallHealth + report.rightIris.overallHealth) / 2
-  if (avgHealth >= 70) {
-    factors.push('Добро базово здравословно състояние')
+
+  const nervousSystemScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('нервна'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('нервна')).length)
+
+  if (report.questionnaireData.sleepHours >= 7 && 
+     (report.questionnaireData.sleepQuality === 'good' || report.questionnaireData.sleepQuality === 'excellent') &&
+     nervousSystemScore >= 65) {
+    factors.push('Добро качество на съня подкрепено от здрава нервна система')
   }
 
-  if (report.questionnaireData.dietaryProfile.includes('Вегетариански') || report.questionnaireData.dietaryProfile.includes('Балансирана диета')) {
-    factors.push('Здравословен хранителен профил')
+  const detoxSystemScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('детоксикац'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('детоксикац')).length)
+
+  if (report.questionnaireData.hydration >= 2 && detoxSystemScore >= 65) {
+    factors.push('Добра хидратация и ефективна детоксикация')
+  }
+
+  const cardiovascularScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('сърдечно') || s.system.toLowerCase().includes('съдова'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('сърдечно') || s.system.toLowerCase().includes('съдова')).length)
+
+  if ((report.questionnaireData.activityLevel === 'active' || report.questionnaireData.activityLevel === 'very-active') &&
+      cardiovascularScore >= 65) {
+    factors.push('Висока физическа активност с добро сърдечно-съдово състояние')
+  }
+
+  if ((report.questionnaireData.stressLevel === 'low' || report.questionnaireData.stressLevel === 'moderate') &&
+      nervousSystemScore >= 65) {
+    factors.push('Управляем стрес и стабилна нервна система')
+  }
+
+  if (avgHealth >= 70) {
+    factors.push('Добро базово здравословно състояние според иридологичния анализ')
+  }
+
+  const digestiveScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('храносмил'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('храносмил')).length)
+
+  if ((report.questionnaireData.dietaryProfile.includes('Вегетариански') || 
+       report.questionnaireData.dietaryProfile.includes('Балансирана диета')) &&
+      digestiveScore >= 65) {
+    factors.push('Здравословен хранителен профил с добра храносмилателна система')
+  }
+
+  const immuneScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('имунна'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('имунна')).length)
+
+  if (immuneScore >= 75) {
+    factors.push('Силна имунна система според иридологичния анализ')
+  }
+
+  const concernZones = report.leftIris.zones.filter(z => z.status === 'concern').length + 
+                       report.rightIris.zones.filter(z => z.status === 'concern').length
+  
+  if (concernZones === 0 && avgHealth >= 75) {
+    factors.push('Отсъствие на притеснителни зони в ириса')
   }
 
   return factors
@@ -283,34 +330,86 @@ function getSupportingFactors(report: AnalysisReport): string[] {
 function getLimitingFactors(report: AnalysisReport): string[] {
   const factors: string[] = []
 
-  if (report.questionnaireData.sleepHours < 6 || report.questionnaireData.sleepQuality === 'poor') {
-    factors.push('Недостатъчен или лошо качество сън')
+  const nervousSystemScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('нервна'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('нервна')).length)
+
+  if ((report.questionnaireData.sleepHours < 6 || report.questionnaireData.sleepQuality === 'poor') &&
+      nervousSystemScore < 60) {
+    factors.push('Недостатъчен или лошо качество сън с отражение върху нервната система')
   }
 
-  if (report.questionnaireData.hydration < 1.5) {
-    factors.push('Недостатъчна хидратация')
+  const detoxSystemScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('детоксикац'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('детоксикац')).length)
+
+  if (report.questionnaireData.hydration < 1.5 && detoxSystemScore < 65) {
+    factors.push('Недостатъчна хидратация влошаваща детоксикацията')
   }
 
-  if (report.questionnaireData.activityLevel === 'sedentary') {
-    factors.push('Ниска физическа активност')
+  const cardiovascularScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('сърдечно') || s.system.toLowerCase().includes('съдова'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('сърдечно') || s.system.toLowerCase().includes('съдова')).length)
+
+  if (report.questionnaireData.activityLevel === 'sedentary' && cardiovascularScore < 70) {
+    factors.push('Ниска физическа активност с отражение върху сърдечно-съдовата система')
   }
 
-  if (report.questionnaireData.stressLevel === 'high' || report.questionnaireData.stressLevel === 'very-high') {
-    factors.push('Висок стрес')
+  if ((report.questionnaireData.stressLevel === 'high' || report.questionnaireData.stressLevel === 'very-high') &&
+      nervousSystemScore < 65) {
+    factors.push('Висок стрес влошаващ състоянието на нервната система')
   }
 
   const concernZones = report.leftIris.zones.filter(z => z.status === 'concern').length + 
                        report.rightIris.zones.filter(z => z.status === 'concern').length
   if (concernZones > 3) {
-    factors.push(`${concernZones} зони с притеснения в ириса`)
+    factors.push(`${concernZones} зони с притеснения според иридологичния анализ`)
   }
 
-  if (report.questionnaireData.dietaryHabits.includes('Бърза храна') || report.questionnaireData.dietaryHabits.includes('Много сладки храни')) {
-    factors.push('Нездравословни хранителни навици')
+  const digestiveScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+    .filter(s => s.system.toLowerCase().includes('храносмил'))
+    .reduce((sum, s) => sum + s.score, 0) / 
+    Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+      .filter(s => s.system.toLowerCase().includes('храносмил')).length)
+
+  if ((report.questionnaireData.dietaryHabits.includes('Бърза храна') || 
+       report.questionnaireData.dietaryHabits.includes('Много сладки храни')) &&
+      digestiveScore < 65) {
+    factors.push('Нездравословни хранителни навици с отражение върху храносмилателната система')
   }
 
-  if (report.questionnaireData.medications && report.questionnaireData.medications.trim() !== '') {
-    factors.push('Текущ прием на медикаменти')
+  const avgHealth = (report.leftIris.overallHealth + report.rightIris.overallHealth) / 2
+  if (avgHealth < 60) {
+    factors.push('Общо ниско здравословно състояние според иридологичния анализ')
+  }
+
+  const attentionZones = report.leftIris.zones.filter(z => z.status === 'attention').length + 
+                         report.rightIris.zones.filter(z => z.status === 'attention').length
+  if (attentionZones > 5) {
+    factors.push(`${attentionZones} зони изискващи внимание според иридологичния анализ`)
+  }
+
+  const allSystemScores = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
+  const systemAverages = new Map<string, number[]>()
+  allSystemScores.forEach(s => {
+    const current = systemAverages.get(s.system) || []
+    systemAverages.set(s.system, [...current, s.score])
+  })
+  const weakSystems = Array.from(systemAverages.entries())
+    .map(([system, scores]) => ({
+      system,
+      score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+    }))
+    .filter(s => s.score < 55)
+  
+  if (weakSystems.length > 0) {
+    factors.push(`Слаби органни системи: ${weakSystems.map(s => s.system).slice(0, 2).join(', ')}`)
   }
 
   return factors

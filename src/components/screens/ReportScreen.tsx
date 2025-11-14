@@ -28,220 +28,456 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
 
   const handleExport = async () => {
     try {
-      const jsPDF = (await import('jspdf')).jsPDF
-      const doc = new jsPDF()
-      const pageWidth = doc.internal.pageSize.getWidth()
-      const margin = 20
-      let yPos = 20
-
-      doc.setFontSize(18)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ИРИДОЛОГИЧЕН ДОКЛАД', pageWidth / 2, yPos, { align: 'center' })
-      yPos += 10
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Дата: ${new Date(report.timestamp).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth / 2, yPos, { align: 'center' })
-      yPos += 15
-
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('БИОМЕТРИЧНИ ДАННИ', margin, yPos)
-      yPos += 7
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Име: ${report.questionnaireData.name}`, margin, yPos)
-      yPos += 5
-      doc.text(`Възраст: ${report.questionnaireData.age} години | Пол: ${report.questionnaireData.gender === 'male' ? 'Мъж' : report.questionnaireData.gender === 'female' ? 'Жена' : 'Друго'}`, margin, yPos)
-      yPos += 5
-      doc.text(`Тегло: ${report.questionnaireData.weight} кг | Ръст: ${report.questionnaireData.height} см | BMI: ${(report.questionnaireData.weight / ((report.questionnaireData.height / 100) ** 2)).toFixed(1)}`, margin, yPos)
-      yPos += 10
-
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ЗДРАВНИ ЦЕЛИ', margin, yPos)
-      yPos += 7
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      report.questionnaireData.goals.forEach((goal) => {
-        doc.text(`• ${goal}`, margin + 5, yPos)
-        yPos += 5
-      })
-      yPos += 5
-
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ОБОБЩЕНИЕ', margin, yPos)
-      yPos += 7
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      const summaryLines = doc.splitTextToSize(report.briefSummary || report.summary, pageWidth - 2 * margin)
-      summaryLines.forEach((line: string) => {
-        if (yPos > 270) {
-          doc.addPage()
-          yPos = 20
-        }
-        doc.text(line, margin, yPos)
-        yPos += 5
-      })
-      yPos += 5
-
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('РЕЗУЛТАТИ', margin, yPos)
-      yPos += 7
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Общо здравословно състояние: ${avgHealth}/100`, margin, yPos)
-      yPos += 5
-      doc.text(`Ляв ирис: ${report.leftIris.overallHealth}/100`, margin, yPos)
-      yPos += 5
-      doc.text(`Десен ирис: ${report.rightIris.overallHealth}/100`, margin, yPos)
-      yPos += 5
-      doc.text(`Зони за внимание: ${report.leftIris.zones.filter(z => z.status !== 'normal').length + report.rightIris.zones.filter(z => z.status !== 'normal').length}`, margin, yPos)
-      yPos += 10
-
-      if (yPos > 240) {
-        doc.addPage()
-        yPos = 20
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        toast.error('Моля, разрешете pop-up прозорците')
+        return
       }
 
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ЛЯВ ИРИС - ЗОНИ С ОТКЛОНЕНИЯ', margin, yPos)
-      yPos += 7
+      const bmi = (report.questionnaireData.weight / ((report.questionnaireData.height / 100) ** 2)).toFixed(1)
+      const concernZones = report.leftIris.zones.filter(z => z.status !== 'normal').length + 
+                          report.rightIris.zones.filter(z => z.status !== 'normal').length
 
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      report.leftIris.zones.filter(z => z.status !== 'normal').forEach((z) => {
-        if (yPos > 270) {
-          doc.addPage()
-          yPos = 20
-        }
-        doc.setFont('helvetica', 'bold')
-        doc.text(`${z.name} (${z.organ})`, margin, yPos)
-        yPos += 4
-        doc.setFont('helvetica', 'normal')
-        doc.text(`Статус: ${z.status === 'attention' ? 'Внимание' : 'Притеснение'}`, margin + 5, yPos)
-        yPos += 4
-        const findingsLines = doc.splitTextToSize(`Находки: ${z.findings}`, pageWidth - 2 * margin - 10)
-        findingsLines.forEach((line: string) => {
-          if (yPos > 270) {
-            doc.addPage()
-            yPos = 20
-          }
-          doc.text(line, margin + 5, yPos)
-          yPos += 4
-        })
-        yPos += 2
-      })
-
-      if (yPos > 240) {
-        doc.addPage()
-        yPos = 20
+      const htmlContent = `
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Иридологичен Доклад - ${report.questionnaireData.name}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 2cm;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: white;
+    }
+    .page {
+      page-break-after: always;
+      padding: 20px 0;
+    }
+    .page:last-child {
+      page-break-after: auto;
+    }
+    h1 {
+      color: #2563eb;
+      font-size: 24px;
+      margin-bottom: 10px;
+      text-align: center;
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #1e40af;
+      font-size: 18px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      border-left: 4px solid #2563eb;
+      padding-left: 10px;
+    }
+    h3 {
+      color: #1e40af;
+      font-size: 14px;
+      margin-top: 15px;
+      margin-bottom: 8px;
+    }
+    p {
+      margin-bottom: 10px;
+      text-align: justify;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .date {
+      color: #666;
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 15px 0;
+      padding: 15px;
+      background: #f8fafc;
+      border-radius: 8px;
+    }
+    .info-item {
+      padding: 5px 0;
+    }
+    .info-label {
+      font-weight: bold;
+      color: #475569;
+    }
+    .score-box {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border: 2px solid #2563eb;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .score-value {
+      font-size: 48px;
+      font-weight: bold;
+      color: #2563eb;
+      line-height: 1;
+    }
+    .score-label {
+      font-size: 14px;
+      color: #64748b;
+      margin-top: 5px;
+    }
+    .goals {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .goal-tag {
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .summary-box {
+      background: #f8fafc;
+      border-left: 4px solid #2563eb;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .summary-box p {
+      margin-bottom: 8px;
+    }
+    .zone-card {
+      background: #fffbeb;
+      border: 1px solid #fbbf24;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      page-break-inside: avoid;
+    }
+    .zone-card.concern {
+      background: #fef2f2;
+      border-color: #ef4444;
+    }
+    .zone-header {
+      font-weight: bold;
+      color: #92400e;
+      margin-bottom: 5px;
+    }
+    .zone-card.concern .zone-header {
+      color: #991b1b;
+    }
+    .zone-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+    .zone-status.attention {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .zone-status.concern {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .food-list {
+      margin: 10px 0;
+    }
+    .food-item {
+      padding: 8px 12px;
+      margin: 5px 0;
+      border-radius: 6px;
+      page-break-inside: avoid;
+    }
+    .food-item.recommended {
+      background: #dcfce7;
+      border-left: 3px solid #16a34a;
+    }
+    .food-item.avoid {
+      background: #fee2e2;
+      border-left: 3px solid #dc2626;
+    }
+    .supplement-card {
+      background: #f0f9ff;
+      border: 1px solid #0ea5e9;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      page-break-inside: avoid;
+    }
+    .supplement-name {
+      font-weight: bold;
+      color: #0369a1;
+      margin-bottom: 5px;
+    }
+    .supplement-details {
+      font-size: 12px;
+      color: #475569;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+      font-style: italic;
+    }
+    .analysis-text {
+      text-align: justify;
+      line-height: 1.8;
+      margin: 15px 0;
+    }
+    ul {
+      margin: 10px 0 10px 20px;
+    }
+    li {
+      margin-bottom: 5px;
+    }
+    @media print {
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
       }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>ИРИДОЛОГИЧЕН ДОКЛАД</h1>
+      <div class="date">
+        Дата: ${new Date(report.timestamp).toLocaleDateString('bg-BG', { 
+          day: 'numeric', 
+          month: 'long', 
+          year: 'numeric' 
+        })}
+      </div>
+    </div>
 
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ДЕСЕН ИРИС - ЗОНИ С ОТКЛОНЕНИЯ', margin, yPos)
-      yPos += 7
+    <h2>Биометрични данни</h2>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">Име:</span> ${report.questionnaireData.name}
+      </div>
+      <div class="info-item">
+        <span class="info-label">Възраст:</span> ${report.questionnaireData.age} години
+      </div>
+      <div class="info-item">
+        <span class="info-label">Пол:</span> ${report.questionnaireData.gender === 'male' ? 'Мъж' : report.questionnaireData.gender === 'female' ? 'Жена' : 'Друго'}
+      </div>
+      <div class="info-item">
+        <span class="info-label">BMI:</span> ${bmi}
+      </div>
+      <div class="info-item">
+        <span class="info-label">Тегло:</span> ${report.questionnaireData.weight} кг
+      </div>
+      <div class="info-item">
+        <span class="info-label">Ръст:</span> ${report.questionnaireData.height} см
+      </div>
+    </div>
 
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      report.rightIris.zones.filter(z => z.status !== 'normal').forEach((z) => {
-        if (yPos > 270) {
-          doc.addPage()
-          yPos = 20
-        }
-        doc.setFont('helvetica', 'bold')
-        doc.text(`${z.name} (${z.organ})`, margin, yPos)
-        yPos += 4
-        doc.setFont('helvetica', 'normal')
-        doc.text(`Статус: ${z.status === 'attention' ? 'Внимание' : 'Притеснение'}`, margin + 5, yPos)
-        yPos += 4
-        const findingsLines = doc.splitTextToSize(`Находки: ${z.findings}`, pageWidth - 2 * margin - 10)
-        findingsLines.forEach((line: string) => {
-          if (yPos > 270) {
-            doc.addPage()
-            yPos = 20
-          }
-          doc.text(line, margin + 5, yPos)
-          yPos += 4
-        })
-        yPos += 2
-      })
+    <h2>Здравни цели</h2>
+    <div class="goals">
+      ${report.questionnaireData.goals.map(goal => `<span class="goal-tag">${goal}</span>`).join('')}
+    </div>
 
-      if (yPos > 240) {
-        doc.addPage()
-        yPos = 20
-      }
+    <h2>Обобщение</h2>
+    <div class="score-box">
+      <div class="score-value">${avgHealth}</div>
+      <div class="score-label">Общо здравословно състояние (от 100)</div>
+    </div>
+    
+    ${report.briefSummary ? `
+      <div class="summary-box">
+        ${report.briefSummary.split('\n').filter(line => line.trim()).map(point => 
+          `<p>• ${point.replace(/^•\s*/, '')}</p>`
+        ).join('')}
+      </div>
+    ` : ''}
 
-      if (report.detailedPlan) {
-        doc.setFontSize(12)
-        doc.setFont('helvetica', 'bold')
-        doc.text('ХРАНИТЕЛНИ ПРЕПОРЪКИ', margin, yPos)
-        yPos += 7
+    <h2>Резултати от анализа</h2>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">Ляв ирис:</span> ${report.leftIris.overallHealth}/100
+      </div>
+      <div class="info-item">
+        <span class="info-label">Десен ирис:</span> ${report.rightIris.overallHealth}/100
+      </div>
+      <div class="info-item">
+        <span class="info-label">Зони за внимание:</span> ${concernZones}
+      </div>
+      <div class="info-item">
+        <span class="info-label">Артефакти:</span> ${report.leftIris.artifacts.length + report.rightIris.artifacts.length}
+      </div>
+    </div>
+  </div>
 
-        if (report.detailedPlan.recommendedFoods.length > 0) {
-          doc.setFontSize(10)
-          doc.setFont('helvetica', 'bold')
-          doc.text('Препоръчителни храни:', margin, yPos)
-          yPos += 5
-          doc.setFontSize(9)
-          doc.setFont('helvetica', 'normal')
-          report.detailedPlan.recommendedFoods.slice(0, 10).forEach((food) => {
-            if (yPos > 270) {
-              doc.addPage()
-              yPos = 20
-            }
-            doc.text(`✓ ${food}`, margin + 5, yPos)
-            yPos += 4
-          })
-          yPos += 3
-        }
+  <div class="page">
+    <h2>Иридологични находки - Ляв ирис</h2>
+    ${report.leftIris.zones.filter(z => z.status !== 'normal').length > 0 ? `
+      ${report.leftIris.zones.filter(z => z.status !== 'normal').map(zone => `
+        <div class="zone-card ${zone.status}">
+          <div class="zone-header">
+            ${zone.name} (${zone.organ})
+            <span class="zone-status ${zone.status}">
+              ${zone.status === 'attention' ? 'Внимание' : 'Притеснение'}
+            </span>
+          </div>
+          <p>${zone.findings}</p>
+        </div>
+      `).join('')}
+    ` : '<p>Всички зони са в норма</p>'}
 
-        if (report.detailedPlan.avoidFoods.length > 0) {
-          if (yPos > 250) {
-            doc.addPage()
-            yPos = 20
-          }
-          doc.setFontSize(10)
-          doc.setFont('helvetica', 'bold')
-          doc.text('Храни за избягване:', margin, yPos)
-          yPos += 5
-          doc.setFontSize(9)
-          doc.setFont('helvetica', 'normal')
-          report.detailedPlan.avoidFoods.slice(0, 10).forEach((food) => {
-            if (yPos > 270) {
-              doc.addPage()
-              yPos = 20
-            }
-            doc.text(`✗ ${food}`, margin + 5, yPos)
-            yPos += 4
-          })
-          yPos += 5
-        }
-      }
+    <h2>Иридологични находки - Десен ирис</h2>
+    ${report.rightIris.zones.filter(z => z.status !== 'normal').length > 0 ? `
+      ${report.rightIris.zones.filter(z => z.status !== 'normal').map(zone => `
+        <div class="zone-card ${zone.status}">
+          <div class="zone-header">
+            ${zone.name} (${zone.organ})
+            <span class="zone-status ${zone.status}">
+              ${zone.status === 'attention' ? 'Внимание' : 'Притеснение'}
+            </span>
+          </div>
+          <p>${zone.findings}</p>
+        </div>
+      `).join('')}
+    ` : '<p>Всички зони са в норма</p>'}
+  </div>
 
-      if (yPos > 260) {
-        doc.addPage()
-        yPos = 20
-      }
-      yPos += 10
+  ${report.detailedAnalysis ? `
+    <div class="page">
+      <h2>Детайлен иридологичен анализ</h2>
+      <div class="analysis-text">
+        ${report.detailedAnalysis.split('\n\n').map(paragraph => 
+          `<p>${paragraph.trim()}</p>`
+        ).join('')}
+      </div>
+    </div>
+  ` : ''}
 
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'italic')
-      doc.text('Този доклад е генериран от AI система за иридологичен анализ и не замества професионална медицинска консултация.', pageWidth / 2, yPos, { align: 'center', maxWidth: pageWidth - 2 * margin })
+  ${report.detailedPlan ? `
+    <div class="page">
+      <h2>Хранителни препоръки</h2>
+      
+      ${report.detailedPlan.recommendedFoods.length > 0 ? `
+        <h3>Препоръчителни храни (топ 3)</h3>
+        <div class="food-list">
+          ${report.detailedPlan.recommendedFoods.slice(0, 3).map(food => 
+            `<div class="food-item recommended">✓ ${food}</div>`
+          ).join('')}
+        </div>
+      ` : ''}
 
-      doc.save(`iridology-report-${new Date().toISOString().split('T')[0]}.pdf`)
-      toast.success('PDF докладът е изтеглен успешно')
+      ${report.detailedPlan.avoidFoods.length > 0 ? `
+        <h3>Храни за избягване (топ 3)</h3>
+        <div class="food-list">
+          ${report.detailedPlan.avoidFoods.slice(0, 3).map(food => 
+            `<div class="food-item avoid">✗ ${food}</div>`
+          ).join('')}
+        </div>
+      ` : ''}
+
+      ${report.detailedPlan.supplements.length > 0 ? `
+        <h3>Хранителни добавки (топ 3)</h3>
+        ${report.detailedPlan.supplements.slice(0, 3).map(supp => `
+          <div class="supplement-card">
+            <div class="supplement-name">${supp.name}</div>
+            <div class="supplement-details">
+              <strong>Дозировка:</strong> ${supp.dosage}<br>
+              <strong>Прием:</strong> ${supp.timing}
+              ${supp.notes ? `<br><strong>Бележка:</strong> ${supp.notes}` : ''}
+            </div>
+          </div>
+        `).join('')}
+      ` : ''}
+
+      ${report.detailedPlan.generalRecommendations.length > 0 ? `
+        <h3>Общи препоръки (топ 3)</h3>
+        <ul>
+          ${report.detailedPlan.generalRecommendations.slice(0, 3).map(rec => 
+            `<li>${rec}</li>`
+          ).join('')}
+        </ul>
+      ` : ''}
+    </div>
+  ` : ''}
+
+  ${report.detailedPlan && (report.detailedPlan.psychologicalRecommendations.length > 0 || 
+     report.detailedPlan.specialRecommendations.length > 0 || 
+     report.detailedPlan.recommendedTests.length > 0) ? `
+    <div class="page">
+      ${report.detailedPlan.psychologicalRecommendations.length > 0 ? `
+        <h2>Психологически препоръки (топ 3)</h2>
+        <ul>
+          ${report.detailedPlan.psychologicalRecommendations.slice(0, 3).map(rec => 
+            `<li>${rec}</li>`
+          ).join('')}
+        </ul>
+      ` : ''}
+
+      ${report.detailedPlan.specialRecommendations.length > 0 ? `
+        <h2>Специални препоръки (топ 3)</h2>
+        <ul>
+          ${report.detailedPlan.specialRecommendations.slice(0, 3).map(rec => 
+            `<li>${rec}</li>`
+          ).join('')}
+        </ul>
+      ` : ''}
+
+      ${report.detailedPlan.recommendedTests.length > 0 ? `
+        <h2>Препоръчителни изследвания (топ 3)</h2>
+        <ul>
+          ${report.detailedPlan.recommendedTests.slice(0, 3).map(test => 
+            `<li>${test}</li>`
+          ).join('')}
+        </ul>
+      ` : ''}
+    </div>
+  ` : ''}
+
+  <div class="footer">
+    Този доклад е генериран от AI система за иридологичен анализ и не замества професионална медицинска консултация.
+    За допълнителна информация и консултация, моля свържете се с квалифициран иридолог или лекар.
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print()
+      }, 500)
+    }
+  </script>
+</body>
+</html>
+`
+      
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+      
+      toast.success('Отваряне на прозорец за печат/запис като PDF')
     } catch (error) {
-      console.error('Error generating PDF:', error)
-      toast.error('Грешка при генериране на PDF')
+      console.error('Error generating export:', error)
+      toast.error('Грешка при генериране на експорт')
     }
   }
 
