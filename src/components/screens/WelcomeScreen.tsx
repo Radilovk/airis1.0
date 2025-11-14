@@ -1,17 +1,21 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear } from '@phosphor-icons/react'
+import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
+import { useKV } from '@github/spark/hooks'
+import type { QuestionnaireData } from '@/types'
 
 interface WelcomeScreenProps {
   onStart: () => void
   onViewHistory: () => void
   onAdmin: () => void
+  onTestStart: () => void
 }
 
-export default function WelcomeScreen({ onStart, onViewHistory, onAdmin }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart }: WelcomeScreenProps) {
   const [isOwner, setIsOwner] = useState(false)
+  const [questionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
 
   useEffect(() => {
     checkOwnership()
@@ -127,6 +131,19 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin }: Welco
               </Button>
             )}
           </div>
+          {questionnaireData && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onTestStart}
+                className="gap-2 border-dashed border-accent text-accent hover:bg-accent/10"
+              >
+                <Flask size={16} weight="duotone" />
+                Тест Режим (Прескачане на въпросник)
+              </Button>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground mt-4">
             Процесът отнема около 5-10 минути
           </p>

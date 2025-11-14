@@ -33,6 +33,12 @@ function App() {
     setCurrentScreen('admin')
   }
 
+  const handleTestStart = () => {
+    if (questionnaireData) {
+      setCurrentScreen('upload')
+    }
+  }
+
   const handleQuestionnaireComplete = (data: QuestionnaireData) => {
     setQuestionnaireData(data)
     setCurrentScreen('upload')
@@ -75,7 +81,7 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} />
+            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} onTestStart={handleTestStart} />
           </motion.div>
         )}
         {currentScreen === 'questionnaire' && (
