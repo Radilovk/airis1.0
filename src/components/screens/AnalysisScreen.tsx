@@ -137,20 +137,22 @@ export default function AnalysisScreen({
   ): Promise<string> => {
     let lastError: Error | null = null
     
-    const useCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig?.provider !== 'github-spark'
     const provider = aiConfig?.provider || 'github-spark'
     const configuredModel = aiConfig?.model || 'gpt-4o'
+    const useCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && provider !== 'github-spark'
     const requestDelay = aiConfig?.requestDelay || 60000
     
     let actualModel: string
-    if (provider === 'github-spark' || !useCustomAPI) {
+    if (provider === 'github-spark') {
       actualModel = getValidSparkModel(configuredModel)
-      console.log(`🎯 [LLM CONFIG] Provider: ${provider}, useCustomAPI: ${useCustomAPI}`)
-      console.log(`🎯 [LLM CONFIG] configuredModel: "${configuredModel}", actualModel за Spark: "${actualModel}"`)
+      console.log(`🎯 [LLM CONFIG] Provider: ${provider}`)
+      console.log(`🎯 [LLM CONFIG] Избран модел от настройки: "${configuredModel}"`)
+      console.log(`🎯 [LLM CONFIG] Валидиран модел за Spark: "${actualModel}"`)
+      addLog('info', `✓ AI Конфигурация заредена: ${provider} / ${actualModel}`)
     } else {
       actualModel = configuredModel
       console.log(`🎯 [LLM CONFIG] Provider: ${provider}, useCustomAPI: ${useCustomAPI}`)
-      console.log(`🎯 [LLM CONFIG] configuredModel: "${configuredModel}", actualModel за External API: "${actualModel}"`)
+      console.log(`🎯 [LLM CONFIG] Избран модел: "${actualModel}"`)
     }
     
     if (useCustomAPI) {
@@ -173,7 +175,7 @@ export default function AnalysisScreen({
         console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${provider} с модел ${actualModel}`)
         
         let response: string
-        if (useCustomAPI && provider !== 'github-spark') {
+        if (useCustomAPI) {
           addLog('info', `→ Извикване на външен API: ${provider}/${actualModel}`)
           response = await callExternalAPI(
             prompt,
@@ -183,12 +185,9 @@ export default function AnalysisScreen({
             jsonMode
           )
         } else {
-          const sparkModel = getValidSparkModel(actualModel)
-          addLog('info', `→ Извикване на GitHub Spark API с модел: ${sparkModel}`)
-          console.log(`🌟 [SPARK] Извикване на window.spark.llm с модел: ${sparkModel}`)
-          console.log(`🎯 [SPARK] Точен модел параметър: "${sparkModel}"`)
-          console.log(`🔍 [SPARK] Оригинален actualModel преди валидация: "${actualModel}"`)
-          response = await window.spark.llm(prompt, sparkModel, jsonMode)
+          addLog('info', `→ Извикване на GitHub Spark API с модел: ${actualModel}`)
+          console.log(`🌟 [SPARK] Извикване на window.spark.llm с модел: ${actualModel}`)
+          response = await window.spark.llm(prompt, actualModel as 'gpt-4o' | 'gpt-4o-mini', jsonMode)
         }
         
         if (response && response.length > 0) {

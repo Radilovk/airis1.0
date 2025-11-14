@@ -104,13 +104,14 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         provider,
         model,
         apiKey: useCustomKey && provider !== 'github-spark' ? apiKey : '',
-        useCustomKey: provider !== 'github-spark' && useCustomKey,
+        useCustomKey: provider !== 'github-spark' ? useCustomKey : false,
         requestDelay,
         requestCount
       }
       
+      console.log('💾 [ADMIN] Запазване на конфигурация:', config)
       await setAiConfig(config)
-      toast.success('Конфигурацията е запазена успешно')
+      toast.success(`✓ AI конфигурация запазена: ${provider} / ${model}`)
     } catch (error) {
       console.error('Error saving config:', error)
       toast.error('Грешка при запазване на конфигурацията')
