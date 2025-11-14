@@ -165,14 +165,12 @@ export default function AnalysisScreen({
     } else {
       actualProvider = 'github-spark'
       actualModel = getValidSparkModel(configuredModel)
-      console.log(`⚠️ [LLM CONFIG] Fallback към GitHub Spark (НЕ използва избрания модел!)`)
+      console.log(`✓ [LLM CONFIG] Използване на GitHub Spark API`)
       console.log(`🎯 [LLM CONFIG] Provider (актуален): ${actualProvider}`)
       console.log(`🎯 [LLM CONFIG] Настроен модел: "${configuredModel}"`)
-      console.log(`🎯 [LLM CONFIG] ⚠️ ВАЖНО: GitHub Spark API игнорира избрания модел и използва винаги gpt-4o!`)
-      console.log(`🎯 [LLM CONFIG] За да използвате избрания модел, добавете собствен API ключ в настройките.`)
-      addLog('warning', `⚠️ GitHub Spark винаги използва gpt-4o независимо от настройките!`)
-      addLog('info', `ℹ️ За да използвате избран модел, добавете собствен API ключ в Admin панела`)
-      addLog('info', `🔧 Режим: GitHub Spark вграден модел (винаги gpt-4o) | Забавяне: ${requestDelay}ms`)
+      console.log(`🎯 [LLM CONFIG] Актуален модел: "${actualModel}"`)
+      addLog('info', `✓ AI Конфигурация заредена: ${actualProvider} / ${actualModel}`)
+      addLog('info', `🔧 Режим: GitHub Spark вграден модел (${actualModel}) | Забавяне: ${requestDelay}ms`)
     }
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -198,9 +196,9 @@ export default function AnalysisScreen({
             jsonMode
           )
         } else {
-          addLog('warning', `→ ⚠️ Използване на GitHub Spark API (ИГНОРИРА избрания модел!)`)
-          console.log(`🌟 [SPARK] Извикване на window.spark.llm (винаги gpt-4o)`)
-          response = await window.spark.llm(prompt, 'gpt-4o', jsonMode)
+          addLog('info', `→ ✅ Използване на GitHub Spark API с модел ${actualModel}`)
+          console.log(`🌟 [SPARK] Извикване на window.spark.llm с модел ${actualModel}`)
+          response = await window.spark.llm(prompt, actualModel as 'gpt-4o' | 'gpt-4o-mini', jsonMode)
         }
         
         if (response && response.length > 0) {

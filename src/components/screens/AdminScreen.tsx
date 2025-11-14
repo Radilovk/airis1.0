@@ -73,14 +73,14 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   useEffect(() => {
     if (aiConfig) {
       setProvider(aiConfig.provider)
-      setModel(aiConfig.provider === 'github-spark' ? 'gpt-4o' : aiConfig.model)
+      setModel(aiConfig.model)
       setApiKey(aiConfig.apiKey)
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 60000)
       setRequestCount(aiConfig.requestCount || 8)
       
       if (aiConfig.provider === 'github-spark') {
-        console.log('ℹ️ [ADMIN] GitHub Spark Provider зареден - фиксиран модел gpt-4o')
+        console.log(`ℹ️ [ADMIN] GitHub Spark Provider зареден - модел: ${aiConfig.model}`)
       }
     }
   }, [aiConfig])
@@ -106,7 +106,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     try {
       const config: AIModelConfig = {
         provider,
-        model: provider === 'github-spark' ? 'gpt-4o' : model,
+        model: model,
         apiKey: useCustomKey && provider !== 'github-spark' ? apiKey : '',
         useCustomKey: provider !== 'github-spark' ? useCustomKey : false,
         requestDelay,
@@ -115,14 +115,10 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
       
-      if (provider === 'github-spark') {
-        console.warn('⚠️ [ADMIN] GitHub Spark API винаги използва gpt-4o независимо от избраните настройки')
-      }
-      
       await setAiConfig(config)
       
       if (provider === 'github-spark' || !useCustomKey) {
-        toast.success(`✓ Конфигурацията е запазена. ВАЖНО: GitHub Spark винаги използва gpt-4o!`, {
+        toast.success(`✓ Конфигурацията е запазена: GitHub Spark / ${model}`, {
           duration: 5000
         })
       } else {
@@ -308,14 +304,14 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               </CardDescription>
               
               {aiConfig && aiConfig.provider === 'github-spark' && !aiConfig.useCustomKey && (
-                <div className="mt-3 p-3 bg-warning/10 rounded-lg border-2 border-warning/30">
-                  <p className="text-sm font-bold text-warning flex items-center gap-2">
-                    <Warning className="w-5 h-5" />
-                    ВАЖНО: GitHub Spark API не позволява избор на модел!
+                <div className="mt-3 p-3 bg-primary/10 rounded-lg border-2 border-primary/30">
+                  <p className="text-sm font-bold text-primary flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" />
+                    GitHub Spark API - Активен модел: {aiConfig.model}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    GitHub Spark API винаги използва <strong>gpt-4o</strong> независимо от избраните настройки.
-                    За да използвате избран модел (включително други модели като Gemini), трябва да добавите 
+                    GitHub Spark поддържа <strong>gpt-4o</strong> и <strong>gpt-4o-mini</strong>. 
+                    За достъп до други модели (GPT-4 Turbo, Gemini и др.), добавете 
                     <strong> собствен API ключ</strong> от OpenAI или Google.
                   </p>
                 </div>
@@ -326,9 +322,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   <p className="text-sm font-medium text-primary">
                     ✓ Активна конфигурация: {aiConfig.provider === 'github-spark' || !aiConfig.useCustomKey ? (
                       <>
-                        <span className="font-mono">GitHub Spark / gpt-4o</span>
+                        <span className="font-mono">GitHub Spark / {aiConfig.model}</span>
                         <span className="ml-2 text-xs text-muted-foreground">
-                          (фиксиран модел - за други модели използвайте собствен API ключ)
+                          (поддържа gpt-4o и gpt-4o-mini)
                         </span>
                       </>
                     ) : (
@@ -350,7 +346,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="github-spark" id="github-spark" />
                       <Label htmlFor="github-spark" className="font-normal cursor-pointer">
-                        GitHub Spark (вграден - винаги gpt-4o)
+                        GitHub Spark (вграден - поддържа gpt-4o и gpt-4o-mini)
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -370,19 +366,19 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   {provider === 'github-spark' && (
                     <div className="mt-2 p-2 bg-muted/50 rounded-lg border border-border">
                       <p className="text-xs text-muted-foreground">
-                        ⚠️ GitHub Spark API използва фиксиран модел <strong>gpt-4o</strong> и не позволява избор на друг модел.
-                        Изборът на модел по-долу няма ефект при GitHub Spark API.
+                        ℹ️ GitHub Spark API поддържа <strong>gpt-4o</strong> и <strong>gpt-4o-mini</strong>. 
+                        Изборът ви по-долу ще бъде използван. За достъп до други модели (GPT-4 Turbo, Gemini), 
+                        използвайте собствен API ключ.
                       </p>
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="model">Модел {provider === 'github-spark' && <span className="text-xs text-muted-foreground">(няма ефект при GitHub Spark)</span>}</Label>
+                  <Label htmlFor="model">Модел</Label>
                   <Select 
                     value={model} 
                     onValueChange={setModel}
-                    disabled={provider === 'github-spark'}
                   >
                     <SelectTrigger id="model">
                       <SelectValue placeholder="Изберете модел" />
@@ -391,7 +387,10 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       {provider === 'github-spark' && (
                         <>
                           <SelectItem value="gpt-4o">
-                            gpt-4o (фиксиран)
+                            gpt-4o
+                          </SelectItem>
+                          <SelectItem value="gpt-4o-mini">
+                            gpt-4o-mini
                           </SelectItem>
                         </>
                       )}
