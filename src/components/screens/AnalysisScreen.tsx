@@ -142,7 +142,7 @@ export default function AnalysisScreen({
     const requestDelay = aiConfig?.requestDelay || 60000
     
     const hasCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
-    const useCustomAPI = hasCustomAPI && provider !== 'github-spark'
+    const useCustomAPI = hasCustomAPI && (provider === 'gemini' || provider === 'openai')
     
     console.log(`🔍 [LLM CONFIG DEBUG] Provider от конфигурация: "${provider}"`)
     console.log(`🔍 [LLM CONFIG DEBUG] Model от конфигурация: "${configuredModel}"`)
@@ -419,7 +419,7 @@ ${response}
       setAnalysisStarted(true)
       
       const hasCustomAPI = aiConfig.useCustomKey && aiConfig.apiKey && aiConfig.apiKey.trim() !== ''
-      const useCustomAPI = hasCustomAPI && aiConfig.provider !== 'github-spark'
+      const useCustomAPI = hasCustomAPI && (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai')
       
       let modelToUse: string
       let providerToUse: string
@@ -427,7 +427,7 @@ ${response}
       if (!useCustomAPI) {
         providerToUse = 'github-spark'
         modelToUse = getValidSparkModel(aiConfig.model)
-        console.log(`🔧 [CONFIG] Fallback към GitHub Spark - Конфигуриран модел: "${aiConfig.model}", валиден Spark модел: "${modelToUse}"`)
+        console.log(`🔧 [CONFIG] GitHub Spark режим - Конфигуриран модел: "${aiConfig.model}", валиден Spark модел: "${modelToUse}"`)
       } else {
         providerToUse = aiConfig.provider
         modelToUse = aiConfig.model
@@ -450,7 +450,7 @@ ${response}
       const requestCount = aiConfig?.requestCount || 8
       
       const hasCustomAPI = aiConfig?.useCustomKey && aiConfig?.apiKey && aiConfig.apiKey.trim() !== ''
-      const useCustomAPI = hasCustomAPI && provider !== 'github-spark'
+      const useCustomAPI = hasCustomAPI && (provider === 'gemini' || provider === 'openai')
       
       let actualModel: string
       let actualProvider: string = provider
@@ -458,7 +458,7 @@ ${response}
       if (!useCustomAPI) {
         actualProvider = 'github-spark'
         actualModel = getValidSparkModel(configuredModel)
-        console.log(`🚀 [АНАЛИЗ] Fallback към GitHub Spark - Конфигуриран: "${configuredModel}", валиден: "${actualModel}"`)
+        console.log(`🚀 [АНАЛИЗ] GitHub Spark режим - Конфигуриран: "${configuredModel}", валиден: "${actualModel}"`)
       } else {
         actualModel = configuredModel
         actualProvider = provider

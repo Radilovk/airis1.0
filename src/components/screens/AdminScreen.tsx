@@ -98,34 +98,32 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   }
 
   const handleSaveConfig = async () => {
-    if ((provider === 'gemini' || provider === 'openai') && !useCustomKey) {
+    if ((provider === 'gemini' || provider === 'openai') && !apiKey.trim()) {
       toast.error(`❌ Грешка: ${provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} изисква собствен API ключ!`, {
-        description: 'Моля, активирайте "Използвай собствен API ключ" и въведете валиден API ключ.',
+        description: 'Моля, въведете валиден API ключ.',
         duration: 6000
       })
       return
     }
-    
-    if (useCustomKey && provider !== 'github-spark' && !apiKey.trim()) {
-      toast.error('Моля, въведете API ключ')
-      return
-    }
 
     try {
+      const actualUseCustomKey = provider === 'gemini' || provider === 'openai' ? true : useCustomKey
+      
       const config: AIModelConfig = {
         provider,
         model: model,
-        apiKey: useCustomKey && provider !== 'github-spark' ? apiKey : '',
-        useCustomKey: provider !== 'github-spark' ? useCustomKey : false,
+        apiKey: actualUseCustomKey && provider !== 'github-spark' ? apiKey : '',
+        useCustomKey: actualUseCustomKey,
         requestDelay,
         requestCount
       }
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
+      console.log(`🔍 [ADMIN] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}`)
       
       await setAiConfig(config)
       
-      if (provider === 'github-spark' || !useCustomKey) {
+      if (provider === 'github-spark') {
         toast.success(`✓ Конфигурацията е запазена: GitHub Spark / ${model}`, {
           duration: 5000
         })
@@ -330,27 +328,27 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               
               {aiConfig && (
                 <div className={`mt-3 p-3 rounded-lg border ${
-                  (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.useCustomKey
+                  (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey
                     ? 'bg-destructive/10 border-destructive/30'
                     : 'bg-primary/10 border-primary/20'
                 }`}>
                   <p className={`text-sm font-medium ${
-                    (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.useCustomKey
+                    (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey
                       ? 'text-destructive'
                       : 'text-primary'
                   }`}>
-                    {(aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.useCustomKey ? (
+                    {(aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey ? (
                       <>
                         ❌ ГРЕШНА КОНФИГУРАЦИЯ: {aiConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI'} / {aiConfig.model}
                         <span className="ml-2 text-xs">
                           (няма API ключ - анализът НЯМА ДА РАБОТИ)
                         </span>
                       </>
-                    ) : aiConfig.provider === 'github-spark' || !aiConfig.useCustomKey ? (
+                    ) : aiConfig.provider === 'github-spark' ? (
                       <>
                         ✓ Активна конфигурация: <span className="font-mono">GitHub Spark / {aiConfig.model}</span>
                         <span className="ml-2 text-xs text-muted-foreground">
-                          (поддържа gpt-4o и gpt-4o-mini)
+                          (вграден API)
                         </span>
                       </>
                     ) : (
@@ -512,73 +510,56 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   </div>
                 </div>
 
-                {provider !== 'github-spark' && (
-                  <>
-                    <Separator />
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="use-custom-key">Използвай собствен API ключ</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Активирайте, за да използвате собствения си API ключ
-                          </p>
-                        </div>
-                        <Switch
-                          id="use-custom-key"
-                          checked={useCustomKey}
-                          onCheckedChange={setUseCustomKey}
-                        />
-                      </div>
-
-                      {!useCustomKey && (
-                        <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                          <p className="text-xs text-muted-foreground">
-                            ⚠️ <strong>Използва се GitHub Spark вграден модел</strong><br/>
-                            Анализът ще отнеме по-дълго време (90-150 сек.) и може да срещнете rate limit грешки при много заявки. За по-бързо и стабилно изпълнение, използвайте собствен API ключ.
-                          </p>
-                        </div>
-                      )}
-
-                      {useCustomKey && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="space-y-2"
-                        >
-                          <Label htmlFor="api-key" className="flex items-center gap-2">
-                            <Key className="w-4 h-4" />
-                            API ключ
-                          </Label>
-                          <Input
-                            id="api-key"
-                            type="password"
-                            placeholder={provider === 'openai' ? 'sk-...' : 'AIza...'}
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            className="font-mono"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            {provider === 'openai' 
-                              ? 'Вашият OpenAI API ключ (започва с sk-)'
-                              : 'Вашият Google AI API ключ'
-                            }
-                          </p>
-                          <div className="mt-3 p-3 bg-accent/10 rounded-lg border border-accent/20">
-                            <p className="text-xs text-accent-foreground">
-                              💡 <strong>Предимства на собствен API ключ:</strong>
-                            </p>
-                            <ul className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-disc list-inside">
-                              <li>По-бързо време за анализ (30-60 сек. вместо 90-150 сек.)</li>
-                              <li>Без GitHub Spark rate limit ограничения</li>
-                              <li>Възможност за избор на различни модели (включително Gemini)</li>
-                            </ul>
-                          </div>
-                        </motion.div>
-                      )}
+                <Separator />
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="api-key" className="flex items-center gap-2">
+                      <Key className="w-4 h-4" />
+                      API ключ {provider === 'gemini' || provider === 'openai' ? '(задължителен)' : '(опционален)'}
+                    </Label>
+                    <Input
+                      id="api-key"
+                      type="password"
+                      placeholder={provider === 'openai' ? 'sk-...' : provider === 'gemini' ? 'AIza...' : 'Оставете празно за GitHub Spark'}
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {provider === 'openai' 
+                        ? 'Вашият OpenAI API ключ (започва с sk-)'
+                        : provider === 'gemini'
+                        ? 'Вашият Google AI API ключ (започва с AIza)'
+                        : 'GitHub Spark не изисква API ключ'
+                      }
+                    </p>
+                  </div>
+                  
+                  {(provider === 'gemini' || provider === 'openai') && (
+                    <div className="mt-3 p-3 bg-accent/10 rounded-lg border border-accent/20">
+                      <p className="text-xs text-accent-foreground">
+                        💡 <strong>Предимства на {provider === 'gemini' ? 'Gemini' : 'OpenAI'}:</strong>
+                      </p>
+                      <ul className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-disc list-inside">
+                        <li>По-бързо време за анализ (30-60 сек. вместо 90-150 сек.)</li>
+                        <li>Без GitHub Spark rate limit ограничения</li>
+                        <li>Достъп до най-новите AI модели</li>
+                        {provider === 'gemini' && <li>Отличен за многоезични анализи (включително български)</li>}
+                      </ul>
                     </div>
-                  </>
-                )}
+                  )}
+                  
+                  {provider === 'github-spark' && apiKey.trim() === '' && (
+                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">
+                        ℹ️ <strong>Използва се GitHub Spark вграден модел</strong><br/>
+                        Анализът ще отнеме по-дълго време (90-150 сек.) и може да срещнете rate limit грешки при много заявки. 
+                        За по-бързо и стабилно изпълнение, изберете OpenAI или Gemini с собствен API ключ.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2 pt-4">
