@@ -153,6 +153,7 @@ export default function AnalysisScreen({
     
     let actualModel: string
     let actualProvider: string
+    let sparkModel: 'gpt-4o' | 'gpt-4o-mini' = 'gpt-4o'
     
     if (useCustomAPI) {
       actualModel = configuredModel
@@ -164,7 +165,8 @@ export default function AnalysisScreen({
       addLog('info', `🔧 Режим: Собствен API (${actualProvider} - ${actualModel}) | Забавяне: ${requestDelay}ms`)
     } else {
       actualProvider = 'github-spark'
-      actualModel = getValidSparkModel(configuredModel)
+      sparkModel = getValidSparkModel(configuredModel)
+      actualModel = sparkModel
       console.log(`✓ [LLM CONFIG] Използване на GitHub Spark API`)
       console.log(`🎯 [LLM CONFIG] Provider (актуален): ${actualProvider}`)
       console.log(`🎯 [LLM CONFIG] Настроен модел: "${configuredModel}"`)
@@ -196,9 +198,9 @@ export default function AnalysisScreen({
             jsonMode
           )
         } else {
-          addLog('info', `→ ✅ Използване на GitHub Spark API с модел ${actualModel}`)
-          console.log(`🌟 [SPARK] Извикване на window.spark.llm с модел ${actualModel}`)
-          response = await window.spark.llm(prompt, actualModel as 'gpt-4o' | 'gpt-4o-mini', jsonMode)
+          addLog('info', `→ ✅ Използване на GitHub Spark API с модел ${sparkModel}`)
+          console.log(`🌟 [SPARK] Извикване на window.spark.llm с модел ${sparkModel}`)
+          response = await window.spark.llm(prompt, sparkModel, jsonMode)
         }
         
         if (response && response.length > 0) {
