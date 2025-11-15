@@ -183,8 +183,8 @@ export default function IrisVisualization({ analysis, side = 'left' }: IrisVisua
               )
             })}
           </svg>
-          <div className="text-center mt-4 text-sm text-muted-foreground">
-            Кликнете на зона за детайли
+          <div className="text-center mt-4 text-sm font-medium text-muted-foreground">
+            Посочете зона за детайли
           </div>
         </div>
 
