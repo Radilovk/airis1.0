@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { 
   ArrowLeft, 
@@ -22,12 +23,17 @@ import {
   CheckCircle,
   Warning,
   Image as ImageIcon,
-  Eye
+  Eye,
+  FileText,
+  Robot
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import type { AIModelConfig, IridologyTextbook, CustomOverlay } from '@/types'
+import type { AIModelConfig, IridologyTextbook, CustomOverlay, IridologyManual, AIPromptTemplate } from '@/types'
 import IridologyOverlay from '@/components/iris/IridologyOverlay'
 import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
+import IridologyManualTab from '@/components/admin/IridologyManualTab'
+import AIPromptTab from '@/components/admin/AIPromptTab'
+import { DEFAULT_IRIDOLOGY_MANUAL, DEFAULT_AI_PROMPT } from '@/lib/default-prompts'
 
 interface AdminScreenProps {
   onBack: () => void
@@ -45,6 +51,15 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   
   const [textbooks, setTextbooks] = useKV<IridologyTextbook[]>('iridology-textbooks', [])
   const [customOverlay, setCustomOverlay] = useKV<CustomOverlay | null>('custom-overlay', null)
+  const [iridologyManual, setIridologyManual] = useKV<IridologyManual>('iridology-manual', {
+    content: DEFAULT_IRIDOLOGY_MANUAL,
+    lastModified: new Date().toISOString()
+  })
+  const [aiPromptTemplate, setAiPromptTemplate] = useKV<AIPromptTemplate>('ai-prompt-template', {
+    content: DEFAULT_AI_PROMPT,
+    lastModified: new Date().toISOString()
+  })
+  
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   
@@ -58,6 +73,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [textbookName, setTextbookName] = useState('')
   const [textbookContent, setTextbookContent] = useState('')
   const [showOverlayPreview, setShowOverlayPreview] = useState(false)
+  
+  const [manualContent, setManualContent] = useState(iridologyManual?.content || DEFAULT_IRIDOLOGY_MANUAL)
+  const [promptContent, setPromptContent] = useState(aiPromptTemplate?.content || DEFAULT_AI_PROMPT)
 
   const getValidSparkModel = (model: string): string => {
     if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
@@ -84,6 +102,18 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       }
     }
   }, [aiConfig])
+
+  useEffect(() => {
+    if (iridologyManual) {
+      setManualContent(iridologyManual.content)
+    }
+  }, [iridologyManual])
+
+  useEffect(() => {
+    if (aiPromptTemplate) {
+      setPromptContent(aiPromptTemplate.content)
+    }
+  }, [aiPromptTemplate])
 
   const checkOwnership = async () => {
     try {
@@ -242,6 +272,50 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     }
   }
 
+  const handleSaveManual = async () => {
+    try {
+      await setIridologyManual({
+        content: manualContent,
+        lastModified: new Date().toISOString()
+      })
+      toast.success('Иридологичното ръководство е запазено успешно')
+    } catch (error) {
+      console.error('Error saving manual:', error)
+      toast.error('Грешка при запазване на ръководството')
+    }
+  }
+
+  const handleResetManual = async () => {
+    setManualContent(DEFAULT_IRIDOLOGY_MANUAL)
+    await setIridologyManual({
+      content: DEFAULT_IRIDOLOGY_MANUAL,
+      lastModified: new Date().toISOString()
+    })
+    toast.success('Ръководството е възстановено до оригиналната версия')
+  }
+
+  const handleSavePrompt = async () => {
+    try {
+      await setAiPromptTemplate({
+        content: promptContent,
+        lastModified: new Date().toISOString()
+      })
+      toast.success('AI промптът е запазен успешно')
+    } catch (error) {
+      console.error('Error saving prompt:', error)
+      toast.error('Грешка при запазване на промпта')
+    }
+  }
+
+  const handleResetPrompt = async () => {
+    setPromptContent(DEFAULT_AI_PROMPT)
+    await setAiPromptTemplate({
+      content: DEFAULT_AI_PROMPT,
+      lastModified: new Date().toISOString()
+    })
+    toast.success('Промптът е възстановен до оригиналната версия')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -297,11 +371,36 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
           </Button>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
+        <Tabs defaultValue="ai-config" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="ai-config">
+              <Brain className="w-4 h-4 mr-2" />
+              AI Модел
+            </TabsTrigger>
+            <TabsTrigger value="manual">
+              <BookOpen className="w-4 h-4 mr-2" />
+              Ръководство
+            </TabsTrigger>
+            <TabsTrigger value="prompt">
+              <Robot className="w-4 h-4 mr-2" />
+              AI Промпт
+            </TabsTrigger>
+            <TabsTrigger value="resources">
+              <FileText className="w-4 h-4 mr-2" />
+              Ресурси
+            </TabsTrigger>
+            <TabsTrigger value="questionnaire">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Въпросник
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="ai-config">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -571,7 +670,17 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
             </CardContent>
           </Card>
         </motion.div>
+          </TabsContent>
 
+          <TabsContent value="manual">
+            <IridologyManualTab />
+          </TabsContent>
+
+          <TabsContent value="prompt">
+            <AIPromptTab />
+          </TabsContent>
+
+          <TabsContent value="resources">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -688,7 +797,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
             </CardContent>
           </Card>
         </motion.div>
+          </TabsContent>
 
+          <TabsContent value="questionnaire">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -696,6 +807,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         >
           <QuestionnaireManager />
         </motion.div>
+          </TabsContent>
+        </Tabs>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

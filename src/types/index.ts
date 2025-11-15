@@ -159,3 +159,13 @@ export interface CustomOverlay {
   name: string
   uploadDate: string
 }
+
+export interface IridologyManual {
+  content: string
+  lastModified: string
+}
+
+export interface AIPromptTemplate {
+  content: string
+  lastModified: string
+}
