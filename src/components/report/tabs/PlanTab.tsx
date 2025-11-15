@@ -22,6 +22,9 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport, SupplementRecommendation } from '@/types'
 import { cn } from '@/lib/utils'
+import NutritionChart from '../NutritionChart'
+import ActionTimeline from '../ActionTimeline'
+import InteractiveRecommendations from '../InteractiveRecommendations'
 
 interface PlanTabProps {
   report: AnalysisReport
@@ -71,6 +74,34 @@ export default function PlanTab({ report }: PlanTabProps) {
               {motivationalSummary}
             </p>
           </Card>
+        </motion.div>
+      )}
+
+      {hasFoodRecs && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.05 }}
+        >
+          <NutritionChart report={report} />
+        </motion.div>
+      )}
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <ActionTimeline report={report} />
+      </motion.div>
+
+      {report.recommendations && report.recommendations.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+        >
+          <InteractiveRecommendations recommendations={report.recommendations} />
         </motion.div>
       )}
 

@@ -18,6 +18,8 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import SystemScoresChart from '../SystemScoresChart'
+import SystemComparisonChart from '../SystemComparisonChart'
+import HealthProgressChart from '../HealthProgressChart'
 import {
   Collapsible,
   CollapsibleContent,
@@ -278,6 +280,25 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
             rightScores={report.rightIris.systemScores}
           />
         </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.25 }}
+      >
+        <SystemComparisonChart 
+          leftScores={report.leftIris.systemScores}
+          rightScores={report.rightIris.systemScores}
+        />
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.3 }}
+      >
+        <HealthProgressChart report={report} />
       </motion.div>
 
       <motion.div

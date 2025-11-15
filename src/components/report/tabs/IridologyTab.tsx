@@ -14,6 +14,8 @@ import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import IrisWithOverlay from '@/components/iris/IrisWithOverlay'
 import IrisVisualization from '../IrisVisualization'
+import ZoneHeatmap from '../ZoneHeatmap'
+import ZoneStatusPieChart from '../ZoneStatusPieChart'
 import {
   Collapsible,
   CollapsibleContent,
@@ -59,6 +61,14 @@ export default function IridologyTab({ report }: IridologyTabProps) {
 
   return (
     <div className="space-y-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <ZoneStatusPieChart leftIris={report.leftIris} rightIris={report.rightIris} />
+      </motion.div>
+      
       {report.detailedAnalysis && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -372,6 +382,17 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.4 }}
+      >
+        <div className="grid md:grid-cols-2 gap-4">
+          <ZoneHeatmap zones={report.leftIris?.zones || []} side="left" />
+          <ZoneHeatmap zones={report.rightIris?.zones || []} side="right" />
+        </div>
+      </motion.div>
 
       {report.detailedAnalysis && (
         <motion.div
