@@ -48,56 +48,60 @@ export default function AIPromptTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Robot className="w-5 h-5 text-primary" />
-          AI Промпт шаблон
+        <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+          <Robot className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
+          <span>AI Промпт шаблон</span>
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           Промптът, който се изпраща към AI модела за анализ на ирисите
         </CardDescription>
         {aiPromptTemplate && (
-          <Badge variant="outline" className="w-fit">
-            Последна промяна: {new Date(aiPromptTemplate.lastModified).toLocaleString('bg-BG')}
+          <Badge variant="outline" className="w-fit text-xs">
+            Последна промяна: {new Date(aiPromptTemplate.lastModified).toLocaleString('bg-BG', {
+              dateStyle: 'short',
+              timeStyle: 'short'
+            })}
           </Badge>
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="p-3 bg-accent/10 rounded-lg border border-accent/20 mb-4">
-          <p className="text-sm font-semibold text-accent-foreground mb-2">
+        <div className="p-2 md:p-3 bg-accent/10 rounded-lg border border-accent/20 mb-4">
+          <p className="text-xs md:text-sm font-semibold text-accent-foreground mb-2">
             📋 Променливи за замяна в промпта:
           </p>
-          <div className="grid grid-cols-2 gap-2 text-xs text-accent-foreground/80">
-            <div><code>{'{{side}}'}</code> - ляв/десен</div>
-            <div><code>{'{{imageHash}}'}</code> - ID на изображението</div>
-            <div><code>{'{{age}}'}</code> - възраст</div>
-            <div><code>{'{{gender}}'}</code> - пол</div>
-            <div><code>{'{{bmi}}'}</code> - индекс на телесна маса</div>
-            <div><code>{'{{goals}}'}</code> - здравни цели</div>
-            <div><code>{'{{complaints}}'}</code> - оплаквания</div>
-            <div><code>{'{{knowledgeContext}}'}</code> - ръководство</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-accent-foreground/80">
+            <div className="break-all"><code>{'{{side}}'}</code> - ляв/десен</div>
+            <div className="break-all"><code>{'{{imageHash}}'}</code> - ID на изображението</div>
+            <div className="break-all"><code>{'{{age}}'}</code> - възраст</div>
+            <div className="break-all"><code>{'{{gender}}'}</code> - пол</div>
+            <div className="break-all"><code>{'{{bmi}}'}</code> - индекс на телесна маса</div>
+            <div className="break-all"><code>{'{{goals}}'}</code> - здравни цели</div>
+            <div className="break-all"><code>{'{{complaints}}'}</code> - оплаквания</div>
+            <div className="break-all"><code>{'{{knowledgeContext}}'}</code> - ръководство</div>
           </div>
         </div>
 
         <Textarea
           value={promptContent}
           onChange={(e) => setPromptContent(e.target.value)}
-          className="min-h-[500px] font-mono text-sm"
+          className="min-h-[300px] md:min-h-[500px] font-mono text-xs md:text-sm"
           placeholder="Въведете AI промпт шаблона..."
         />
         
-        <div className="flex gap-2">
-          <Button onClick={handleSavePrompt} className="flex-1">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={handleSavePrompt} className="flex-1 text-sm md:text-base">
             <CheckCircle className="w-4 h-4 mr-2" />
             Запази промените
           </Button>
-          <Button onClick={handleResetPrompt} variant="outline">
+          <Button onClick={handleResetPrompt} variant="outline" className="sm:flex-initial text-sm md:text-base">
             <ArrowCounterClockwise className="w-4 h-4 mr-2" />
-            Възстанови оригинала
+            <span className="hidden sm:inline">Възстанови оригинала</span>
+            <span className="sm:hidden">Възстанови</span>
           </Button>
         </div>
         
-        <div className="p-3 bg-muted/50 rounded-lg border border-border">
-          <p className="text-xs text-muted-foreground">
+        <div className="p-2 md:p-3 bg-muted/50 rounded-lg border border-border">
+          <p className="text-xs text-muted-foreground break-words">
             💡 Този промпт определя как AI модела ще анализира ирисите. Използвайте променливите в двойни къдрави скоби за динамично попълване на данни.
           </p>
         </div>

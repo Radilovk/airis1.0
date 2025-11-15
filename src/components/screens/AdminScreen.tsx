@@ -357,41 +357,45 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
-        <div className="flex items-center justify-between">
+      <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-4 md:space-y-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Административен панел</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Административен панел</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Управление на AI модели и учебници по иридология
             </p>
           </div>
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} className="w-full sm:w-auto">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Назад
           </Button>
         </div>
 
         <Tabs defaultValue="ai-config" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="ai-config">
-              <Brain className="w-4 h-4 mr-2" />
-              AI Модел
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1 h-auto p-1">
+            <TabsTrigger value="ai-config" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
+              <Brain className="w-4 h-4 md:mr-1" />
+              <span className="hidden sm:inline">AI Модел</span>
+              <span className="sm:hidden">AI</span>
             </TabsTrigger>
-            <TabsTrigger value="manual">
-              <BookOpen className="w-4 h-4 mr-2" />
-              Ръководство
+            <TabsTrigger value="manual" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
+              <BookOpen className="w-4 h-4 md:mr-1" />
+              <span className="hidden sm:inline">Ръководство</span>
+              <span className="sm:hidden">Книга</span>
             </TabsTrigger>
-            <TabsTrigger value="prompt">
-              <Robot className="w-4 h-4 mr-2" />
-              AI Промпт
+            <TabsTrigger value="prompt" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
+              <Robot className="w-4 h-4 md:mr-1" />
+              <span className="hidden sm:inline">AI Промпт</span>
+              <span className="sm:hidden">Промпт</span>
             </TabsTrigger>
-            <TabsTrigger value="resources">
-              <FileText className="w-4 h-4 mr-2" />
-              Ресурси
+            <TabsTrigger value="resources" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
+              <FileText className="w-4 h-4 md:mr-1" />
+              <span className="hidden sm:inline">Ресурси</span>
+              <span className="sm:hidden">Файлове</span>
             </TabsTrigger>
-            <TabsTrigger value="questionnaire">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Въпросник
+            <TabsTrigger value="questionnaire" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5 col-span-2 md:col-span-1">
+              <CheckCircle className="w-4 h-4 md:mr-1" />
+              <span>Въпросник</span>
             </TabsTrigger>
           </TabsList>
 
@@ -403,19 +407,19 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
             >
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <Brain className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                 Настройки на AI модел
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Изберете AI модел и конфигурирайте API достъп за анализ на ирисите
               </CardDescription>
               
               {aiConfig && aiConfig.provider === 'github-spark' && !aiConfig.useCustomKey && (
-                <div className="mt-3 p-3 bg-primary/10 rounded-lg border-2 border-primary/30">
-                  <p className="text-sm font-bold text-primary flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    GitHub Spark API - Активен модел: {aiConfig.model}
+                <div className="mt-3 p-2 md:p-3 bg-primary/10 rounded-lg border-2 border-primary/30">
+                  <p className="text-xs md:text-sm font-bold text-primary flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span className="break-words">GitHub Spark API - Активен модел: {aiConfig.model}</span>
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
                     GitHub Spark поддържа <strong>gpt-4o</strong> и <strong>gpt-4o-mini</strong>. 
@@ -426,12 +430,12 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               )}
               
               {aiConfig && (
-                <div className={`mt-3 p-3 rounded-lg border ${
+                <div className={`mt-3 p-2 md:p-3 rounded-lg border ${
                   (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey
                     ? 'bg-destructive/10 border-destructive/30'
                     : 'bg-primary/10 border-primary/20'
                 }`}>
-                  <p className={`text-sm font-medium ${
+                  <p className={`text-xs md:text-sm font-medium break-words ${
                     (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey
                       ? 'text-destructive'
                       : 'text-primary'
@@ -439,27 +443,27 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     {(aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey ? (
                       <>
                         ❌ ГРЕШНА КОНФИГУРАЦИЯ: {aiConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI'} / {aiConfig.model}
-                        <span className="ml-2 text-xs">
+                        <span className="block md:inline md:ml-2 text-xs mt-1 md:mt-0">
                           (няма API ключ - анализът НЯМА ДА РАБОТИ)
                         </span>
                       </>
                     ) : aiConfig.provider === 'github-spark' ? (
                       <>
                         ✓ Активна конфигурация: <span className="font-mono">GitHub Spark / {aiConfig.model}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">
+                        <span className="block md:inline md:ml-2 text-xs text-muted-foreground mt-1 md:mt-0">
                           (вграден API)
                         </span>
                       </>
                     ) : (
                       <>
                         ✓ Активна конфигурация: <span className="font-mono">{aiConfig.provider} / {aiConfig.model}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">
+                        <span className="block md:inline md:ml-2 text-xs text-muted-foreground mt-1 md:mt-0">
                           (собствен API ключ)
                         </span>
                       </>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Забавяне: {aiConfig.requestDelay || 30000}ms | Заявки: {aiConfig.requestCount || 8} | 
                     Очаквано време: ~{Math.round((aiConfig.requestDelay || 30000) * (aiConfig.requestCount || 8) / 60000)} мин
                   </p>
@@ -469,23 +473,23 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Доставчик на AI модел</Label>
+                  <Label className="text-sm md:text-base">Доставчик на AI модел</Label>
                   <RadioGroup value={provider} onValueChange={(v) => setProvider(v as 'openai' | 'gemini' | 'github-spark')}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="github-spark" id="github-spark" />
-                      <Label htmlFor="github-spark" className="font-normal cursor-pointer">
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="github-spark" id="github-spark" className="mt-0.5 flex-shrink-0" />
+                      <Label htmlFor="github-spark" className="font-normal cursor-pointer text-sm leading-relaxed">
                         GitHub Spark (вграден - поддържа gpt-4o и gpt-4o-mini)
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="openai" id="openai" />
-                      <Label htmlFor="openai" className="font-normal cursor-pointer">
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="openai" id="openai" className="mt-0.5 flex-shrink-0" />
+                      <Label htmlFor="openai" className="font-normal cursor-pointer text-sm leading-relaxed">
                         OpenAI (изисква API ключ - позволява избор на модел)
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="gemini" id="gemini" />
-                      <Label htmlFor="gemini" className="font-normal cursor-pointer">
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="gemini" id="gemini" className="mt-0.5 flex-shrink-0" />
+                      <Label htmlFor="gemini" className="font-normal cursor-pointer text-sm leading-relaxed">
                         Google Gemini (изисква API ключ - позволява избор на модел)
                       </Label>
                     </div>
@@ -502,16 +506,16 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   )}
                   
                   {(provider === 'openai' || provider === 'gemini') && (
-                    <div className="mt-2 p-3 bg-accent/10 rounded-lg border border-accent/30">
+                    <div className="mt-2 p-2 md:p-3 bg-accent/10 rounded-lg border border-accent/30">
                       <p className="text-xs font-semibold text-accent-foreground mb-2">
                         ⚠️ ВАЖНО: {provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} изисква собствен API ключ
                       </p>
                       <p className="text-xs text-accent-foreground/80">
                         За да използвате {provider === 'gemini' ? 'Gemini модели' : 'OpenAI модели'}, трябва да:
                       </p>
-                      <ol className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-decimal list-inside">
-                        <li>Активирайте "Използвай собствен API ключ" по-долу</li>
-                        <li>Въведете валиден {provider === 'gemini' ? 'Google AI' : 'OpenAI'} API ключ</li>
+                      <ol className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-decimal list-inside pl-1">
+                        <li className="break-words">Активирайте "Използвай собствен API ключ" по-долу</li>
+                        <li className="break-words">Въведете валиден {provider === 'gemini' ? 'Google AI' : 'OpenAI'} API ключ</li>
                         <li>Запазете настройките</li>
                       </ol>
                       <p className="text-xs text-accent-foreground/80 mt-2">
@@ -522,7 +526,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="model">Модел</Label>
+                  <Label htmlFor="model" className="text-sm md:text-base">Модел</Label>
                   <Select 
                     value={model} 
                     onValueChange={setModel}
@@ -613,9 +617,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="api-key" className="flex items-center gap-2">
-                      <Key className="w-4 h-4" />
-                      API ключ {provider === 'gemini' || provider === 'openai' ? '(задължителен)' : '(опционален)'}
+                    <Label htmlFor="api-key" className="flex items-center gap-2 text-sm md:text-base flex-wrap">
+                      <Key className="w-4 h-4 flex-shrink-0" />
+                      <span>API ключ {provider === 'gemini' || provider === 'openai' ? '(задължителен)' : '(опционален)'}</span>
                     </Label>
                     <Input
                       id="api-key"
@@ -623,9 +627,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       placeholder={provider === 'openai' ? 'sk-...' : provider === 'gemini' ? 'AIza...' : 'Оставете празно за GitHub Spark'}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      className="font-mono"
+                      className="font-mono text-sm"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground break-words">
                       {provider === 'openai' 
                         ? 'Вашият OpenAI API ключ (започва с sk-)'
                         : provider === 'gemini'
@@ -636,22 +640,22 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   </div>
                   
                   {(provider === 'gemini' || provider === 'openai') && (
-                    <div className="mt-3 p-3 bg-accent/10 rounded-lg border border-accent/20">
+                    <div className="mt-3 p-2 md:p-3 bg-accent/10 rounded-lg border border-accent/20">
                       <p className="text-xs text-accent-foreground">
                         💡 <strong>Предимства на {provider === 'gemini' ? 'Gemini' : 'OpenAI'}:</strong>
                       </p>
-                      <ul className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-disc list-inside">
-                        <li>По-бързо време за анализ (30-60 сек. вместо 90-150 сек.)</li>
-                        <li>Без GitHub Spark rate limit ограничения</li>
+                      <ul className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-disc list-inside pl-1">
+                        <li className="break-words">По-бързо време за анализ (30-60 сек. вместо 90-150 сек.)</li>
+                        <li className="break-words">Без GitHub Spark rate limit ограничения</li>
                         <li>Достъп до най-новите AI модели</li>
-                        {provider === 'gemini' && <li>Отличен за многоезични анализи (включително български)</li>}
+                        {provider === 'gemini' && <li className="break-words">Отличен за многоезични анализи (включително български)</li>}
                       </ul>
                     </div>
                   )}
                   
                   {provider === 'github-spark' && apiKey.trim() === '' && (
-                    <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="p-2 md:p-3 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground break-words">
                         ℹ️ <strong>Използва се GitHub Spark вграден модел</strong><br/>
                         Анализът ще отнеме по-дълго време (90-150 сек.) и може да срещнете rate limit грешки при много заявки. 
                         За по-бързо и стабилно изпълнение, изберете OpenAI или Gemini с собствен API ключ.
@@ -662,7 +666,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               </div>
 
               <div className="flex items-center gap-2 pt-4">
-                <Button onClick={handleSaveConfig} className="flex-1">
+                <Button onClick={handleSaveConfig} className="flex-1 text-sm md:text-base">
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Запази настройките
                 </Button>
@@ -688,18 +692,18 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         >
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                 Учебници по иридология
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Качете учебници и референтни материали за подобряване на анализа
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="textbook-file" className="flex items-center gap-2">
+                  <Label htmlFor="textbook-file" className="flex items-center gap-2 text-sm md:text-base">
                     <Upload className="w-4 h-4" />
                     Качи файл (опционално)
                   </Label>
@@ -715,7 +719,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="textbook-name">Име на учебника</Label>
+                  <Label htmlFor="textbook-name" className="text-sm md:text-base">Име на учебника</Label>
                   <Input
                     id="textbook-name"
                     placeholder="напр. Основи на иридологията - Д-р Иванов"
@@ -725,20 +729,20 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="textbook-content">Съдържание</Label>
+                  <Label htmlFor="textbook-content" className="text-sm md:text-base">Съдържание</Label>
                   <Textarea
                     id="textbook-content"
                     placeholder="Въведете или поставете текста от учебника..."
                     value={textbookContent}
                     onChange={(e) => setTextbookContent(e.target.value)}
-                    className="min-h-[200px] font-mono text-sm"
+                    className="min-h-[200px] font-mono text-xs md:text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
                     Този текст ще бъде използван като контекст при AI анализа
                   </p>
                 </div>
 
-                <Button onClick={handleAddTextbook} className="w-full">
+                <Button onClick={handleAddTextbook} className="w-full text-sm md:text-base">
                   <Upload className="w-4 h-4 mr-2" />
                   Добави учебник
                 </Button>
@@ -748,11 +752,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Налични учебници ({textbooks?.length || 0})</Label>
+                  <Label className="text-sm md:text-base">Налични учебници ({textbooks?.length || 0})</Label>
                 </div>
 
                 {textbooks && textbooks.length > 0 ? (
-                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                  <ScrollArea className="h-[250px] md:h-[300px] rounded-md border p-2 md:p-4">
                     <div className="space-y-3">
                       {textbooks.map((textbook) => (
                         <motion.div
@@ -760,12 +764,12 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-card"
+                          className="flex items-start justify-between gap-2 md:gap-4 p-2 md:p-3 rounded-lg border bg-card"
                         >
-                          <div className="flex-1 space-y-1">
-                            <p className="font-medium">{textbook.name}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant="outline">
+                          <div className="flex-1 space-y-1 min-w-0">
+                            <p className="font-medium text-sm md:text-base break-words">{textbook.name}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                              <Badge variant="outline" className="text-xs">
                                 {formatFileSize(textbook.fileSize)}
                               </Badge>
                               <span>•</span>
@@ -778,6 +782,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteTextbook(textbook.id)}
+                            className="flex-shrink-0"
                           >
                             <Trash className="w-4 h-4 text-destructive" />
                           </Button>
@@ -817,11 +822,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         >
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <ImageIcon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                 Иридологичен Overlay Map
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Качете персонализиран overlay шаблон за използване при оразмеряване на изображения
               </CardDescription>
             </CardHeader>
@@ -847,19 +852,20 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowOverlayPreview(!showOverlayPreview)}
-                          className="gap-2"
+                          className="gap-1 md:gap-2 text-xs md:text-sm"
                         >
-                          <Eye className="w-4 h-4" />
-                          {showOverlayPreview ? 'Скрий' : 'Преглед'}
+                          <Eye className="w-3 h-3 md:w-4 md:h-4" />
+                          <span className="hidden sm:inline">{showOverlayPreview ? 'Скрий' : 'Преглед'}</span>
+                          <span className="sm:hidden">{showOverlayPreview ? '▲' : '▼'}</span>
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={handleRemoveOverlay}
-                          className="gap-2 text-destructive hover:text-destructive"
+                          className="gap-1 md:gap-2 text-destructive hover:text-destructive text-xs md:text-sm"
                         >
-                          <Trash className="w-4 h-4" />
-                          Премахни
+                          <Trash className="w-3 h-3 md:w-4 md:h-4" />
+                          <span className="hidden sm:inline">Премахни</span>
                         </Button>
                       </div>
                     </div>
@@ -869,10 +875,10 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-4 flex justify-center p-4 bg-black/5 rounded-lg"
+                        className="mt-4 flex justify-center p-2 md:p-4 bg-black/5 rounded-lg"
                       >
-                        <div className="relative w-64 h-64">
-                          <IridologyOverlay size={256} className="opacity-90" />
+                        <div className="relative w-48 h-48 md:w-64 md:h-64">
+                          <IridologyOverlay size={256} className="opacity-90 w-full h-full" />
                         </div>
                       </motion.div>
                     )}
@@ -895,7 +901,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       Качете персонализиран SVG или PNG файл
                     </p>
                     <Label htmlFor="overlay-upload" className="cursor-pointer">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                      <div className="inline-flex items-center gap-2 px-3 md:px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm md:text-base">
                         <Upload className="w-4 h-4" />
                         Качи Overlay Map
                       </div>
@@ -911,16 +917,16 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">Предварителен преглед на стандартния overlay:</p>
-                    <div className="flex justify-center p-4 bg-black/5 rounded-lg border">
-                      <div className="relative w-64 h-64">
-                        <IridologyOverlay size={256} className="opacity-90" />
+                    <div className="flex justify-center p-2 md:p-4 bg-black/5 rounded-lg border">
+                      <div className="relative w-48 h-48 md:w-64 md:h-64">
+                        <IridologyOverlay size={256} className="opacity-90 w-full h-full" />
                       </div>
                     </div>
                   </div>
                   
-                  <div className="p-3 bg-secondary/50 rounded-lg">
+                  <div className="p-2 md:p-3 bg-secondary/50 rounded-lg">
                     <p className="text-xs font-semibold mb-2">📋 Изисквания за overlay:</p>
-                    <ul className="text-xs text-muted-foreground space-y-1">
+                    <ul className="text-xs text-muted-foreground space-y-1 break-words">
                       <li>• Формат: SVG (препоръчва се) или PNG</li>
                       <li>• Квадратен формат с еднакви размери (напр. 800x800px)</li>
                       <li>• Центриран дизайн с концентрични кръгове</li>

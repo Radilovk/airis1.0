@@ -48,16 +48,19 @@ export default function IridologyManualTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-primary" />
-          Иридологично ръководство
+        <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+          <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
+          <span>Иридологично ръководство</span>
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           Ръководството, по което се води разчитането на ирисите при анализ
         </CardDescription>
         {iridologyManual && (
-          <Badge variant="outline" className="w-fit">
-            Последна промяна: {new Date(iridologyManual.lastModified).toLocaleString('bg-BG')}
+          <Badge variant="outline" className="w-fit text-xs">
+            Последна промяна: {new Date(iridologyManual.lastModified).toLocaleString('bg-BG', { 
+              dateStyle: 'short', 
+              timeStyle: 'short' 
+            })}
           </Badge>
         )}
       </CardHeader>
@@ -65,24 +68,25 @@ export default function IridologyManualTab() {
         <Textarea
           value={manualContent}
           onChange={(e) => setManualContent(e.target.value)}
-          className="min-h-[500px] font-mono text-sm"
+          className="min-h-[300px] md:min-h-[500px] font-mono text-xs md:text-sm"
           placeholder="Въведете съдържанието на иридологичното ръководство..."
         />
         
-        <div className="flex gap-2">
-          <Button onClick={handleSaveManual} className="flex-1">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={handleSaveManual} className="flex-1 text-sm md:text-base">
             <CheckCircle className="w-4 h-4 mr-2" />
             Запази промените
           </Button>
-          <Button onClick={handleResetManual} variant="outline">
+          <Button onClick={handleResetManual} variant="outline" className="sm:flex-initial text-sm md:text-base">
             <ArrowCounterClockwise className="w-4 h-4 mr-2" />
-            Възстанови оригинала
+            <span className="hidden sm:inline">Възстанови оригинала</span>
+            <span className="sm:hidden">Възстанови</span>
           </Button>
         </div>
         
-        <div className="p-3 bg-muted/50 rounded-lg border border-border">
-          <p className="text-xs text-muted-foreground">
-            💡 Това ръководство се използва като референтна база знания при AI анализа на ирисите. 
+        <div className="p-2 md:p-3 bg-muted/50 rounded-lg border border-border">
+          <p className="text-xs text-muted-foreground break-words">
+            💡 Това ръководство се използва като referencer база знания при AI анализа на ирисите. 
             Промените тук ще повлияят на интерпретацията на находките.
           </p>
         </div>
