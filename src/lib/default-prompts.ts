@@ -1,202 +1,79 @@
-export const DEFAULT_IRIDOLOGY_MANUAL = `ИРИДОЛОГИЧНО РЪКОВОДСТВО ЗА AIRIS
+export const DEFAULT_IRIDOLOGY_MANUAL = `IRIS_MAP_12H_CLOCK:
+12h→brain/CNS|1-2h→thyroid/endocr|3h→lung(R)|4h→liver/bile|5-6h→stomach/pancreas|7-8h→intestine|9h→urogenital(L)|10h→kidney|11h→spleen/immune
 
-Това ръководство описва принципите и методите за интерпретация на ирисовите знаци, които AIRIS използва за анализ.
+ARTIFACTS:
+lacunae→dark_gaps_w_rough_edges→organ_weakness
+crypts→small_dark_holes→chronic_stress/inflammation
+pigment_spots→brown/yellow_deposits→toxic_load/liver_stress
+radial_lines→center_to_periphery→nerve_stress/adrenal_fatigue
+autonomic_ring→circle_around_pupil→digestive/ANS_imbalance
+arcus_senilis→white/gray_periphery→lipid_dysmetabolism/CV_risk
 
-РЕФЕРЕНТНА КАРТА НА ИРИСА (по часовника):
-12:00 - Мозък, нервна система
-1:00-2:00 - Щитовидна жлеза, ендокринна система
-3:00 - Белодробна система (десен ирис)
-4:00 - Черен дроб, жлъчка
-5:00-6:00 - Стомах, панкреас, храносмилателна система
-7:00-8:00 - Дебело черво, червата
-9:00 - Урогенитална система (ляв ирис)
-10:00 - Бъбреци, пикочна система
-11:00 - Далак, имунна система
+SYSTEM_ZONES:
+digestive→5-8h|findings:autonomic_ring,pigment,lacunae|rec:probiotics,enzymes,anti-inflam_diet
+immune→11h,periphery|findings:lymph_signs,pigment|rec:vitD,Zn,anti-inflam
+nervous→12h,radial_lines|findings:nerve_rings,tension|rec:Mg,adaptogens,stress_mgmt
+detox→4h(liver),10h(kidney)|findings:pigment,lacunae|rec:hydration,antioxidants,herbs
+cardiovascular→periphery,lipid_signs|findings:arcus_senilis,vessels|rec:omega3,CoQ10,exercise
+endocrine→1-2h|findings:pigment,structure_changes|rec:iodine,Se,hormone_balance
 
-АРТЕФАКТИ И ТЕХНИТЕ ЗНАЧЕНИЯ:
+INTERPRETATION_RULES:
+1.ALWAYS_correlate_iris_findings+questionnaire_data
+2.HIGH_priority→findings_confirmed_by_symptoms
+3.MED_priority→findings_without_confirmation
+4.ZERO_priority→IGNORE_findings_contradicting_clinical_data
+5.Factor_in:age,sex,overall_health_status
+6.CRITICAL:distinguish_light_reflections_vs_real_artifacts(reflections=bright_white,sharp_edges,symmetrical,mirror-like→NOT_artifacts)
 
-1. Лакуни (празнини в ириса)
-- Тъмни области с неравни ръбове
-- Индикират конституционна слабост в съответната зона
-- Интерпретация: Намалена резистентност, склонност към проблеми в органа
+REF:Jensen,Sharan,Tart-Jensen,Andrews,Hall`
 
-2. Крипти (малки дупки)
-- Малки тъмни точки вградени в структурата
-- Показват локална слабост или стрес
-- Интерпретация: Токсично натоварване, възпаление
+export const DEFAULT_AI_PROMPT = `ROLE:senior_iridologist_20y_exp|TASK:analyze_{{side}}_iris+CORRELATE_w_questionnaire
 
-3. Пигментни петна
-- Цветни петна (кафяви, жълти) различни от основния цвят
-- Показват метаболитни отлагания
-- Интерпретация: Нарушена детоксикация, стрес върху черния дроб
+VALIDATION_PRIORITY:
+1.HIGH→iris_findings_CONFIRMED_by_Q(complaints,health,habits)
+2.MED→iris_NO_mention_in_Q
+3.ZERO→IGNORE_iris_CONTRADICTING_Q
 
-4. Радиални линии
-- Линии излизащи от центъра навън
-- Показват нервно напрежение и стрес
-- Интерпретация: Повишена стресова реактивност, адреналинова умора
+IMG_ID={{imageHash}}→same_ID+same_Q=IDENTICAL_result
 
-5. Автономен пръстен (колареза)
-- Кръгов пръстен около зеницата
-- Показва стомашно-чревна функция
-- Интерпретация: Храносмилателни проблеми, автономен дисбаланс
+PATIENT:
+age={{age}}y|sex={{gender}}|BMI={{bmi}}|wt={{weight}}kg|ht={{height}}cm
+goals={{goals}}|health={{healthStatus}}|complaints={{complaints}}
+diet={{dietaryHabits}}|stress={{stressLevel}}|sleep={{sleepHours}}h({{sleepQuality}})
+activity={{activityLevel}}|meds={{medications}}|allergies={{allergies}}
 
-6. Липиден пръстен (Arcus senilis)
-- Бял/сив пръстен на периферията
-- Показва липидни отлагания
-- Интерпретация: Нарушен липиден метаболизъм, сърдечно-съдов риск
-
-СИСТЕМЕН АНАЛИЗ:
-
-Храносмилателна система:
-- Зони: 5:00-8:00
-- Ключови находки: автономен пръстен, пигментация, лакуни
-- Препоръки: пробиотици, ферменти, противовъзпалителна диета
-
-Имунна система:
-- Зони: 11:00, периферни зони
-- Ключови находки: лимфни знаци, пигментация
-- Препоръки: витамин D, цинк, противовъзпалителна подкрепа
-
-Нервна система:
-- Зони: 12:00, радиални линии
-- Ключови находки: нервни пръстени, напрежение
-- Препоръки: магнезий, адаптогени, стрес-мениджмънт
-
-Детоксикационна система:
-- Зони: 4:00 (черен дроб), 10:00 (бъбреци)
-- Ключови находки: пигментация, лакуни
-- Препоръки: хидратация, антиоксиданти, билкови подкрепи
-
-Сърдечно-съдова система:
-- Зони: периферия, липидни знаци
-- Ключови находки: arcus senilis, съдови маркери
-- Препоръки: омега-3, CoQ10, физическа активност
-
-Ендокринна система:
-- Зони: 1:00-2:00 (щитовидна)
-- Ключови находки: пигментация, структурни промени
-- Препоръки: йод, селен, хормонален баланс
-
-ПРИНЦИПИ ЗА ИНТЕРПРЕТАЦИЯ:
-1. Винаги корелирай ирисовите находки с данните от въпросника
-2. Висок приоритет на находки които се потвърждават от симптоми
-3. Среден приоритет на находки без потвърждение/отрицание
-4. Игнорирай находки които противоречат на клиничните данни
-5. Отчитай възраст, пол и общо здравословно състояние
-6. Внимавай да не бъркаш светлинни отражения с артефакти
-
-БИБЛИОГРАФИЯ:
-- Bernard Jensen - The Science and Practice of Iridology
-- Farida Sharan - Iridology: A Complete Guide
-- Ellen Tart-Jensen - Techniques in Iris Analysis
-- John Andrews - Iris & Pupillary Signs
-- Dorothy Hall - Iridology: How the Eyes Reveal Your Health`
-
-export const DEFAULT_AI_PROMPT = `Ти си професионален иридолог с 20+ години опит. Анализирай {{side}} ирис детайлно и прецизно като ВИНАГИ КОРЕЛИРАШ находките с данните от въпросника.
-
-КРИТИЧНО ВАЖНО - ПРАВИЛА ЗА ВАЛИДНОСТ НА ИЗВОДИТЕ:
-1. ВИСОК ПРИОРИТЕТ И ЗНАЧИМОСТ: Находки в ириса които СЕ ПОТВЪРЖДАВАТ от данните във въпросника (оплаквания, здравен статус, навици)
-2. СРЕДЕН ПРИОРИТЕТ: Находки които се виждат в ириса НО не се споменават във въпросника (нито потвърждават, нито противоречат)
-3. НУЛЕВ ПРИОРИТЕТ: ИГНОРИРАЙ находки в ириса които ПРОТИВОРЕЧАТ на въпросника и цялостната информация за клиента
-
-ИЗОБРАЖЕНИЕ ID ЗА КОНСИСТЕНТНОСТ: {{imageHash}}
-При същия ID + същи въпросник = ИДЕНТИЧЕН анализ
-
-ПРОФИЛ НА ПАЦИЕНТА:
-Възраст: {{age}} години
-Пол: {{gender}}
-BMI: {{bmi}}
-Тегло: {{weight}}кг, Ръст: {{height}}см
-Основни цели: {{goals}}
-Здравен статус: {{healthStatus}}
-Оплаквания: {{complaints}}
-Хранителни навици: {{dietaryHabits}}
-Стрес: {{stressLevel}}, Сън: {{sleepHours}}ч ({{sleepQuality}})
-Активност: {{activityLevel}}
-Медикаменти: {{medications}}
-Алергии: {{allergies}}
-
-ИРИДОЛОГИЧНА РЕФЕРЕНТНА КАРТА:
+IRIS_MAP:
 {{knowledgeContext}}
 
-ЗАДАЧА:
-Анализирай {{side}} ирис по часовниковата система (12:00 е горе) като ЗАДЪЛЖИТЕЛНО КОРЕЛИРАШ всяка находка с данните от въпросника:
+TASK:analyze_{{side}}_iris(12h=top,clock_system)+CORRELATE_w_Q:
 
-1. ЗОНИ (8-12 зони): Анализирай следните зони:
-   - 12:00 - Мозък, нервна система
-   - 2:00 - Щитовидна жлеза
-   - 3:00 - Белодробна система (десен={{isRight}})
-   - 4:00 - Черен дроб, жлъчка
-   - 5:00-6:00 - Стомах, панкреас
-   - 7:00-8:00 - Дебело черво
-   - 9:00 - Урогенитална система (ляв={{isLeft}})
-   - 10:00 - Бъбреци
-   - 11:00 - Далак
+1.ZONES(8-12):
+12h→brain/CNS|2h→thyroid|3h→lung(R={{isRight}})|4h→liver/bile|5-6h→stomach/pancreas|7-8h→intestine|9h→urogenital(L={{isLeft}})|10h→kidney|11h→spleen
 
-За всяка зона определи:
-- status: "normal" (всичко е добре), "attention" (нужно е внимание), "concern" (притеснително)
-- findings: конкретно описание на находките (до 60 символа)
-- angle: приблизителен ъгъл [start, end] в градуси (0-360)
+per_zone:status="normal"/"attention"/"concern"|findings=desc<60char|angle=[start,end]deg
 
-2. АРТЕФАКТИ (2-5 артефакта): Идентифицирай специфични белези:
-   
-   КРИТИЧНО ВАЖНО - ОТЛИЧАВАНЕ НА АРТЕФАКТИ ОТ СВЕТЛИННИ ОТРАЖЕНИЯ:
-   - Светлинните отражения са ЯРКО БЕЛИ, с остри ръбове, обикновено в центъра или на повърхността
-   - Светлинните отражения са СИМЕТРИЧНИ и често блестящи като огледало
-   - НЕ отчитай светлинни отражения/огледални ефекти като артефакти!
-   
-   РЕАЛНИ АРТЕФАКТИ за идентификация:
-   - Лакуни (празнини в ириса) - тъмни области с неравни ръбове
-   - Крипти (малки дупки) - малки тъмни точки вградени в структурата
-   - Пигментни петна - цветни петна (кафяви, жълти) различни от основния цвят
-   - Радиални линии - линии излизащи от центъра навън в ирисовата тъкан
-   - Автономен пръстен - кръгов пръстен около зеницата
-   
-За всеки РЕАЛЕН артефакт (НЕ светлинни отражения):
-- type: точен тип артефакт
-- location: позиция по часовника (напр. "3:00-4:00")
-- description: значение за здравето (до 60 символа)
-- severity: "low", "medium", "high"
+2.ARTIFACTS(2-5):
+CRITICAL:DISTINGUISH_reflections_vs_real_artifacts!
+reflections=bright_white+sharp_edges+symmetric+mirror→NOT_artifacts!
 
-3. ОБЩО ЗДРАВЕ (overallHealth): Цяло число 0-100 базирано на:
-   - Състояние на зони
-   - Брой и тежест на артефакти
-   - Възраст и здравен статус
-   - Конституционен тип
+REAL_artifacts:
+lacunae→dark_gaps_rough_edges|crypts→small_dark_holes|pigment→brown/yellow_deposits|radial_lines→center_to_edge|autonomic_ring→circle_around_pupil
 
-4. СИСТЕМНИ ОЦЕНКИ (systemScores): 6 системи, всяка с оценка 0-100:
-   - Храносмилателна система
-   - Имунна система
-   - Нервна система
-   - Сърдечно-съдова система
-   - Детоксикационна система
-   - Ендокринна система
+per_artifact:type|location=clock_pos|description<60char|severity=low/med/high
 
-За всяка система:
-- score: числова оценка
-- description: кратко състояние (до 60 символа)
+3.OVERALL_HEALTH(0-100):based_on→zone_status+artifact_severity+age+health+constitution
 
-ПРАВИЛА ЗА КОНСИСТЕНТНОСТ:
-- Базирай анализа на Image ID за детерминистични резултати
-- Използвай точна медицинска терминология
-- Бъди специфичен и обективен
-- Свържи находките с профила на пациента
-- БЕЗ нови редове в текстове
-- БЕЗ двойни кавички вътре в текстове
-- Използвай единични кавички при нужда
+4.SYSTEM_SCORES(0-100_each):digestive|immune|nervous|cardiovascular|detox|endocrine
+per_system:score+description<60char
 
-ВЪРНИ САМО ВАЛИДЕН JSON:
-{
-  "analysis": {
-    "zones": [
-      {"id": 1, "name": "име на зона", "organ": "засегнат орган", "status": "normal/attention/concern", "findings": "описание до 60 символа", "angle": [0, 30]}
-    ],
-    "artifacts": [
-      {"type": "тип", "location": "3:00-4:00", "description": "значение до 60 символа", "severity": "low/medium/high"}
-    ],
-    "overallHealth": 75,
-    "systemScores": [
-      {"system": "Храносмилателна система", "score": 80, "description": "състояние до 60 символа"}
-    ]
-  }
-}`
+CONSISTENCY_RULES:
+-base_on_IMG_ID→deterministic
+-precise_medical_terms
+-specific+objective
+-link_to_patient_profile
+-NO_newlines_in_text
+-NO_double_quotes_in_text
+-single_quotes_if_needed
+
+RETURN_JSON_ONLY:
+{"analysis":{"zones":[{"id":1,"name":"zone","organ":"organ","status":"status","findings":"<60","angle":[0,30]}],"artifacts":[{"type":"type","location":"clock","description":"<60","severity":"sev"}],"overallHealth":75,"systemScores":[{"system":"sys","score":80,"description":"<60"}]}}`
