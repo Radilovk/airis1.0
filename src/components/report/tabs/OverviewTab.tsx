@@ -18,7 +18,6 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import SystemScoresChart from '../SystemScoresChart'
-import SystemComparisonChart from '../SystemComparisonChart'
 import HealthProgressChart from '../HealthProgressChart'
 import {
   Collapsible,
@@ -38,21 +37,36 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
   const limitingFactors = getLimitingFactors(report)
   const [expandedBio, setExpandedBio] = useState(false)
   
+  const getSleepQualityLabel = (quality: string) => {
+    const labels: Record<string, string> = {
+      'poor': 'Лошо',
+      'fair': 'Средно',
+      'good': 'Добро',
+      'excellent': 'Отлично'
+    }
+    return labels[quality] || quality
+  }
+
   const getLifestyleMetrics = () => {
+    const sleepScore = report.questionnaireData.sleepHours >= 7 && 
+                       report.questionnaireData.sleepHours <= 9 && 
+                       (report.questionnaireData.sleepQuality === 'good' || 
+                        report.questionnaireData.sleepQuality === 'excellent')
+    
     const metrics = [
       {
         icon: Moon,
         label: 'Сън',
         value: `${report.questionnaireData.sleepHours}ч`,
-        quality: report.questionnaireData.sleepQuality,
-        score: report.questionnaireData.sleepHours >= 7 && report.questionnaireData.sleepQuality !== 'poor' ? 'good' : 'needs-attention'
+        quality: getSleepQualityLabel(report.questionnaireData.sleepQuality),
+        score: sleepScore ? 'good' : 'needs-attention'
       },
       {
         icon: Drop,
         label: 'Хидратация',
-        value: `${report.questionnaireData.hydration}л`,
-        quality: report.questionnaireData.hydration >= 2 ? 'добра' : 'недостатъчна',
-        score: report.questionnaireData.hydration >= 2 ? 'good' : 'needs-attention'
+        value: `${report.questionnaireData.hydration} чаши`,
+        quality: report.questionnaireData.hydration >= 8 ? 'добра' : 'недостатъчна',
+        score: report.questionnaireData.hydration >= 8 ? 'good' : 'needs-attention'
       },
       {
         icon: Lightning,
@@ -286,17 +300,6 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.25 }}
-      >
-        <SystemComparisonChart 
-          leftScores={report.leftIris.systemScores}
-          rightScores={report.rightIris.systemScores}
-        />
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
       >
         <HealthProgressChart report={report} />
       </motion.div>
