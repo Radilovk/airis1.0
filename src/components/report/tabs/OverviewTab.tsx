@@ -67,8 +67,11 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
       sleepQualityText = 'Прекомерен'
     }
     
-    if (sleepQuality === 'poor') {
+    if (sleepQuality === 'poor' || sleepQuality === 'fair') {
       sleepScore = 'needs-attention'
+      if (sleepHours >= 7 && sleepHours <= 9) {
+        sleepQualityText = getSleepQualityLabel(sleepQuality)
+      }
     }
     
     const metrics = [
