@@ -7,11 +7,23 @@ import {
   TrendDown,
   CheckCircle,
   XCircle,
-  Activity
+  Activity,
+  Heart,
+  Brain,
+  Drop,
+  Moon,
+  Lightning,
+  Barbell
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import SystemScoresChart from '../SystemScoresChart'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { useState } from 'react'
 
 interface OverviewTabProps {
   report: AnalysisReport
@@ -22,6 +34,41 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
   const goalAchievability = calculateGoalAchievability(report)
   const supportingFactors = getSupportingFactors(report)
   const limitingFactors = getLimitingFactors(report)
+  const [expandedBio, setExpandedBio] = useState(false)
+  
+  const getLifestyleMetrics = () => {
+    const metrics = [
+      {
+        icon: Moon,
+        label: 'Сън',
+        value: `${report.questionnaireData.sleepHours}ч`,
+        quality: report.questionnaireData.sleepQuality,
+        score: report.questionnaireData.sleepHours >= 7 && report.questionnaireData.sleepQuality !== 'poor' ? 'good' : 'needs-attention'
+      },
+      {
+        icon: Drop,
+        label: 'Хидратация',
+        value: `${report.questionnaireData.hydration}л`,
+        quality: report.questionnaireData.hydration >= 2 ? 'добра' : 'недостатъчна',
+        score: report.questionnaireData.hydration >= 2 ? 'good' : 'needs-attention'
+      },
+      {
+        icon: Lightning,
+        label: 'Стрес',
+        value: report.questionnaireData.stressLevel === 'low' ? 'Нисък' : report.questionnaireData.stressLevel === 'moderate' ? 'Умерен' : 'Висок',
+        quality: '',
+        score: report.questionnaireData.stressLevel === 'low' || report.questionnaireData.stressLevel === 'moderate' ? 'good' : 'needs-attention'
+      },
+      {
+        icon: Barbell,
+        label: 'Активност',
+        value: report.questionnaireData.activityLevel === 'sedentary' ? 'Ниска' : report.questionnaireData.activityLevel === 'light' ? 'Лека' : report.questionnaireData.activityLevel === 'moderate' ? 'Умерена' : 'Висока',
+        quality: '',
+        score: report.questionnaireData.activityLevel !== 'sedentary' ? 'good' : 'needs-attention'
+      }
+    ]
+    return metrics
+  }
 
   return (
     <div className="space-y-4">
@@ -45,6 +92,96 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
                 ))}
               </div>
             </div>
+          </div>
+        </Card>
+      </motion.div>
+      
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.05 }}
+      >
+        <Collapsible open={expandedBio} onOpenChange={setExpandedBio}>
+          <Card className="p-5">
+            <CollapsibleTrigger className="w-full flex items-center justify-between">
+              <h3 className="font-semibold text-base">Биометрични данни</h3>
+              <motion.div
+                animate={{ rotate: expandedBio ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <TrendDown size={18} className="text-muted-foreground" />
+              </motion.div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Възраст</p>
+                  <p className="text-sm font-semibold">{report.questionnaireData.age} год.</p>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Пол</p>
+                  <p className="text-sm font-semibold">
+                    {report.questionnaireData.gender === 'male' ? 'Мъж' : report.questionnaireData.gender === 'female' ? 'Жена' : 'Друго'}
+                  </p>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Тегло</p>
+                  <p className="text-sm font-semibold">{report.questionnaireData.weight} кг</p>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Ръст</p>
+                  <p className="text-sm font-semibold">{report.questionnaireData.height} см</p>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3 col-span-2">
+                  <p className="text-xs text-muted-foreground mb-1">BMI</p>
+                  <p className="text-sm font-semibold">
+                    {(report.questionnaireData.weight / ((report.questionnaireData.height / 100) ** 2)).toFixed(1)}
+                  </p>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      </motion.div>
+      
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <Card className="p-5">
+          <h3 className="font-semibold text-base mb-4">Начин на живот</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {getLifestyleMetrics().map((metric, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1 + idx * 0.05 }}
+                className={`rounded-lg p-3 border ${
+                  metric.score === 'good' 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-orange-50 border-orange-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <metric.icon 
+                    size={18} 
+                    weight="duotone" 
+                    className={metric.score === 'good' ? 'text-green-600' : 'text-orange-600'} 
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">{metric.label}</span>
+                </div>
+                <p className={`text-sm font-bold ${
+                  metric.score === 'good' ? 'text-green-700' : 'text-orange-700'
+                }`}>
+                  {metric.value}
+                </p>
+                {metric.quality && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{metric.quality}</p>
+                )}
+              </motion.div>
+            ))}
           </div>
         </Card>
       </motion.div>

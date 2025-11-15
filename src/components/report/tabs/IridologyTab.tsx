@@ -5,23 +5,34 @@ import {
   Warning,
   CheckCircle,
   Info,
-  Eye
+  Eye,
+  SealWarning,
+  ShieldCheck,
+  Activity
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import IrisWithOverlay from '@/components/iris/IrisWithOverlay'
 import IrisVisualization from '../IrisVisualization'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { useState } from 'react'
 
 interface IridologyTabProps {
   report: AnalysisReport
 }
 
 export default function IridologyTab({ report }: IridologyTabProps) {
+  const [expandedAnalysis, setExpandedAnalysis] = useState(false)
+  
   const getStatusBadge = (status: 'normal' | 'attention' | 'concern') => {
     const variants = {
-      normal: { variant: 'default' as const, icon: CheckCircle, text: 'Норма', color: 'text-green-600' },
-      attention: { variant: 'secondary' as const, icon: Info, text: 'Внимание', color: 'text-yellow-600' },
-      concern: { variant: 'destructive' as const, icon: Warning, text: 'Притеснение', color: 'text-red-600' }
+      normal: { variant: 'default' as const, icon: CheckCircle, text: 'Норма', color: 'text-green-600', bg: 'bg-green-50' },
+      attention: { variant: 'secondary' as const, icon: Info, text: 'Внимание', color: 'text-yellow-600', bg: 'bg-yellow-50' },
+      concern: { variant: 'destructive' as const, icon: Warning, text: 'Притеснение', color: 'text-red-600', bg: 'bg-red-50' }
     }
     const config = variants[status]
     const Icon = config.icon
@@ -32,16 +43,112 @@ export default function IridologyTab({ report }: IridologyTabProps) {
       </Badge>
     )
   }
+  
+  const getZoneStats = (zones: any[]) => {
+    const stats = {
+      total: zones.length,
+      normal: zones.filter(z => z?.status === 'normal').length,
+      attention: zones.filter(z => z?.status === 'attention').length,
+      concern: zones.filter(z => z?.status === 'concern').length
+    }
+    return stats
+  }
+  
+  const leftStats = getZoneStats(report.leftIris?.zones || [])
+  const rightStats = getZoneStats(report.rightIris?.zones || [])
 
   return (
     <div className="space-y-4">
+      {report.detailedAnalysis && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Collapsible open={expandedAnalysis} onOpenChange={setExpandedAnalysis}>
+            <Card className="overflow-hidden">
+              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Activity size={20} weight="duotone" className="text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-base">Детайлен Иридологичен Анализ</h3>
+                    <p className="text-xs text-muted-foreground">Пълно обяснение на находките</p>
+                  </div>
+                </div>
+                <motion.div
+                  animate={{ rotate: expandedAnalysis ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Warning size={18} className="text-muted-foreground" />
+                </motion.div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-5 pb-5 space-y-3">
+                  {report.detailedAnalysis.split(/\n\n+/).filter(p => p.trim()).map((paragraph, idx) => {
+                    const cleanParagraph = paragraph.trim()
+                    return cleanParagraph ? (
+                      <motion.div 
+                        key={idx}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05, duration: 0.25 }}
+                        className="flex items-start gap-3 p-4 bg-muted/30 rounded-xl"
+                      >
+                        <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+                        <p className="text-sm leading-relaxed text-foreground/90">{cleanParagraph}</p>
+                      </motion.div>
+                    ) : null
+                  })}
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        </motion.div>
+      )}
+      
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4 bg-gradient-to-br from-green-50/50 to-green-100/30">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck size={18} weight="duotone" className="text-green-600" />
+            <span className="text-xs font-semibold text-green-700">Здрави Зони</span>
+          </div>
+          <p className="text-2xl font-bold text-green-700">{leftStats.normal + rightStats.normal}</p>
+        </Card>
+        
+        <Card className="p-4 bg-gradient-to-br from-yellow-50/50 to-yellow-100/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Info size={18} weight="duotone" className="text-yellow-600" />
+            <span className="text-xs font-semibold text-yellow-700">Внимание</span>
+          </div>
+          <p className="text-2xl font-bold text-yellow-700">{leftStats.attention + rightStats.attention}</p>
+        </Card>
+        
+        <Card className="p-4 bg-gradient-to-br from-orange-50/50 to-orange-100/30">
+          <div className="flex items-center gap-2 mb-2">
+            <SealWarning size={18} weight="duotone" className="text-orange-600" />
+            <span className="text-xs font-semibold text-orange-700">Притеснение</span>
+          </div>
+          <p className="text-2xl font-bold text-orange-700">{leftStats.concern + rightStats.concern}</p>
+        </Card>
+        
+        <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Eye size={18} weight="duotone" className="text-primary" />
+            <span className="text-xs font-semibold text-primary">Общо Зони</span>
+          </div>
+          <p className="text-2xl font-bold text-primary">{leftStats.total + rightStats.total}</p>
+        </Card>
+      </div>
+      
       <Tabs defaultValue="left" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-auto p-1">
-          <TabsTrigger value="left" className="flex items-center gap-2 py-2.5">
+        <TabsList className="grid w-full grid-cols-2 h-auto p-1.5 bg-muted/50">
+          <TabsTrigger value="left" className="flex items-center gap-2 py-2.5 rounded-lg">
             <Eye size={16} weight="duotone" />
             <span className="text-xs font-medium">Ляв Ирис</span>
           </TabsTrigger>
-          <TabsTrigger value="right" className="flex items-center gap-2 py-2.5">
+          <TabsTrigger value="right" className="flex items-center gap-2 py-2.5 rounded-lg">
             <Eye size={16} weight="duotone" />
             <span className="text-xs font-medium">Десен Ирис</span>
           </TabsTrigger>
@@ -82,22 +189,45 @@ export default function IridologyTab({ report }: IridologyTabProps) {
             transition={{ duration: 0.3, delay: 0.1 }}
           >
             <Card className="p-5">
-              <h3 className="font-semibold text-sm mb-3">Иридологични Зони</h3>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <Activity size={16} weight="duotone" className="text-primary" />
+                Иридологични Зони
+              </h3>
               <div className="space-y-3">
                 {(report.leftIris?.zones || [])
                   .filter(zone => zone && zone.status !== 'normal')
-                  .map((zone) => (
-                    <div key={zone.id} className="border rounded-lg p-3 bg-card">
-                      <div className="flex items-start justify-between mb-2 gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm">{zone.name || ''}</h4>
-                          <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                  .map((zone, idx) => {
+                    const statusConfig = {
+                      attention: { bg: 'bg-yellow-50', border: 'border-yellow-200', icon: Info, iconColor: 'text-yellow-600' },
+                      concern: { bg: 'bg-red-50', border: 'border-red-200', icon: Warning, iconColor: 'text-red-600' }
+                    }[zone.status] || { bg: 'bg-gray-50', border: 'border-gray-200', icon: Info, iconColor: 'text-gray-600' }
+                    
+                    const Icon = statusConfig.icon
+                    
+                    return (
+                      <motion.div 
+                        key={zone.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05, duration: 0.25 }}
+                        className={`border-2 rounded-xl p-4 ${statusConfig.bg} ${statusConfig.border} hover:shadow-md transition-all`}
+                      >
+                        <div className="flex items-start justify-between mb-3 gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConfig.bg} shadow-sm`}>
+                              <Icon size={20} weight="duotone" className={statusConfig.iconColor} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-sm mb-0.5">{zone.name || ''}</h4>
+                              <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                            </div>
+                          </div>
+                          {getStatusBadge(zone.status)}
                         </div>
-                        {getStatusBadge(zone.status)}
-                      </div>
-                      <p className="text-xs leading-relaxed mt-2 text-foreground/90">{zone.findings || ''}</p>
-                    </div>
-                  ))}
+                        <p className="text-sm leading-relaxed text-foreground/90 pl-12">{zone.findings || ''}</p>
+                      </motion.div>
+                    )
+                  })}
                 {(report.leftIris?.zones || []).filter(zone => zone && zone.status !== 'normal').length === 0 && (
                   <div className="text-center py-8">
                     <CheckCircle size={32} weight="duotone" className="text-green-600 mx-auto mb-2" />
@@ -168,22 +298,45 @@ export default function IridologyTab({ report }: IridologyTabProps) {
             transition={{ duration: 0.3, delay: 0.1 }}
           >
             <Card className="p-5">
-              <h3 className="font-semibold text-sm mb-3">Иридологични Зони</h3>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <Activity size={16} weight="duotone" className="text-primary" />
+                Иридологични Зони
+              </h3>
               <div className="space-y-3">
                 {(report.rightIris?.zones || [])
                   .filter(zone => zone && zone.status !== 'normal')
-                  .map((zone) => (
-                    <div key={zone.id} className="border rounded-lg p-3 bg-card">
-                      <div className="flex items-start justify-between mb-2 gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm">{zone.name || ''}</h4>
-                          <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                  .map((zone, idx) => {
+                    const statusConfig = {
+                      attention: { bg: 'bg-yellow-50', border: 'border-yellow-200', icon: Info, iconColor: 'text-yellow-600' },
+                      concern: { bg: 'bg-red-50', border: 'border-red-200', icon: Warning, iconColor: 'text-red-600' }
+                    }[zone.status] || { bg: 'bg-gray-50', border: 'border-gray-200', icon: Info, iconColor: 'text-gray-600' }
+                    
+                    const Icon = statusConfig.icon
+                    
+                    return (
+                      <motion.div 
+                        key={zone.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05, duration: 0.25 }}
+                        className={`border-2 rounded-xl p-4 ${statusConfig.bg} ${statusConfig.border} hover:shadow-md transition-all`}
+                      >
+                        <div className="flex items-start justify-between mb-3 gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConfig.bg} shadow-sm`}>
+                              <Icon size={20} weight="duotone" className={statusConfig.iconColor} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-sm mb-0.5">{zone.name || ''}</h4>
+                              <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                            </div>
+                          </div>
+                          {getStatusBadge(zone.status)}
                         </div>
-                        {getStatusBadge(zone.status)}
-                      </div>
-                      <p className="text-xs leading-relaxed mt-2 text-foreground/90">{zone.findings || ''}</p>
-                    </div>
-                  ))}
+                        <p className="text-sm leading-relaxed text-foreground/90 pl-12">{zone.findings || ''}</p>
+                      </motion.div>
+                    )
+                  })}
                 {(report.rightIris?.zones || []).filter(zone => zone && zone.status !== 'normal').length === 0 && (
                   <div className="text-center py-8">
                     <CheckCircle size={32} weight="duotone" className="text-green-600 mx-auto mb-2" />
