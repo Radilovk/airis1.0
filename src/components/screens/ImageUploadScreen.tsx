@@ -41,7 +41,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }, [])
 
-  const compressImage = async (dataUrl: string, maxWidth: number = 800, quality: number = 0.75): Promise<string> => {
+  const compressImage = async (dataUrl: string, maxWidth: number = 600, quality: number = 0.65): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image()
       img.onload = () => {
@@ -129,13 +129,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
 
         console.log(`Оригинален размер на изображението: ${Math.round(dataUrl.length / 1024)} KB`)
         
-        const compressedDataUrl = await compressImage(dataUrl, 800, 0.75)
+        const compressedDataUrl = await compressImage(dataUrl, 600, 0.65)
         
         console.log(`Компресиран размер: ${Math.round(compressedDataUrl.length / 1024)} KB`)
         
-        if (compressedDataUrl.length > 400 * 1024) {
+        if (compressedDataUrl.length > 250 * 1024) {
           console.warn('Изображението е все още голямо, допълнителна компресия...')
-          const extraCompressed = await compressImage(compressedDataUrl, 600, 0.6)
+          const extraCompressed = await compressImage(compressedDataUrl, 500, 0.55)
           console.log(`Допълнително компресиран: ${Math.round(extraCompressed.length / 1024)} KB`)
           
           if (!isMountedRef.current) {
@@ -205,13 +205,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       
       console.log(`Размер на cropped изображение преди компресия: ${Math.round(croppedDataUrl.length / 1024)} KB`)
       
-      const compressedDataUrl = await compressImage(croppedDataUrl, 800, 0.75)
+      const compressedDataUrl = await compressImage(croppedDataUrl, 600, 0.65)
       
       console.log(`Размер на cropped изображение след компресия: ${Math.round(compressedDataUrl.length / 1024)} KB`)
       
-      if (compressedDataUrl.length > 500 * 1024) {
+      if (compressedDataUrl.length > 250 * 1024) {
         console.warn('Изображението е все още твърде голямо, допълнителна компресия...')
-        const extraCompressed = await compressImage(compressedDataUrl, 600, 0.6)
+        const extraCompressed = await compressImage(compressedDataUrl, 500, 0.55)
         console.log(`След допълнителна компресия: ${Math.round(extraCompressed.length / 1024)} KB`)
         
         if (!isMountedRef.current) return

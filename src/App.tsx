@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster } from '@/components/ui/sonner'
@@ -20,8 +20,8 @@ type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | '
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
   const [questionnaireData, setQuestionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
-  const [leftIris, setLeftIris] = useState<IrisImage | null>(null)
-  const [rightIris, setRightIris] = useState<IrisImage | null>(null)
+  const leftIrisRef = useRef<IrisImage | null>(null)
+  const rightIrisRef = useRef<IrisImage | null>(null)
   const [analysisReport, setAnalysisReport] = useKV<AnalysisReport | null>('analysis-report', null)
   const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
 
@@ -70,12 +70,12 @@ function App() {
         throw new Error('Невалиден формат на изображението')
       }
 
-      console.log('Запазване на изображения в паметта...')
+      console.log('Запазване на изображения в ref (без re-render)...')
       
-      setLeftIris(left)
-      setRightIris(right)
+      leftIrisRef.current = left
+      rightIrisRef.current = right
       
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 50))
       
       console.log('Преминаване към анализ...')
       setCurrentScreen('analysis')
@@ -109,8 +109,8 @@ function App() {
 
   const handleRestart = () => {
     setQuestionnaireData(() => null)
-    setLeftIris(null)
-    setRightIris(null)
+    leftIrisRef.current = null
+    rightIrisRef.current = null
     setAnalysisReport(() => null)
     setTimeout(() => setCurrentScreen('welcome'), 50)
   }
@@ -155,7 +155,7 @@ function App() {
             />
           </motion.div>
         )}
-        {currentScreen === 'analysis' && (
+        {currentScreen === 'analysis' && leftIrisRef.current && rightIrisRef.current && (
           <motion.div
             key="analysis"
             initial={{ opacity: 0 }}
@@ -165,8 +165,8 @@ function App() {
           >
             <AnalysisScreen
               questionnaireData={questionnaireData!}
-              leftIris={leftIris!}
-              rightIris={rightIris!}
+              leftIris={leftIrisRef.current}
+              rightIris={rightIrisRef.current}
               onComplete={handleAnalysisComplete}
             />
           </motion.div>
