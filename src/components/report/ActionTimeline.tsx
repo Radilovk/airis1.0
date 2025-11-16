@@ -31,8 +31,8 @@ export default function ActionTimeline({ report }: ActionTimelineProps) {
     if (report.detailedPlan?.recommendedFoods && report.detailedPlan.recommendedFoods.length > 0) {
       phase1Actions.push(`Започнете с ${report.detailedPlan.recommendedFoods.slice(0, 2).join(', ')}`)
     }
-    if (report.questionnaireData.hydration < 2) {
-      phase1Actions.push('Увеличете дневния прием на вода до 2-2.5л')
+    if (report.questionnaireData.hydration < 8) {
+      phase1Actions.push('Увеличете дневния прием на вода до 8-10 чаши (2-2.5л)')
     }
     
     timeline.push({

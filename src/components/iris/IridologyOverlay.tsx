@@ -3,11 +3,13 @@ import { useKV } from '@github/spark/hooks'
 
 interface IridologyOverlayProps {
   size?: number
+  side?: 'left' | 'right'
   className?: string
 }
 
 export default function IridologyOverlay({ 
-  size = 400, 
+  size = 400,
+  side = 'left',
   className = ''
 }: IridologyOverlayProps) {
   const [customOverlay] = useKV<{ dataUrl: string, type: 'svg' | 'png' } | null>('custom-overlay', null)

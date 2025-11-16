@@ -424,7 +424,7 @@ function calculateGoalAchievability(report: AnalysisReport): Record<string, numb
       if (report.questionnaireData.sleepQuality === 'excellent' || report.questionnaireData.sleepQuality === 'good') {
         score += 10
       }
-      if (report.questionnaireData.hydration >= 2) {
+      if (report.questionnaireData.hydration >= 8) {
         score += 5
       }
     }
@@ -470,7 +470,7 @@ function getSupportingFactors(report: AnalysisReport): string[] {
     Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
       .filter(s => s.system.toLowerCase().includes('детоксикац')).length)
 
-  if (report.questionnaireData.hydration >= 2 && detoxSystemScore >= 65) {
+  if (report.questionnaireData.hydration >= 8 && detoxSystemScore >= 65) {
     factors.push('Добра хидратация и ефективна детоксикация')
   }
 
@@ -552,7 +552,7 @@ function getLimitingFactors(report: AnalysisReport): string[] {
     ? detoxSystemScores.reduce((sum, s) => sum + s.score, 0) / detoxSystemScores.length
     : 70
 
-  if (report.questionnaireData.hydration < 1.5 && detoxSystemScore < 65) {
+  if (report.questionnaireData.hydration < 6 && detoxSystemScore < 65) {
     factors.push('Недостатъчна хидратация влошаваща детоксикацията')
   }
 

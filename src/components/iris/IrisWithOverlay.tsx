@@ -20,13 +20,8 @@ export default function IrisWithOverlay({
         alt={`${side === 'left' ? 'Ляв' : 'Десен'} ирис`}
         className="absolute inset-0 w-full h-full object-cover rounded-lg"
       />
-      <div 
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          transform: side === 'right' ? 'scaleX(-1)' : 'none'
-        }}
-      >
-        <IridologyOverlay size={size} className="opacity-60" />
+      <div className="absolute inset-0 pointer-events-none">
+        <IridologyOverlay size={size} side={side} className="opacity-60" />
       </div>
     </div>
   )
