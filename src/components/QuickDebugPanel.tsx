@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Bug, X, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { Bug, X, CaretDown, CaretUp, Download } from '@phosphor-icons/react'
 import { runDiagnostics, type DiagnosticResult } from '@/lib/diagnostics'
+import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 
 export default function QuickDebugPanel() {
   const [isOpen, setIsOpen] = useState(false)
@@ -153,6 +154,16 @@ export default function QuickDebugPanel() {
               className="w-full"
             >
               Опресни
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => uploadDiagnostics.downloadReport()}
+              className="w-full gap-2"
+            >
+              <Download size={16} />
+              Изтегли Upload Diagnostics
             </Button>
           </>
         )}

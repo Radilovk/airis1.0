@@ -14,6 +14,7 @@ import AboutAirisScreen from '@/components/screens/AboutAirisScreen'
 import DiagnosticScreen from '@/components/screens/DiagnosticScreen'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
+import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import { estimateStorageUsage, estimateDataSize } from '@/lib/storage-utils'
 import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 
@@ -94,6 +95,17 @@ function App() {
   }
 
   const handleImagesComplete = async (left: IrisImage, right: IrisImage) => {
+    uploadDiagnostics.log('APP_HANDLE_IMAGES_COMPLETE_START', 'start', {
+      leftExists: !!left,
+      rightExists: !!right,
+      leftType: typeof left,
+      rightType: typeof right,
+      leftIsNull: left === null,
+      rightIsNull: right === null,
+      leftIsUndefined: left === undefined,
+      rightIsUndefined: right === undefined
+    })
+    
     console.log('🔍 [APP] ========== handleImagesComplete CALLED ==========')
     console.log('🔍 [APP] left parameter:', left)
     console.log('🔍 [APP] right parameter:', right)
@@ -105,6 +117,12 @@ function App() {
     console.log('🔍 [APP] right is undefined?', right === undefined)
     
     if (!left || !right) {
+      uploadDiagnostics.log('APP_IMAGES_COMPLETE_ERROR_MISSING_PARAMS', 'error', {
+        left: !!left,
+        right: !!right,
+        leftType: typeof left,
+        rightType: typeof right
+      })
       errorLogger.error('APP_IMAGES_COMPLETE', 'CRITICAL: left or right parameter is null/undefined!', undefined, {
         left: !!left,
         right: !!right,
@@ -117,6 +135,12 @@ function App() {
     }
     
     if (!left.dataUrl || !right.dataUrl) {
+      uploadDiagnostics.log('APP_IMAGES_COMPLETE_ERROR_MISSING_DATA_URL', 'error', {
+        leftHasDataUrl: !!left?.dataUrl,
+        rightHasDataUrl: !!right?.dataUrl,
+        leftDataUrlType: typeof left?.dataUrl,
+        rightDataUrlType: typeof right?.dataUrl
+      })
       errorLogger.error('APP_IMAGES_COMPLETE', 'CRITICAL: dataUrl is missing from images!', undefined, {
         leftHasDataUrl: !!left?.dataUrl,
         rightHasDataUrl: !!right?.dataUrl,
@@ -130,6 +154,15 @@ function App() {
       return
     }
     
+    uploadDiagnostics.log('APP_IMAGES_COMPLETE_VALIDATION_SUCCESS', 'success', {
+      leftSize: Math.round(left.dataUrl.length / 1024),
+      rightSize: Math.round(right.dataUrl.length / 1024),
+      leftSide: left.side,
+      rightSide: right.side,
+      currentScreen,
+      lockStatus: screenTransitionLockRef.current
+    })
+    
     errorLogger.info('APP_IMAGES_COMPLETE', 'handleImagesComplete called with VALID images', {
       leftSize: Math.round(left.dataUrl.length / 1024),
       rightSize: Math.round(right.dataUrl.length / 1024),
@@ -140,31 +173,49 @@ function App() {
     })
 
     if (screenTransitionLockRef.current) {
+      uploadDiagnostics.log('APP_IMAGES_COMPLETE_DUPLICATE_CALL', 'warning')
       errorLogger.warning('APP_IMAGES_COMPLETE', 'Screen transition already in progress, ignoring duplicate call')
       return
     }
     
     try {
       screenTransitionLockRef.current = true
+      uploadDiagnostics.log('APP_LOCK_ACQUIRED', 'info')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Lock acquired, starting image processing')
       
       if (!left?.dataUrl || !right?.dataUrl) {
-        throw new Error('Невалидни данни на изображенията')
+        const error = new Error('Невалидни данни на изображенията')
+        uploadDiagnostics.log('APP_VALIDATION_ERROR_NO_DATA_URL', 'error', undefined, error)
+        throw error
       }
 
       if (!left.dataUrl.startsWith('data:image/') || !right.dataUrl.startsWith('data:image/')) {
-        throw new Error('Невалиден формат на изображението')
+        const error = new Error('Невалиден формат на изображението')
+        uploadDiagnostics.log('APP_VALIDATION_ERROR_INVALID_FORMAT', 'error', {
+          leftStartsWith: left.dataUrl.substring(0, 20),
+          rightStartsWith: right.dataUrl.substring(0, 20)
+        }, error)
+        throw error
       }
 
       const leftSize = estimateDataSize(left)
       const rightSize = estimateDataSize(right)
       const totalSize = leftSize + rightSize
 
+      uploadDiagnostics.log('APP_SIZE_CHECK', 'info', {
+        totalSizeKB: Math.round(totalSize / 1024),
+        leftSizeKB: Math.round(left.dataUrl.length / 1024),
+        rightSizeKB: Math.round(right.dataUrl.length / 1024)
+      })
+
       console.log(`📊 [APP] Total image data size: ${Math.round(totalSize / 1024)} KB`)
       console.log(`📊 [APP] Left image: ${Math.round(left.dataUrl.length / 1024)} KB`)
       console.log(`📊 [APP] Right image: ${Math.round(right.dataUrl.length / 1024)} KB`)
 
       if (left.dataUrl.length > 200 * 1024) {
+        uploadDiagnostics.log('APP_ERROR_LEFT_TOO_LARGE', 'error', {
+          size: Math.round(left.dataUrl.length / 1024)
+        })
         errorLogger.warning('APP_IMAGES_COMPLETE', 'Left image is too large', {
           size: Math.round(left.dataUrl.length / 1024)
         })
@@ -174,6 +225,9 @@ function App() {
       }
 
       if (right.dataUrl.length > 200 * 1024) {
+        uploadDiagnostics.log('APP_ERROR_RIGHT_TOO_LARGE', 'error', {
+          size: Math.round(right.dataUrl.length / 1024)
+        })
         errorLogger.warning('APP_IMAGES_COMPLETE', 'Right image is too large', {
           size: Math.round(right.dataUrl.length / 1024)
         })
@@ -183,19 +237,27 @@ function App() {
       }
 
       const storageUsage = await estimateStorageUsage()
+      uploadDiagnostics.log('APP_STORAGE_CHECK', 'info', {
+        storageUsage: storageUsage.toFixed(1)
+      })
+      
       if (storageUsage > 90) {
         const usagePercent = `${storageUsage.toFixed(1)}%`
+        uploadDiagnostics.log('APP_ERROR_STORAGE_FULL', 'error', { usage: usagePercent })
         errorLogger.error('APP_IMAGES_COMPLETE', 'Storage is almost full', undefined, { usage: usagePercent })
         toast.error('Няма достатъчно място в паметта. Моля, изчистете стари анализи от историята.')
         screenTransitionLockRef.current = false
         return
       }
 
+      uploadDiagnostics.log('APP_VALIDATION_COMPLETE', 'success')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Image validation successful')
       
+      uploadDiagnostics.log('APP_SAVING_TO_REFS', 'start')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to refs...')
       leftIrisRef.current = left
       rightIrisRef.current = right
+      uploadDiagnostics.log('APP_SAVED_TO_REFS', 'success')
       
       errorLogger.info('APP_IMAGES_COMPLETE', 'Forcing garbage collection hint...')
       if (typeof window !== 'undefined' && 'gc' in window && typeof (window as any).gc === 'function') {
@@ -207,27 +269,39 @@ function App() {
         }
       }
       
+      uploadDiagnostics.log('APP_WAITING_MEMORY_STABILIZATION', 'info')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Waiting 200ms for memory stabilization...')
       console.log('⏳ [APP] Buffer time - allowing browser to stabilize memory...')
       await sleep(200)
       
+      uploadDiagnostics.log('APP_SET_IMAGES_READY', 'info')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Setting imagesReady flag')
       setImagesReady(true)
       
       await sleep(50)
       
+      uploadDiagnostics.log('APP_TRANSITION_TO_ANALYSIS', 'start')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Transitioning to analysis screen')
       console.log('🚀 [APP] Transitioning to analysis screen...')
       setCurrentScreen('analysis')
+      uploadDiagnostics.log('APP_TRANSITION_COMPLETE', 'success')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Screen transition completed')
       console.log('✅ [APP] Screen transition successful')
       
       setTimeout(() => {
         screenTransitionLockRef.current = false
+        uploadDiagnostics.log('APP_LOCK_RELEASED', 'info')
         errorLogger.info('APP_IMAGES_COMPLETE', 'Lock released')
       }, 1000)
     } catch (error) {
       screenTransitionLockRef.current = false
+      uploadDiagnostics.log('APP_IMAGES_COMPLETE_ERROR', 'error', {
+        leftValid: !!left?.dataUrl,
+        rightValid: !!right?.dataUrl,
+        leftSize: left?.dataUrl ? Math.round(left.dataUrl.length / 1024) : 0,
+        rightSize: right?.dataUrl ? Math.round(right.dataUrl.length / 1024) : 0,
+        error: error instanceof Error ? error.message : String(error)
+      }, error as Error)
       errorLogger.error('APP_IMAGES_COMPLETE', 'Error processing images', error as Error, {
         leftValid: !!left?.dataUrl,
         rightValid: !!right?.dataUrl,
