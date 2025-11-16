@@ -429,7 +429,14 @@ ${response}
   }
 
   useEffect(() => {
+    let mounted = true
+    
     const loadConfigAndStartAnalysis = async () => {
+      if (!mounted) {
+        console.log('⚠️ [ANALYSIS] Component unmounted, aborting')
+        return
+      }
+      
       if (configLoaded || analysisStarted || analysisRunning) {
         console.log('⚠️ [ANALYSIS] Анализ вече е стартиран, пропускане...')
         console.log(`📊 [ANALYSIS] configLoaded: ${configLoaded}, analysisStarted: ${analysisStarted}, analysisRunning: ${analysisRunning}`)
@@ -441,16 +448,23 @@ ${response}
       
       await sleep(500)
       
+      if (!mounted) {
+        console.log('⚠️ [ANALYSIS] Component unmounted during sleep, aborting')
+        return
+      }
+      
       console.log('⚙️ [ANALYSIS] Зареждане на AI конфигурация от KV storage...')
       const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
       const finalConfig = storedConfig || aiConfig
       
       if (!finalConfig) {
         console.warn('⚠️ [CONFIG] Няма конфигурация - използване на default')
-        setConfigLoaded(true)
-        setAnalysisStarted(true)
-        setAnalysisRunning(true)
-        performAnalysis()
+        if (mounted) {
+          setConfigLoaded(true)
+          setAnalysisStarted(true)
+          setAnalysisRunning(true)
+          performAnalysis()
+        }
         return
       }
       
@@ -478,6 +492,11 @@ ${response}
         console.log(`🔧 [CONFIG] Собствен API режим - Provider: ${providerToUse}, модел: "${modelToUse}"`)
       }
       
+      if (!mounted) {
+        console.log('⚠️ [ANALYSIS] Component unmounted before starting analysis, aborting')
+        return
+      }
+      
       addLog('info', `✓ AI Конфигурация заредена: ${providerToUse} / ${modelToUse}`)
       console.log('🔧 [CONFIG] AI конфигурация заредена:', finalConfig)
       console.log('🎯 [CONFIG] Provider който ще се използва:', providerToUse)
@@ -494,6 +513,11 @@ ${response}
     
     console.log('🔄 [ANALYSIS] useEffect извикан')
     loadConfigAndStartAnalysis()
+    
+    return () => {
+      console.log('🧹 [ANALYSIS] Component unmounting, cleanup')
+      mounted = false
+    }
   }, [])
 
   const performAnalysis = async () => {

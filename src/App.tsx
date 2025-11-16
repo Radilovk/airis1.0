@@ -134,22 +134,18 @@ function App() {
 
       errorLogger.info('APP_IMAGES_COMPLETE', 'Image validation successful')
       
-      errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to state...')
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to state synchronously...')
       setLeftIris(left)
       setRightIris(right)
       
-      errorLogger.info('APP_IMAGES_COMPLETE', 'Images saved to state, waiting before screen transition')
-      
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      errorLogger.info('APP_IMAGES_COMPLETE', 'Transitioning to analysis screen')
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Transitioning to analysis screen after state update')
       setCurrentScreen('analysis')
-      errorLogger.info('APP_IMAGES_COMPLETE', 'setCurrentScreen("analysis") called successfully')
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Screen transition completed')
       
       setTimeout(() => {
         screenTransitionLockRef.current = false
-        errorLogger.info('APP_IMAGES_COMPLETE', 'Lock released after transition')
-      }, 1000)
+        errorLogger.info('APP_IMAGES_COMPLETE', 'Lock released')
+      }, 500)
     } catch (error) {
       screenTransitionLockRef.current = false
       errorLogger.error('APP_IMAGES_COMPLETE', 'Error processing images', error as Error, {

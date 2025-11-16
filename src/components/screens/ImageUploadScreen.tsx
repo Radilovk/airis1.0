@@ -345,10 +345,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         throw new Error('Невалиден формат на изображенията')
       }
       
-      errorLogger.info('UPLOAD_NEXT', 'Validation successful, pausing before onComplete')
-      await new Promise(resolve => setTimeout(resolve, 150))
-      
-      errorLogger.info('UPLOAD_NEXT', 'Calling onComplete callback')
+      errorLogger.info('UPLOAD_NEXT', 'Validation successful, calling onComplete')
       onComplete(leftImage, rightImage)
       errorLogger.info('UPLOAD_NEXT', 'onComplete() called successfully')
     } catch (error) {
