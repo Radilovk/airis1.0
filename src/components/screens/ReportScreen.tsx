@@ -9,7 +9,8 @@ import {
   Target,
   Activity,
   ClipboardText,
-  FloppyDisk
+  FloppyDisk,
+  Warning
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
@@ -17,12 +18,34 @@ import type { AnalysisReport } from '@/types'
 import OverviewTab from '@/components/report/tabs/OverviewTab'
 import IridologyTab from '@/components/report/tabs/IridologyTab'
 import PlanTab from '@/components/report/tabs/PlanTab'
-import ErrorBoundary from '@/components/ErrorFallback'
+import { ErrorBoundary } from 'react-error-boundary'
 import { useKV } from '@github/spark/hooks'
+import { Card } from '@/components/ui/card'
 
 interface ReportScreenProps {
   report: AnalysisReport
   onRestart: () => void
+}
+
+function ErrorFallback({ error }: { error: Error }) {
+  return (
+    <Card className="p-6">
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
+          <Warning size={20} weight="duotone" className="text-destructive" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg mb-2">Грешка при зареждане</h3>
+          <p className="text-sm text-muted-foreground mb-2">
+            Възникна проблем при показване на тази секция.
+          </p>
+          <p className="text-xs font-mono text-destructive bg-muted/50 p-2 rounded">
+            {error.message}
+          </p>
+        </div>
+      </div>
+    </Card>
+  )
 }
 
 export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
@@ -653,19 +676,19 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
           </TabsList>
 
           <TabsContent value="overview" className="mt-6">
-            <ErrorBoundary>
+            <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
               <OverviewTab report={report} avgHealth={avgHealth} />
             </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="iridology" className="mt-6">
-            <ErrorBoundary>
+            <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
               <IridologyTab report={report} />
             </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="plan" className="mt-6">
-            <ErrorBoundary>
+            <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
               <PlanTab report={report} />
             </ErrorBoundary>
           </TabsContent>

@@ -1,7 +1,6 @@
 import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
-
-import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
+import { Warning, ArrowClockwise } from "@phosphor-icons/react";
 
 export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, resetErrorBoundary: () => void }) => {
   if (import.meta.env.DEV) throw error;
@@ -10,7 +9,7 @@ export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, res
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Alert variant="destructive" className="mb-6">
-          <AlertTriangleIcon />
+          <Warning size={20} weight="duotone" />
           <AlertTitle>Възникна грешка при изпълнение</AlertTitle>
           <AlertDescription>
             Нещо неочаквано се случи по време на изпълнение на приложението. Детайлите за грешката са показани по-долу. Моля, свържете се с автора на приложението и го уведомете за този проблем.
@@ -26,10 +25,10 @@ export const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error, res
         
         <Button 
           onClick={resetErrorBoundary} 
-          className="w-full"
+          className="w-full gap-2"
           variant="outline"
         >
-          <RefreshCwIcon />
+          <ArrowClockwise size={18} />
           Опитай Отново
         </Button>
       </div>
