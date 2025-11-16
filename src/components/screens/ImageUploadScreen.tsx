@@ -249,7 +249,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
                       ref={leftInputRef}
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       className="hidden"
                       disabled={isProcessing}
                       onChange={(e) => {
@@ -320,7 +319,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
                       ref={rightInputRef}
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       className="hidden"
                       disabled={isProcessing}
                       onChange={(e) => {
