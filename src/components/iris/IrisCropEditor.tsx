@@ -61,44 +61,69 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     setImageLoaded(false)
     setImageError(false)
     
+    if (!imageDataUrl || typeof imageDataUrl !== 'string') {
+      console.error('Невалиден imageDataUrl')
+      setImageError(true)
+      return
+    }
+
+    if (!imageDataUrl.startsWith('data:image/')) {
+      console.error('Невалиден формат на imageDataUrl')
+      setImageError(true)
+      return
+    }
+    
     const img = new Image()
+    let mounted = true
     
     img.onload = () => {
-      imageRef.current = img
-      setImageLoaded(true)
+      if (mounted) {
+        imageRef.current = img
+        setImageLoaded(true)
+      }
     }
     
     img.onerror = (error) => {
       console.error('Грешка при зареждане на изображението:', error)
-      setImageError(true)
-      setImageLoaded(false)
+      if (mounted) {
+        setImageError(true)
+        setImageLoaded(false)
+      }
     }
     
     try {
       img.src = imageDataUrl
     } catch (error) {
       console.error('Грешка при задаване на изображението:', error)
-      setImageError(true)
+      if (mounted) {
+        setImageError(true)
+      }
     }
     
     return () => {
+      mounted = false
       img.onload = null
       img.onerror = null
       if (imageRef.current === img) {
         imageRef.current = null
+      }
+      try {
+        img.src = ''
+      } catch (e) {
+        // Ignore cleanup errors
       }
     }
   }, [imageDataUrl])
   
   // Draw canvas with current transform
   useEffect(() => {
-    if (!imageLoaded) return
+    if (!imageLoaded || imageError) return
     
     const canvas = canvasRef.current
     const img = imageRef.current
     if (!canvas || !img) return
     
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: false })
     if (!ctx) return
     
     try {
@@ -106,28 +131,23 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       const centerX = width / 2
       const centerY = height / 2
       
-      // Clear canvas
       ctx.clearRect(0, 0, width, height)
       
-      // Save context state
       ctx.save()
       
-      // Apply transformations
       ctx.translate(centerX + transform.x, centerY + transform.y)
       ctx.rotate((transform.rotation * Math.PI) / 180)
       ctx.scale(transform.scale, transform.scale)
       
-      // Draw image centered
       const imgWidth = img.width
       const imgHeight = img.height
       ctx.drawImage(img, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight)
       
-      // Restore context
       ctx.restore()
     } catch (error) {
       console.error('Грешка при рисуване на канваса:', error)
     }
-  }, [transform, canvasSize, imageLoaded])
+  }, [transform, canvasSize, imageLoaded, imageError])
   
   // Touch and mouse handlers
   const getTouchDistance = (touches: React.TouchList) => {
@@ -260,6 +280,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     
     if (!canvas || !img || !imageLoaded) {
       console.error('Canvas или изображение не са готови')
+      toast.error('Изображението все още не е заредено')
       return
     }
     
@@ -268,7 +289,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       const cropSize = 800
       cropCanvas.width = cropSize
       cropCanvas.height = cropSize
-      const cropCtx = cropCanvas.getContext('2d')
+      const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: false })
       
       if (!cropCtx) {
         throw new Error('Не може да се създаде context за canvas')
@@ -292,11 +313,14 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       
       const finalizeCrop = () => {
         try {
-          const croppedDataUrl = cropCanvas.toDataURL('image/png', 0.95)
-          onSave(croppedDataUrl)
+          const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.92)
+          
+          requestAnimationFrame(() => {
+            onSave(croppedDataUrl)
+          })
         } catch (error) {
           console.error('Грешка при създаване на dataURL:', error)
-          throw error
+          toast.error('Грешка при запазване на изображението')
         }
       }
       

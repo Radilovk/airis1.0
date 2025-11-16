@@ -34,6 +34,11 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
   }, [])
 
   const handleFileSelect = (side: 'left' | 'right', file: File) => {
+    if (!file) {
+      console.warn('Няма избран файл')
+      return
+    }
+
     if (!file.type.startsWith('image/')) {
       toast.error('Моля, качете изображение')
       return
@@ -47,7 +52,11 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
     setIsProcessing(true)
 
     if (fileReaderRef.current) {
-      fileReaderRef.current.abort()
+      try {
+        fileReaderRef.current.abort()
+      } catch (e) {
+        console.warn('Не може да се прекъсне предишно четене')
+      }
     }
 
     const reader = new FileReader()
@@ -55,17 +64,24 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
 
     reader.onload = (e) => {
       try {
-        const dataUrl = e.target?.result as string
-        if (dataUrl && typeof dataUrl === 'string') {
+        const result = e.target?.result
+        if (!result || typeof result !== 'string') {
+          throw new Error('Невалиден резултат от четене на файла')
+        }
+        
+        const dataUrl = result as string
+        if (!dataUrl.startsWith('data:image/')) {
+          throw new Error('Невалиден формат на изображението')
+        }
+
+        requestAnimationFrame(() => {
           setTempImageData(dataUrl)
           setEditingSide(side)
-        } else {
-          throw new Error('Невалидни данни от изображението')
-        }
+          setIsProcessing(false)
+        })
       } catch (error) {
         console.error('Грешка при обработка на изображението:', error)
         toast.error('Грешка при обработка на изображението')
-      } finally {
         setIsProcessing(false)
       }
     }
@@ -77,6 +93,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
     }
 
     reader.onabort = () => {
+      console.log('Четенето е прекъснато')
       setIsProcessing(false)
     }
 
@@ -90,36 +107,51 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
   }
 
   const handleCropSave = (croppedDataUrl: string) => {
-    if (!editingSide) return
+    if (!editingSide) {
+      console.warn('Липсва информация за страна на ириса')
+      return
+    }
     
     try {
       if (!croppedDataUrl || typeof croppedDataUrl !== 'string') {
         throw new Error('Невалидни данни от crop редактора')
       }
-      
-      const image: IrisImage = { dataUrl: croppedDataUrl, side: editingSide }
-      
-      if (editingSide === 'left') {
-        setLeftImage(image)
-      } else {
-        setRightImage(image)
+
+      if (!croppedDataUrl.startsWith('data:image/')) {
+        throw new Error('Невалиден формат на обработеното изображение')
       }
       
-      setEditingSide(null)
-      setTempImageData(null)
-      toast.success(`${editingSide === 'left' ? 'Ляв' : 'Десен'} ирис запазен успешно`)
+      const image: IrisImage = { dataUrl: croppedDataUrl, side: editingSide }
+      const savedSide = editingSide
+      
+      requestAnimationFrame(() => {
+        if (savedSide === 'left') {
+          setLeftImage(image)
+        } else {
+          setRightImage(image)
+        }
+        
+        setEditingSide(null)
+        setTempImageData(null)
+        setIsProcessing(false)
+        
+        toast.success(`${savedSide === 'left' ? 'Ляв' : 'Десен'} ирис запазен успешно`)
+      })
     } catch (error) {
       console.error('Грешка при запазване на изображението:', error)
       toast.error('Грешка при запазване на изображението')
       setEditingSide(null)
       setTempImageData(null)
+      setIsProcessing(false)
     }
   }
 
   const handleCropCancel = () => {
-    setEditingSide(null)
-    setTempImageData(null)
-    setIsProcessing(false)
+    requestAnimationFrame(() => {
+      setEditingSide(null)
+      setTempImageData(null)
+      setIsProcessing(false)
+    })
   }
 
   const handleEditImage = (side: 'left' | 'right') => {
@@ -203,10 +235,12 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
                 
                 {!leftImage ? (
                   <div
-                    className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
-                    onDrop={(e) => handleDrop('left', e)}
+                    className={`border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors ${
+                      isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:bg-muted/50'
+                    }`}
+                    onDrop={(e) => !isProcessing && handleDrop('left', e)}
                     onDragOver={(e) => e.preventDefault()}
-                    onClick={() => leftInputRef.current?.click()}
+                    onClick={() => !isProcessing && leftInputRef.current?.click()}
                   >
                     <Upload size={48} weight="duotone" className="mx-auto mb-4 text-muted-foreground" />
                     <p className="font-medium mb-2">Кликнете или пуснете снимка</p>
@@ -215,10 +249,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
                       ref={leftInputRef}
                       type="file"
                       accept="image/*"
+                      capture="environment"
                       className="hidden"
+                      disabled={isProcessing}
                       onChange={(e) => {
                         const file = e.target.files?.[0]
-                        if (file) handleFileSelect('left', file)
+                        if (file) {
+                          handleFileSelect('left', file)
+                          e.target.value = ''
+                        }
                       }}
                     />
                   </div>
@@ -267,10 +306,12 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
                 
                 {!rightImage ? (
                   <div
-                    className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
-                    onDrop={(e) => handleDrop('right', e)}
+                    className={`border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors ${
+                      isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:bg-muted/50'
+                    }`}
+                    onDrop={(e) => !isProcessing && handleDrop('right', e)}
                     onDragOver={(e) => e.preventDefault()}
-                    onClick={() => rightInputRef.current?.click()}
+                    onClick={() => !isProcessing && rightInputRef.current?.click()}
                   >
                     <Upload size={48} weight="duotone" className="mx-auto mb-4 text-muted-foreground" />
                     <p className="font-medium mb-2">Кликнете або пуснете снимка</p>
@@ -279,10 +320,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
                       ref={rightInputRef}
                       type="file"
                       accept="image/*"
+                      capture="environment"
                       className="hidden"
+                      disabled={isProcessing}
                       onChange={(e) => {
                         const file = e.target.files?.[0]
-                        if (file) handleFileSelect('right', file)
+                        if (file) {
+                          handleFileSelect('right', file)
+                          e.target.value = ''
+                        }
                       }}
                     />
                   </div>
@@ -331,7 +377,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
             <Button
               size="lg"
               onClick={handleNext}
-              disabled={!leftImage || !rightImage}
+              disabled={!leftImage || !rightImage || isProcessing || editingSide !== null}
               className="gap-2"
             >
               Започни Анализ
@@ -341,7 +387,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
         </div>
       </div>
 
-      {editingSide && tempImageData && (
+      {editingSide && tempImageData && !isProcessing && (
         <IrisCropEditor
           imageDataUrl={tempImageData}
           side={editingSide}

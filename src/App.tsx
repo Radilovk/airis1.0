@@ -19,8 +19,8 @@ type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | '
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
   const [questionnaireData, setQuestionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
-  const [leftIris, setLeftIris] = useKV<IrisImage | null>('left-iris', null)
-  const [rightIris, setRightIris] = useKV<IrisImage | null>('right-iris', null)
+  const [leftIris, setLeftIris] = useState<IrisImage | null>(null)
+  const [rightIris, setRightIris] = useState<IrisImage | null>(null)
   const [analysisReport, setAnalysisReport] = useKV<AnalysisReport | null>('analysis-report', null)
   const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
 
