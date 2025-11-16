@@ -19,11 +19,14 @@ import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 
 type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'admin' | 'about' | 'diagnostics'
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
   const [questionnaireData, setQuestionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
-  const [leftIris, setLeftIris] = useState<IrisImage | null>(null)
-  const [rightIris, setRightIris] = useState<IrisImage | null>(null)
+  const leftIrisRef = useRef<IrisImage | null>(null)
+  const rightIrisRef = useRef<IrisImage | null>(null)
+  const [imagesReady, setImagesReady] = useState(false)
   const [analysisReport, setAnalysisReport] = useKV<AnalysisReport | null>('analysis-report', null)
   const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
   const screenTransitionLockRef = useRef(false)
@@ -104,21 +107,23 @@ function App() {
       const totalSize = leftSize + rightSize
 
       console.log(`📊 [APP] Total image data size: ${Math.round(totalSize / 1024)} KB`)
+      console.log(`📊 [APP] Left image: ${Math.round(left.dataUrl.length / 1024)} KB`)
+      console.log(`📊 [APP] Right image: ${Math.round(right.dataUrl.length / 1024)} KB`)
 
-      if (left.dataUrl.length > 300 * 1024) {
+      if (left.dataUrl.length > 200 * 1024) {
         errorLogger.warning('APP_IMAGES_COMPLETE', 'Left image is too large', {
           size: Math.round(left.dataUrl.length / 1024)
         })
-        toast.error('Лявото изображение е твърде голямо. Моля, опитайте с по-малка снимка.')
+        toast.error('Лявото изображение е твърде голямо (>200KB). Моля, опитайте с по-малка снимка.')
         screenTransitionLockRef.current = false
         return
       }
 
-      if (right.dataUrl.length > 300 * 1024) {
+      if (right.dataUrl.length > 200 * 1024) {
         errorLogger.warning('APP_IMAGES_COMPLETE', 'Right image is too large', {
           size: Math.round(right.dataUrl.length / 1024)
         })
-        toast.error('Дясното изображение е твърде голямо. Моля, опитайте с по-малка снимка.')
+        toast.error('Дясното изображение е твърде голямо (>200KB). Моля, опитайте с по-малка снимка.')
         screenTransitionLockRef.current = false
         return
       }
@@ -134,13 +139,20 @@ function App() {
 
       errorLogger.info('APP_IMAGES_COMPLETE', 'Image validation successful')
       
-      errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to state synchronously...')
-      setLeftIris(left)
-      setRightIris(right)
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to refs (no re-render for large data)...')
+      leftIrisRef.current = left
+      rightIrisRef.current = right
       
-      errorLogger.info('APP_IMAGES_COMPLETE', 'Transitioning to analysis screen after state update')
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Waiting 100ms before screen transition for browser stabilization...')
+      console.log('⏳ [APP] Buffer time - allowing browser to stabilize...')
+      await sleep(100)
+      
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Setting imagesReady flag and transitioning to analysis screen')
+      console.log('🚀 [APP] Transitioning to analysis screen...')
+      setImagesReady(true)
       setCurrentScreen('analysis')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Screen transition completed')
+      console.log('✅ [APP] Screen transition successful')
       
       setTimeout(() => {
         screenTransitionLockRef.current = false
@@ -154,6 +166,7 @@ function App() {
         leftSize: left?.dataUrl ? Math.round(left.dataUrl.length / 1024) : 0,
         rightSize: right?.dataUrl ? Math.round(right.dataUrl.length / 1024) : 0
       })
+      console.error('❌ [APP] Error processing images:', error)
       toast.error('Грешка при обработка на изображенията. Опитайте отново.')
     }
   }
@@ -202,8 +215,9 @@ function App() {
 
   const handleRestart = () => {
     setQuestionnaireData(() => null)
-    setLeftIris(null)
-    setRightIris(null)
+    leftIrisRef.current = null
+    rightIrisRef.current = null
+    setImagesReady(false)
     setAnalysisReport(() => null)
     setTimeout(() => setCurrentScreen('welcome'), 50)
   }
@@ -248,7 +262,7 @@ function App() {
             />
           </motion.div>
         )}
-        {currentScreen === 'analysis' && leftIris && rightIris && (
+        {currentScreen === 'analysis' && leftIrisRef.current && rightIrisRef.current && (
           <motion.div
             key="analysis"
             initial={{ opacity: 0 }}
@@ -258,8 +272,8 @@ function App() {
           >
             <AnalysisScreen
               questionnaireData={questionnaireData!}
-              leftIris={leftIris}
-              rightIris={rightIris}
+              leftIris={leftIrisRef.current}
+              rightIris={rightIrisRef.current}
               onComplete={handleAnalysisComplete}
             />
           </motion.div>

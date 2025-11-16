@@ -44,7 +44,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }, [])
 
-  const compressImage = async (dataUrl: string, maxWidth: number = 500, quality: number = 0.6): Promise<string> => {
+  const compressImage = async (dataUrl: string, maxWidth: number = 400, quality: number = 0.55): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image()
       img.onload = () => {
@@ -136,17 +136,17 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
 
         console.log(`📸 [UPLOAD] Оригинален размер на изображението: ${Math.round(dataUrl.length / 1024)} KB`)
         
-        let compressedDataUrl = await compressImage(dataUrl, 500, 0.6)
+        let compressedDataUrl = await compressImage(dataUrl, 400, 0.55)
         
         console.log(`📸 [UPLOAD] Компресиран размер (1st pass): ${Math.round(compressedDataUrl.length / 1024)} KB`)
         
-        if (compressedDataUrl.length > 150 * 1024) {
+        if (compressedDataUrl.length > 120 * 1024) {
           console.warn('⚠️ [UPLOAD] Изображението е все още голямо, допълнителна компресия...')
-          compressedDataUrl = await compressImage(compressedDataUrl, 400, 0.5)
+          compressedDataUrl = await compressImage(compressedDataUrl, 350, 0.45)
           console.log(`📸 [UPLOAD] Допълнително компресиран (2nd pass): ${Math.round(compressedDataUrl.length / 1024)} KB`)
         }
         
-        if (compressedDataUrl.length > 200 * 1024) {
+        if (compressedDataUrl.length > 150 * 1024) {
           console.error('❌ [UPLOAD] Изображението е твърде голямо дори след компресия!')
           toast.error('Изображението е твърде голямо. Моля, опитайте с по-малка снимка.')
           setIsProcessing(false)
@@ -217,16 +217,16 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       console.log(`📊 [UPLOAD] Размер на cropped изображение преди компресия: ${Math.round(croppedDataUrl.length / 1024)} KB`)
       console.log('🗜️ [UPLOAD] Започване на агресивна компресия...')
       
-      let finalImage = await compressImage(croppedDataUrl, 500, 0.6)
+      let finalImage = await compressImage(croppedDataUrl, 400, 0.55)
       console.log(`📊 [UPLOAD] Размер след 1st pass: ${Math.round(finalImage.length / 1024)} KB`)
       
-      if (finalImage.length > 150 * 1024) {
+      if (finalImage.length > 120 * 1024) {
         console.warn('⚠️ [UPLOAD] Допълнителна компресия (2nd pass)...')
-        finalImage = await compressImage(finalImage, 400, 0.5)
+        finalImage = await compressImage(finalImage, 350, 0.45)
         console.log(`📊 [UPLOAD] Размер след 2nd pass: ${Math.round(finalImage.length / 1024)} KB`)
       }
       
-      if (finalImage.length > 200 * 1024) {
+      if (finalImage.length > 150 * 1024) {
         console.error('❌ [UPLOAD] Изображението е твърде голямо дори след агресивна компресия!')
         toast.error('Изображението е твърде голямо. Моля, опитайте с по-малка снимка.')
         setEditingSide(null)
