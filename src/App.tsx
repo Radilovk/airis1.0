@@ -19,8 +19,8 @@ type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | '
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
   const [questionnaireData, setQuestionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
-  const [leftIris, setLeftIris] = useState<IrisImage | null>(null)
-  const [rightIris, setRightIris] = useState<IrisImage | null>(null)
+  const [leftIris, setLeftIris] = useKV<IrisImage | null>('temp-left-iris', null)
+  const [rightIris, setRightIris] = useKV<IrisImage | null>('temp-right-iris', null)
   const [analysisReport, setAnalysisReport] = useKV<AnalysisReport | null>('analysis-report', null)
   const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
 
@@ -51,33 +51,33 @@ function App() {
   }
 
   const handleQuestionnaireComplete = (data: QuestionnaireData) => {
-    setQuestionnaireData(data)
-    setCurrentScreen('upload')
+    setQuestionnaireData(() => data)
+    setTimeout(() => setCurrentScreen('upload'), 50)
   }
 
   const handleImagesComplete = (left: IrisImage, right: IrisImage) => {
-    setLeftIris(left)
-    setRightIris(right)
-    setCurrentScreen('analysis')
+    setLeftIris(() => left)
+    setRightIris(() => right)
+    setTimeout(() => setCurrentScreen('analysis'), 100)
   }
 
   const handleAnalysisComplete = (report: AnalysisReport) => {
-    setAnalysisReport(report)
+    setAnalysisReport(() => report)
     setHistory((current) => [report, ...(current || [])])
-    setCurrentScreen('report')
+    setTimeout(() => setCurrentScreen('report'), 50)
   }
 
   const handleViewReport = (report: AnalysisReport) => {
-    setAnalysisReport(report)
-    setCurrentScreen('report')
+    setAnalysisReport(() => report)
+    setTimeout(() => setCurrentScreen('report'), 50)
   }
 
   const handleRestart = () => {
-    setQuestionnaireData(null)
-    setLeftIris(null)
-    setRightIris(null)
-    setAnalysisReport(null)
-    setCurrentScreen('welcome')
+    setQuestionnaireData(() => null)
+    setLeftIris(() => null)
+    setRightIris(() => null)
+    setAnalysisReport(() => null)
+    setTimeout(() => setCurrentScreen('welcome'), 50)
   }
 
   return (

@@ -26,7 +26,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
-  const [customOverlay] = useKV<CustomOverlay | null>('custom-overlay', null)
+  const customOverlayRef = useRef<CustomOverlay | null>(null)
   
   const [transform, setTransform] = useState<Transform>({
     scale: 1,
@@ -41,6 +41,20 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   const [canvasSize, setCanvasSize] = useState({ width: 400, height: 400 })
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
+  
+  useEffect(() => {
+    const loadOverlay = async () => {
+      try {
+        const overlay = await window.spark.kv.get<CustomOverlay>('custom-overlay')
+        if (overlay) {
+          customOverlayRef.current = overlay
+        }
+      } catch (error) {
+        console.warn('Няма custom overlay')
+      }
+    }
+    loadOverlay()
+  }, [])
   
   // Responsive canvas size
   useEffect(() => {
@@ -314,17 +328,14 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       const finalizeCrop = () => {
         try {
           const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.92)
-          
-          requestAnimationFrame(() => {
-            onSave(croppedDataUrl)
-          })
+          onSave(croppedDataUrl)
         } catch (error) {
           console.error('Грешка при създаване на dataURL:', error)
           toast.error('Грешка при запазване на изображението')
         }
       }
       
-      if (customOverlay) {
+      if (customOverlayRef.current) {
         const overlayImg = new Image()
         
         const overlayTimeout = setTimeout(() => {
@@ -351,7 +362,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
           finalizeCrop()
         }
         
-        overlayImg.src = customOverlay.dataUrl
+        overlayImg.src = customOverlayRef.current.dataUrl
       } else {
         const overlayDiv = document.createElement('div')
         overlayDiv.style.position = 'absolute'

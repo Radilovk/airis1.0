@@ -20,15 +20,22 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
   const [editingSide, setEditingSide] = useState<'left' | 'right' | null>(null)
   const [tempImageData, setTempImageData] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const isMountedRef = useRef(true)
   
   const leftInputRef = useRef<HTMLInputElement>(null)
   const rightInputRef = useRef<HTMLInputElement>(null)
   const fileReaderRef = useRef<FileReader | null>(null)
 
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
+      isMountedRef.current = false
       if (fileReaderRef.current) {
-        fileReaderRef.current.abort()
+        try {
+          fileReaderRef.current.abort()
+        } catch (e) {
+          console.warn('FileReader cleanup warning')
+        }
       }
     }
   }, [])
@@ -63,6 +70,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
     fileReaderRef.current = reader
 
     reader.onload = (e) => {
+      if (!isMountedRef.current) {
+        return
+      }
+      
       try {
         const result = e.target?.result
         if (!result || typeof result !== 'string') {
@@ -74,11 +85,9 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
           throw new Error('Невалиден формат на изображението')
         }
 
-        requestAnimationFrame(() => {
-          setTempImageData(dataUrl)
-          setEditingSide(side)
-          setIsProcessing(false)
-        })
+        setTempImageData(dataUrl)
+        setEditingSide(side)
+        setIsProcessing(false)
       } catch (error) {
         console.error('Грешка при обработка на изображението:', error)
         toast.error('Грешка при обработка на изображението')
@@ -112,6 +121,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
       return
     }
     
+    if (!isMountedRef.current) {
+      return
+    }
+    
     try {
       if (!croppedDataUrl || typeof croppedDataUrl !== 'string') {
         throw new Error('Невалидни данни от crop редактора')
@@ -124,19 +137,17 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
       const image: IrisImage = { dataUrl: croppedDataUrl, side: editingSide }
       const savedSide = editingSide
       
-      requestAnimationFrame(() => {
-        if (savedSide === 'left') {
-          setLeftImage(image)
-        } else {
-          setRightImage(image)
-        }
-        
-        setEditingSide(null)
-        setTempImageData(null)
-        setIsProcessing(false)
-        
-        toast.success(`${savedSide === 'left' ? 'Ляв' : 'Десен'} ирис запазен успешно`)
-      })
+      if (savedSide === 'left') {
+        setLeftImage(image)
+      } else {
+        setRightImage(image)
+      }
+      
+      setEditingSide(null)
+      setTempImageData(null)
+      setIsProcessing(false)
+      
+      toast.success(`${savedSide === 'left' ? 'Ляв' : 'Десен'} ирис запазен успешно`)
     } catch (error) {
       console.error('Грешка при запазване на изображението:', error)
       toast.error('Грешка при запазване на изображението')
@@ -147,11 +158,9 @@ export default function ImageUploadScreen({ onComplete, initialLeft, initialRigh
   }
 
   const handleCropCancel = () => {
-    requestAnimationFrame(() => {
-      setEditingSide(null)
-      setTempImageData(null)
-      setIsProcessing(false)
-    })
+    setEditingSide(null)
+    setTempImageData(null)
+    setIsProcessing(false)
   }
 
   const handleEditImage = (side: 'left' | 'right') => {
