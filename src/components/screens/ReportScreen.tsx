@@ -602,18 +602,21 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
                   size="sm" 
                   onClick={handleShare} 
                   className="h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
+                  title="Сподели"
                 >
                   <Share size={18} />
                 </Button>
               </motion.div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   size="sm" 
                   onClick={handleExport} 
-                  className="h-9 w-9 p-0 hover:bg-accent/10 hover:text-accent transition-colors"
+                  className="gap-2 hover:bg-accent/10 hover:text-accent hover:border-accent transition-colors"
+                  title="Експорт в HTML/PDF"
                 >
                   <Download size={18} />
+                  <span className="hidden sm:inline">Експорт HTML</span>
                 </Button>
               </motion.div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -622,6 +625,7 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
                   size="sm" 
                   onClick={onRestart} 
                   className="h-9 w-9 p-0 hover:bg-muted transition-colors"
+                  title="Започни отново"
                 >
                   <ArrowClockwise size={18} />
                 </Button>

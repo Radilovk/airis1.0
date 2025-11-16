@@ -112,6 +112,17 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
             >
               Започни Анализ
             </Button>
+            {questionnaireData && (
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={onTestStart}
+                className="px-8 py-6 text-lg font-semibold gap-2 bg-gradient-to-r from-accent/20 to-accent/10 border-2 border-accent/50 hover:bg-accent/20"
+              >
+                <Flask size={20} weight="duotone" />
+                Използвай предишни данни
+              </Button>
+            )}
             <Button
               size="lg"
               variant="outline"
@@ -155,19 +166,6 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               </Button>
             )}
           </div>
-          {questionnaireData && (
-            <div className="mt-6 flex justify-center">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onTestStart}
-                className="gap-2 border-dashed border-accent text-accent hover:bg-accent/10"
-              >
-                <Flask size={16} weight="duotone" />
-                Тест Режим (Прескачане на въпросник)
-              </Button>
-            </div>
-          )}
           <p className="text-sm text-muted-foreground mt-4">
             Процесът отнема около 5-10 минути
           </p>
