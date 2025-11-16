@@ -22,8 +22,8 @@ type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | '
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
   const [questionnaireData, setQuestionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
-  const leftIrisRef = useRef<IrisImage | null>(null)
-  const rightIrisRef = useRef<IrisImage | null>(null)
+  const [leftIris, setLeftIris] = useState<IrisImage | null>(null)
+  const [rightIris, setRightIris] = useState<IrisImage | null>(null)
   const [analysisReport, setAnalysisReport] = useKV<AnalysisReport | null>('analysis-report', null)
   const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
   const screenTransitionLockRef = useRef(false)
@@ -134,16 +134,13 @@ function App() {
 
       errorLogger.info('APP_IMAGES_COMPLETE', 'Image validation successful')
       
-      leftIrisRef.current = left
-      rightIrisRef.current = right
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to state...')
+      setLeftIris(left)
+      setRightIris(right)
       
-      errorLogger.info('APP_IMAGES_COMPLETE', 'Images saved to refs, waiting before screen transition')
+      errorLogger.info('APP_IMAGES_COMPLETE', 'Images saved to state, waiting before screen transition')
       
       await new Promise(resolve => setTimeout(resolve, 300))
-      
-      if (!leftIrisRef.current || !rightIrisRef.current) {
-        throw new Error('Изображенията не са правилно запазени')
-      }
       
       errorLogger.info('APP_IMAGES_COMPLETE', 'Transitioning to analysis screen')
       setCurrentScreen('analysis')
@@ -209,8 +206,8 @@ function App() {
 
   const handleRestart = () => {
     setQuestionnaireData(() => null)
-    leftIrisRef.current = null
-    rightIrisRef.current = null
+    setLeftIris(null)
+    setRightIris(null)
     setAnalysisReport(() => null)
     setTimeout(() => setCurrentScreen('welcome'), 50)
   }
@@ -255,7 +252,7 @@ function App() {
             />
           </motion.div>
         )}
-        {currentScreen === 'analysis' && leftIrisRef.current && rightIrisRef.current && (
+        {currentScreen === 'analysis' && leftIris && rightIris && (
           <motion.div
             key="analysis"
             initial={{ opacity: 0 }}
@@ -265,8 +262,8 @@ function App() {
           >
             <AnalysisScreen
               questionnaireData={questionnaireData!}
-              leftIris={leftIrisRef.current}
-              rightIris={rightIrisRef.current}
+              leftIris={leftIris}
+              rightIris={rightIris}
               onComplete={handleAnalysisComplete}
             />
           </motion.div>
