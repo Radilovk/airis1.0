@@ -10,9 +10,11 @@ import ReportScreen from '@/components/screens/ReportScreen'
 import HistoryScreen from '@/components/screens/HistoryScreen'
 import AdminScreen from '@/components/screens/AdminScreen'
 import AboutAirisScreen from '@/components/screens/AboutAirisScreen'
+import DiagnosticScreen from '@/components/screens/DiagnosticScreen'
+import QuickDebugPanel from '@/components/QuickDebugPanel'
 import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 
-type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'admin' | 'about'
+type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'admin' | 'about' | 'diagnostics'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
@@ -36,6 +38,10 @@ function App() {
 
   const handleAboutAccess = () => {
     setCurrentScreen('about')
+  }
+
+  const handleDiagnosticsAccess = () => {
+    setCurrentScreen('diagnostics')
   }
 
   const handleTestStart = () => {
@@ -77,6 +83,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" />
+      <QuickDebugPanel />
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (
           <motion.div
@@ -86,7 +93,7 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} onTestStart={handleTestStart} onAbout={handleAboutAccess} />
+            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} onTestStart={handleTestStart} onAbout={handleAboutAccess} onDiagnostics={handleDiagnosticsAccess} />
           </motion.div>
         )}
         {currentScreen === 'questionnaire' && (
@@ -173,6 +180,17 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <AboutAirisScreen onBack={() => setCurrentScreen('welcome')} />
+          </motion.div>
+        )}
+        {currentScreen === 'diagnostics' && (
+          <motion.div
+            key="diagnostics"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <DiagnosticScreen onBack={() => setCurrentScreen('welcome')} />
           </motion.div>
         )}
       </AnimatePresence>
