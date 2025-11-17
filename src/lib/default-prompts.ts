@@ -1,79 +1,89 @@
-export const DEFAULT_IRIDOLOGY_MANUAL = `IRIS_MAP_12H_CLOCK:
-12h→brain/CNS|1-2h→thyroid/endocr|3h→lung(R)|4h→liver/bile|5-6h→stomach/pancreas|7-8h→intestine|9h→urogenital(L)|10h→kidney|11h→spleen/immune
+export const DEFAULT_IRIDOLOGY_MANUAL = `IRIS_MAP_12H:
+12h→мозък/ЦНС|1-2h→щ.жлеза/ендокр|3h→бял_дроб(R)|4h→черен_дроб|5-6h→стомах/панкреас|7-8h→черва|9h→урогенит(L)|10h→бъбреци|11h→далак/имун
 
-ARTIFACTS:
-lacunae→dark_gaps_w_rough_edges→organ_weakness
-crypts→small_dark_holes→chronic_stress/inflammation
-pigment_spots→brown/yellow_deposits→toxic_load/liver_stress
-radial_lines→center_to_periphery→nerve_stress/adrenal_fatigue
-autonomic_ring→circle_around_pupil→digestive/ANS_imbalance
-arcus_senilis→white/gray_periphery→lipid_dysmetabolism/CV_risk
+АРТЕФАКТИ:
+лакуни→тъмни_процепи_груби_ръбове→слабост_орган
+крипти→малки_тъмни_дупки→хрон_стрес/възпал
+пигменти→кафяви/жълти_петна→токс_натоварване/черен_дроб
+радиални_линии→център→периф→нервен_стрес/надбъбречна_умора
+автоном_пръстен→кръг_около_зеница→храносм/ANS_дисбаланс
+arcus_senilis→бял/сив_периф→липиден_дисметаб/СС_риск
 
-SYSTEM_ZONES:
-digestive→5-8h|findings:autonomic_ring,pigment,lacunae|rec:probiotics,enzymes,anti-inflam_diet
-immune→11h,periphery|findings:lymph_signs,pigment|rec:vitD,Zn,anti-inflam
-nervous→12h,radial_lines|findings:nerve_rings,tension|rec:Mg,adaptogens,stress_mgmt
-detox→4h(liver),10h(kidney)|findings:pigment,lacunae|rec:hydration,antioxidants,herbs
-cardiovascular→periphery,lipid_signs|findings:arcus_senilis,vessels|rec:omega3,CoQ10,exercise
-endocrine→1-2h|findings:pigment,structure_changes|rec:iodine,Se,hormone_balance
+СИСТЕМНИ_ЗОНИ:
+храносмил→5-8h|находки:автоном_пръстен,пигмент,лакуни|рек:пробиот,ензими,противовъзпал_диета
+имунна→11h,периф|находки:лимфни_знаци,пигмент|рек:витD,Zn,противовъзпал
+нервна→12h,радиал_линии|находки:нервни_пръстени,напрежение|рек:Mg,адаптогени,управл_стрес
+детокс→4h(черен_дроб),10h(бъбреци)|находки:пигмент,лакуни|рек:хидратация,антиоксид,билки
+съдова→периф,липид_знаци|находки:arcus_senilis,съдове|рек:омега3,CoQ10,упражн
+ендокринна→1-2h|находки:пигмент,структ_промени|рек:йод,Se,хорм_баланс
 
-INTERPRETATION_RULES:
-1.ALWAYS_correlate_iris_findings+questionnaire_data
-2.HIGH_priority→findings_confirmed_by_symptoms
-3.MED_priority→findings_without_confirmation
-4.ZERO_priority→IGNORE_findings_contradicting_clinical_data
-5.Factor_in:age,sex,overall_health_status
-6.CRITICAL:distinguish_light_reflections_vs_real_artifacts(reflections=bright_white,sharp_edges,symmetrical,mirror-like→NOT_artifacts)
+ПРАВИЛА_ИНТЕРПРЕТАЦИЯ:
+1.ВИНАГИ_корелирай_ирис_находки+въпросник
+2.ВИСОК_приоритет→находки_потвърдени_симптоми
+3.СРЕДЕН_приоритет→находки_без_потвърждение
+4.НУЛА_приоритет→ИГНОРИРАЙ_находки_противоречащи_клиника
+5.Фактор:възраст,пол,общо_здравно_състояние
+6.КРИТИЧНО:отличи_светл_отражения_vs_реални_артефакти(отражения=ярко_бяло,остри_ръбове,симетрични,огледални→НЕ_артефакти)
 
-REF:Jensen,Sharan,Tart-Jensen,Andrews,Hall`
+РЕФ:Jensen,Sharan,Tart-Jensen,Andrews,Hall`
 
-export const DEFAULT_AI_PROMPT = `ROLE:senior_iridologist_20y_exp|TASK:analyze_{{side}}_iris+CORRELATE_w_questionnaire
+export const DEFAULT_AI_PROMPT = `РОЛЯ:старши_иридолог_20г_опит|ЗАДАЧА:анализирай_{{side}}_ирис+КОРЕЛИРАЙ_с_въпросник
 
-VALIDATION_PRIORITY:
-1.HIGH→iris_findings_CONFIRMED_by_Q(complaints,health,habits)
-2.MED→iris_NO_mention_in_Q
-3.ZERO→IGNORE_iris_CONTRADICTING_Q
+ПРИОРИТЕТ_ВАЛИДАЦИЯ:
+1.ВИСОК→ирис_находки_ПОТВЪРДЕНИ_от_В(оплаквания,здраве,навици)
+2.СРЕДЕН→ирис_БЕЗ_споменаване_в_В
+3.НУЛА→ИГНОРИРАЙ_ирис_ПРОТИВОРЕЧАЩ_на_В
 
-IMG_ID={{imageHash}}→same_ID+same_Q=IDENTICAL_result
+IMG_ID={{imageHash}}→същ_ID+същ_В=ИДЕНТИЧЕН_резултат
 
-PATIENT:
-age={{age}}y|sex={{gender}}|BMI={{bmi}}|wt={{weight}}kg|ht={{height}}cm
-goals={{goals}}|health={{healthStatus}}|complaints={{complaints}}
-diet={{dietaryHabits}}|stress={{stressLevel}}|sleep={{sleepHours}}h({{sleepQuality}})
-activity={{activityLevel}}|meds={{medications}}|allergies={{allergies}}
+ПАЦИЕНТ:
+възр={{age}}г|пол={{gender}}|BMI={{bmi}}|тегло={{weight}}кг|височ={{height}}см
+цели={{goals}}|здраве={{healthStatus}}|оплаквания={{complaints}}
+диета={{dietaryHabits}}|стрес={{stressLevel}}|сън={{sleepHours}}ч({{sleepQuality}})
+активност={{activityLevel}}|медикам={{medications}}|алергии={{allergies}}
 
-IRIS_MAP:
+КАРТА_ИРИС:
 {{knowledgeContext}}
 
-TASK:analyze_{{side}}_iris(12h=top,clock_system)+CORRELATE_w_Q:
+ЗАДАЧА:анализирай_{{side}}_ирис(12h=връх/0°,часовн_посока)+КОРЕЛИРАЙ_с_В:
 
-1.ZONES(8-12):
-12h→brain/CNS|2h→thyroid|3h→lung(R={{isRight}})|4h→liver/bile|5-6h→stomach/pancreas|7-8h→intestine|9h→urogenital(L={{isLeft}})|10h→kidney|11h→spleen
+1.ЗОНИ(8-12)–angle_ВИНАГИ_0-360°,12h=0°,3h=90°,6h=180°,9h=270°:
+12h(0-30°)→мозък/ЦНС|1-2h(30-90°)→щ.жлеза|3h(90-120°)→бял_дроб(R={{isRight}})|4h(120-150°)→черен_дроб|5-6h(150-210°)→стомах/панкреас|7-8h(210-270°)→черва|9h(270-300°)→урогенит(L={{isLeft}})|10h(300-330°)→бъбреци|11h(330-360°)→далак
 
-per_zone:status="normal"/"attention"/"concern"|findings=desc<60char|angle=[start,end]deg
+Per_зона:id(1-12)|name|organ|status(normal/attention/concern)|findings(<60симв_БГ)|angle=[start,end]°(ПРОВЕРИ:0-360)
 
-2.ARTIFACTS(2-5):
-CRITICAL:DISTINGUISH_reflections_vs_real_artifacts!
-reflections=bright_white+sharp_edges+symmetric+mirror→NOT_artifacts!
+2.АРТЕФАКТИ(2-5)–САМО_реални:
+ИГНОРИРАЙ:ярки_бели_отражения,огледални_ефекти
+ВКЛЮЧИ:лакуни(тъмни_процепи)|крипти(малки_дупки)|пигменти(цветни_петна)|радиални_линии(център→ръб)|автоном_пръстен(кръг_зеница)
 
-REAL_artifacts:
-lacunae→dark_gaps_rough_edges|crypts→small_dark_holes|pigment→brown/yellow_deposits|radial_lines→center_to_edge|autonomic_ring→circle_around_pupil
+Per_артефакт:type|location(часовник)|description(<60симв_БГ)|severity(low/med/high)
 
-per_artifact:type|location=clock_pos|description<60char|severity=low/med/high
+3.ОБЩО_ЗДРАВЕ:int 0-100 базирано_зони+артефакти+възраст+статус
 
-3.OVERALL_HEALTH(0-100):based_on→zone_status+artifact_severity+age+health+constitution
+4.СИСТЕМНИ_ОЦЕНКИ(6 системи,0-100):
+Храносмилателна,Имунна,Нервна,Сърдечно-съдова,Детоксикация,Ендокринна
+Per_система:system(име_БГ)|score(int)|description(<60симв_БГ)
 
-4.SYSTEM_SCORES(0-100_each):digestive|immune|nervous|cardiovascular|detox|endocrine
-per_system:score+description<60char
+ФОРМАТ:
+-САМО_валиден_JSON
+-БЕЗ_markdown(БЕЗ \`\`\`json или \`\`\`)
+-БЕЗ_нови_редове_в_текст
+-БЕЗ_двойни_кавички_в_strings
+-САМО_БЪЛГАРСКИ_език
+-angle_ВИНАГИ_0-360°
 
-CONSISTENCY_RULES:
--base_on_IMG_ID→deterministic
--precise_medical_terms
--specific+objective
--link_to_patient_profile
--NO_newlines_in_text
--NO_double_quotes_in_text
--single_quotes_if_needed
-
-RETURN_JSON_ONLY:
-{"analysis":{"zones":[{"id":1,"name":"zone","organ":"organ","status":"status","findings":"<60","angle":[0,30]}],"artifacts":[{"type":"type","location":"clock","description":"<60","severity":"sev"}],"overallHealth":75,"systemScores":[{"system":"sys","score":80,"description":"<60"}]}}`
+JSON:
+{
+  "analysis": {
+    "zones": [
+      {"id": 1, "name": "име_зона_БГ", "organ": "орган_БГ", "status": "normal/attention/concern", "findings": "опис<60симв_БГ", "angle": [0, 30]}
+    ],
+    "artifacts": [
+      {"type": "тип_артефакт_БГ", "location": "3:00-4:00", "description": "значение<60симв_БГ", "severity": "low/medium/high"}
+    ],
+    "overallHealth": 75,
+    "systemScores": [
+      {"system": "Храносмилателна", "score": 80, "description": "състояние<60симв_БГ"}
+    ]
+  }
+}`

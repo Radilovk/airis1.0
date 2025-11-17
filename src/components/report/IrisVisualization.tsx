@@ -116,15 +116,17 @@ export default function IrisVisualization({ analysis, side = 'left' }: IrisVisua
               strokeDasharray="4,4"
             />
 
-            {(analysis.zones || []).map((zone) => {
+            {(analysis.zones || []).map((zone, index) => {
               if (!zone) return null
-              const midAngle = ((zone.angle?.[0] || 0) + (zone.angle?.[1] || 30)) / 2
+              const startAngle = zone.angle?.[0] ?? 0
+              const endAngle = zone.angle?.[1] ?? 30
+              const midAngle = (startAngle + endAngle) / 2
               const labelPos = polarToCartesian(centerX, centerY, radius * 0.85, midAngle)
               
               return (
-                <g key={zone.id}>
+                <g key={`${zone.id}-${index}`}>
                   <path
-                    d={describeArc(centerX, centerY, radius, zone.angle?.[0] || 0, zone.angle?.[1] || 30)}
+                    d={describeArc(centerX, centerY, radius, startAngle, endAngle)}
                     fill={getColorForStatus(zone.status)}
                     stroke={getStrokeForStatus(zone.status)}
                     strokeWidth={(hoveredZone?.id === zone.id || selectedZone?.id === zone.id) ? 3 : zone.status === 'normal' ? 1 : 2}

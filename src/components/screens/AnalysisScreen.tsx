@@ -256,12 +256,12 @@ export default function AnalysisScreen({
   const robustJSONParse = async (response: string, context: string): Promise<any> => {
     let cleaned = response.trim()
     
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.replace(/^```json\s*/m, '').replace(/```\s*$/m, '').trim()
-      addLog('info', `Премахнати markdown \`\`\`json блокове`)
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```\s*/m, '').replace(/```\s*$/m, '').trim()
-      addLog('info', `Премахнати markdown \`\`\` блокове`)
+    if (cleaned.includes('```json')) {
+      cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      addLog('info', `Премахнати markdown блокове с \`\`\`json`)
+    } else if (cleaned.includes('```')) {
+      cleaned = cleaned.replace(/```\s*/g, '').trim()
+      addLog('info', `Премахнати markdown блокове с \`\`\``)
     }
     
     try {
@@ -815,88 +815,90 @@ GitHub Spark API има ограничения за брой заявки в м�
       
       addLog('info', 'Използване на AIRIS база знания за контекст...')
       const knowledgeContext = `
-РЕФЕРЕНТНА КАРТА НА ИРИСА (по часовника):
-${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}: ${z.organ} (${z.system})`).join(', ')}
+РЕФЕРЕНТНА КАРТА НА ИРИСА(12h=0°,часовн_посока,360°_пълен_кръг):
+${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}°):${z.organ}(${z.system})`).join('|')}
 
-АРТЕФАКТИ И ТЕХНИТЕ ЗНАЧЕНИЯ:
-${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}: ${a.interpretation}`).join('\n')}
+АРТЕФАКТИ_И_ЗНАЧЕНИЯ:
+${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join('|')}
 
-ПРЕПОРЪКИ ЗА СИСТЕМИ:
-Храносмилателна: ${AIRIS_KNOWLEDGE.systemAnalysis.digestive.recommendations.join(', ')}
-Имунна: ${AIRIS_KNOWLEDGE.systemAnalysis.immune.recommendations.join(', ')}
-Нервна: ${AIRIS_KNOWLEDGE.systemAnalysis.nervous.recommendations.join(', ')}
-Детоксикация: ${AIRIS_KNOWLEDGE.systemAnalysis.detox.recommendations.join(', ')}
+ПРЕПОРЪКИ_СИСТЕМИ:
+Храносмилателна:${AIRIS_KNOWLEDGE.systemAnalysis.digestive.recommendations.join(',')}
+Имунна:${AIRIS_KNOWLEDGE.systemAnalysis.immune.recommendations.join(',')}
+Нервна:${AIRIS_KNOWLEDGE.systemAnalysis.nervous.recommendations.join(',')}
+Детоксикация:${AIRIS_KNOWLEDGE.systemAnalysis.detox.recommendations.join(',')}
 `
       addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
       addLog('info', 'Подготовка на prompt за LLM...')
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`PROF_IRIDOLOGIST | IMG_ID:${imageHash} | SIDE:${sideName}
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`ИРИДОЛОГ|IMG_ID:${imageHash}|СТРАНА:${sideName}
 
-CORE_RULES:
-1. HIGH_PRIO: iris_findings CONFIRM questionnaire_data
-2. MED_PRIO: iris_findings NO_CONFLICT questionnaire_data
-3. IGNORE: iris_findings CONTRADICT questionnaire_data
+ПРАВИЛА:
+1.ВИСОК_ПРИОР:находки_от_ирис_ПОТВЪРДЕНИ_от_въпросник
+2.СРЕДЕН_ПРИОР:находки_БЕЗ_споменаване_във_въпросник
+3.ИГНОРИРАЙ:находки_ПРОТИВОРЕЧАЩИ_на_въпросник
 
-CLIENT_DATA:
-Age:${questionnaire.age} Sex:${genderName} BMI:${bmi} W:${questionnaire.weight}kg H:${questionnaire.height}cm
-Goals:${goalsText}
-Status:${questionnaire.healthStatus.join(',')}
-Complaints:${complaintsText}
-Diet:${questionnaire.dietaryHabits.join(',')}
-Stress:${questionnaire.stressLevel} Sleep:${questionnaire.sleepHours}h(${questionnaire.sleepQuality})
-Activity:${questionnaire.activityLevel}
-Meds:${questionnaire.medications || 'None'}
-Allergies:${questionnaire.allergies || 'None'}
+ПАЦИЕНТ:
+Възр:${questionnaire.age}|Пол:${genderName}|BMI:${bmi}|Тегло:${questionnaire.weight}кг|Височ:${questionnaire.height}см
+Цели:${goalsText}
+Статус:${questionnaire.healthStatus.join(',')}
+Оплаквания:${complaintsText}
+Диета:${questionnaire.dietaryHabits.join(',')}
+Стрес:${questionnaire.stressLevel}|Сън:${questionnaire.sleepHours}ч(${questionnaire.sleepQuality})
+Активност:${questionnaire.activityLevel}
+Медикаменти:${questionnaire.medications || 'Няма'}
+Алергии:${questionnaire.allergies || 'Няма'}
 
-IRIDOLOGY_REF:
+КАРТА_ИРИС:
 ${knowledgeContext}
 
-TASK: Analyze ${sideName} iris via clock_system (12:00=top). Correlate ALL findings w/ questionnaire.
+ЗАДАЧА:Анализирай ${sideName} ирис.12h=0°=връх,часовн_посока.Angle_ВИНАГИ_0-360°.
 
-1. ZONES (8-12): Analyze key zones
-   12:00-Brain/Nervous 2:00-Thyroid 3:00-Lungs${side==='right'?'(R)':''} 4:00-Liver/Gallbladder
-   5:00-6:00-Stomach/Pancreas 7:00-8:00-Colon 9:00-Urogenital${side==='left'?'(L)':''} 10:00-Kidneys 11:00-Spleen
+1.ЗОНИ(8-12)–angle_ЗАДЪЛЖИТЕЛНО_правилни_0-360°:
+   12h(0-30°)→Мозък/Нервна
+   1-2h(30-90°)→Щ.жлеза/Ендокринна
+   3h(90-120°)→Белодроб${side==='right'?'(R)':''}
+   4h(120-150°)→Черен_дроб/Жлъчка
+   5-6h(150-210°)→Стомах/Панкреас
+   7-8h(210-270°)→Черва/Колон
+   9h(270-300°)→Урогенитална${side==='left'?'(L)':''}
+   10h(300-330°)→Бъбреци
+   11h(330-360°)→Далак/Лимфна
    
-Per zone: status(normal/attention/concern), findings(<60chr), angle[start,end](0-360deg)
+Per_зона:id(1-12)|name(БГ)|organ(БГ)|status(normal/attention/concern)|findings(<60симв_БГ)|angle=[start,end]°
 
-2. ARTIFACTS (2-5): ID real artifacts ONLY
-   EXCLUDE: bright_white reflections, mirror_effects, glare
-   INCLUDE: lacunae(dark_gaps), crypts(small_holes), pigment_spots(color!=base), 
-            radial_lines(center→out), autonomic_ring(circular_near_pupil)
-   
-Per artifact: type, location(clock_pos), description(<60chr), severity(low/med/high)
+ПРИМЕР_angle:12h_зона→[0,30],3h_зона→[90,120],6h_зона→[180,210],9h_зона→[270,300]
 
-3. OVERALL_HEALTH: int 0-100 based on zones+artifacts+age+status
+2.АРТЕФАКТИ(2-5)–САМО_реални:
+ИГНОРИРАЙ:ярки_бели_отражения,огледални_ефекти
+ВКЛЮЧИ:лакуни(тъмни_процепи)|крипти(малки_дупки)|пигменти(цветни_петна)|радиални_линии(център→ръб)|автоном_пръстен(кръг_зеница)
 
-4. SYSTEM_SCORES (6 systems, 0-100 each):
-   Digestive, Immune, Nervous, Cardiovascular, Detox, Endocrine
-   Per system: score(int), description(<60chr)
+Per_артефакт:type(БГ)|location(часовник_БГ)|description(<60симв_БГ)|severity(low/med/high)
 
-CONSISTENCY:
-- Use IMG_ID for deterministic results
-- Medical terminology
-- Correlate findings w/ patient profile
-- NO newlines in text fields
-- NO double quotes inside strings
+3.ОБЩО_ЗДРАВЕ:int 0-100 базирано_зони+артефакти+възраст+статус
 
-FORMAT_STRICT:
-- Return ONLY valid JSON object
-- NO markdown (NO \`\`\`json or \`\`\`)
-- NO extra text
-- Direct JSON response
+4.СИСТЕМНИ_ОЦЕНКИ(6 системи,0-100):
+Храносмилателна,Имунна,Нервна,Сърдечно-съдова,Детоксикация,Ендокринна
+Per_система:system(име_БГ)|score(int)|description(<60симв_БГ)
+
+ФОРМАТ:
+-САМО_валиден_JSON
+-БЕЗ_markdown(БЕЗ \`\`\`json или \`\`\`)
+-БЕЗ_нови_редове_в_текст
+-БЕЗ_двойни_кавички_в_strings
+-САМО_БЪЛГАРСКИ_език
 
 JSON:
 {
   "analysis": {
     "zones": [
-      {"id": 1, "name": "zone_name", "organ": "affected_organ", "status": "normal/attention/concern", "findings": "desc<60chr", "angle": [0, 30]}
+      {"id": 1, "name": "Мозъчна зона", "organ": "Мозък", "status": "normal", "findings": "опис БГ", "angle": [0, 30]}
     ],
     "artifacts": [
-      {"type": "artifact_type", "location": "3:00-4:00", "description": "meaning<60chr", "severity": "low/medium/high"}
+      {"type": "Лакуни", "location": "3:00-4:00", "description": "опис БГ", "severity": "low"}
     ],
     "overallHealth": 75,
     "systemScores": [
-      {"system": "Digestive_System", "score": 80, "description": "condition<60chr"}
+      {"system": "Храносмилателна", "score": 80, "description": "опис БГ"}
     ]
   }
 }`
@@ -1068,42 +1070,44 @@ JSON формат:
         .map(s => s.system)
         .join(', ')
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`NUTRITION_PLAN | LANG:BG | CONCISE
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`ХРАНИТЕЛЕН_ПЛАН|КРАТКО
 
-CORRELATION_RULES:
-- Base on: iris findings + goals + complaints
-- EXCLUDE: generic advice, irrelevant foods
+ПРАВИЛА_КОРЕЛАЦИЯ:
+-Базирай_на:ирис_находки+цели+оплаквания
+-ИЗКЛЮЧИ:общи_съвети,ирелевантни_храни
 
-FINDINGS:
-Weak_systems: ${weakSystems || 'None'}
-Affected_organs: ${uniqueOrgans}
+НАХОДКИ:
+Слаби_системи:${weakSystems || 'Няма'}
+Засегнати_органи:${uniqueOrgans}
 
-CLIENT:
-Age:${questionnaire.age} BMI:${(questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)}
-Goals:${questionnaire.goals.join(',')}
-Complaints:${questionnaire.complaints || 'None'}
-Allergies:${questionnaire.foodIntolerances || 'None'}
+ПАЦИЕНТ:
+Възр:${questionnaire.age}|BMI:${(questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)}
+Цели:${questionnaire.goals.join(',')}
+Оплаквания:${questionnaire.complaints || 'Няма'}
+Алергии:${questionnaire.foodIntolerances || 'Няма'}
 
-TASK - BRIEF & SPECIFIC:
+ЗАДАЧА-КРАТКО_И_СПЕЦИФИЧНО:
 
-1. generalRecommendations (3 concise principles):
-   - ONE key principle per item (30-40 words max)
-   - Link to specific finding
-   - NO repetition of same concept
-   
-2. recommendedFoods (10-12 items):
-   - Specific names: "Киноа (протеини, магнезий)"
-   - NO categories, NO duplicates
-   - Brief reason (5-8 words)
-   
-3. avoidFoods (8-10 items):
-   - Specific names: "Бяла захар (възпаление)"
-   - Brief reason (5-8 words)
+1.generalRecommendations(3 принципа):
+   -ЕДИН принцип per айтем(30-40думи макс)
+   -Връзка_със_специфична_находка
+   -БЕЗ повторение
 
-CRITICAL:
-- BRIEF descriptions
-- NO repetition
-- Return ONLY valid JSON
+2.recommendedFoods(10-12 айтема):
+   -Конкретни имена:"Киноа(протеини,магнезий)"
+   -БЕЗ категории,БЕЗ дублиране
+   -Кратка причина(5-8думи)
+
+3.avoidFoods(8-10 айтема):
+   -Конкретни имена:"Бяла захар(възпаление)"
+   -Кратка причина(5-8думи)
+
+КРИТИЧНО:
+-КРАТКИ описания
+-БЕЗ повторения
+-Върни САМО валиден JSON
+-БЕЗ markdown БЕЗ \`\`\`
+-САМО БГ език
 
 JSON:
 {
@@ -1152,62 +1156,64 @@ JSON:
         ...rightAnalysis.zones.filter(z => z.status !== 'normal')
       ]
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`SUPPLEMENTS | LANG:BG | MAX 3
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`ДОБАВКИ|МАКС_3
 
-CORRELATION SAFETY RULES:
-1. Base on: weak systems + complaints + goals
-2. CHECK CONTRAINDICATIONS: meds, health status
-3. CRITICAL: EXCLUDE already taking supplements (see Meds below)
-4. Meds/supplements intake is NOT limiting factor - analyze EFFECT on health
-5. IF current meds WORSEN iris findings → note & recommend doctor consult
-6. IF current supplements INSUFFICIENT per iris → recommend ADDITIONAL/DIFFERENT
+ПРАВИЛА_БЕЗОПАСНОСТ:
+1.Базирай_на:слаби_системи+оплаквания+цели
+2.ПРОВЕРИ_контраиндикации:медикаменти,здраве
+3.КРИТИЧНО:ИЗКЛЮЧИ_вече_приемани(виж_Медикаменти)
+4.Прием_медикаменти_НЕ_е_лимитиращ-анализирай_ЕФЕКТ_на_здраве
+5.АКО_медикаменти_ВЛОШАВАТ_ирис→отбележи+препоръчай_лекар
+6.АКО_добавки_НЕДОСТАТЪЧНИ→препоръчай_ДОПЪЛНИТЕЛНИ/РАЗЛИЧНИ
 
-CURRENT INTAKE ANALYSIS:
-Meds/Supplements: ${questionnaire.medications || 'None'}
-- IF already taking (e.g. Magnesium, Vit D) → DO NOT recommend again
-- IF med WORSENS iris → flag it & suggest doctor consult
-- IF current supplements INSUFFICIENT → recommend DIFFERENT ones
+ТЕКУЩ_ПРИЕМ_АНАЛИЗ:
+Медикаменти/Добавки:${questionnaire.medications || 'Няма'}
+-АКО_вече_приема(напр.Магнезий,ВитD)→НЕ_препоръчвай_отново
+-АКО_медикамент_ВЛОШАВА_ирис→маркирай+препоръчай_лекар
+-АКО_добавки_НЕДОСТАТЪЧНИ→препоръчай_РАЗЛИЧНИ
 
-IRIS:
-Weak systems(<75): ${weakSystemsDetailed.map(s => `${s.system}:${s.score}/100`).join(',')}
-Affected zones: ${concernedZones.map(z => `${z.organ}(${z.status})`).join(',')}
-Health avg: ${Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)}/100
+ИРИС:
+Слаби_системи(<75):${weakSystemsDetailed.map(s => `${s.system}:${s.score}/100`).join(',')}
+Засегнати_зони:${concernedZones.map(z => `${z.organ}(${z.status})`).join(',')}
+Ср_здраве:${Math.round((leftAnalysis.overallHealth + rightAnalysis.overallHealth) / 2)}/100
 
-CLIENT:
-Age:${questionnaire.age} Status:${questionnaire.healthStatus.join(',')}
-Complaints:${questionnaire.complaints || 'None'}
-Goals:${questionnaire.goals.join(',')}
-Meds:${questionnaire.medications || 'None'}
-Allergies:${questionnaire.allergies || 'None'}
-Diet:${questionnaire.dietaryProfile.join(',')}
-Activity:${questionnaire.activityLevel}
-Stress:${questionnaire.stressLevel}
-Sleep:${questionnaire.sleepHours}h(${questionnaire.sleepQuality})
+ПАЦИЕНТ:
+Възр:${questionnaire.age}|Статус:${questionnaire.healthStatus.join(',')}
+Оплаквания:${questionnaire.complaints || 'Няма'}
+Цели:${questionnaire.goals.join(',')}
+Медикаменти:${questionnaire.medications || 'Няма'}
+Алергии:${questionnaire.allergies || 'Няма'}
+Диета:${questionnaire.dietaryProfile.join(',')}
+Активност:${questionnaire.activityLevel}
+Стрес:${questionnaire.stressLevel}
+Сън:${questionnaire.sleepHours}ч(${questionnaire.sleepQuality})
 
-TASK: Create 3 PERSONALIZED supplement recommendations:
-- name: full name (e.g. "Магнезий Бисглицинат", "Витамин D3 + K2")
-  * DO NOT recommend if already taking!
-  * Check Meds/Supplements list before recommending
-- dosage: safe dose for age
-- timing: detailed intake instructions
-- notes: personalized explanation WHY this specific one
+ЗАДАЧА:Създай 3 ПЕРСОНАЛИЗИРАНИ добавки:
+-name:пълно_име(напр."Магнезий Бисглицинат","Витамин D3+K2")
+  *НЕ_препоръчвай_ако_вече_приема!
+  *Провери_списък_Медикаменти преди_препоръка
+-dosage:безопасна_доза_за_възраст
+-timing:детайлни_инструкции_прием
+-notes:персонализирано_обяснение_ЗАЩО_точно_тази
 
-IMPORTANT:
-- EXACTLY 3 supplements (NOT more)
-- Safe dosages for age
-- Consider ALL med interactions
-- Focus on CORRELATED problems
-- Avoid contraindications
-- CRITICAL: No duplicate of already taking supplements!
+ВАЖНО:
+-ТОЧНО_3_добавки(НЕ_повече)
+-Безопасни_дози_възраст
+-Вземи_предвид_медикаменти_взаимодействия
+-Фокус_КОРЕЛИРАНИ_проблеми
+-Избягвай_контраиндикации
+-КРИТИЧНО:БЕЗ_дублиране_вече_приемани!
+-САМО_БГ_език
+-БЕЗ_markdown
 
-Return ONLY valid JSON, NO markdown, NO extra text:
+JSON:
 {
   "supplements": [
     {
-      "name": "supplement name", 
-      "dosage": "specific dose", 
-      "timing": "detailed intake", 
-      "notes": "personalized explanation why"
+      "name": "име добавка БГ", 
+      "dosage": "доза БГ", 
+      "timing": "инструкции БГ", 
+      "notes": "обяснение БГ"
     }
   ]
 }`
@@ -1270,24 +1276,25 @@ REMOVE_END*/
         ? Math.round(nervousSystem.reduce((sum, s) => sum + s.score, 0) / nervousSystem.length)
         : 70
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`BRIEF психологически препоръки на български (3 КРАТКИ препоръки).
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`КРАТКИ_психолог_препоръки(3 бр).
 
-DATA:
-Нервна система: ${avgNervousScore}/100
-Стрес: ${questionnaire.stressLevel}
-Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality})
-Цели: ${questionnaire.goals.join(', ')}
+ДАННИ:
+Нервна_система:${avgNervousScore}/100
+Стрес:${questionnaire.stressLevel}
+Сън:${questionnaire.sleepHours}ч(${questionnaire.sleepQuality})
+Цели:${questionnaire.goals.join(',')}
 
-TASK - 3 КРАТКИ препоръки (всяка 25-35 думи):
-1. Стрес управление - специфична техника за ТОЗИ клиент
-2. Сън подобрение - конкретен протокол
-3. Емоционален баланс - практична стратегия
+ЗАДАЧА-3_КРАТКИ_препоръки(всяка 25-35думи):
+1.Стрес_управление-специфична_техника_за_ТОЗИ_клиент
+2.Сън_подобрение-конкретен_протокол
+3.Емоционален_баланс-практична_стратегия
 
-RULES:
-- BRIEF (25-35 думи всяка)
-- SPECIFIC действия
-- NO общи съвети
-- Return ONLY JSON
+ПРАВИЛА:
+-КРАТКО(25-35думи_всяка)
+-SPECIFIC_действия
+-БЕЗ_общи_съвети
+-САМО_БГ_език
+-БЕЗ_markdown
 
 JSON:
 {
@@ -1323,24 +1330,25 @@ JSON:
         ...rightAnalysis.zones.filter(z => z.status === 'concern')
       ]
       
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`BRIEF специални препоръки на български (3 КРАТКИ, УНИКАЛНИ препоръки).
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`КРАТКИ_специални_препоръки(3 бр,УНИКАЛНИ).
 
-DATA:
-Concern zones: ${highPriorityZones.map(z => z.organ).join(', ')}
-Goals: ${questionnaire.goals.join(', ')}
-Complaints: ${questionnaire.complaints || 'None'}
+ДАННИ:
+Притеснителни_зони:${highPriorityZones.map(z => z.organ).join(',')}
+Цели:${questionnaire.goals.join(',')}
+Оплаквания:${questionnaire.complaints || 'Няма'}
 
-TASK - 3 UNIQUE препоръки (всяка 30-40 думи):
-1. Адресира конкретна притеснителна зона + оплакване
-2. Фокусирана към специфична цел на клиента
-3. Уникален протокол/практика за ТОЗИ клиент
+ЗАДАЧА-3_UNIQUE_препоръки(всяка 30-40думи):
+1.Адресира_конкретна_зона+оплакване
+2.Фокус_специфична_цел_клиента
+3.Уникален_протокол/практика_ТОЗИ_клиент
 
-RULES:
-- BRIEF (30-40 думи всяка)
-- UNIQUE за този клиент
-- SPECIFIC протоколи
-- NO общи съвети
-- Return ONLY JSON
+ПРАВИЛА:
+-КРАТКО(30-40думи_всяка)
+-UNIQUE_за_клиента
+-SPECIFIC_протоколи
+-БЕЗ_общи_съвети
+-САМО_БГ_език
+-БЕЗ_markdown
 
 JSON:
 {
