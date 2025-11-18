@@ -27,7 +27,8 @@ import {
   FileText,
   Robot,
   PencilSimple,
-  ClockCounterClockwise
+  ClockCounterClockwise,
+  DownloadSimple
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AIModelConfig, IridologyTextbook, CustomOverlay, IridologyManual, AIPromptTemplate } from '@/types'
@@ -37,6 +38,7 @@ import IridologyManualTab from '@/components/admin/IridologyManualTab'
 import AIPromptTab from '@/components/admin/AIPromptTab'
 import EditorModeTab from '@/components/admin/EditorModeTab'
 import ChangelogTab from '@/components/admin/ChangelogTab'
+import ProjectExportTab from '@/components/admin/ProjectExportTab'
 import { DEFAULT_IRIDOLOGY_MANUAL, DEFAULT_AI_PROMPT } from '@/lib/default-prompts'
 
 interface AdminScreenProps {
@@ -376,7 +378,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         </div>
 
         <Tabs defaultValue="ai-config" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 gap-1 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 gap-1 h-auto p-1">
             <TabsTrigger value="ai-config" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <Brain className="w-4 h-4 md:mr-1" />
               <span className="hidden sm:inline">AI Модел</span>
@@ -411,6 +413,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               <ClockCounterClockwise className="w-4 h-4 md:mr-1" />
               <span className="hidden lg:inline">Промени</span>
               <span className="lg:hidden">Лог</span>
+            </TabsTrigger>
+            <TabsTrigger value="export" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
+              <DownloadSimple className="w-4 h-4 md:mr-1" />
+              <span className="hidden lg:inline">Експорт</span>
+              <span className="lg:hidden">ZIP</span>
             </TabsTrigger>
           </TabsList>
 
@@ -847,6 +854,10 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
             >
               <ChangelogTab />
             </motion.div>
+          </TabsContent>
+
+          <TabsContent value="export">
+            <ProjectExportTab />
           </TabsContent>
         </Tabs>
 
