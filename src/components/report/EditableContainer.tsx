@@ -32,22 +32,24 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 interface EditableContainerProps {
   container: ReportContainer
-  editorMode: boolean
+  editorMode?: boolean
   onToggleVisibility: (id: string) => void
-  onDelete: (id: string) => void
+  onDelete?: (id: string) => void
   onAddComment: (containerId: string, text: string) => void
-  onResolveComment: (containerId: string, commentId: string) => void
+  onResolveComment?: (containerId: string, commentId: string) => void
+  onDeleteComment?: (containerId: string, commentId: string) => void
   onUpdateMetadata?: (containerId: string, metadata: any) => void
   children: React.ReactNode
 }
 
 export default function EditableContainer({ 
   container, 
-  editorMode,
+  editorMode = true,
   onToggleVisibility, 
   onDelete, 
   onAddComment,
   onResolveComment,
+  onDeleteComment,
   onUpdateMetadata,
   children 
 }: EditableContainerProps) {
@@ -188,17 +190,31 @@ export default function EditableContainer({
                                 {new Date(comment.timestamp).toLocaleString('bg-BG')}
                               </p>
                             </div>
-                            <Button
-                              variant={comment.resolved ? "ghost" : "outline"}
-                              size="sm"
-                              onClick={() => onResolveComment(container.id, comment.id)}
-                            >
-                              {comment.resolved ? (
-                                <CheckCircle size={16} className="text-green-600" weight="fill" />
-                              ) : (
-                                <CheckCircle size={16} />
+                            <div className="flex gap-1">
+                              {onResolveComment && (
+                                <Button
+                                  variant={comment.resolved ? "ghost" : "outline"}
+                                  size="sm"
+                                  onClick={() => onResolveComment(container.id, comment.id)}
+                                >
+                                  {comment.resolved ? (
+                                    <CheckCircle size={16} className="text-green-600" weight="fill" />
+                                  ) : (
+                                    <CheckCircle size={16} />
+                                  )}
+                                </Button>
                               )}
-                            </Button>
+                              {onDeleteComment && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onDeleteComment(container.id, comment.id)}
+                                  className="hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  <Trash size={16} />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </Card>
                       ))}
@@ -271,12 +287,13 @@ export default function EditableContainer({
               variant="ghost"
               size="sm"
               onClick={() => {
-                if (confirm(`Сигурни ли сте, че искате да изтриете "${container.title}"?`)) {
+                if (onDelete && confirm(`Сигурни ли сте, че искате да изтриете "${container.title}"?`)) {
                   onDelete(container.id)
                   toast.success('Контейнер изтрит')
                 }
               }}
               className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+              disabled={!onDelete}
             >
               <Trash size={16} />
             </Button>

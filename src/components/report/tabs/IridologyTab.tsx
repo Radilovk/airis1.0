@@ -215,27 +215,34 @@ export default function IridologyTab({ report }: IridologyTabProps) {
                     const Icon = statusConfig.icon
                     
                     return (
-                      <motion.div 
-                        key={zone.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05, duration: 0.25 }}
-                        className={`border-2 rounded-xl p-4 ${statusConfig.bg} ${statusConfig.border} hover:shadow-md transition-all`}
-                      >
-                        <div className="flex items-start justify-between mb-3 gap-3">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConfig.bg} shadow-sm`}>
-                              <Icon size={20} weight="duotone" className={statusConfig.iconColor} />
+                      <Collapsible key={zone.id}>
+                        <motion.div 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05, duration: 0.25 }}
+                          className={`border-2 rounded-xl overflow-hidden ${statusConfig.bg} ${statusConfig.border} hover:shadow-md transition-all`}
+                        >
+                          <CollapsibleTrigger className="w-full p-4 hover:bg-black/5 transition-colors">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConfig.bg} shadow-sm`}>
+                                  <Icon size={20} weight="duotone" className={statusConfig.iconColor} />
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                  <h4 className="font-bold text-sm mb-0.5">{zone.name || ''}</h4>
+                                  <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                                </div>
+                              </div>
+                              {getStatusBadge(zone.status)}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-bold text-sm mb-0.5">{zone.name || ''}</h4>
-                              <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="px-4 pb-4 pl-16">
+                              <p className="text-sm leading-relaxed text-foreground/90">{zone.findings || ''}</p>
                             </div>
-                          </div>
-                          {getStatusBadge(zone.status)}
-                        </div>
-                        <p className="text-sm leading-relaxed text-foreground/90 pl-12">{zone.findings || ''}</p>
-                      </motion.div>
+                          </CollapsibleContent>
+                        </motion.div>
+                      </Collapsible>
                     )
                   })}
                 {(report.leftIris?.zones || []).filter(zone => zone && zone.status !== 'normal').length === 0 && (
@@ -324,27 +331,34 @@ export default function IridologyTab({ report }: IridologyTabProps) {
                     const Icon = statusConfig.icon
                     
                     return (
-                      <motion.div 
-                        key={zone.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05, duration: 0.25 }}
-                        className={`border-2 rounded-xl p-4 ${statusConfig.bg} ${statusConfig.border} hover:shadow-md transition-all`}
-                      >
-                        <div className="flex items-start justify-between mb-3 gap-3">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConfig.bg} shadow-sm`}>
-                              <Icon size={20} weight="duotone" className={statusConfig.iconColor} />
+                      <Collapsible key={zone.id}>
+                        <motion.div 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05, duration: 0.25 }}
+                          className={`border-2 rounded-xl overflow-hidden ${statusConfig.bg} ${statusConfig.border} hover:shadow-md transition-all`}
+                        >
+                          <CollapsibleTrigger className="w-full p-4 hover:bg-black/5 transition-colors">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${statusConfig.bg} shadow-sm`}>
+                                  <Icon size={20} weight="duotone" className={statusConfig.iconColor} />
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                  <h4 className="font-bold text-sm mb-0.5">{zone.name || ''}</h4>
+                                  <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                                </div>
+                              </div>
+                              {getStatusBadge(zone.status)}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-bold text-sm mb-0.5">{zone.name || ''}</h4>
-                              <p className="text-xs text-muted-foreground">{zone.organ || ''}</p>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="px-4 pb-4 pl-16">
+                              <p className="text-sm leading-relaxed text-foreground/90">{zone.findings || ''}</p>
                             </div>
-                          </div>
-                          {getStatusBadge(zone.status)}
-                        </div>
-                        <p className="text-sm leading-relaxed text-foreground/90 pl-12">{zone.findings || ''}</p>
-                      </motion.div>
+                          </CollapsibleContent>
+                        </motion.div>
+                      </Collapsible>
                     )
                   })}
                 {(report.rightIris?.zones || []).filter(zone => zone && zone.status !== 'normal').length === 0 && (

@@ -18,7 +18,9 @@ import type { AnalysisReport, EditorModeConfig, ReportModule } from '@/types'
 import OverviewTab from '@/components/report/tabs/OverviewTab'
 import OverviewTabEditable from '@/components/report/tabs/OverviewTabEditable'
 import IridologyTab from '@/components/report/tabs/IridologyTab'
+import IridologyTabEditable from '@/components/report/tabs/IridologyTabEditable'
 import PlanTab from '@/components/report/tabs/PlanTab'
+import PlanTabEditable from '@/components/report/tabs/PlanTabEditable'
 import ReportEditorMode from '@/components/report/ReportEditorMode'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useKV } from '@github/spark/hooks'
@@ -574,9 +576,13 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
           ? <OverviewTabEditable report={report} avgHealth={avgHealth} />
           : <OverviewTab report={report} avgHealth={avgHealth} />
       case 'iridology':
-        return <IridologyTab report={report} />
+        return editorConfig?.enabled
+          ? <IridologyTabEditable report={report} />
+          : <IridologyTab report={report} />
       case 'plan':
-        return <PlanTab report={report} />
+        return editorConfig?.enabled
+          ? <PlanTabEditable report={report} />
+          : <PlanTab report={report} />
       case 'custom':
         return (
           <div className="text-center py-8 text-muted-foreground">
