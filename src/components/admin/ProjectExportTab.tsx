@@ -14,7 +14,6 @@ import {
   Info
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import JSZip from 'jszip'
 
 export default function ProjectExportTab() {
   const [isExporting, setIsExporting] = useState(false)
@@ -74,13 +73,19 @@ export default function ProjectExportTab() {
 
   const handleExportProject = async () => {
     setIsExporting(true)
-    setExportProgress('Подготовка на файлове...')
+    setExportProgress('Подготовка на информация...')
     
     try {
+      toast.info('ZIP експортът не е наличен в момента. Моля, използвайте GitHub за достъп до кода.', {
+        duration: 5000
+      })
+      setIsExporting(false)
+      setExportProgress('')
+      return
+
+      /* ZIP export disabled - JSZip not available
       setExportProgress('Четене на файлове от проекта...')
       await new Promise(resolve => setTimeout(resolve, 500))
-
-      const zip = new JSZip()
 
       const filesToRead = [
         'index.html',
@@ -680,6 +685,7 @@ npm run dev
         setExportProgress('')
         setIsExporting(false)
       }, 2000)
+      */
 
     } catch (error) {
       console.error('Грешка при експорт:', error)
