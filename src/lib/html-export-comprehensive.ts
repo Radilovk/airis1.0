@@ -26,7 +26,9 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
     const centerY = 200
     const pupilRadius = radius * 0.25
     const innerRingEnd = radius * 0.33
+    const middleRingStart = innerRingEnd
     const middleRingEnd = radius * 0.83
+    const outerRingStart = middleRingEnd
 
     const polarToCartesian = (cx: number, cy: number, r: number, angleInDegrees: number) => {
       const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0
@@ -51,18 +53,18 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
 
     const getColorForStatus = (status: string) => {
       const colors: Record<string, string> = {
-        normal: 'rgba(16, 185, 129, 0.15)',
-        attention: 'rgba(245, 158, 11, 0.25)',
-        concern: 'rgba(239, 68, 68, 0.3)'
+        normal: 'rgba(34, 197, 94, 0.15)',
+        attention: 'rgba(234, 179, 8, 0.35)',
+        concern: 'rgba(239, 68, 68, 0.45)'
       }
       return colors[status] || 'rgba(100, 116, 139, 0.1)'
     }
 
     const getStrokeForStatus = (status: string) => {
       const colors: Record<string, string> = {
-        normal: 'rgba(16, 185, 129, 0.5)',
-        attention: 'rgba(245, 158, 11, 0.7)',
-        concern: 'rgba(239, 68, 68, 0.8)'
+        normal: 'rgba(34, 197, 94, 0.5)',
+        attention: 'rgba(234, 179, 8, 0.75)',
+        concern: 'rgba(239, 68, 68, 0.85)'
       }
       return colors[status] || 'rgba(100, 116, 139, 0.3)'
     }
@@ -75,9 +77,9 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
             <stop offset="100%" stop-color="rgba(30, 41, 59, 0.7)" />
           </radialGradient>
           <linearGradient id="ringGlow-${side}" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="rgba(59, 130, 246, 0.3)" />
-            <stop offset="50%" stop-color="rgba(99, 102, 241, 0.3)" />
-            <stop offset="100%" stop-color="rgba(139, 92, 246, 0.3)" />
+            <stop offset="0%" stop-color="rgba(59, 130, 246, 0.6)" />
+            <stop offset="50%" stop-color="rgba(99, 102, 241, 0.6)" />
+            <stop offset="100%" stop-color="rgba(139, 92, 246, 0.6)" />
           </linearGradient>
           <filter id="glow-${side}">
             <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
@@ -90,16 +92,16 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
 
         <circle cx="${centerX}" cy="${centerY}" r="${radius + 5}" fill="none" stroke="url(#ringGlow-${side})" stroke-width="1" opacity="0.3" />
         
-        <circle cx="${centerX}" cy="${centerY}" r="${innerRingEnd}" fill="none" stroke="rgba(59, 130, 246, 0.4)" stroke-width="2" stroke-dasharray="4,2" filter="url(#glow-${side})" />
-        <circle cx="${centerX}" cy="${centerY}" r="${innerRingEnd}" fill="none" stroke="rgba(99, 102, 241, 0.5)" stroke-width="3" filter="url(#glow-${side})" />
-        <circle cx="${centerX}" cy="${centerY}" r="${middleRingEnd}" fill="none" stroke="rgba(139, 92, 246, 0.5)" stroke-width="3" filter="url(#glow-${side})" />
-        <circle cx="${centerX}" cy="${centerY}" r="${middleRingEnd}" fill="none" stroke="rgba(168, 85, 247, 0.4)" stroke-width="2" stroke-dasharray="4,2" filter="url(#glow-${side})" />
+        <circle cx="${centerX}" cy="${centerY}" r="${innerRingEnd}" fill="none" stroke="rgba(59, 130, 246, 0.7)" stroke-width="1.5" stroke-dasharray="4,2" filter="url(#glow-${side})" />
+        <circle cx="${centerX}" cy="${centerY}" r="${middleRingStart}" fill="none" stroke="rgba(99, 102, 241, 0.8)" stroke-width="2.5" filter="url(#glow-${side})" />
+        <circle cx="${centerX}" cy="${centerY}" r="${middleRingEnd}" fill="none" stroke="rgba(139, 92, 246, 0.8)" stroke-width="2.5" filter="url(#glow-${side})" />
+        <circle cx="${centerX}" cy="${centerY}" r="${outerRingStart}" fill="none" stroke="rgba(168, 85, 247, 0.7)" stroke-width="1.5" stroke-dasharray="4,2" filter="url(#glow-${side})" />
     `
 
     for (let angle = 0; angle < 360; angle += 30) {
       const outer = polarToCartesian(centerX, centerY, radius, angle)
       const inner = polarToCartesian(centerX, centerY, pupilRadius, angle)
-      svgContent += `<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="rgba(100, 116, 139, 0.15)" stroke-width="1" />`
+      svgContent += `<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="rgba(100, 116, 139, 0.25)" stroke-width="1" />`
     }
 
     zones.forEach((zone) => {
@@ -159,6 +161,35 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
 
     svgContent += `</svg>`
     return svgContent
+  }
+
+  const parseDetailedAnalysis = (text: string) => {
+    const sections = {
+      overview: '',
+      keyFindings: '',
+      goalConnection: '',
+      prognosis: ''
+    }
+    
+    const lines = text.split('\n').filter(line => line.trim())
+    let currentSection = ''
+    
+    lines.forEach(line => {
+      const trimmed = line.trim()
+      if (trimmed.includes('Обща оценка') || trimmed.includes('обща оценка')) {
+        currentSection = 'overview'
+      } else if (trimmed.includes('Най-важни находки') || trimmed.includes('важни находки')) {
+        currentSection = 'keyFindings'
+      } else if (trimmed.includes('Връзка с целите') || trimmed.includes('връзка с целите')) {
+        currentSection = 'goalConnection'
+      } else if (trimmed.includes('Прогноза') || trimmed.includes('прогноза')) {
+        currentSection = 'prognosis'
+      } else if (currentSection && !trimmed.match(/^\d+\./)) {
+        sections[currentSection as keyof typeof sections] += (sections[currentSection as keyof typeof sections] ? ' ' : '') + trimmed
+      }
+    })
+    
+    return sections
   }
 
   const generateSystemScoresChart = () => {
@@ -853,7 +884,7 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
         <div class="section">
           <div class="section-title">
             <span class="section-icon">📊</span>
-            Обща оценка
+            Кратко Резюме
           </div>
           <div class="analysis-text">
             ${report.briefSummary.split(/\n/).filter(line => line.trim()).map(point => {
@@ -940,19 +971,67 @@ export function generateComprehensiveReportHTML(report: AnalysisReport): string 
         <div class="section">
           <div class="section-title">
             <span class="section-icon">🔍</span>
-            Връзка с Целите и Прогноза
+            Детайлен Иридологичен Анализ
           </div>
-          <div class="analysis-text">
-            ${report.detailedAnalysis.split(/\n\n+/).filter(p => p.trim()).map(paragraph => {
-              const cleanParagraph = paragraph.trim()
-              return cleanParagraph ? `
-                <div class="analysis-paragraph">
-                  <div class="analysis-bullet"></div>
-                  <p>${cleanParagraph}</p>
+          ${(() => {
+            const sections = parseDetailedAnalysis(report.detailedAnalysis)
+            let html = '<div class="analysis-text">'
+            
+            if (sections.overview) {
+              html += `
+                <div class="card" style="margin-bottom: 24px;">
+                  <div class="card-header">
+                    <span style="font-size: 18px; font-weight: 700;">⚕️ Обща Оценка</span>
+                  </div>
+                  <div class="card-content">
+                    <p style="line-height: 1.8;">${sections.overview}</p>
+                  </div>
                 </div>
-              ` : ''
-            }).join('')}
-          </div>
+              `
+            }
+            
+            if (sections.keyFindings) {
+              html += `
+                <div class="card" style="margin-bottom: 24px;">
+                  <div class="card-header">
+                    <span style="font-size: 18px; font-weight: 700;">⚠️ Най-важни Находки</span>
+                  </div>
+                  <div class="card-content">
+                    <p style="line-height: 1.8;">${sections.keyFindings}</p>
+                  </div>
+                </div>
+              `
+            }
+            
+            if (sections.goalConnection) {
+              html += `
+                <div class="card" style="margin-bottom: 24px;">
+                  <div class="card-header">
+                    <span style="font-size: 18px; font-weight: 700;">🎯 Връзка с Целите</span>
+                  </div>
+                  <div class="card-content">
+                    <p style="line-height: 1.8;">${sections.goalConnection}</p>
+                  </div>
+                </div>
+              `
+            }
+            
+            if (sections.prognosis) {
+              html += `
+                <div class="card" style="margin-bottom: 24px;">
+                  <div class="card-header">
+                    <span style="font-size: 18px; font-weight: 700;">📈 Прогноза</span>
+                  </div>
+                  <div class="card-content">
+                    <p style="line-height: 1.8;">${sections.prognosis}</p>
+                  </div>
+                </div>
+              `
+            }
+            
+            html += '</div>'
+            return html
+          })()}
         </div>
       ` : ''}
 

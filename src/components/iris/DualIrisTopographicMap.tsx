@@ -119,6 +119,14 @@ export default function DualIrisTopographicMap({
     const centerX = radius
     const centerY = radius
     const irisRadius = radius * 0.85
+    
+    const pupilRadius = irisRadius * 0.25
+    const innerRingStart = pupilRadius
+    const innerRingEnd = irisRadius * 0.33
+    const middleRingStart = innerRingEnd
+    const middleRingEnd = irisRadius * 0.83
+    const outerRingStart = middleRingEnd
+    const outerRingEnd = irisRadius
 
     return (
       <div className="relative flex-1 min-w-0">
@@ -126,7 +134,7 @@ export default function DualIrisTopographicMap({
           <img
             src={imageUrl}
             alt={`${side === 'left' ? 'Ляв' : 'Десен'} ирис`}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover rounded-xl"
           />
           
           <svg
@@ -142,7 +150,77 @@ export default function DualIrisTopographicMap({
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
+              <linearGradient id={`ringGlow-${side}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="rgba(59, 130, 246, 0.6)" />
+                <stop offset="50%" stopColor="rgba(99, 102, 241, 0.6)" />
+                <stop offset="100%" stopColor="rgba(139, 92, 246, 0.6)" />
+              </linearGradient>
+              <radialGradient id={`pupilGlow-${side}`} cx="50%" cy="50%">
+                <stop offset="0%" stopColor="rgba(59, 130, 246, 0.3)" />
+                <stop offset="100%" stopColor="rgba(15, 23, 42, 0.1)" />
+              </radialGradient>
             </defs>
+
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r={innerRingEnd}
+              fill="none"
+              stroke="rgba(59, 130, 246, 0.7)"
+              strokeWidth="1.5"
+              strokeDasharray="4,2"
+              filter={`url(#glow-${side})`}
+            />
+            
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r={middleRingStart}
+              fill="none"
+              stroke="rgba(99, 102, 241, 0.8)"
+              strokeWidth="2.5"
+              filter={`url(#glow-${side})`}
+            />
+            
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r={middleRingEnd}
+              fill="none"
+              stroke="rgba(139, 92, 246, 0.8)"
+              strokeWidth="2.5"
+              filter={`url(#glow-${side})`}
+            />
+            
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r={outerRingStart}
+              fill="none"
+              stroke="rgba(168, 85, 247, 0.7)"
+              strokeWidth="1.5"
+              strokeDasharray="4,2"
+              filter={`url(#glow-${side})`}
+            />
+
+            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle) => {
+              const angleRad = ((angle - 90) * Math.PI) / 180
+              const innerX = centerX + pupilRadius * Math.cos(angleRad)
+              const innerY = centerY + pupilRadius * Math.sin(angleRad)
+              const outerX = centerX + irisRadius * Math.cos(angleRad)
+              const outerY = centerY + irisRadius * Math.sin(angleRad)
+              return (
+                <line
+                  key={`radial-${side}-${angle}`}
+                  x1={innerX}
+                  y1={innerY}
+                  x2={outerX}
+                  y2={outerY}
+                  stroke="rgba(100, 116, 139, 0.25)"
+                  strokeWidth="1"
+                />
+              )
+            })}
 
             {normalizedZones.map((zone, idx) => {
               const [startAngle, endAngle] = zone.angle

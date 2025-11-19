@@ -44,12 +44,23 @@ interface IridologyTabEditableProps {
 
 const DEFAULT_CONTAINERS: ReportContainer[] = [
   {
+    id: 'detailed-analysis-container',
+    moduleId: 'iridology',
+    type: 'card',
+    title: 'Детайлен Иридологичен Анализ',
+    visible: true,
+    order: 0,
+    comments: [],
+    interactive: false,
+    metadata: { icon: 'Activity' }
+  },
+  {
     id: 'topographic-map-container',
     moduleId: 'iridology',
     type: 'custom',
     title: 'Топографска Карта на Зоните',
     visible: true,
-    order: 0,
+    order: 1,
     comments: [],
     interactive: true,
     metadata: { icon: 'Eye' }
@@ -60,7 +71,7 @@ const DEFAULT_CONTAINERS: ReportContainer[] = [
     type: 'card',
     title: 'Статистика на Зоните',
     visible: true,
-    order: 1,
+    order: 2,
     comments: [],
     interactive: false,
     metadata: { icon: 'Activity' }
@@ -71,7 +82,7 @@ const DEFAULT_CONTAINERS: ReportContainer[] = [
     type: 'custom',
     title: 'Детайли по Зони',
     visible: true,
-    order: 2,
+    order: 3,
     comments: [],
     interactive: true,
     metadata: { icon: 'Eye' }
@@ -230,8 +241,83 @@ export default function IridologyTabEditable({ report }: IridologyTabEditablePro
   const leftStats = getZoneStats(report.leftIris?.zones || [])
   const rightStats = getZoneStats(report.rightIris?.zones || [])
 
+  const parseDetailedAnalysis = (text: string) => {
+    const sections = {
+      overview: '',
+      keyFindings: '',
+      goalConnection: '',
+      prognosis: ''
+    }
+    
+    const lines = text.split('\n').filter(line => line.trim())
+    let currentSection = ''
+    
+    lines.forEach(line => {
+      const trimmed = line.trim()
+      if (trimmed.includes('Обща оценка') || trimmed.includes('обща оценка')) {
+        currentSection = 'overview'
+      } else if (trimmed.includes('Най-важни находки') || trimmed.includes('важни находки')) {
+        currentSection = 'keyFindings'
+      } else if (trimmed.includes('Връзка с целите') || trimmed.includes('връзка с целите')) {
+        currentSection = 'goalConnection'
+      } else if (trimmed.includes('Прогноза') || trimmed.includes('прогноза')) {
+        currentSection = 'prognosis'
+      } else if (currentSection && !trimmed.match(/^\d+\./)) {
+        sections[currentSection as keyof typeof sections] += (sections[currentSection as keyof typeof sections] ? ' ' : '') + trimmed
+      }
+    })
+    
+    return sections
+  }
+
   const renderContainerContent = (container: ReportContainer) => {
     switch (container.id) {
+      case 'detailed-analysis-container':
+        const sections = parseDetailedAnalysis(report.detailedAnalysis || report.summary || '')
+        return (
+          <div className="space-y-6">
+            {sections.overview && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Activity size={20} weight="duotone" className="text-primary" />
+                  Обща Оценка
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/90">{sections.overview}</p>
+              </div>
+            )}
+            
+            {sections.keyFindings && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <SealWarning size={20} weight="duotone" className="text-amber-600" />
+                  Най-важни Находки
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/90">{sections.keyFindings}</p>
+              </div>
+            )}
+            
+            {sections.goalConnection && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <CheckCircle size={20} weight="duotone" className="text-green-600" />
+                  Връзка с Целите
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/90">{sections.goalConnection}</p>
+              </div>
+            )}
+            
+            {sections.prognosis && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Info size={20} weight="duotone" className="text-blue-600" />
+                  Прогноза
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/90">{sections.prognosis}</p>
+              </div>
+            )}
+          </div>
+        )
+      
       case 'topographic-map-container':
         return (
           <motion.div
