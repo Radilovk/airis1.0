@@ -23,8 +23,6 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport, EditorModeConfig, ReportContainer, SupplementRecommendation } from '@/types'
 import { cn } from '@/lib/utils'
-import NutritionChart from '../NutritionChart'
-import ActionTimeline from '../ActionTimeline'
 import EditableContainer from '../EditableContainer'
 import {
   DndContext, 

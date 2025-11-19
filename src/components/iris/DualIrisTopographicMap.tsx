@@ -68,8 +68,8 @@ export default function DualIrisTopographicMap({
     startAngle: number,
     endAngle: number
   ) => {
-    const startRad = ((startAngle - 90) * Math.PI) / 180
-    const endRad = ((endAngle - 90) * Math.PI) / 180
+    const startRad = (startAngle * Math.PI) / 180
+    const endRad = (endAngle * Math.PI) / 180
 
     const x1 = centerX + radius * Math.cos(startRad)
     const y1 = centerY + radius * Math.sin(startRad)
@@ -89,22 +89,17 @@ export default function DualIrisTopographicMap({
   const normalizeZones = (zones: IrisZone[]): IrisZone[] => {
     if (!zones || zones.length === 0) return []
     
-    if (zones.length === 12) {
-      return zones.map((zone, idx) => ({
-        ...zone,
-        angle: [idx * 30, (idx + 1) * 30]
-      }))
-    }
-
     const normalized: IrisZone[] = []
     const anglePerZone = 360 / 12
 
     for (let i = 0; i < 12; i++) {
       const existingZone = zones[i] || zones[0]
+      const startAngle = i * anglePerZone - 90
+      const endAngle = (i + 1) * anglePerZone - 90
       const newZone: IrisZone = {
         ...existingZone,
         id: i + 1,
-        angle: [i * anglePerZone, (i + 1) * anglePerZone] as [number, number]
+        angle: [startAngle, endAngle] as [number, number]
       }
       normalized.push(newZone)
     }
@@ -151,10 +146,6 @@ export default function DualIrisTopographicMap({
 
             {normalizedZones.map((zone, idx) => {
               const [startAngle, endAngle] = zone.angle
-              const midAngle = (startAngle + endAngle) / 2
-              const midRad = ((midAngle - 90) * Math.PI) / 180
-              const labelX = centerX + irisRadius * 0.7 * Math.cos(midRad)
-              const labelY = centerY + irisRadius * 0.7 * Math.sin(midRad)
 
               const isHovered = hoveredZone?.zone.id === zone.id && hoveredZone?.side === side
               const isSelected = selectedZone?.zone.id === zone.id && selectedZone?.side === side
@@ -174,21 +165,6 @@ export default function DualIrisTopographicMap({
                     onMouseLeave={() => setHoveredZone(null)}
                     onClick={() => setSelectedZone({ zone, side })}
                   />
-                  <text
-                    x={labelX}
-                    y={labelY}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill="white"
-                    fontSize="11"
-                    fontWeight="700"
-                    className="pointer-events-none drop-shadow-lg"
-                    style={{
-                      textShadow: '0 0 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.6)'
-                    }}
-                  >
-                    {idx + 1}
-                  </text>
                 </g>
               )
             })}
@@ -215,8 +191,8 @@ export default function DualIrisTopographicMap({
             />
 
             {Array.from({ length: 12 }).map((_, i) => {
-              const angle = i * 30
-              const angleRad = ((angle - 90) * Math.PI) / 180
+              const angle = i * 30 - 90
+              const angleRad = (angle * Math.PI) / 180
               const x1 = centerX + irisRadius * 0.25 * Math.cos(angleRad)
               const y1 = centerY + irisRadius * 0.25 * Math.sin(angleRad)
               const x2 = centerX + irisRadius * Math.cos(angleRad)

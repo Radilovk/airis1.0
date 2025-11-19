@@ -20,7 +20,6 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import SystemScoresChart from '../SystemScoresChart'
-import HealthProgressChart from '../HealthProgressChart'
 import {
   Collapsible,
   CollapsibleContent,

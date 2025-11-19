@@ -15,7 +15,6 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport, EditorModeConfig, ReportContainer } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
-import ZoneStatusPieChart from '../ZoneStatusPieChart'
 import {
   Collapsible,
   CollapsibleContent,
@@ -45,23 +44,12 @@ interface IridologyTabEditableProps {
 
 const DEFAULT_CONTAINERS: ReportContainer[] = [
   {
-    id: 'zone-pie-chart-container',
-    moduleId: 'iridology',
-    type: 'chart',
-    title: 'Статистика по Зони',
-    visible: true,
-    order: 0,
-    comments: [],
-    interactive: false,
-    metadata: { chartType: 'pie' }
-  },
-  {
     id: 'topographic-map-container',
     moduleId: 'iridology',
     type: 'custom',
     title: 'Топографска Карта на Зоните',
     visible: true,
-    order: 1,
+    order: 0,
     comments: [],
     interactive: true,
     metadata: { icon: 'Eye' }
@@ -72,7 +60,7 @@ const DEFAULT_CONTAINERS: ReportContainer[] = [
     type: 'card',
     title: 'Статистика на Зоните',
     visible: true,
-    order: 2,
+    order: 1,
     comments: [],
     interactive: false,
     metadata: { icon: 'Activity' }
@@ -83,7 +71,7 @@ const DEFAULT_CONTAINERS: ReportContainer[] = [
     type: 'custom',
     title: 'Детайли по Зони',
     visible: true,
-    order: 3,
+    order: 2,
     comments: [],
     interactive: true,
     metadata: { icon: 'Eye' }
@@ -244,17 +232,6 @@ export default function IridologyTabEditable({ report }: IridologyTabEditablePro
 
   const renderContainerContent = (container: ReportContainer) => {
     switch (container.id) {
-      case 'zone-pie-chart-container':
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <ZoneStatusPieChart leftIris={report.leftIris} rightIris={report.rightIris} />
-          </motion.div>
-        )
-      
       case 'topographic-map-container':
         return (
           <motion.div

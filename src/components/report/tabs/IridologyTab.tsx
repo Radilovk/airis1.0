@@ -13,7 +13,6 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
-import ZoneStatusPieChart from '../ZoneStatusPieChart'
 import {
   Collapsible,
   CollapsibleContent,
@@ -59,14 +58,6 @@ export default function IridologyTab({ report }: IridologyTabProps) {
 
   return (
     <div className="space-y-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <ZoneStatusPieChart leftIris={report.leftIris} rightIris={report.rightIris} />
-      </motion.div>
-      
       {report.detailedAnalysis && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
