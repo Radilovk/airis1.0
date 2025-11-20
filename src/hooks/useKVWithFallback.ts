@@ -1,18 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { estimateDataSize, isSafeForLocalStorage } from '@/lib/storage-utils'
 
-// Extend window type to include spark.kv
-declare global {
-  interface Window {
-    spark?: {
-      kv?: {
-        get<T = any>(key: string): Promise<T | null>
-        set<T = any>(key: string, value: T): Promise<void>
-        delete(key: string): Promise<void>
-      }
-    }
-  }
-}
+// Types are defined in src/types/index.ts
 
 /**
  * Custom hook for using KV storage with fallback to localStorage
@@ -23,7 +12,6 @@ export function useKVWithFallback<T>(
   defaultValue: T
 ): [T, (value: T) => Promise<void>] {
   const [value, setValue] = useState<T>(defaultValue)
-  const [isLoading, setIsLoading] = useState(true)
 
   // Load initial value
   useEffect(() => {
@@ -34,7 +22,6 @@ export function useKVWithFallback<T>(
           const kvValue = await window.spark.kv.get<T>(key)
           if (kvValue !== null && kvValue !== undefined) {
             setValue(kvValue)
-            setIsLoading(false)
             return
           }
         }
@@ -46,8 +33,6 @@ export function useKVWithFallback<T>(
         }
       } catch (error) {
         console.error(`[useKVWithFallback] Error loading ${key}:`, error)
-      } finally {
-        setIsLoading(false)
       }
     }
 

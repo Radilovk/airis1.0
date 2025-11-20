@@ -1,3 +1,5 @@
+// Types are defined in src/types/index.ts
+
 interface ErrorLog {
   timestamp: string
   type: 'error' | 'warning' | 'info'
@@ -5,19 +7,6 @@ interface ErrorLog {
   message: string
   stack?: string
   data?: any
-}
-
-// Extend window type to include spark.kv
-declare global {
-  interface Window {
-    spark?: {
-      kv?: {
-        get<T = any>(key: string): Promise<T | null>
-        set<T = any>(key: string, value: T): Promise<void>
-        delete(key: string): Promise<void>
-      }
-    }
-  }
 }
 
 class ErrorLogger {

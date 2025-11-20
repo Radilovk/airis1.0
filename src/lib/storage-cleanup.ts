@@ -1,15 +1,4 @@
-// Extend window type to include spark.kv
-declare global {
-  interface Window {
-    spark?: {
-      kv?: {
-        get<T = any>(key: string): Promise<T | null>
-        set<T = any>(key: string, value: T): Promise<void>
-        delete(key: string): Promise<void>
-      }
-    }
-  }
-}
+// Types are defined in src/types/index.ts
 
 const DB_NAME = 'airis_storage'
 const DB_VERSION = 1

@@ -227,3 +227,16 @@ export interface EditorModeConfig {
   showContainerBorders?: boolean
   showContainerLabels?: boolean
 }
+
+// Global type definitions for GitHub Spark KV storage
+declare global {
+  interface Window {
+    spark?: {
+      kv?: {
+        get<T = any>(key: string): Promise<T | null>
+        set<T = any>(key: string, value: T): Promise<void>
+        delete(key: string): Promise<void>
+      }
+    }
+  }
+}
