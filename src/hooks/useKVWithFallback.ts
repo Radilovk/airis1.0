@@ -106,15 +106,6 @@ export function useKVWithFallback<T>(
         if (indexedDBValue !== undefined && indexedDBValue !== null) {
           console.log(`[STORAGE] ✓ Loaded ${key} from IndexedDB`)
           setValue_(indexedDBValue)
-          
-          // Try to sync to KV
-          try {
-            await setKvValue(indexedDBValue)
-          } catch (e) {
-            console.warn(`[STORAGE] KV not available, using IndexedDB only for ${key}`)
-            kvAvailable.current = false
-          }
-          
           setIsLoading(false)
           isInitialized.current = true
           return
@@ -130,11 +121,8 @@ export function useKVWithFallback<T>(
           // Try to sync to better storage
           try {
             await setInIndexedDB(key, parsed)
-            if (kvAvailable.current) {
-              await setKvValue(parsed)
-            }
           } catch (e) {
-            console.warn(`[STORAGE] Failed to sync ${key} to better storage:`, e)
+            console.warn(`[STORAGE] Failed to sync ${key} to IndexedDB:`, e)
           }
           
           setIsLoading(false)
@@ -157,7 +145,8 @@ export function useKVWithFallback<T>(
     }
     
     initializeStorage()
-  }, [key, kvValue, defaultValue, setKvValue])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, kvValue, defaultValue])
 
   const setValue = useCallback(
     async (newValue: T | ((current: T | null) => T)) => {
@@ -195,9 +184,11 @@ export function useKVWithFallback<T>(
         // 3. Save to KV storage (best for web deployment, persists across devices)
         if (kvAvailable.current) {
           savePromises.push(
-            Promise.resolve(setKvValue(resolvedValue))
-              .then(() => console.log(`[STORAGE] ✓ Saved ${key} to KV storage`))
-              .catch((error) => {
+            (async () => {
+              try {
+                await setKvValue(resolvedValue)
+                console.log(`[STORAGE] ✓ Saved ${key} to KV storage`)
+              } catch (error) {
                 console.warn(`[STORAGE] KV storage failed for ${key}:`, error)
                 if (error instanceof Error && (
                   error.message?.includes('Forbidden') || 
@@ -207,7 +198,8 @@ export function useKVWithFallback<T>(
                   kvAvailable.current = false
                   console.log(`[STORAGE] KV storage disabled for future writes`)
                 }
-              })
+              }
+            })()
           )
         }
 
