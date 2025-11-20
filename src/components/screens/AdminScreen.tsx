@@ -32,20 +32,20 @@ import {
 import { motion } from 'framer-motion'
 import type { AIModelConfig, IridologyTextbook, CustomOverlay, IridologyManual, AIPromptTemplate } from '@/types'
 import IridologyOverlay from '@/components/iris/IridologyOverlay'
-import QuestionnaireManager from '@/components/settings/QuestionnaireManager'
-import IridologyManualTab from '@/components/settings/IridologyManualTab'
-import AIPromptTab from '@/components/settings/AIPromptTab'
-import EditorModeTab from '@/components/settings/EditorModeTab'
-import ChangelogTab from '@/components/settings/ChangelogTab'
-import ProjectExportTab from '@/components/settings/ProjectExportTab'
-import AIModelStrategyTab from '@/components/settings/AIModelStrategyTab'
+import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
+import IridologyManualTab from '@/components/admin/IridologyManualTab'
+import AIPromptTab from '@/components/admin/AIPromptTab'
+import EditorModeTab from '@/components/admin/EditorModeTab'
+import ChangelogTab from '@/components/admin/ChangelogTab'
+import ProjectExportTab from '@/components/admin/ProjectExportTab'
+import AIModelStrategyTab from '@/components/admin/AIModelStrategyTab'
 import { DEFAULT_IRIDOLOGY_MANUAL, DEFAULT_AI_PROMPT } from '@/lib/default-prompts'
 
-interface SettingsScreenProps {
+interface AdminScreenProps {
   onBack: () => void
 }
 
-export default function SettingsScreen({ onBack }: SettingsScreenProps) {
+export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [aiConfig, setAiConfig] = useKV<AIModelConfig>('ai-model-config', {
     provider: 'github-spark',
     model: 'gpt-4o',
@@ -97,7 +97,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       setRequestCount(aiConfig.requestCount || 8)
       
       if (aiConfig.provider === 'github-spark') {
-        console.log(`ℹ️ [SETTINGS] GitHub Spark Provider зареден - модел: ${aiConfig.model}`)
+        console.log(`ℹ️ [ADMIN] GitHub Spark Provider зареден - модел: ${aiConfig.model}`)
       }
     }
   }, [aiConfig])
@@ -176,8 +176,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         requestCount
       }
       
-      console.log('💾 [SETTINGS] Запазване на конфигурация:', config)
-      console.log(`🔍 [SETTINGS] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}`)
+      console.log('💾 [ADMIN] Запазване на конфигурация:', config)
+      console.log(`🔍 [ADMIN] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}`)
       
       await setAiConfig(config)
       
@@ -353,7 +353,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-4 md:space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Настройки на приложението</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Административен панел</h1>
             <p className="text-sm md:text-base text-muted-foreground">
               Управление на AI модели и учебници по иридология
             </p>
@@ -364,12 +364,12 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           </Button>
         </div>
 
-        {/* Settings Access Success Indicator */}
+        {/* Admin Access Success Indicator */}
         <div className="p-3 md:p-4 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-lg">
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
             <CheckCircle className="w-5 h-5 flex-shrink-0" weight="fill" />
             <p className="text-sm md:text-base font-medium">
-              ✓ Настройките са достъпни и работят правилно
+              ✓ Административният панел е достъпен и работи правилно
             </p>
           </div>
           <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 mt-1 ml-7">
