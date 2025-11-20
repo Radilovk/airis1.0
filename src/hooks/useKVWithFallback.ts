@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { estimateDataSize, isSafeForLocalStorage } from '@/lib/storage-utils'
 
-// Types are defined in src/types/index.ts
+// Types are defined in src/vite-end.d.ts
 
 /**
  * Custom hook for using KV storage with fallback to localStorage
@@ -20,7 +20,7 @@ export function useKVWithFallback<T>(
         // Try KV storage first
         if (window.spark?.kv) {
           const kvValue = await window.spark.kv.get<T>(key)
-          if (kvValue !== null && kvValue !== undefined) {
+          if (kvValue !== undefined) {
             setValue(kvValue)
             return
           }

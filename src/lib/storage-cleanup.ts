@@ -1,4 +1,4 @@
-// Types are defined in src/types/index.ts
+// Types are defined in src/vite-end.d.ts
 
 const DB_NAME = 'airis_storage'
 const DB_VERSION = 1
@@ -31,7 +31,7 @@ async function getFromStorage(key: string): Promise<any> {
   try {
     if (window.spark?.kv) {
       const kvValue = await window.spark.kv.get<any>(key)
-      if (kvValue !== null && kvValue !== undefined) {
+      if (kvValue !== undefined) {
         return kvValue
       }
     }

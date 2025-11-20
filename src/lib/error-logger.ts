@@ -1,4 +1,4 @@
-// Types are defined in src/types/index.ts
+// Types are defined in src/vite-end.d.ts
 
 interface ErrorLog {
   timestamp: string
