@@ -364,6 +364,19 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
           </Button>
         </div>
 
+        {/* Admin Access Success Indicator */}
+        <div className="p-3 md:p-4 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-lg">
+          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            <CheckCircle className="w-5 h-5 flex-shrink-0" weight="fill" />
+            <p className="text-sm md:text-base font-medium">
+              ✓ Административният панел е достъпен и работи правилно
+            </p>
+          </div>
+          <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 mt-1 ml-7">
+            Всички настройки се запазват локално и ще бъдат използвани за анализите.
+          </p>
+        </div>
+
         <Tabs defaultValue="ai-config" className="w-full">
           <TabsList className="grid w-full grid-cols-5 md:grid-cols-9 gap-1 h-auto p-1">
             <TabsTrigger value="ai-config" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
