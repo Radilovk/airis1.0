@@ -31,9 +31,11 @@ async function openDB(): Promise<IDBDatabase> {
 export async function getFromStorage(key: string, silent: boolean = false): Promise<any> {
   // Priority 1: Try KV storage
   try {
-    const kvValue = await window.spark.kv.get<any>(key)
-    if (kvValue !== null && kvValue !== undefined) {
-      return kvValue
+    if (window.spark?.kv) {
+      const kvValue = await window.spark.kv.get<any>(key)
+      if (kvValue !== null && kvValue !== undefined) {
+        return kvValue
+      }
     }
   } catch (error) {
     if (!silent) {
@@ -121,7 +123,9 @@ export async function saveToStorage(key: string, value: any, silent: boolean = f
   savePromises.push(
     (async () => {
       try {
-        await window.spark.kv.set(key, value)
+        if (window.spark?.kv) {
+          await window.spark.kv.set(key, value)
+        }
       } catch (error) {
         if (!silent) {
           console.warn(`[STORAGE] KV storage write failed for ${key}:`, error)
@@ -177,7 +181,9 @@ export async function deleteFromStorage(key: string, silent: boolean = false): P
   deletePromises.push(
     (async () => {
       try {
-        await window.spark.kv.delete(key)
+        if (window.spark?.kv) {
+          await window.spark.kv.delete(key)
+        }
       } catch (error) {
         if (!silent) {
           console.warn(`[STORAGE] KV storage delete failed for ${key}:`, error)
