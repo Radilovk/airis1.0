@@ -16,7 +16,7 @@ import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 const AnalysisScreen = lazy(() => import('@/components/screens/AnalysisScreen'))
 const ReportScreen = lazy(() => import('@/components/screens/ReportScreen'))
 const HistoryScreen = lazy(() => import('@/components/screens/HistoryScreen'))
-const AdminScreen = lazy(() => import('@/components/screens/AdminScreen'))
+const SettingsScreen = lazy(() => import('@/components/screens/SettingsScreen'))
 const AboutAirisScreen = lazy(() => import('@/components/screens/AboutAirisScreen'))
 const DiagnosticScreen = lazy(() => import('@/components/screens/DiagnosticScreen'))
 
@@ -469,7 +469,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <AdminScreen onBack={() => setCurrentScreen('welcome')} />
+              <SettingsScreen onBack={() => setCurrentScreen('welcome')} />
             </Suspense>
           </motion.div>
         )}
