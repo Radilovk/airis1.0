@@ -30,7 +30,7 @@ const LoadingScreen = () => (
   </div>
 )
 
-type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'admin' | 'about' | 'diagnostics'
+type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'settings' | 'about' | 'diagnostics'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -84,7 +84,7 @@ function App() {
   }
 
   const handleAdminAccess = () => {
-    setCurrentScreen('admin')
+    setCurrentScreen('settings')
   }
 
   const handleAboutAccess = () => {
@@ -460,9 +460,9 @@ function App() {
             </Suspense>
           </motion.div>
         )}
-        {currentScreen === 'admin' && (
+        {currentScreen === 'settings' && (
           <motion.div
-            key="admin"
+            key="settings"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
