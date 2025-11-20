@@ -1,92 +1,220 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 
 /**
- * A wrapper around useKV that provides localStorage fallback when KV storage is unavailable.
- * This ensures the app remains functional even when KV storage permissions are not configured.
+ * Enhanced storage hook for web deployment with multiple persistence layers:
+ * 1. GitHub KV Storage (primary - persists across devices/browsers)
+ * 2. IndexedDB (secondary - robust local storage with large capacity)
+ * 3. localStorage (tertiary - simple fallback)
+ * 
+ * This ensures settings are remembered in web deployments (GitHub Pages).
  */
+
+// IndexedDB helper functions
+const DB_NAME = 'airis_storage'
+const DB_VERSION = 1
+const STORE_NAME = 'settings'
+
+async function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+    
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME)
+      }
+    }
+  })
+}
+
+async function getFromIndexedDB(key: string): Promise<any> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly')
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.get(key)
+      
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  } catch (error) {
+    console.warn(`[STORAGE] IndexedDB read error for ${key}:`, error)
+    return null
+  }
+}
+
+async function setInIndexedDB(key: string, value: any): Promise<void> {
+  try {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readwrite')
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.put(value, key)
+      
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (error) {
+    console.warn(`[STORAGE] IndexedDB write error for ${key}:`, error)
+    throw error
+  }
+}
+
 export function useKVWithFallback<T>(
   key: string,
   defaultValue: T
 ): [T | null, (value: T | ((current: T | null) => T)) => Promise<void>] {
   const [kvValue, setKvValue] = useKV<T>(key, defaultValue)
-  const [localValue, setLocalValue] = useState<T | null>(() => {
-    // Try to load from localStorage as fallback
-    try {
-      const stored = localStorage.getItem(`airis_${key}`)
-      if (stored) {
-        return JSON.parse(stored)
-      }
-    } catch (error) {
-      console.warn(`[KV_FALLBACK] Failed to load ${key} from localStorage:`, error)
-    }
-    return defaultValue
-  })
-  
-  const [useLocalStorage, setUseLocalStorage] = useState(false)
-  const [hasKVError, setHasKVError] = useState(false)
+  const [value, setValue_] = useState<T | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const isInitialized = useRef(false)
+  const kvAvailable = useRef(true)
 
-  // Try to detect KV storage failures
+  // Initialize: Load from best available storage
   useEffect(() => {
-    const checkKVHealth = async () => {
+    if (isInitialized.current) return
+    
+    const initializeStorage = async () => {
       try {
-        // If kvValue is null and we haven't set a localStorage flag, KV might be failing
-        if (kvValue === null && defaultValue !== null && !hasKVError) {
-          console.warn(`[KV_FALLBACK] KV storage may be unavailable for key: ${key}`)
-          setHasKVError(true)
-          setUseLocalStorage(true)
-        } else if (kvValue !== null) {
-          // KV is working, sync to localStorage as backup
+        console.log(`[STORAGE] Initializing ${key}...`)
+        
+        // Priority 1: Try KV storage (best for web deployment)
+        if (kvValue !== null && kvValue !== undefined) {
+          console.log(`[STORAGE] ✓ Using KV storage for ${key}`)
+          setValue_(kvValue)
+          
+          // Backup to IndexedDB and localStorage
           try {
+            await setInIndexedDB(key, kvValue)
             localStorage.setItem(`airis_${key}`, JSON.stringify(kvValue))
           } catch (e) {
-            console.warn(`[KV_FALLBACK] Failed to backup to localStorage:`, e)
+            console.warn(`[STORAGE] Failed to backup ${key}:`, e)
           }
+          
+          setIsLoading(false)
+          isInitialized.current = true
+          return
         }
+        
+        // Priority 2: Try IndexedDB
+        const indexedDBValue = await getFromIndexedDB(key)
+        if (indexedDBValue !== undefined && indexedDBValue !== null) {
+          console.log(`[STORAGE] ✓ Loaded ${key} from IndexedDB`)
+          setValue_(indexedDBValue)
+          setIsLoading(false)
+          isInitialized.current = true
+          return
+        }
+        
+        // Priority 3: Try localStorage
+        const localStorageValue = localStorage.getItem(`airis_${key}`)
+        if (localStorageValue && localStorageValue !== 'null' && localStorageValue !== 'undefined') {
+          const parsed = JSON.parse(localStorageValue)
+          console.log(`[STORAGE] ✓ Loaded ${key} from localStorage`)
+          setValue_(parsed)
+          
+          // Try to sync to better storage
+          try {
+            await setInIndexedDB(key, parsed)
+          } catch (e) {
+            console.warn(`[STORAGE] Failed to sync ${key} to IndexedDB:`, e)
+          }
+          
+          setIsLoading(false)
+          isInitialized.current = true
+          return
+        }
+        
+        // Priority 4: Use default value
+        console.log(`[STORAGE] Using default value for ${key}`)
+        setValue_(defaultValue)
+        setIsLoading(false)
+        isInitialized.current = true
+        
       } catch (error) {
-        console.error(`[KV_FALLBACK] Error checking KV health:`, error)
-        setHasKVError(true)
-        setUseLocalStorage(true)
+        console.error(`[STORAGE] Error initializing ${key}:`, error)
+        setValue_(defaultValue)
+        setIsLoading(false)
+        isInitialized.current = true
       }
     }
-
-    checkKVHealth()
-  }, [kvValue, defaultValue, key, hasKVError])
+    
+    initializeStorage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, kvValue, defaultValue])
 
   const setValue = useCallback(
-    async (value: T | ((current: T | null) => T)) => {
-      const newValue = typeof value === 'function' 
-        ? (value as (current: T | null) => T)(useLocalStorage ? localValue : kvValue)
-        : value
-
-      // Always try to save to localStorage first as fallback
+    async (newValue: T | ((current: T | null) => T)) => {
       try {
-        localStorage.setItem(`airis_${key}`, JSON.stringify(newValue))
-        setLocalValue(newValue)
-      } catch (error) {
-        console.error(`[KV_FALLBACK] Failed to save to localStorage:`, error)
-      }
+        const currentValue = value
+        
+        // Compute new value if it's a function
+        const resolvedValue = typeof newValue === 'function' 
+          ? (newValue as (current: T | null) => T)(currentValue)
+          : newValue
 
-      // Try to save to KV storage if available
-      if (!useLocalStorage) {
-        try {
-          await setKvValue(newValue)
-        } catch (error) {
-          console.warn(`[KV_FALLBACK] KV storage failed for ${key}, using localStorage:`, error)
-          
-          // Check if it's a permission error
-          if (error instanceof Error && (error.message?.includes('Forbidden') || error.message?.includes('403'))) {
-            setHasKVError(true)
-            setUseLocalStorage(true)
-          }
+        console.log(`[STORAGE] Saving ${key}:`, resolvedValue)
+
+        // Update local state immediately
+        setValue_(resolvedValue)
+
+        // Save to all available storage layers in parallel
+        const savePromises: Promise<void>[] = []
+
+        // 1. Save to localStorage (fastest, always available)
+        savePromises.push(
+          Promise.resolve().then(() => {
+            localStorage.setItem(`airis_${key}`, JSON.stringify(resolvedValue))
+            console.log(`[STORAGE] ✓ Saved ${key} to localStorage`)
+          })
+        )
+
+        // 2. Save to IndexedDB (more capacity, persistent)
+        savePromises.push(
+          setInIndexedDB(key, resolvedValue)
+            .then(() => console.log(`[STORAGE] ✓ Saved ${key} to IndexedDB`))
+            .catch((error) => console.warn(`[STORAGE] Failed to save ${key} to IndexedDB:`, error))
+        )
+
+        // 3. Save to KV storage (best for web deployment, persists across devices)
+        if (kvAvailable.current) {
+          savePromises.push(
+            (async () => {
+              try {
+                await setKvValue(resolvedValue)
+                console.log(`[STORAGE] ✓ Saved ${key} to KV storage`)
+              } catch (error) {
+                console.warn(`[STORAGE] KV storage failed for ${key}:`, error)
+                if (error instanceof Error && (
+                  error.message?.includes('Forbidden') || 
+                  error.message?.includes('403') ||
+                  error.message?.includes('permissions')
+                )) {
+                  kvAvailable.current = false
+                  console.log(`[STORAGE] KV storage disabled for future writes`)
+                }
+              }
+            })()
+          )
         }
+
+        // Wait for all saves to complete (don't fail if some fail)
+        await Promise.allSettled(savePromises)
+        console.log(`[STORAGE] ✓ Successfully saved ${key} to available storage layers`)
+        
+      } catch (error) {
+        console.error(`[STORAGE] Critical error saving ${key}:`, error)
+        throw error
       }
     },
-    [key, kvValue, localValue, useLocalStorage, setKvValue]
+    [key, value, setKvValue]
   )
 
-  // Return the appropriate value based on storage availability
-  const currentValue = useLocalStorage ? localValue : kvValue
-
-  return [currentValue, setValue]
+  // Return null while loading to prevent using stale default values
+  return [isLoading ? null : value, setValue]
 }
