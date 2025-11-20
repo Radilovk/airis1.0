@@ -120,10 +120,10 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               size="lg"
               variant="secondary"
               onClick={onAdmin}
-              className="px-8 py-6 text-lg font-semibold gap-2"
+              className="px-8 py-6 text-lg font-semibold gap-2 bg-amber-500/10 border-2 border-amber-500/30 hover:bg-amber-500/20"
             >
               <Gear size={20} weight="duotone" />
-              Настройки
+              Админ Панел
             </Button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
