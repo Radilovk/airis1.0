@@ -1,5 +1,3 @@
-import { getFromStorage, saveToStorage } from './multi-layer-storage'
-
 interface ErrorLog {
   timestamp: string
   type: 'error' | 'warning' | 'info'
@@ -9,9 +7,22 @@ interface ErrorLog {
   data?: any
 }
 
+// Extend window type to include spark.kv
+declare global {
+  interface Window {
+    spark?: {
+      kv?: {
+        get<T = any>(key: string): Promise<T | null>
+        set<T = any>(key: string, value: T): Promise<void>
+        delete(key: string): Promise<void>
+      }
+    }
+  }
+}
+
 class ErrorLogger {
   private logs: ErrorLog[] = []
-  private maxLogs = 100
+  private maxLogs = 50 // Reduced from 100 to 50
 
   log(type: ErrorLog['type'], context: string, message: string, data?: any, error?: Error) {
     const log: ErrorLog = {
@@ -66,8 +77,13 @@ class ErrorLogger {
 
   private async persistLogs() {
     try {
-      // Use silent mode to avoid infinite loops if error logging fails
-      await saveToStorage('error-logs', this.logs, true)
+      // Keep only last 20 logs when persisting to save space
+      const logsToSave = this.logs.slice(-20)
+      
+      // Use window.spark.kv directly if available
+      if (window.spark?.kv) {
+        await window.spark.kv.set('error-logs', logsToSave)
+      }
     } catch (e) {
       // Silent failure to avoid infinite error loops
     }
@@ -75,10 +91,12 @@ class ErrorLogger {
 
   async loadLogs() {
     try {
-      // Use silent mode to avoid infinite loops
-      const stored = await getFromStorage('error-logs', true)
-      if (stored && Array.isArray(stored)) {
-        this.logs = stored
+      // Use window.spark.kv directly if available
+      if (window.spark?.kv) {
+        const stored = await window.spark.kv.get<ErrorLog[]>('error-logs')
+        if (stored && Array.isArray(stored)) {
+          this.logs = stored
+        }
       }
     } catch (e) {
       // Silent failure
