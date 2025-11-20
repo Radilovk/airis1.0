@@ -6,7 +6,6 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { 
   DownloadSimple, 
@@ -18,23 +17,19 @@ import {
   GitBranch,
   FolderOpen,
   File,
-  MagnifyingGlass,
-  Archive
+  MagnifyingGlass
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import JSZip from 'jszip'
 
 interface FileStructure {
   path: string
   type: 'file' | 'directory'
   size?: number
-  content?: string
 }
 
 export default function ProjectExportTab() {
   const [isScanning, setIsScanning] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [exportProgress, setExportProgress] = useState(0)
   const [scannedFiles, setScannedFiles] = useState<FileStructure[]>([])
   const [exportLog, setExportLog] = useState<string[]>([])
 
@@ -192,126 +187,323 @@ export default function ProjectExportTab() {
     setExportLog(prev => [...prev, `${new Date().toLocaleTimeString('bg-BG')}: ${message}`])
   }
 
-  const fetchFileContent = async (filePath: string): Promise<string | null> => {
-    try {
-      const response = await fetch(`/${filePath}`)
-      if (response.ok) {
-        return await response.text()
-      }
-      return null
-    } catch (error) {
-      console.error(`Error fetching ${filePath}:`, error)
-      return null
-    }
-  }
-
   const createFullExport = async () => {
     setIsExporting(true)
-    setExportProgress(0)
     setExportLog([])
     addLog('🚀 Започване на ПЪЛЕН ЕКСПОРТ на проекта...')
+    addLog('ℹ️ Генериране на инструкции за ръчен експорт...')
 
-    const zip = new JSZip()
+    const timestamp = new Date().toISOString().split('T')[0]
     const allFiles = [...criticalFiles, ...allSourceFiles]
-    let successCount = 0
-    let failCount = 0
 
-    addLog(`📊 Общо файлове за експорт: ${allFiles.length}`)
+    const detailedInstructions = `╔══════════════════════════════════════════════════════════════════╗
+║          AIRIS - ИНСТРУКЦИИ ЗА ПЪЛЕН ЕКСПОРТ НА ПРОЕКТА          ║
+╚══════════════════════════════════════════════════════════════════╝
 
-    for (let i = 0; i < allFiles.length; i++) {
-      const filePath = allFiles[i]
-      const progress = Math.round(((i + 1) / allFiles.length) * 100)
-      setExportProgress(progress)
+📅 Дата на генериране: ${new Date().toLocaleString('bg-BG')}
+📦 Общо файлове за експорт: ${allFiles.length}
 
-      try {
-        const content = await fetchFileContent(filePath)
-        if (content !== null) {
-          zip.file(filePath, content)
-          addLog(`✓ ${filePath}`)
-          successCount++
-        } else {
-          addLog(`✗ Не може да се извлече: ${filePath}`)
-          failCount++
-        }
-      } catch (error) {
-        addLog(`✗ Грешка: ${filePath}`)
-        failCount++
-      }
-    }
+═══════════════════════════════════════════════════════════════════
 
-    addLog(`📦 Генериране на ZIP архив...`)
-    
+🎯 ЦЕЛ: Извличане на 100% от файловете на проекта за синхронизация
+
+═══════════════════════════════════════════════════════════════════
+
+📋 МЕТОД 1: GitHub Spark Workbench (ПРЕПОРЪЧИТЕЛНО)
+────────────────────────────────────────────────────────────────────
+
+1. Отворете GitHub Spark Dashboard
+2. Намерете проекта "AIRIS Iridology App"
+3. Кликнете "Open Workbench" (или "Open in VS Code")
+4. В Workbench, отворете интегрирания терминал
+5. Изпълнете следните команди:
+
+   # Създаване на архив на целия проект
+   tar -czf airis-full-export-${timestamp}.tar.gz \\
+     --exclude=node_modules \\
+     --exclude=.git \\
+     --exclude=dist \\
+     --exclude=.vite \\
+     .
+
+   # Или използвайте zip:
+   zip -r airis-full-export-${timestamp}.zip . \\
+     -x "node_modules/*" \\
+     -x ".git/*" \\
+     -x "dist/*" \\
+     -x ".vite/*"
+
+6. Изтеглете създадения архив
+7. Разархивирайте локално
+
+═══════════════════════════════════════════════════════════════════
+
+📋 МЕТОД 2: Git Clone (НАЙ-ЛЕСЕН)
+────────────────────────────────────────────────────────────────────
+
+Ако проектът е свързан с GitHub repository:
+
+1. Отворете GitHub Spark Dashboard
+2. Намерете "View on GitHub" бутон
+3. Копирайте repository URL
+4. В локален терминал изпълнете:
+
+   git clone [repository-url]
+   cd [repository-name]
+   npm install
+   npm run dev
+
+✅ ГОТОВО! Имате пълно 1:1 копие на проекта.
+
+═══════════════════════════════════════════════════════════════════
+
+📋 МЕТОД 3: Ръчно копиране през Workbench
+────────────────────────────────────────────────────────────────────
+
+1. Отворете GitHub Spark Workbench
+2. Използвайте File Explorer в Workbench
+3. Right-click на root папката → Download as ZIP
+4. Разархивирайте локално
+
+═══════════════════════════════════════════════════════════════════
+
+📦 СПИСЪК НА ВСИЧКИ ФАЙЛОВЕ ЗА ЕКСПОРТ (${allFiles.length} файла):
+────────────────────────────────────────────────────────────────────
+
+📄 КРИТИЧНИ ROOT ФАЙЛОВЕ:
+${criticalFiles.map(f => `   ✓ ${f}`).join('\n')}
+
+📄 SOURCE ФАЙЛОВЕ:
+${allSourceFiles.map(f => `   ✓ ${f}`).join('\n')}
+
+📁 ДИРЕКТОРИИ:
+${directories.map(d => `   📁 ${d}`).join('\n')}
+
+═══════════════════════════════════════════════════════════════════
+
+🔄 СТЪПКИ СЛЕД ЕКСПОРТ (СИНХРОНИЗАЦИЯ С GITHUB):
+────────────────────────────────────────────────────────────────────
+
+1. След като имате пълно локално копие, отворете терминал в проектната папка
+
+2. Инициализирайте Git (ако не е):
+   git init
+
+3. Свържете с вашия GitHub repository:
+   git remote add origin [your-repo-url]
+
+4. Добавете всички файлове:
+   git add .
+
+5. Commit промените:
+   git commit -m "Full sync: Complete 1:1 export from Spark"
+
+6. Push към GitHub:
+   git push -u origin main
+
+   (или: git push -u origin master, ако използвате master branch)
+
+═══════════════════════════════════════════════════════════════════
+
+✅ ВАЛИДАЦИЯ НА ЕКСПОРТА:
+────────────────────────────────────────────────────────────────────
+
+След експорт, проверете дали следните файлове са налични:
+
+□ index.html
+□ package.json
+□ package-lock.json
+□ vite.config.ts
+□ tsconfig.json
+□ tailwind.config.js
+□ PRD.md
+□ README.md
+□ src/App.tsx
+□ src/index.css
+□ src/main.tsx
+□ src/components/ui/ (всички shadcn компоненти)
+□ src/components/screens/ (всички екрани)
+□ src/components/admin/ (админ панели)
+□ src/hooks/ (всички hooks)
+□ src/lib/ (всички библиотеки)
+□ src/types/ (TypeScript типове)
+
+═══════════════════════════════════════════════════════════════════
+
+🧪 ТЕСТВАНЕ НА ЕКСПОРТИРАНИЯ ПРОЕКТ:
+────────────────────────────────────────────────────────────────────
+
+1. Влезте в проектната директория:
+   cd airis-project
+
+2. Инсталирайте dependencies:
+   npm install
+
+3. Стартирайте development сървър:
+   npm run dev
+
+4. Отворете браузър на:
+   http://localhost:5173
+
+5. Ако приложението работи → ✅ УСПЕШЕН ЕКСПОРТ!
+
+═══════════════════════════════════════════════════════════════════
+
+🐛 TROUBLESHOOTING:
+────────────────────────────────────────────────────────────────────
+
+ПРОБЛЕМ: "Cannot find module '@/components/...'"
+РЕШЕНИЕ: Проверете дали src/components/ папката е напълно копирана
+
+ПРОБЛЕМ: "Package not found"
+РЕШЕНИЕ: npm install в проектната директория
+
+ПРОБЛЕМ: TypeScript грешки
+РЕШЕНИЕ: Проверете tsconfig.json и vite.config.ts
+
+ПРОБЛЕМ: Vite не стартира
+РЕШЕНИЕ: 
+   - Изтрийте node_modules/ и package-lock.json
+   - npm install
+   - npm run dev
+
+ПРОБЛЕМ: Липсващи изображения/assets
+РЕШЕНИЕ: Проверете src/assets/ директорията
+
+═══════════════════════════════════════════════════════════════════
+
+📞 ДОПЪЛНИТЕЛНА ИНФОРМАЦИЯ:
+────────────────────────────────────────────────────────────────────
+
+• Общ размер на проекта: ~10-50 MB (без node_modules)
+• Брой React компоненти: 60+
+• Брой shadcn/ui компоненти: 45+
+• Брой екрани: 9
+• Брой admin панели: 7
+• TypeScript файлове: 80+
+
+═══════════════════════════════════════════════════════════════════
+
+💡 ВАЖНИ ЗАБЕЛЕЖКИ:
+────────────────────────────────────────────────────────────────────
+
+1. НЕ експортирайте node_modules/ (прекалено голяма папка)
+2. НЕ експортирайте .git/ (ще се създаде нов Git repo)
+3. НЕ експортирайте dist/ (build artifacts)
+4. НЕ експортирайте .vite/ (cache файлове)
+
+Експортирайте САМО:
+✓ Всички source файлове (src/)
+✓ Конфигурационни файлове (root)
+✓ Документация (.md файлове)
+✓ Assets (src/assets/)
+
+═══════════════════════════════════════════════════════════════════
+
+📧 ПОДДРЪЖКА:
+────────────────────────────────────────────────────────────────────
+
+При проблеми с експорта или синхронизацията:
+
+1. Използвайте Diagnostics екрана в Admin Panel
+2. Проверете Export Log за грешки
+3. Сканирайте проекта за липсващи файлове
+4. Консултирайте се с GitHub Spark документацията
+
+═══════════════════════════════════════════════════════════════════
+
+Генерирано от: AIRIS Admin Panel - Project Export Tab
+Версия: 2.0
+Дата: ${new Date().toLocaleString('bg-BG')}
+
+═══════════════════════════════════════════════════════════════════
+`
+
+    addLog('✅ Инструкциите са генерирани успешно')
+    addLog('💾 Създаване на текстов файл...')
+
     try {
-      const blob = await zip.generateAsync({ 
-        type: 'blob',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 9 }
-      })
-      
+      const blob = new Blob([detailedInstructions], { type: 'text/plain;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const timestamp = new Date().toISOString().split('T')[0]
-      a.download = `AIRIS-FULL-EXPORT-${timestamp}.zip`
+      a.download = `AIRIS-FULL-EXPORT-INSTRUCTIONS-${timestamp}.txt`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
       addLog(`✅ ЕКСПОРТ ЗАВЪРШЕН!`)
-      addLog(`✓ Успешно: ${successCount} файла`)
-      addLog(`✗ Неуспешно: ${failCount} файла`)
-      addLog(`📦 ZIP размер: ${(blob.size / 1024 / 1024).toFixed(2)} MB`)
+      addLog(`📄 Файл: AIRIS-FULL-EXPORT-INSTRUCTIONS-${timestamp}.txt`)
+      addLog(`📊 Размер: ${(blob.size / 1024).toFixed(2)} KB`)
+      addLog(``)
+      addLog(`ℹ️ ВАЖНО: Този файл съдържа детайлни инструкции`)
+      addLog(`ℹ️ как да извлечете ВСИЧКИ файлове от Spark Workbench`)
+      addLog(`ℹ️ и да ги синхронизирате с GitHub repository.`)
+      addLog(``)
+      addLog(`📋 ПРЕПОРЪЧАН МЕТОД:`)
+      addLog(`   1. Отворете GitHub Spark Workbench`)
+      addLog(`   2. Използвайте 'git clone' или 'tar/zip' команди`)
+      addLog(`   3. Следвайте стъпките в изтегления файл`)
 
-      toast.success('Пълният експорт е готов!', {
-        description: `${successCount} файла в ZIP архив (${(blob.size / 1024 / 1024).toFixed(2)} MB)`
+      toast.success('Инструкциите са готови!', {
+        description: 'Следвайте стъпките в изтегления файл за пълен експорт'
       })
     } catch (error) {
-      addLog(`❌ ГРЕШКА при създаване на ZIP: ${error}`)
-      toast.error('Грешка при създаване на архива')
+      addLog(`❌ ГРЕШКА: ${error}`)
+      toast.error('Грешка при създаване на файла')
     }
 
     setIsExporting(false)
-    setExportProgress(0)
   }
 
   const scanProjectFiles = async () => {
     setIsScanning(true)
     setScannedFiles([])
     setExportLog([])
-    addLog('🔍 Започване на сканиране на проекта...')
+    addLog('🔍 Започване на инвентаризация на проекта...')
 
     const files: FileStructure[] = []
-    let totalSize = 0
-
     const allFiles = [...criticalFiles, ...allSourceFiles]
 
+    addLog(`📊 Общо файлове в проекта: ${allFiles.length}`)
+    addLog(`📁 Общо директории: ${directories.length}`)
+    addLog(``)
+
+    let estimatedSize = 0
+
     for (const file of allFiles) {
-      try {
-        const response = await fetch(`/${file}`)
-        if (response.ok) {
-          const blob = await response.blob()
-          const content = await blob.text()
-          files.push({ path: file, type: 'file', size: blob.size, content })
-          totalSize += blob.size
-          addLog(`✓ Намерен: ${file} (${(blob.size / 1024).toFixed(2)} KB)`)
-        }
-      } catch (error) {
-        addLog(`✗ Пропуснат: ${file}`)
-      }
+      const ext = file.split('.').pop()?.toLowerCase()
+      let sizeEstimate = 10 * 1024
+      
+      if (ext === 'tsx' || ext === 'ts') sizeEstimate = 15 * 1024
+      if (ext === 'css') sizeEstimate = 5 * 1024
+      if (ext === 'json') sizeEstimate = 8 * 1024
+      if (ext === 'md') sizeEstimate = 20 * 1024
+      
+      files.push({ path: file, type: 'file', size: sizeEstimate })
+      estimatedSize += sizeEstimate
+      addLog(`✓ ${file}`)
     }
 
+    addLog(``)
     for (const dir of directories) {
       addLog(`📁 Директория: ${dir}`)
       files.push({ path: dir, type: 'directory' })
     }
 
     setScannedFiles(files)
-    addLog(`✅ Сканиране завършено: ${files.filter(f => f.type === 'file').length} файла, ~${(totalSize / 1024 / 1024).toFixed(2)} MB`)
+    addLog(``)
+    addLog(`✅ Инвентаризация завършена`)
+    addLog(`📄 Файлове: ${files.filter(f => f.type === 'file').length}`)
+    addLog(`📁 Директории: ${files.filter(f => f.type === 'directory').length}`)
+    addLog(`📊 Приблизителен размер: ~${(estimatedSize / 1024 / 1024).toFixed(2)} MB`)
+    addLog(``)
+    addLog(`ℹ️ За РЕАЛЕН експорт използвайте GitHub Spark Workbench`)
     setIsScanning(false)
     
-    toast.success(`Сканирани ${files.filter(f => f.type === 'file').length} файла`, {
-      description: `Общ размер: ~${(totalSize / 1024 / 1024).toFixed(2)} MB`
+    toast.success(`Инвентаризирани ${files.filter(f => f.type === 'file').length} файла`, {
+      description: `Приблизителен размер: ~${(estimatedSize / 1024 / 1024).toFixed(2)} MB`
     })
   }
 
@@ -609,16 +801,16 @@ ${exportLog.join('\n')}
       <Tabs defaultValue="export" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="export">
-            <Archive className="w-4 h-4 mr-2" />
-            Пълен Експорт
+            <DownloadSimple className="w-4 h-4 mr-2" />
+            Инструкции
           </TabsTrigger>
           <TabsTrigger value="overview">
             <Package className="w-4 h-4 mr-2" />
-            Инструкции
+            Методи
           </TabsTrigger>
           <TabsTrigger value="scanner">
             <MagnifyingGlass className="w-4 h-4 mr-2" />
-            Сканиране
+            Файлове
           </TabsTrigger>
           <TabsTrigger value="github">
             <GitBranch className="w-4 h-4 mr-2" />
@@ -630,48 +822,45 @@ ${exportLog.join('\n')}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-                <Archive className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-                Автоматичен Пълен Експорт
+                <DownloadSimple className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                Пълен Експорт - Инструкции
               </CardTitle>
               <CardDescription className="text-sm">
-                Създай 1:1 копие на целия проект като ZIP архив - включва ВСИЧКИ файлове
+                Генерирай детайлни инструкции за извличане на ВСИЧКИ файлове от Spark Workbench
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Нов метод:</strong> Този експорт автоматично извлича ВСИЧКИ файлове от проекта 
-                  и ги пакетира в ZIP архив, готов за ръчна синхронизация с GitHub repository.
+                  <strong>Нов метод:</strong> Тази функция генерира детайлни инструкции за извличане 
+                  на ВСИЧКИ файлове от Spark Workbench и синхронизация с GitHub repository. 
+                  Браузърите не позволяват директен достъп до файловата система на Spark.
                 </AlertDescription>
               </Alert>
 
               <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                <h4 className="font-semibold text-sm">Какво включва този експорт:</h4>
+                <h4 className="font-semibold text-sm">Как да получите пълен 1:1 експорт:</h4>
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Всички конфигурационни файлове (package.json, tsconfig.json, vite.config.ts и др.)</span>
+                    <span>Изтеглете детайлните инструкции (бутонът по-долу)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Пълна src/ директория с всички компоненти, hooks, lib файлове и типове</span>
+                    <span>Отворете GitHub Spark Workbench с пълен достъп до файловете</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Всички shadcn/ui компоненти (50+ компонента)</span>
+                    <span>Използвайте git clone (препоръчително) или tar/zip команди в терминала</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Всички екрани и административни панели</span>
+                    <span>Алтернативно: изтеглете целия проект чрез Workbench UI</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Документация и README файлове</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span>Стилове и тематични файлове</span>
+                    <span>Синхронизирайте с вашия GitHub repository чрез git push</span>
                   </li>
                 </ul>
               </div>
@@ -688,18 +877,20 @@ ${exportLog.join('\n')}
                   {isExporting ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      Експортиране... {exportProgress}%
+                      Генериране на инструкции...
                     </>
                   ) : (
                     <>
-                      <Archive className="w-5 h-5 mr-2" />
-                      Създай ZIP архив (Пълен Експорт)
+                      <DownloadSimple className="w-5 h-5 mr-2" />
+                      Изтегли инструкции за пълен експорт
                     </>
                   )}
                 </Button>
 
                 {isExporting && (
-                  <Progress value={exportProgress} className="w-full" />
+                  <div className="text-sm text-muted-foreground text-center">
+                    Подготовка на детайлни инструкции за всички {[...criticalFiles, ...allSourceFiles].length} файла...
+                  </div>
                 )}
               </div>
 
@@ -732,20 +923,19 @@ ${exportLog.join('\n')}
               <Alert variant="default" className="border-green-500/50 bg-green-500/10">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription>
-                  <strong>След експорта:</strong> Разархивирайте ZIP файла и копирайте всички файлове 
-                  в локалното ви Git repository, след което направете commit и push.
+                  <strong>Защо този метод:</strong> Браузърите нямат директен достъп до Spark файловата система. 
+                  Този метод генерира прецизни инструкции как да извлечете всички файлове през Workbench 
+                  и да ги синхронизирате с GitHub.
                 </AlertDescription>
               </Alert>
 
               <div className="p-3 bg-muted/30 rounded-lg space-y-2 text-xs">
-                <p className="font-semibold">Бързи команди след разархивиране:</p>
-                <code className="block p-2 bg-muted rounded">
-                  cd your-repo<br />
-                  # копирайте всички файлове от ZIP<br />
-                  git add .<br />
-                  git commit -m "Full sync from Spark - complete 1:1 export"<br />
-                  git push origin main
-                </code>
+                <p className="font-semibold">ПРЕПОРЪЧАНИ МЕТОДИ (от инструкциите):</p>
+                <div className="space-y-1 ml-2">
+                  <p>🥇 <strong>Метод 1:</strong> git clone [repo-url] (НАЙ-ЛЕСЕН)</p>
+                  <p>🥈 <strong>Метод 2:</strong> tar/zip команди в Spark терминал</p>
+                  <p>🥉 <strong>Метод 3:</strong> Download от Workbench UI</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -756,10 +946,10 @@ ${exportLog.join('\n')}
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
                 <Package className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-                Експорт и Синхронизация
+                Методи за експорт
               </CardTitle>
               <CardDescription className="text-sm">
-                Пълни инструкции за експорт на проекта и ръчна синхронизация с GitHub repository
+                Различни начини за извличане на файловете и синхронизация с GitHub
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -870,10 +1060,10 @@ ${exportLog.join('\n')}
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MagnifyingGlass className="w-5 h-5 text-primary" />
-                Сканиране на проекта
+                Инвентаризация на проекта
               </CardTitle>
               <CardDescription>
-                Автоматично открий всички файлове в проекта
+                Преглед на всички файлове и директории в проекта
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -886,26 +1076,40 @@ ${exportLog.join('\n')}
                 {isScanning ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Сканиране в процес...
+                    Инвентаризация в процес...
                   </>
                 ) : (
                   <>
                     <MagnifyingGlass className="w-5 h-5 mr-2" />
-                    Започни сканиране
+                    Покажи всички файлове
                   </>
                 )}
               </Button>
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Този инструмент показва списък на всички файлове в проекта 
+                  с приблизителни размери. За реален експорт използвайте Workbench.
+                </AlertDescription>
+              </Alert>
 
               {scannedFiles.length > 0 && (
                 <>
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold">Открити файлове:</h4>
+                      <h4 className="text-sm font-semibold">Файлове в проекта:</h4>
                       <Badge>
                         {scannedFiles.filter(f => f.type === 'file').length} файла, {scannedFiles.filter(f => f.type === 'directory').length} директории
                       </Badge>
                     </div>
+                    <Alert className="text-xs">
+                      <Info className="h-3 w-3" />
+                      <AlertDescription>
+                        Приблизителни размери. Реалните размери ще видите при експорт.
+                      </AlertDescription>
+                    </Alert>
                     <ScrollArea className="h-[300px] rounded-md border p-3">
                       <div className="space-y-1">
                         {scannedFiles.map((file, idx) => (
@@ -918,7 +1122,7 @@ ${exportLog.join('\n')}
                             <span className="font-mono flex-1">{file.path}</span>
                             {file.size && (
                               <span className="text-muted-foreground">
-                                {(file.size / 1024).toFixed(2)} KB
+                                ~{(file.size / 1024).toFixed(1)} KB
                               </span>
                             )}
                           </div>
