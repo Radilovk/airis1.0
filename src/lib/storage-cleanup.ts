@@ -1,8 +1,10 @@
+import { getFromStorage, saveToStorage, deleteFromStorage } from './multi-layer-storage'
+
 export async function cleanupOldReportsWithImages() {
   try {
     console.log('🧹 [CLEANUP] Започване на почистване на стари репорти с изображения...')
     
-    const history = await window.spark.kv.get<any[]>('analysis-history')
+    const history = await getFromStorage('analysis-history')
     
     if (!history || !Array.isArray(history)) {
       console.log('ℹ️ [CLEANUP] Няма история за почистване')
@@ -36,7 +38,7 @@ export async function cleanupOldReportsWithImages() {
       }
     })
     
-    await window.spark.kv.set('analysis-history', cleanedHistory)
+    await saveToStorage('analysis-history', cleanedHistory)
     
     console.log(`✅ [CLEANUP] Почистени ${cleanedCount} изображения, ${errorCount} грешки`)
     
@@ -51,13 +53,13 @@ export async function clearOldAnalysisReport() {
   try {
     console.log('🧹 [CLEANUP] Изтриване на стар analysis report от storage...')
     
-    const oldReport = await window.spark.kv.get<any>('analysis-report')
+    const oldReport = await getFromStorage('analysis-report')
     
     if (oldReport) {
       const reportSize = JSON.stringify(oldReport).length
       console.log(`📊 [CLEANUP] Намерен стар репорт с размер: ${Math.round(reportSize / 1024)} KB`)
       
-      await window.spark.kv.delete('analysis-report')
+      await deleteFromStorage('analysis-report')
       
       console.log('✅ [CLEANUP] Стар репорт изтрит успешно')
       return true
@@ -73,7 +75,7 @@ export async function clearOldAnalysisReport() {
 
 export async function estimateStorageSavings() {
   try {
-    const history = await window.spark.kv.get<any[]>('analysis-history')
+    const history = await getFromStorage('analysis-history')
     
     if (!history || !Array.isArray(history)) {
       return { currentSize: 0, potentialSavings: 0, reports: 0 }

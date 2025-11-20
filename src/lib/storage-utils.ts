@@ -1,3 +1,5 @@
+import { getFromStorage, saveToStorage } from './multi-layer-storage'
+
 export async function estimateStorageUsage(): Promise<number> {
   try {
     if ('storage' in navigator && 'estimate' in navigator.storage) {
@@ -55,10 +57,10 @@ export async function clearOldAnalysisHistory(): Promise<void> {
   try {
     console.log('🧹 [STORAGE] Clearing old analysis history to free space...')
     
-    const history = await window.spark.kv.get<any[]>('analysis-history')
+    const history = await getFromStorage('analysis-history')
     if (history && Array.isArray(history)) {
       const recentHistory = history.slice(0, 5)
-      await window.spark.kv.set('analysis-history', recentHistory)
+      await saveToStorage('analysis-history', recentHistory)
       console.log(`✅ [STORAGE] Kept ${recentHistory.length} most recent analyses, removed ${history.length - recentHistory.length}`)
     }
   } catch (error) {

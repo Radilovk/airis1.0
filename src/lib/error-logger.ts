@@ -1,3 +1,5 @@
+import { getFromStorage, saveToStorage } from './multi-layer-storage'
+
 interface ErrorLog {
   timestamp: string
   type: 'error' | 'warning' | 'info'
@@ -64,20 +66,22 @@ class ErrorLogger {
 
   private async persistLogs() {
     try {
-      await window.spark.kv.set('error-logs', this.logs)
+      // Use silent mode to avoid infinite loops if error logging fails
+      await saveToStorage('error-logs', this.logs, true)
     } catch (e) {
-      console.warn('Could not persist error logs:', e)
+      // Silent failure to avoid infinite error loops
     }
   }
 
   async loadLogs() {
     try {
-      const stored = await window.spark.kv.get<ErrorLog[]>('error-logs')
+      // Use silent mode to avoid infinite loops
+      const stored = await getFromStorage('error-logs', true)
       if (stored && Array.isArray(stored)) {
         this.logs = stored
       }
     } catch (e) {
-      console.warn('Could not load error logs:', e)
+      // Silent failure
     }
   }
 
