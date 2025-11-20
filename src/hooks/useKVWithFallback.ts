@@ -190,16 +190,18 @@ export function useKVWithFallback<T>(
                 console.log(`[STORAGE] ✓ Saved ${key} to KV storage`)
               } catch (error) {
                 console.warn(`[STORAGE] KV storage failed for ${key}:`, error)
-                if (error instanceof Error && (
-                  error.message?.includes('Forbidden') || 
-                  error.message?.includes('403') ||
-                  error.message?.includes('permissions')
-                )) {
+                // Disable KV for any error to prevent cascading failures
+                if (error instanceof Error) {
                   kvAvailable.current = false
-                  console.log(`[STORAGE] KV storage disabled for future writes`)
+                  console.log(`[STORAGE] KV storage disabled for future writes due to: ${error.message}`)
                 }
+                // Don't rethrow - this is handled by Promise.allSettled
               }
-            })()
+            })().catch(err => {
+              // Extra safety catch to prevent any unhandled rejections
+              console.warn(`[STORAGE] Unexpected error in KV save for ${key}:`, err)
+              kvAvailable.current = false
+            })
           )
         }
 

@@ -62,22 +62,41 @@ class ErrorLogger {
     this.persistLogs()
   }
 
+  private kvAvailable = true
+
   private async persistLogs() {
+    // Don't try to persist if KV is known to be unavailable
+    if (!this.kvAvailable) {
+      return
+    }
+
     try {
       await window.spark.kv.set('error-logs', this.logs)
     } catch (e) {
-      console.warn('Could not persist error logs:', e)
+      // Silently disable KV persistence to prevent error cascades
+      this.kvAvailable = false
+      // Only log to console, don't create new error logs
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('Could not persist error logs:', e)
+      }
     }
   }
 
   async loadLogs() {
+    if (!this.kvAvailable) {
+      return
+    }
+
     try {
       const stored = await window.spark.kv.get<ErrorLog[]>('error-logs')
       if (stored && Array.isArray(stored)) {
         this.logs = stored
       }
     } catch (e) {
-      console.warn('Could not load error logs:', e)
+      this.kvAvailable = false
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('Could not load error logs:', e)
+      }
     }
   }
 
