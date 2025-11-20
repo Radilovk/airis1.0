@@ -26,7 +26,7 @@ import PlanTabEditable from '@/components/report/tabs/PlanTabEditable'
 import ReportEditorMode from '@/components/report/ReportEditorMode'
 import EditorSidebar from '@/components/report/EditorSidebar'
 import { ErrorBoundary } from 'react-error-boundary'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
 
 interface ReportScreenProps {
@@ -58,8 +58,8 @@ function ErrorFallback({ error }: { error: Error }) {
 export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
   const [activeTab, setActiveTab] = useState('overview')
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
-  const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
-  const [editorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
+  const [editorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [
       { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },

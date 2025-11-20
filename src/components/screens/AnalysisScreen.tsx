@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,7 @@ export default function AnalysisScreen({
   const [loadedConfig, setLoadedConfig] = useState<AIModelConfig | null>(null)
   const [analysisRunning, setAnalysisRunning] = useState(false)
   
-  const [aiConfig] = useKV<AIModelConfig>('ai-model-config', {
+  const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'github-spark',
     model: 'gpt-4o',
     apiKey: '',

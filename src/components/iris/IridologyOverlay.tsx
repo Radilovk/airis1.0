@@ -1,5 +1,5 @@
 import React from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 
 interface IridologyOverlayProps {
   size?: number
@@ -12,7 +12,7 @@ export default function IridologyOverlay({
   side = 'left',
   className = ''
 }: IridologyOverlayProps) {
-  const [customOverlay] = useKV<{ dataUrl: string, type: 'svg' | 'png' } | null>('custom-overlay', null)
+  const [customOverlay] = useKVWithFallback<{ dataUrl: string, type: 'svg' | 'png' } | null>('custom-overlay', null)
   
   if (customOverlay) {
     return (

@@ -1,7 +1,7 @@
 import { ComponentType, useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { cn } from '@/lib/utils'
 import CardEditorToolbar, { CardEditorState } from './CardEditorToolbar'
 import type { EditorModeConfig } from '@/types'
@@ -40,13 +40,13 @@ export function withCardEditor<P extends object>(
     children,
     ...props
   }: WithCardEditorProps & P) {
-    const [editorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+    const [editorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
       enabled: false,
       moduleOrder: [],
       lastModified: new Date().toISOString(),
     })
 
-    const [cardStates, setCardStates] = useKV<Record<string, CardEditorState>>(
+    const [cardStates, setCardStates] = useKVWithFallback<Record<string, CardEditorState>>(
       'card-editor-states',
       {}
     )
@@ -150,13 +150,13 @@ export function EditableCard({
   className,
   children,
 }: WithCardEditorProps) {
-  const [editorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [editorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [],
     lastModified: new Date().toISOString(),
   })
 
-  const [cardStates, setCardStates] = useKV<Record<string, CardEditorState>>(
+  const [cardStates, setCardStates] = useKVWithFallback<Record<string, CardEditorState>>(
     'card-editor-states',
     {}
   )

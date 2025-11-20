@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import type { QuestionnaireData } from '@/types'
 
 interface WelcomeScreenProps {
@@ -15,7 +15,7 @@ interface WelcomeScreenProps {
 }
 
 export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart, onAbout, onDiagnostics }: WelcomeScreenProps) {
-  const [questionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
+  const [questionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
   const features = [
     {
       icon: Eye,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,7 +10,7 @@ import type { AIPromptTemplate } from '@/types'
 import { DEFAULT_AI_PROMPT } from '@/lib/default-prompts'
 
 export default function AIPromptTab() {
-  const [aiPromptTemplate, setAiPromptTemplate] = useKV<AIPromptTemplate>('ai-prompt-template', {
+  const [aiPromptTemplate, setAiPromptTemplate] = useKVWithFallback<AIPromptTemplate>('ai-prompt-template', {
     content: DEFAULT_AI_PROMPT,
     lastModified: new Date().toISOString()
   })

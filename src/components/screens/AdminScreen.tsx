@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,7 +46,7 @@ interface AdminScreenProps {
 }
 
 export default function AdminScreen({ onBack }: AdminScreenProps) {
-  const [aiConfig, setAiConfig] = useKV<AIModelConfig>('ai-model-config', {
+  const [aiConfig, setAiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'github-spark',
     model: 'gpt-4o',
     apiKey: '',
@@ -55,13 +55,13 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     requestCount: 8
   })
   
-  const [textbooks, setTextbooks] = useKV<IridologyTextbook[]>('iridology-textbooks', [])
-  const [customOverlay, setCustomOverlay] = useKV<CustomOverlay | null>('custom-overlay', null)
-  const [iridologyManual, setIridologyManual] = useKV<IridologyManual>('iridology-manual', {
+  const [textbooks, setTextbooks] = useKVWithFallback<IridologyTextbook[]>('iridology-textbooks', [])
+  const [customOverlay, setCustomOverlay] = useKVWithFallback<CustomOverlay | null>('custom-overlay', null)
+  const [iridologyManual, setIridologyManual] = useKVWithFallback<IridologyManual>('iridology-manual', {
     content: DEFAULT_IRIDOLOGY_MANUAL,
     lastModified: new Date().toISOString()
   })
-  const [aiPromptTemplate, setAiPromptTemplate] = useKV<AIPromptTemplate>('ai-prompt-template', {
+  const [aiPromptTemplate, setAiPromptTemplate] = useKVWithFallback<AIPromptTemplate>('ai-prompt-template', {
     content: DEFAULT_AI_PROMPT,
     lastModified: new Date().toISOString()
   })

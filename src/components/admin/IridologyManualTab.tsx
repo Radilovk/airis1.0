@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,7 +10,7 @@ import type { IridologyManual } from '@/types'
 import { DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 
 export default function IridologyManualTab() {
-  const [iridologyManual, setIridologyManual] = useKV<IridologyManual>('iridology-manual', {
+  const [iridologyManual, setIridologyManual] = useKVWithFallback<IridologyManual>('iridology-manual', {
     content: DEFAULT_IRIDOLOGY_MANUAL,
     lastModified: new Date().toISOString()
   })

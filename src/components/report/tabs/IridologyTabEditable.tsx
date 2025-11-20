@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -90,7 +90,7 @@ const DEFAULT_CONTAINERS: ReportContainer[] = [
 ]
 
 export default function IridologyTabEditable({ report }: IridologyTabEditableProps) {
-  const [editorConfig, setEditorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [editorConfig, setEditorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [],
     lastModified: new Date().toISOString()

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -35,7 +35,7 @@ const DEFAULT_STRATEGY: AIModelStrategy = {
 }
 
 export default function AIModelStrategyTab() {
-  const [strategy, setStrategy] = useKV<AIModelStrategy>('ai-model-strategy', DEFAULT_STRATEGY)
+  const [strategy, setStrategy] = useKVWithFallback<AIModelStrategy>('ai-model-strategy', DEFAULT_STRATEGY)
   
   const [manualWeight, setManualWeight] = useState(strategy?.manualWeight ?? 40)
   const [promptWeight, setPromptWeight] = useState(strategy?.promptWeight ?? 30)
