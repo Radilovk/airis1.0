@@ -195,7 +195,7 @@ export function useKVWithFallback<T>(
         // 3. Save to KV storage (best for web deployment, persists across devices)
         if (kvAvailable.current) {
           savePromises.push(
-            setKvValue(resolvedValue)
+            Promise.resolve(setKvValue(resolvedValue))
               .then(() => console.log(`[STORAGE] ✓ Saved ${key} to KV storage`))
               .catch((error) => {
                 console.warn(`[STORAGE] KV storage failed for ${key}:`, error)
