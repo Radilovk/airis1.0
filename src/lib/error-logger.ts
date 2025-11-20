@@ -10,13 +10,6 @@ interface ErrorLog {
 class ErrorLogger {
   private logs: ErrorLog[] = []
   private maxLogs = 100
-  private kvAvailable = true
-
-  private safeConsoleWarn(message: string, error?: any) {
-    if (typeof console !== 'undefined' && console.warn) {
-      console.warn(message, error)
-    }
-  }
 
   log(type: ErrorLog['type'], context: string, message: string, data?: any, error?: Error) {
     const log: ErrorLog = {
@@ -70,34 +63,21 @@ class ErrorLogger {
   }
 
   private async persistLogs() {
-    // Don't try to persist if KV is known to be unavailable
-    if (!this.kvAvailable) {
-      return
-    }
-
     try {
       await window.spark.kv.set('error-logs', this.logs)
     } catch (e) {
-      // Silently disable KV persistence to prevent error cascades
-      this.kvAvailable = false
-      // Only log to console, don't create new error logs
-      this.safeConsoleWarn('Could not persist error logs:', e)
+      console.warn('Could not persist error logs:', e)
     }
   }
 
   async loadLogs() {
-    if (!this.kvAvailable) {
-      return
-    }
-
     try {
       const stored = await window.spark.kv.get<ErrorLog[]>('error-logs')
       if (stored && Array.isArray(stored)) {
         this.logs = stored
       }
     } catch (e) {
-      this.kvAvailable = false
-      this.safeConsoleWarn('Could not load error logs:', e)
+      console.warn('Could not load error logs:', e)
     }
   }
 
