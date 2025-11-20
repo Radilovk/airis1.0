@@ -44,9 +44,10 @@ import { DEFAULT_IRIDOLOGY_MANUAL, DEFAULT_AI_PROMPT } from '@/lib/default-promp
 
 interface AdminScreenProps {
   onBack: () => void
+  isAuthenticated: boolean
 }
 
-export default function AdminScreen({ onBack }: AdminScreenProps) {
+export default function AdminScreen({ onBack, isAuthenticated }: AdminScreenProps) {
   const [aiConfig, setAiConfig] = useKV<AIModelConfig>('ai-model-config', {
     provider: 'github-spark',
     model: 'gpt-4o',
@@ -334,7 +335,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     )
   }
 
-  if (!isOwner) {
+  if (!isOwner && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -344,7 +345,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               Достъп отказан
             </CardTitle>
             <CardDescription>
-              Само собственикът на приложението има достъп до административния панел.
+              Нуждаете се от PIN код или собственически достъп за административния панел.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -13,6 +13,7 @@ import AdminScreen from '@/components/screens/AdminScreen'
 import AboutAirisScreen from '@/components/screens/AboutAirisScreen'
 import DiagnosticScreen from '@/components/screens/DiagnosticScreen'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
+import PinAuthDialog from '@/components/admin/PinAuthDialog'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import { estimateStorageUsage, estimateDataSize } from '@/lib/storage-utils'
@@ -31,6 +32,8 @@ function App() {
   const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null)
   const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
   const screenTransitionLockRef = useRef(false)
+  const [showPinDialog, setShowPinDialog] = useState(false)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
 
   useEffect(() => {
     errorLogger.info('APP_MOUNT', 'Application mounted successfully')
@@ -72,6 +75,11 @@ function App() {
   }
 
   const handleAdminAccess = () => {
+    setShowPinDialog(true)
+  }
+
+  const handlePinAuthSuccess = () => {
+    setIsAdminAuthenticated(true)
     setCurrentScreen('admin')
   }
 
@@ -361,6 +369,7 @@ function App() {
     rightIrisRef.current = null
     setImagesReady(false)
     setAnalysisReport(null)
+    setIsAdminAuthenticated(false)
     setTimeout(() => setCurrentScreen('welcome'), 50)
   }
 
@@ -368,6 +377,11 @@ function App() {
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" />
       <QuickDebugPanel />
+      <PinAuthDialog 
+        open={showPinDialog}
+        onOpenChange={setShowPinDialog}
+        onSuccess={handlePinAuthSuccess}
+      />
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (
           <motion.div
@@ -450,7 +464,13 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <AdminScreen onBack={() => setCurrentScreen('welcome')} />
+            <AdminScreen 
+              onBack={() => {
+                setIsAdminAuthenticated(false)
+                setCurrentScreen('welcome')
+              }} 
+              isAuthenticated={isAdminAuthenticated}
+            />
           </motion.div>
         )}
         {currentScreen === 'about' && (
