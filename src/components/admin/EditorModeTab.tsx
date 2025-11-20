@@ -299,8 +299,8 @@ export default function EditorModeTab() {
                   const resolvedModuleComments = module.comments.filter(c => c.resolved)
                   
                   let unresolvedContainerComments = 0
-                  let totalContainers = module.containers?.length || 0
-                  let visibleContainers = module.containers?.filter(c => c.visible).length || 0
+                  const totalContainers = module.containers?.length || 0
+                  const visibleContainers = module.containers?.filter(c => c.visible).length || 0
                   
                   module.containers?.forEach(container => {
                     unresolvedContainerComments += container.comments.filter(c => !c.resolved).length

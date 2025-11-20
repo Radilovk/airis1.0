@@ -114,6 +114,33 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     }
   }, [aiPromptTemplate])
 
+  const validateApiKey = (provider: string, key: string): { valid: boolean; message?: string } => {
+    if (!key.trim()) {
+      return { valid: false, message: 'API ключът не може да бъде празен' }
+    }
+    
+    switch (provider) {
+      case 'openai':
+        if (!key.startsWith('sk-')) {
+          return { valid: false, message: 'OpenAI API ключът трябва да започва с "sk-"' }
+        }
+        if (key.length < 20) {
+          return { valid: false, message: 'OpenAI API ключът е твърде кратък' }
+        }
+        break
+      case 'gemini':
+        if (!key.startsWith('AIza')) {
+          return { valid: false, message: 'Google Gemini API ключът трябва да започва с "AIza"' }
+        }
+        if (key.length < 30) {
+          return { valid: false, message: 'Google Gemini API ключът е твърде кратък' }
+        }
+        break
+    }
+    
+    return { valid: true }
+  }
+
   const handleSaveConfig = async () => {
     if ((provider === 'gemini' || provider === 'openai') && !apiKey.trim()) {
       toast.error(`❌ Грешка: ${provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} изисква собствен API ключ!`, {
@@ -121,6 +148,20 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         duration: 6000
       })
       return
+    }
+
+    // Validate API key format if custom key is being used
+    if ((provider === 'openai' || provider === 'gemini') && apiKey.trim()) {
+      const validation = validateApiKey(provider, apiKey)
+      if (!validation.valid) {
+        toast.error(`❌ Невалиден API ключ: ${validation.message}`, {
+          description: provider === 'openai' 
+            ? 'OpenAI ключовете започват с "sk-" и са поне 20 символа.'
+            : 'Gemini ключовете започват с "AIza" и са поне 30 символа.',
+          duration: 6000
+        })
+        return
+      }
     }
 
     try {
