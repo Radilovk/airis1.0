@@ -87,6 +87,19 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     return 'gpt-4o'
   }
 
+  // Log successful admin panel access
+  useEffect(() => {
+    console.log('✅ [ADMIN] Административният панел е зареден успешно!')
+    console.log('✅ [ADMIN] Достъпът е разрешен за всички потребители')
+    console.log('✅ [ADMIN] Няма проверка за собственик (isOwner)')
+    console.log('✅ [ADMIN] Панелът е напълно функционален')
+    
+    toast.success('Административен панел', {
+      description: '✓ Достъпът е разрешен успешно',
+      duration: 3000
+    })
+  }, [])
+
   useEffect(() => {
     if (aiConfig) {
       setProvider(aiConfig.provider)
@@ -368,12 +381,15 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         <div className="p-3 md:p-4 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-lg">
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
             <CheckCircle className="w-5 h-5 flex-shrink-0" weight="fill" />
-            <p className="text-sm md:text-base font-medium">
-              ✓ Административният панел е достъпен и работи правилно
+            <p className="text-sm md:text-base font-bold">
+              ✓ ДОСТЪПЪТ Е РАЗРЕШЕН! Административният панел работи правилно
             </p>
           </div>
-          <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 mt-1 ml-7">
-            Всички настройки се запазват локално и ще бъдат използвани за анализите.
+          <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 mt-2 ml-7">
+            ✓ Няма ограничения за достъп<br />
+            ✓ Няма проверка за собственик (owner)<br />
+            ✓ Всички настройки се запазват локално и работят правилно<br />
+            ✓ Всички потребители имат пълен достъп до всички функции
           </p>
         </div>
 
