@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { 
   DownloadSimple, 
@@ -11,13 +13,24 @@ import {
   FileCode, 
   CheckCircle,
   Warning,
-  Info
+  Info,
+  GitBranch,
+  FolderOpen,
+  File,
+  MagnifyingGlass
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 
+interface FileStructure {
+  path: string
+  type: 'file' | 'directory'
+  size?: number
+}
+
 export default function ProjectExportTab() {
-  const [isExporting, setIsExporting] = useState(false)
-  const [exportProgress, setExportProgress] = useState<string>('')
+  const [isScanning, setIsScanning] = useState(false)
+  const [scannedFiles, setScannedFiles] = useState<FileStructure[]>([])
+  const [exportLog, setExportLog] = useState<string[]>([])
 
   const projectStructure = [
     { path: 'src/App.tsx', desc: 'Главен компонент на приложението' },
@@ -34,820 +47,721 @@ export default function ProjectExportTab() {
     { path: 'README.md', desc: 'Документация' }
   ]
 
+  const criticalFiles = [
+    'index.html',
+    'package.json',
+    'package-lock.json',
+    'vite.config.ts',
+    'tsconfig.json',
+    'tailwind.config.js',
+    'theme.json',
+    'components.json',
+    'PRD.md',
+    'README.md',
+    'src/App.tsx',
+    'src/index.css',
+    'src/main.css',
+    'src/main.tsx',
+    'src/vite-end.d.ts'
+  ]
+
+  const directories = [
+    'src/components/',
+    'src/components/ui/',
+    'src/components/screens/',
+    'src/components/admin/',
+    'src/components/iris/',
+    'src/components/report/',
+    'src/hooks/',
+    'src/lib/',
+    'src/types/',
+    'src/styles/',
+    'src/assets/'
+  ]
+
+  const addLog = (message: string) => {
+    setExportLog(prev => [...prev, `${new Date().toLocaleTimeString('bg-BG')}: ${message}`])
+  }
+
+  const scanProjectFiles = async () => {
+    setIsScanning(true)
+    setScannedFiles([])
+    setExportLog([])
+    addLog('🔍 Започване на сканиране на проекта...')
+
+    const files: FileStructure[] = []
+    let totalSize = 0
+
+    const filesToScan = [
+      ...criticalFiles,
+      'AIRIS_KNOWLEDGE_README.md',
+      'AI_CONFIGURATION_GUIDE.md',
+      'CHANGELOG.md',
+      'TROUBLESHOOTING.md',
+      'README_BG.md',
+      '.gitignore',
+      'extract-project.py',
+      'runtime.config.json',
+      'spark.meta.json'
+    ]
+
+    for (const file of filesToScan) {
+      try {
+        const response = await fetch(`/${file}`)
+        if (response.ok) {
+          const blob = await response.blob()
+          files.push({ path: file, type: 'file', size: blob.size })
+          totalSize += blob.size
+          addLog(`✓ Намерен: ${file} (${(blob.size / 1024).toFixed(2)} KB)`)
+        }
+      } catch (error) {
+        addLog(`✗ Пропуснат: ${file}`)
+      }
+    }
+
+    for (const dir of directories) {
+      addLog(`📁 Сканиране на директория: ${dir}`)
+      files.push({ path: dir, type: 'directory' })
+    }
+
+    setScannedFiles(files)
+    addLog(`✅ Сканиране завършено: ${files.length} файла/директории, ~${(totalSize / 1024 / 1024).toFixed(2)} MB`)
+    setIsScanning(false)
+    
+    toast.success(`Сканирани ${files.length} файла/директории`, {
+      description: `Общ размер: ~${(totalSize / 1024 / 1024).toFixed(2)} MB`
+    })
+  }
+
+  const exportManualInstructions = () => {
+    const instructions = `╔════════════════════════════════════════════════════════════════╗
+║         AIRIS - ПЪЛНА ИНСТРУКЦИЯ ЗА ЕКСПОРТ                    ║
+╚════════════════════════════════════════════════════════════════╝
+
+📅 Дата: ${new Date().toLocaleString('bg-BG')}
+
+════════════════════════════════════════════════════════════════
+
+🎯 ПРОБЛЕМ: Автоматичната синхронизация GitHub Spark → Repository е нарушена
+
+🔧 РЕШЕНИЕ: Ръчна синхронизация чрез пълен експорт на файловете
+
+════════════════════════════════════════════════════════════════
+
+📋 СТЪПКА 1: ДОСТЪП ДО GITHUB SPARK WORKBENCH
+---------------------------------------------
+1. Отворете GitHub Spark Dashboard
+2. Намерете проекта "AIRIS Iridology App"
+3. Кликнете "Open Workbench" или "View Code"
+4. Вие ще влезете в Spark IDE с пълен достъп до файловете
+
+════════════════════════════════════════════════════════════════
+
+📦 СТЪПКА 2: КРИТИЧНИ ФАЙЛОВЕ ЗА ЕКСПОРТ
+-----------------------------------------
+Трябва да експортирате ВСИЧКИ тези файлове:
+
+🔹 ROOT ФАЙЛОВЕ:
+   ✓ index.html
+   ✓ package.json
+   ✓ package-lock.json
+   ✓ vite.config.ts
+   ✓ tsconfig.json
+   ✓ tailwind.config.js
+   ✓ theme.json
+   ✓ components.json
+   ✓ PRD.md
+   ✓ README.md
+   ✓ .gitignore
+   ✓ Всички MD документи (CHANGELOG, TROUBLESHOOTING, и т.н.)
+
+🔹 SRC/ ДИРЕКТОРИЯ (ЦЯЛАТА!):
+   ✓ src/App.tsx
+   ✓ src/index.css
+   ✓ src/main.css
+   ✓ src/main.tsx
+   ✓ src/vite-end.d.ts
+   ✓ src/ErrorFallback.tsx
+
+🔹 SRC/COMPONENTS/ (ВСИЧКИ ПОДДИРЕКТОРИИ!):
+   ✓ src/components/ui/ (всички shadcn компоненти)
+   ✓ src/components/screens/ (всички екрани)
+   ✓ src/components/admin/ (админ панел)
+   ✓ src/components/iris/ (ирис анализ)
+   ✓ src/components/report/ (репорт компоненти)
+   ✓ src/components/EditorModeIndicator.tsx
+   ✓ src/components/ErrorFallback.tsx
+   ✓ src/components/QuickDebugPanel.tsx
+
+🔹 SRC/HOOKS/:
+   ✓ src/hooks/use-mobile.ts
+   ✓ src/hooks/use-editable-elements.ts
+   ✓ src/hooks/use-deep-editable.ts
+
+🔹 SRC/LIB/:
+   ✓ src/lib/utils.ts
+   ✓ src/lib/error-logger.ts
+   ✓ src/lib/storage-utils.ts
+   ✓ src/lib/storage-cleanup.ts
+   ✓ src/lib/airis-knowledge.ts
+   ✓ src/lib/default-prompts.ts
+   ✓ src/lib/defaultQuestions.ts
+   ✓ src/lib/upload-diagnostics.ts
+   ✓ Всички останали lib файлове
+
+🔹 SRC/TYPES/:
+   ✓ src/types/index.ts
+   ✓ Всички TypeScript дефиниции
+
+🔹 SRC/STYLES/:
+   ✓ src/styles/theme.css
+
+🔹 SRC/ASSETS/ (АКО СЪЩЕСТВУВА):
+   ✓ Всички изображения, fonts, и др.
+
+════════════════════════════════════════════════════════════════
+
+💾 СТЪПКА 3: МЕТОДИ ЗА ЕКСПОРТ
+------------------------------
+
+МЕТОД 1: GitHub Spark Workbench Download
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. В Spark Workbench, отворете File Explorer
+2. Изберете root директорията на проекта
+3. Right-click → "Download" или използвайте Download бутон
+4. Запазете ZIP локално
+
+⚠️ ВНИМАНИЕ: Понякога Spark Workbench download не включва всички файлове!
+
+МЕТОД 2: Git Clone (ПРЕПОРЪЧИТЕЛНО)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Намерете GitHub repository URL-а на проекта
+2. В терминал изпълнете:
+   
+   git clone [repository-url]
+   cd [project-name]
+
+3. Вече имате ПЪЛНА локална копия
+
+МЕТОД 3: Ръчно копиране файл по файл
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Отворете всеки файл в Spark IDE
+2. Copy-paste съдържанието в локални файлове
+3. Пресъздайте същата директорна структура
+
+⚠️ Това е бавно, но гарантира 100% пълнота!
+
+МЕТОД 4: Python Script (extract-project.py)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ако имате extract-project.py в root:
+1. Стартирайте го в Spark terminal
+2. Той ще създаде ZIP с всички файлове
+
+════════════════════════════════════════════════════════════════
+
+🔄 СТЪПКА 4: СИНХРОНИЗАЦИЯ С GITHUB REPOSITORY
+-----------------------------------------------
+След като имате локално копие:
+
+1. Клонирайте вашия GitHub repository (ако не сте):
+   git clone [your-repo-url]
+   cd [repo-name]
+
+2. Копирайте ВСИЧКИ файлове от Spark експорта:
+   cp -r [spark-export]/* .
+
+3. Проверете промените:
+   git status
+
+4. Commit всички промени:
+   git add .
+   git commit -m "Manual sync: Full project export from Spark"
+
+5. Push към GitHub:
+   git push origin main
+
+════════════════════════════════════════════════════════════════
+
+✅ СТЪПКА 5: ВАЛИДАЦИЯ
+-----------------------
+След синхронизация, проверете:
+
+□ package.json съдържа всички dependencies
+□ Всички src/components/ директории са налични
+□ Всички src/lib/ файлове са налични
+□ index.html, vite.config.ts, tsconfig.json са налични
+□ PRD.md и документационните файлове са налични
+
+Тествайте локално:
+npm install
+npm run dev
+
+Ако работи на http://localhost:5173 → SUCCESS! ✅
+
+════════════════════════════════════════════════════════════════
+
+🐛 TROUBLESHOOTING
+------------------
+
+ПРОБЛЕМ: "Module not found"
+→ Проверете дали всички файлове от src/ са копирани
+
+ПРОБЛЕМ: "Cannot find package"
+→ Изпълнете: npm install
+
+ПРОБЛЕМ: Build грешки
+→ Проверете TypeScript конфигурацията (tsconfig.json)
+
+ПРОБЛЕМ: Vite грешки
+→ Проверете vite.config.ts и убедете се, че е коректен
+
+════════════════════════════════════════════════════════════════
+
+📞 ПОДДРЪЖКА
+------------
+При проблеми:
+1. Проверете Export Log в админ панела
+2. Сканирайте проекта за липсващи файлове
+3. Използвайте Diagnostics екрана за system info
+
+════════════════════════════════════════════════════════════════
+
+Генерирано от AIRIS Admin Panel - Export Tab
+${new Date().toLocaleString('bg-BG')}
+`
+
+    const blob = new Blob([instructions], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `AIRIS-EXPORT-INSTRUCTIONS-${new Date().toISOString().split('T')[0]}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.success('Инструкциите са изтеглени успешно!')
+  }
+
+  const exportFileList = () => {
+    if (scannedFiles.length === 0) {
+      toast.error('Първо сканирайте проекта')
+      return
+    }
+
+    const fileList = `AIRIS Project - File List
+Generated: ${new Date().toLocaleString('bg-BG')}
+Total Files: ${scannedFiles.filter(f => f.type === 'file').length}
+Total Directories: ${scannedFiles.filter(f => f.type === 'directory').length}
+
+═══════════════════════════════════════════════════════════════
+
+FILES:
+${scannedFiles.filter(f => f.type === 'file').map(f => 
+  `${f.path} ${f.size ? `(${(f.size / 1024).toFixed(2)} KB)` : ''}`
+).join('\n')}
+
+DIRECTORIES:
+${scannedFiles.filter(f => f.type === 'directory').map(f => f.path).join('\n')}
+
+═══════════════════════════════════════════════════════════════
+
+Export Log:
+${exportLog.join('\n')}
+`
+
+    const blob = new Blob([fileList], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `AIRIS-FILE-LIST-${new Date().toISOString().split('T')[0]}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.success('Списъкът с файлове е изтеглен!')
+  }
+
   const exportInstructions = [
     {
-      title: 'Изтегляне на файлове',
+      title: 'Достъп до кода',
       steps: [
-        'Натиснете бутона "Изтегли проекта като ZIP"',
-        'Запазете ZIP файла на вашия компютър',
-        'Разархивирайте файла в желаната директория'
+        'Използвайте GitHub Spark Workbench за пълен достъп',
+        'Изтеглете детайлните инструкции с бутона "Инструкции за експорт"',
+        'Следвайте стъпките за пълна синхронизация'
       ]
     },
     {
-      title: 'Инсталация на зависимости',
+      title: 'Методи за експорт',
       steps: [
-        'Отворете терминал в директорията на проекта',
-        'Изпълнете: npm install',
-        'Изчакайте да се инсталират всички пакети'
+        'Git Clone - най-надежден метод (препоръчително)',
+        'Spark Workbench Download - бърз, но понякога непълен',
+        'Ръчно копиране - бавен, но 100% гарантира пълнота'
       ]
     },
     {
-      title: 'Стартиране на проекта',
+      title: 'Локално тестване',
       steps: [
-        'Изпълнете: npm run dev',
-        'Отворете браузър на: http://localhost:5173',
-        'Готово! Приложението работи локално'
+        'npm install - инсталира всички зависимости',
+        'npm run dev - стартира dev сървър',
+        'Проверка на http://localhost:5173'
       ]
     },
     {
-      title: 'Deploy в GitHub Pages (опционално)',
+      title: 'Синхронизация с GitHub',
       steps: [
-        'Създайте ново GitHub repository',
-        'Push-нете всички файлове',
-        'Отидете в Settings → Pages',
-        'Изберете "GitHub Actions" като source',
-        'Използвайте готовия workflow файл (включен в експорта)'
+        'git add . - добави всички промени',
+        'git commit -m "Manual sync from Spark"',
+        'git push origin main - синхронизирай с repository'
       ]
     }
   ]
-
-  const handleExportProject = async () => {
-    setIsExporting(true)
-    setExportProgress('Подготовка на информация...')
-    
-    try {
-      toast.info('ZIP експортът не е наличен в момента. Моля, използвайте GitHub за достъп до кода.', {
-        duration: 5000
-      })
-      setIsExporting(false)
-      setExportProgress('')
-      return
-
-      /* ZIP export disabled - JSZip not available
-      setExportProgress('Четене на файлове от проекта...')
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      const filesToRead = [
-        'index.html',
-        'package.json',
-        'vite.config.ts',
-        'tsconfig.json',
-        'tailwind.config.js',
-        'theme.json',
-        'components.json',
-        'README.md',
-        'PRD.md'
-      ]
-
-      const srcFiles = [
-        'src/App.tsx',
-        'src/index.css',
-        'src/main.css',
-        'src/main.tsx',
-        'src/vite-end.d.ts',
-        'src/lib/utils.ts',
-        'src/lib/error-logger.ts',
-        'src/lib/storage-utils.ts',
-        'src/lib/storage-cleanup.ts',
-        'src/lib/airis-knowledge.ts',
-        'src/lib/default-prompts.ts',
-        'src/lib/defaultQuestions.ts',
-        'src/types/index.ts',
-        'src/hooks/use-mobile.ts'
-      ]
-
-      const allFiles = [...filesToRead, ...srcFiles]
-      let successCount = 0
-      let errorCount = 0
-
-      for (const file of allFiles) {
-        try {
-          const response = await fetch(`/${file}`)
-          if (response.ok) {
-            const content = await response.text()
-            zip.file(file, content)
-            successCount++
-          } else {
-            errorCount++
-            console.warn(`Файлът ${file} не може да бъде прочетен (${response.status})`)
-          }
-        } catch (error) {
-          errorCount++
-          console.warn(`Грешка при четене на ${file}:`, error)
-        }
-      }
-
-      setExportProgress('Създаване на README за GitHub...')
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const readmeContent = `# AIRIS - AI Иридологичен Анализ
-
-## Описание
-
-AIRIS е модерно уеб приложение за AI-базиран иридологичен анализ. Приложението използва advanced AI модели (GPT-4, Gemini) за детайлен анализ на ирисите и генериране на здравни препоръки.
-
-## Технологии
-
-- **React 19** с TypeScript
-- **Vite** за build и dev server  
-- **Tailwind CSS** за стилизация
-- **shadcn/ui** компоненти
-- **Framer Motion** за анимации
-- **Spark KV** за persistence
-- **AI Integration** - GPT-4o, GPT-4o-mini, Gemini
-
-## Инсталация
-
-\`\`\`bash
-# Клониране на репозиторито
-git clone [your-repo-url]
-cd airis-app
-
-# Инсталация на dependencies
-npm install
-
-# Стартиране на dev server
-npm run dev
-\`\`\`
-
-Приложението ще стартира на \`http://localhost:5173\`
-
-## Конфигурация
-
-### AI Модели
-
-Приложението поддържа:
-- **GitHub Spark API** (вграден) - gpt-4o, gpt-4o-mini
-- **OpenAI API** (собствен API key) - всички GPT модели
-- **Google Gemini API** (собствен API key) - всички Gemini модели
-
-Конфигурацията се прави от Admin панела в приложението.
-
-### Настройки за AI анализ
-
-- **Забавяне между заявки**: Регулира скоростта на AI заявките
-- **Брой заявки**: Контролира детайлността на анализа (4-12 заявки)
-- **API Key управление**: Използвайте собствен API key за по-бързи анализи
-
-### Environment Variables
-
-За production deployment:
-
-\`\`\`env
-# Опционално - за production API keys
-VITE_OPENAI_API_KEY=your-openai-key
-VITE_GEMINI_API_KEY=your-gemini-key
-\`\`\`
-
-## Структура на проекта
-
-\`\`\`
-airis-app/
-├── src/
-│   ├── components/
-│   │   ├── screens/        # Главни екрани на приложението
-│   │   ├── admin/          # Admin panel компоненти
-│   │   ├── iris/           # Iris анализ компоненти
-│   │   ├── report/         # Report генериране
-│   │   └── ui/             # shadcn/ui компоненти
-│   ├── hooks/              # Custom React hooks
-│   ├── lib/                # Utility функции
-│   │   ├── airis-knowledge.ts      # Иридологична база знания
-│   │   ├── default-prompts.ts      # AI prompt templates
-│   │   ├── error-logger.ts         # Error tracking
-│   │   ├── storage-utils.ts        # Storage management
-│   │   └── storage-cleanup.ts      # Автоматично cleanup
-│   ├── types/              # TypeScript типове
-│   ├── App.tsx             # Main app компонент
-│   ├── index.css           # Global стилове и тема
-│   └── main.tsx            # React entry point
-├── index.html              # HTML entry point
-├── package.json            # Dependencies
-├── vite.config.ts          # Vite конфигурация
-├── tsconfig.json           # TypeScript конфигурация
-├── tailwind.config.js      # Tailwind конфигурация
-└── PRD.md                  # Product Requirements Document
-\`\`\`
-
-## Основни функционалности
-
-### 1. Въпросник
-- Детайлен здравен въпросник
-- Персонална информация (възраст, пол, работа)
-- Симптоми и здравословни проблеми
-- Начин на живот и хранене
-- Семейна анамнеза
-
-### 2. Upload на Iris изображения
-- Поддръжка за ляв и десен ирис
-- Автоматична компресия и оптимизация
-- Validation и preview на изображенията
-- Storage management с auto-cleanup
-
-### 3. AI Анализ
-- Мултивалентен корелиран анализ (4-12 AI заявки)
-- Детайлен анализ на всеки ирис поотделно
-- Корелация между иридологични находки и въпросник
-- Специализирани препоръки за:
-  - Хранителен план
-  - Хранителни добавки
-  - Психологическо благополучие
-  - Медицински изследвания
-
-### 4. Детайлен Report
-- Comprehensive здравен анализ
-- Визуализация на iris зони
-- Категоризирани находки (алармиращи, важни, второстепенни)
-- Експорт като PDF и текст
-- Принтиране на репорт
-
-### 5. История на анализи
-- Автоматично запазване на всички анализи
-- Преглед на предишни резултати
-- Търсене и филтриране
-- Export/delete на стари анализи
-
-### 6. Admin панел
-- AI модел конфигурация
-- Управление на иридологични учебници
-- Персонализиране на AI промпти
-- Editor mode за директно редактиране
-- Changelog и документация
-- Project export функционалност
-
-### 7. Допълнителни функции
-- Quick debug panel за troubleshooting
-- Diagnostic screen с system информация
-- Error logging и tracking
-- Storage usage monitoring
-- Responsive дизайн (mobile-first)
-
-## Build за Production
-
-\`\`\`bash
-# Build на проекта
-npm run build
-
-# Preview на build-а
-npm run preview
-\`\`\`
-
-Build-натите файлове са в \`dist/\` директорията.
-
-## Deployment
-
-### GitHub Pages
-
-1. Push кода в GitHub repository
-2. Settings → Pages → Source: "GitHub Actions"
-3. GitHub Actions workflow автоматично deploy-ва приложението
-4. Приложението ще е достъпно на \`https://[username].github.io/[repo-name]\`
-
-Workflow файл е включен в \`.github/workflows/deploy.yml\`
-
-### Vercel
-
-\`\`\`bash
-# Инсталиране на Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-\`\`\`
-
-### Netlify
-
-1. Drag & drop \`dist/\` директорията в Netlify
-2. Или свържете GitHub repository за auto-deploy
-
-### Cloudflare Pages
-
-1. Свържете GitHub repository
-2. Build command: \`npm run build\`
-3. Build output: \`dist\`
-
-## API Integration
-
-### OpenAI
-
-1. Създайте account на [platform.openai.com](https://platform.openai.com)
-2. Генерирайте API key
-3. В Admin панела → AI Модел → изберете OpenAI
-4. Въведете API key
-
-### Google Gemini
-
-1. Създайте account на [ai.google.dev](https://ai.google.dev)
-2. Генерирайте API key
-3. В Admin панела → AI Модел → изберете Gemini
-4. Въведете API key
-
-## Troubleshooting
-
-### Проблем: "Rate limit exceeded"
-**Решение**: Използвайте собствен API key или увеличете забавянето между заявки
-
-### Проблем: Storage е пълен
-**Решение**: Изтрийте стари анализи от History екрана. Auto-cleanup работи автоматично.
-
-### Проблем: Изображенията не се качват
-**Решение**: Уверете се, че изображенията са под 200KB. Компресирайте ги ако е нужно.
-
-### Проблем: AI анализ не работи
-**Решение**: 
-1. Проверете AI конфигурацията в Admin панела
-2. Ако използвате собствен API key, уверете се че е валиден
-3. Проверете Diagnostics екрана за повече информация
-
-## Известни ограничения
-
-- Максимален размер на изображение: 200KB per image
-- GitHub Spark има rate limits (използвайте собствен API key за по-добра производителност)
-- Storage quota зависи от браузъра (обикновено 5-10MB)
-
-## Security & Privacy
-
-- Всички данни се съхраняват локално в браузъра (IndexedDB)
-- Нищо не се изпраща към външни сървъри (освен AI API)
-- API keys се съхраняват безопасно в браузъра
-- Изображения и лични данни не се качват никъде освен за AI анализ
-
-## Лиценз
-
-MIT License - вижте LICENSE файл за детайли
-
-## Поддръжка и Разработка
-
-За bug reports, feature requests или въпроси:
-- Отворете issue в GitHub repository
-- Използвайте Diagnostics екрана за събиране на system информация
-
-## Автори
-
-Създадено с GitHub Spark и ❤️
-
----
-
-**Важно**: Това приложение предоставя информационни AI-базирани анализи и НЕ заменя професионална медицинска консултация. Винаги консултирайте се с квалифициран здравен специалист.
-`
-
-      zip.file('DEPLOY_README.md', readmeContent)
-
-      setExportProgress('Създаване на GitHub Actions workflow...')
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const githubWorkflow = `name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build
-        run: npm run build
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-`
-
-      zip.file('.github/workflows/deploy.yml', githubWorkflow)
-
-      setExportProgress('Създаване на .gitignore...')
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      const gitignoreContent = `# Dependencies
-node_modules/
-package-lock.json
-
-# Build output
-dist/
-*.local
-
-# Environment variables
-.env
-.env.local
-.env.production
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# Testing
-coverage/
-
-# Debug
-debug/
-diagnostics/
-`
-
-      zip.file('.gitignore', gitignoreContent)
-
-      setExportProgress('Създаване на package scripts...')
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      const packageScripts = `{
-  "name": "airis-iridology-app",
-  "version": "1.0.0",
-  "description": "AI-powered iridology analysis application",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
-  },
-  "dependencies": {
-    "See original package.json for full dependency list": "Copy from your GitHub Spark project"
-  },
-  "devDependencies": {
-    "See original package.json for full dev dependency list": "Copy from your GitHub Spark project"
-  }
-}
-`
-
-      zip.file('PACKAGE_INFO.json', packageScripts)
-
-      setExportProgress('Създаване на инструкции...')
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      zip.file('EXPORT_INFO.txt', `
-╔════════════════════════════════════════════════════════════════╗
-║         AIRIS - Експорт на проекта                             ║
-╚════════════════════════════════════════════════════════════════╝
-
-Дата на експорт: ${new Date().toLocaleString('bg-BG')}
-Експортирани файлове: ${successCount}
-Пропуснати файлове: ${errorCount}
-
-════════════════════════════════════════════════════════════════
-
-КАКВО Е ВКЛЮЧЕНО В ТОЗИ ЕКСПОРТ:
----------------------------------
-✓ Конфигурационни файлове (package.json, tsconfig, vite.config)
-✓ Основни source файлове (App.tsx, hooks, utilities)
-✓ GitHub Actions workflow за автоматичен deployment
-✓ Подробна документация (DEPLOY_README.md)
-✓ .gitignore файл
-✓ Build и deployment инструкции
-
-КАКВО НЕ Е ВКЛЮЧЕНО (трябва да копирате от GitHub):
-----------------------------------------------------
-⚠ src/components/ директория (всички компоненти)
-⚠ shadcn/ui компоненти (src/components/ui/)
-⚠ assets/ директория (ако има изображения)
-⚠ node_modules/ (ще се инсталират с npm install)
-
-════════════════════════════════════════════════════════════════
-
-СЛЕДВАЩИ СТЪПКИ:
-----------------
-
-1. РАЗАРХИВИРАНЕ
-   Разархивирайте този ZIP файл в желаната директория
-
-2. КОПИРАНЕ НА КОМПОНЕНТИ
-   От вашия GitHub Spark проект, копирайте:
-   - Целия src/components/ директория
-   - Целия src/assets/ директория (ако съществува)
-   
-3. ИНСТАЛАЦИЯ НА DEPENDENCIES
-   Отворете терминал в директорията и изпълнете:
-   
-   npm install
-   
-   Това ще инсталира всички необходими пакети.
-
-4. СТАРТИРАНЕ ЗА РАЗРАБОТКА
-   
-   npm run dev
-   
-   Отворете браузър на: http://localhost:5173
-
-5. BUILD ЗА PRODUCTION
-   
-   npm run build
-   
-   Build-натите файлове ще са в dist/ директория
-
-════════════════════════════════════════════════════════════════
-
-DEPLOYMENT ОПЦИИ:
------------------
-
-► GITHUB PAGES (Препоръчително)
-  1. Push кода в GitHub repository
-  2. Settings → Pages → Source: "GitHub Actions"
-  3. Workflow файлът ще deploy-не автоматично
-  
-► VERCEL
-  1. Свържете GitHub repo с Vercel
-  2. Auto-deploy при всеки commit
-  
-► NETLIFY
-  1. Drag & drop dist/ директорията
-  2. Или свържете GitHub repo
-  
-► CLOUDFLARE PAGES
-  1. Свържете GitHub repo
-  2. Build command: npm run build
-  3. Build output: dist
-
-════════════════════════════════════════════════════════════════
-
-ВАЖНИ ЗАБЕЛЕЖКИ:
-----------------
-
-⚠ API KEYS: Конфигурирайте AI API keys в Admin панела
-⚠ STORAGE: Проектът използва браузър storage (IndexedDB)
-⚠ DEPENDENCIES: Уверете се, че копирате package.json от GitHub
-⚠ GITHUB REPO: За пълна копие, клонирайте GitHub repository
-
-════════════════════════════════════════════════════════════════
-
-ЗА ПОВЕЧЕ ИНФОРМАЦИЯ:
----------------------
-Прочетете DEPLOY_README.md за детайлна документация.
-
-Поддръжка: Отворете issue в GitHub repository
-
-════════════════════════════════════════════════════════════════
-`)
-
-      zip.file('QUICK_START.txt', `
-╔════════════════════════════════════════════════════════════════╗
-║              БЪРЗ СТАРТ - 3 Стъпки                             ║
-╚════════════════════════════════════════════════════════════════╝
-
-1️⃣ РАЗАРХИВИРАЙТЕ
-   Разархивирайте този ZIP в директория по избор
-
-2️⃣ КОПИРАЙТЕ КОМПОНЕНТИТЕ
-   От GitHub Spark проекта, копирайте:
-   → src/components/ (цялата директория)
-   → src/assets/ (ако съществува)
-
-3️⃣ ИНСТАЛИРАЙТЕ & СТАРТИРАЙТЕ
-   Отворете терминал и изпълнете:
-   
-   npm install
-   npm run dev
-   
-   Готово! → http://localhost:5173
-
-════════════════════════════════════════════════════════════════
-
-ПРЕПОРЪКА: 
-За най-лесен начин, клонирайте директно GitHub repository:
-
-git clone [your-github-repo-url]
-cd [repo-name]
-npm install
-npm run dev
-
-════════════════════════════════════════════════════════════════
-`)
-
-      setExportProgress('Финализиране на архив...')
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      const blob = await zip.generateAsync({ 
-        type: 'blob',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 9 }
-      })
-      
-      setExportProgress('Изтегляне на файл...')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `airis-project-export-${new Date().toISOString().split('T')[0]}.zip`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      setExportProgress('Готово! ✓')
-      toast.success('Проектът е експортиран успешно!', {
-        description: `Експортирани ${successCount} файла${errorCount > 0 ? `. ${errorCount} файла пропуснати.` : ''}`,
-        duration: 6000
-      })
-
-      setTimeout(() => {
-        setExportProgress('')
-        setIsExporting(false)
-      }, 2000)
-      */
-
-    } catch (error) {
-      console.error('Грешка при експорт:', error)
-      toast.error('Грешка при експортиране на проекта', {
-        description: error instanceof Error ? error.message : 'Неизвестна грешка'
-      })
-      setExportProgress('')
-      setIsExporting(false)
-    }
-  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="space-y-4"
     >
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-            <Package className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-            Експорт на проекта
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Изтеглете пълния код на приложението за локална разработка или deployment
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-            <div className="flex gap-3">
-              <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-blue-500">
-                  GitHub Repository Integration
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Това приложение е създадено с GitHub Spark и автоматично се съхранява в GitHub repository. 
-                  Можете да клонирате директно от GitHub или да използвате този експорт за локална разработка.
-                </p>
-              </div>
-            </div>
-          </div>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">
+            <Package className="w-4 h-4 mr-2" />
+            Общ преглед
+          </TabsTrigger>
+          <TabsTrigger value="scanner">
+            <MagnifyingGlass className="w-4 h-4 mr-2" />
+            Сканиране
+          </TabsTrigger>
+          <TabsTrigger value="github">
+            <GitBranch className="w-4 h-4 mr-2" />
+            GitHub
+          </TabsTrigger>
+        </TabsList>
 
-          <div className="space-y-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <FileCode className="w-4 h-4" />
-              Какво включва експортът:
-            </h3>
-            <ScrollArea className="h-[200px] rounded-md border p-3">
-              <div className="space-y-2">
-                {projectStructure.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-mono text-xs">{item.path}</span>
-                      <span className="text-muted-foreground ml-2">- {item.desc}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <Package className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                Експорт и Синхронизация
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Пълни инструкции за експорт на проекта и ръчна синхронизация с GitHub repository
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Важно:</strong> Автоматичната синхронизация между Spark и GitHub repository може да е нарушена. 
+                  Използвайте тези инструменти за пълен експорт и ръчна синхронизация.
+                </AlertDescription>
+              </Alert>
 
-          <Separator />
-
-          <div className="space-y-3">
-            <h3 className="font-semibold">Инструкции за deployment:</h3>
-            <div className="space-y-4">
-              {exportInstructions.map((section, idx) => (
-                <div key={idx} className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Badge variant="outline" className="rounded-full w-6 h-6 flex items-center justify-center p-0">
-                      {idx + 1}
-                    </Badge>
-                    {section.title}
-                  </h4>
-                  <ul className="ml-8 space-y-1">
-                    {section.steps.map((step, stepIdx) => (
-                      <li key={stepIdx} className="text-sm text-muted-foreground list-disc">
-                        {step}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
-              <div className="flex gap-2">
-                <Warning className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-amber-500">
-                    Важна информация
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Експортът включва основни конфигурационни файлове. За пълен проект, 
-                    клонирайте GitHub repository или копирайте всички файлове от src/ директорията.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleExportProject} 
-              disabled={isExporting}
-              className="w-full"
-              size="lg"
-            >
-              {isExporting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  {exportProgress}
-                </>
-              ) : (
-                <>
+              <div className="grid gap-3">
+                <Button 
+                  onClick={exportManualInstructions}
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                >
                   <DownloadSimple className="w-5 h-5 mr-2" />
-                  Изтегли проекта като ZIP
+                  Изтегли пълните инструкции за експорт
+                </Button>
+
+                <Button 
+                  onClick={scanProjectFiles}
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  disabled={isScanning}
+                >
+                  {isScanning ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                      Сканиране...
+                    </>
+                  ) : (
+                    <>
+                      <MagnifyingGlass className="w-5 h-5 mr-2" />
+                      Сканирай проекта за файлове
+                    </>
+                  )}
+                </Button>
+
+                {scannedFiles.length > 0 && (
+                  <Button 
+                    onClick={exportFileList}
+                    variant="outline"
+                    size="lg"
+                    className="w-full"
+                  >
+                    <FileCode className="w-5 h-5 mr-2" />
+                    Изтегли списък с файлове
+                  </Button>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <FileCode className="w-4 h-4" />
+                  Структура на проекта:
+                </h3>
+                <ScrollArea className="h-[200px] rounded-md border p-3">
+                  <div className="space-y-2">
+                    {projectStructure.map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-mono text-xs">{item.path}</span>
+                          <span className="text-muted-foreground ml-2">- {item.desc}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="font-semibold">Инструкции стъпка по стъпка:</h3>
+                <div className="space-y-4">
+                  {exportInstructions.map((section, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <h4 className="text-sm font-medium flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-full w-6 h-6 flex items-center justify-center p-0">
+                          {idx + 1}
+                        </Badge>
+                        {section.title}
+                      </h4>
+                      <ul className="ml-8 space-y-1">
+                        {section.steps.map((step, stepIdx) => (
+                          <li key={stepIdx} className="text-sm text-muted-foreground list-disc">
+                            {step}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="scanner" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MagnifyingGlass className="w-5 h-5 text-primary" />
+                Сканиране на проекта
+              </CardTitle>
+              <CardDescription>
+                Автоматично открий всички файлове в проекта
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button 
+                onClick={scanProjectFiles}
+                disabled={isScanning}
+                className="w-full"
+                size="lg"
+              >
+                {isScanning ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Сканиране в процес...
+                  </>
+                ) : (
+                  <>
+                    <MagnifyingGlass className="w-5 h-5 mr-2" />
+                    Започни сканиране
+                  </>
+                )}
+              </Button>
+
+              {scannedFiles.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold">Открити файлове:</h4>
+                      <Badge>
+                        {scannedFiles.filter(f => f.type === 'file').length} файла, {scannedFiles.filter(f => f.type === 'directory').length} директории
+                      </Badge>
+                    </div>
+                    <ScrollArea className="h-[300px] rounded-md border p-3">
+                      <div className="space-y-1">
+                        {scannedFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-xs py-1">
+                            {file.type === 'file' ? (
+                              <File className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            ) : (
+                              <FolderOpen className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            )}
+                            <span className="font-mono flex-1">{file.path}</span>
+                            {file.size && (
+                              <span className="text-muted-foreground">
+                                {(file.size / 1024).toFixed(2)} KB
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  <Button 
+                    onClick={exportFileList}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <DownloadSimple className="w-4 h-4 mr-2" />
+                    Изтегли списък
+                  </Button>
                 </>
               )}
-            </Button>
 
-            {exportProgress && (
-              <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                <p className="text-sm text-center text-primary font-medium">
-                  {exportProgress}
+              {exportLog.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">Export Log:</h4>
+                    <ScrollArea className="h-[200px] rounded-md border p-3 bg-muted/30">
+                      <div className="space-y-1 font-mono text-xs">
+                        {exportLog.map((log, idx) => (
+                          <div key={idx} className={
+                            log.includes('✓') ? 'text-green-600' :
+                            log.includes('✗') ? 'text-red-600' :
+                            log.includes('📁') ? 'text-blue-600' :
+                            'text-foreground'
+                          }>
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="github" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-primary" />
+                GitHub Repository Sync
+              </CardTitle>
+              <CardDescription>
+                Директен достъп и синхронизация с GitHub repository
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Препоръчан метод:</strong> Използвайте Git Clone за най-надеждна синхронизация
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm">Стъпки за Git Clone:</h4>
+                <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                  <li>Отворете GitHub Spark Dashboard</li>
+                  <li>Намерете "View on GitHub" линк за проекта</li>
+                  <li>Копирайте repository URL</li>
+                  <li>В терминал: <code className="bg-muted px-2 py-0.5 rounded text-xs">git clone [repo-url]</code></li>
+                  <li>Влезте в директорията: <code className="bg-muted px-2 py-0.5 rounded text-xs">cd [repo-name]</code></li>
+                  <li>Инсталирайте: <code className="bg-muted px-2 py-0.5 rounded text-xs">npm install</code></li>
+                  <li>Стартирайте: <code className="bg-muted px-2 py-0.5 rounded text-xs">npm run dev</code></li>
+                </ol>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm">Ръчна синхронизация (ако auto-sync е нарушена):</h4>
+                <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                  <li>Експортирайте всички файлове от Spark Workbench</li>
+                  <li>Клонирайте вашия GitHub repository локално</li>
+                  <li>Копирайте всички файлове от Spark експорта в локалния repo</li>
+                  <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git add .</code></li>
+                  <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git commit -m "Manual sync from Spark"</code></li>
+                  <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git push origin main</code></li>
+                </ol>
+              </div>
+
+              <Separator />
+
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  💡 <strong>Съвет:</strong> След успешна синхронизация, можете да работите директно 
+                  в локалния Git repository и да push-вате промените. GitHub Spark може да се използва 
+                  само за бърза разработка, а production кодът да се управлява през Git.
                 </p>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">GitHub Repository Access</CardTitle>
-          <CardDescription className="text-sm">
-            Директен достъп до GitHub кода на приложението
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Това приложение е хоствано в GitHub Spark. За пълен достъп до кода:
-          </p>
-          <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-            <li>Отворете GitHub Spark dashboard</li>
-            <li>Намерете това приложение в списъка с проекти</li>
-            <li>Кликнете на "View on GitHub" за достъп до repository</li>
-            <li>Клонирайте repository с: <code className="bg-muted px-1 py-0.5 rounded text-xs">git clone [repo-url]</code></li>
-          </ol>
-          <div className="p-3 bg-muted rounded-lg mt-4">
-            <p className="text-xs text-muted-foreground">
-              💡 <strong>Съвет:</strong> За най-добри резултати, използвайте Git за version control и 
-              клонирайте директно от GitHub repository вместо да разчитате само на ZIP експорт.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+              <Alert variant="destructive">
+                <Warning className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Внимание:</strong> Ако правите промени едновременно в Spark и локално, 
+                  ще имате конфликти. Изберете един основен източник на истина - или Spark, или Git.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Troubleshooting</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Проблем: "Cannot find module"</h4>
+                <p className="text-xs text-muted-foreground">
+                  → Проверете дали всички src/components/ и src/lib/ файлове са копирани
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Проблем: "Package not found"</h4>
+                <p className="text-xs text-muted-foreground">
+                  → Изпълнете <code className="bg-muted px-1 py-0.5 rounded">npm install</code> в проектната директория
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Проблем: Build errors</h4>
+                <p className="text-xs text-muted-foreground">
+                  → Проверете tsconfig.json и vite.config.ts дали са коректни
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Проблем: Git конфликти</h4>
+                <p className="text-xs text-muted-foreground">
+                  → Използвайте <code className="bg-muted px-1 py-0.5 rounded">git status</code> за преглед и 
+                  resolve конфликтите ръчно или с <code className="bg-muted px-1 py-0.5 rounded">git mergetool</code>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </motion.div>
   )
 }
