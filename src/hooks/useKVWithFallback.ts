@@ -191,11 +191,9 @@ export function useKVWithFallback<T>(
               } catch (error) {
                 console.warn(`[STORAGE] KV storage failed for ${key}:`, error)
                 // Disable KV for any error to prevent cascading failures
+                kvAvailable.current = false
                 if (error instanceof Error) {
-                  kvAvailable.current = false
                   console.log(`[STORAGE] KV storage disabled for future writes due to: ${error.message}`)
-                } else {
-                  kvAvailable.current = false
                 }
                 // Don't rethrow - this is handled by Promise.allSettled
               }

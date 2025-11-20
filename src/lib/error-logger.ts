@@ -10,6 +10,13 @@ interface ErrorLog {
 class ErrorLogger {
   private logs: ErrorLog[] = []
   private maxLogs = 100
+  private kvAvailable = true
+
+  private safeConsoleWarn(message: string, error?: any) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn(message, error)
+    }
+  }
 
   log(type: ErrorLog['type'], context: string, message: string, data?: any, error?: Error) {
     const log: ErrorLog = {
@@ -62,8 +69,6 @@ class ErrorLogger {
     this.persistLogs()
   }
 
-  private kvAvailable = true
-
   private async persistLogs() {
     // Don't try to persist if KV is known to be unavailable
     if (!this.kvAvailable) {
@@ -76,9 +81,7 @@ class ErrorLogger {
       // Silently disable KV persistence to prevent error cascades
       this.kvAvailable = false
       // Only log to console, don't create new error logs
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('Could not persist error logs:', e)
-      }
+      this.safeConsoleWarn('Could not persist error logs:', e)
     }
   }
 
@@ -94,9 +97,7 @@ class ErrorLogger {
       }
     } catch (e) {
       this.kvAvailable = false
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('Could not load error logs:', e)
-      }
+      this.safeConsoleWarn('Could not load error logs:', e)
     }
   }
 
