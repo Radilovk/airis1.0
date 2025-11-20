@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,7 @@ interface QuestionnaireScreenProps {
 }
 
 export default function QuestionnaireScreen({ onComplete, initialData }: QuestionnaireScreenProps) {
-  const [questionnaireConfig] = useKV<QuestionnaireConfig>('questionnaire-config', {
+  const [questionnaireConfig] = useKVWithFallback<QuestionnaireConfig>('questionnaire-config', {
     questions: defaultQuestions,
     version: '1.0'
   })

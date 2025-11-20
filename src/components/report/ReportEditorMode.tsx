@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { 
   DndContext, 
   closestCenter,
@@ -241,7 +241,7 @@ interface ReportEditorModeProps {
 }
 
 export default function ReportEditorMode({ children }: ReportEditorModeProps) {
-  const [editorConfig, setEditorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [editorConfig, setEditorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [
       { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },

@@ -1,4 +1,4 @@
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Download, FileText, CheckCircle } from '@phosphor-icons/react'
@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import type { EditorModeConfig } from '@/types'
 
 export default function EditorCommentsExport() {
-  const [editorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [editorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [],
     lastModified: new Date().toISOString()

@@ -1,4 +1,4 @@
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { DeepEditableState, DeepEditableComment } from '@/components/report/DeepEditableWrapper'
 import { toast } from 'sonner'
 
@@ -9,7 +9,7 @@ export interface DeepEditableStore {
 }
 
 export function useDeepEditable(moduleId: string, editorMode: boolean = false) {
-  const [store, setStore] = useKV<DeepEditableStore>('deep-editable-store', {})
+  const [store, setStore] = useKVWithFallback<DeepEditableStore>('deep-editable-store', {})
 
   const moduleStore = (store || {})[moduleId] || {}
 

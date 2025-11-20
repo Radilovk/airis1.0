@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -422,7 +422,7 @@ function QuestionEditor({ question, onSave, onCancel }: QuestionEditorProps) {
 }
 
 export default function QuestionnaireManager() {
-  const [questionnaireConfig, setQuestionnaireConfig] = useKV<QuestionnaireConfig>('questionnaire-config', {
+  const [questionnaireConfig, setQuestionnaireConfig] = useKVWithFallback<QuestionnaireConfig>('questionnaire-config', {
     questions: defaultQuestions,
     version: '1.0'
   })

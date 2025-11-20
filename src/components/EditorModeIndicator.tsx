@@ -1,11 +1,11 @@
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Badge } from '@/components/ui/badge'
 import { PencilSimple } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { EditorModeConfig } from '@/types'
 
 export default function EditorModeIndicator() {
-  const [editorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [editorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [],
     lastModified: new Date().toISOString()

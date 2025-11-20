@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,7 @@ interface EditorSidebarProps {
 }
 
 export default function EditorSidebar({ moduleId, moduleName }: EditorSidebarProps) {
-  const [elementsConfig, setElementsConfig] = useKV<EditableElementsConfig>(
+  const [elementsConfig, setElementsConfig] = useKVWithFallback<EditableElementsConfig>(
     'editable-elements-config',
     {}
   )

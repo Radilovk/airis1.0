@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
@@ -36,12 +36,12 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
-  const [questionnaireData, setQuestionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
+  const [questionnaireData, setQuestionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
   const leftIrisRef = useRef<IrisImage | null>(null)
   const rightIrisRef = useRef<IrisImage | null>(null)
   const [imagesReady, setImagesReady] = useState(false)
   const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null)
-  const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
+  const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
   const screenTransitionLockRef = useRef(false)
 
   useEffect(() => {

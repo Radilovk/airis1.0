@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 import EditorCommentsExport from './EditorCommentsExport'
 
 export default function EditorModeTab() {
-  const [editorConfig, setEditorConfig] = useKV<EditorModeConfig>('editor-mode-config', {
+  const [editorConfig, setEditorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
     enabled: false,
     moduleOrder: [
       { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },

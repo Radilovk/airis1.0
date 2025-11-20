@@ -1,4 +1,4 @@
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +20,7 @@ interface HistoryScreenProps {
 }
 
 export default function HistoryScreen({ onViewReport, onBack }: HistoryScreenProps) {
-  const [history, setHistory] = useKV<AnalysisReport[]>('analysis-history', [])
+  const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
 
   const handleDelete = (timestamp: string) => {
     setHistory((current) => (current || []).filter(r => r.timestamp !== timestamp))

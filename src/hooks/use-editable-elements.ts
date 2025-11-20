@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { toast } from 'sonner'
 import type { EditableElementComment } from '@/components/report/EditableElement'
 
@@ -18,7 +18,7 @@ export interface EditableElementsConfig {
 }
 
 export function useEditableElements(moduleId: string, enabled: boolean = false) {
-  const [elementsConfig, setElementsConfig] = useKV<EditableElementsConfig>(
+  const [elementsConfig, setElementsConfig] = useKVWithFallback<EditableElementsConfig>(
     'editable-elements-config',
     {}
   )
