@@ -1,3 +1,5 @@
+import { getFromStorage, saveToStorage } from './multi-layer-storage'
+
 interface ErrorLog {
   timestamp: string
   type: 'error' | 'warning' | 'info'
@@ -5,112 +7,6 @@ interface ErrorLog {
   message: string
   stack?: string
   data?: any
-}
-
-// Storage helper functions with fallback support
-const DB_NAME = 'airis_storage'
-const DB_VERSION = 1
-const STORE_NAME = 'settings'
-
-async function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-    
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-    
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    }
-  })
-}
-
-async function getFromStorage(key: string): Promise<any> {
-  // Priority 1: Try KV storage
-  try {
-    const kvValue = await window.spark.kv.get<any>(key)
-    if (kvValue !== null && kvValue !== undefined) {
-      return kvValue
-    }
-  } catch (error) {
-    // Silent failure for error logger to avoid infinite loops
-  }
-  
-  // Priority 2: Try IndexedDB
-  try {
-    const db = await openDB()
-    const value = await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly')
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.get(key)
-      
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-    if (value !== undefined && value !== null) {
-      return value
-    }
-  } catch (error) {
-    // Silent failure
-  }
-  
-  // Priority 3: Try localStorage
-  try {
-    const localValue = localStorage.getItem(`airis_${key}`)
-    if (localValue && localValue !== 'null' && localValue !== 'undefined') {
-      return JSON.parse(localValue)
-    }
-  } catch (error) {
-    // Silent failure
-  }
-  
-  return null
-}
-
-async function saveToStorage(key: string, value: any): Promise<void> {
-  const savePromises: Promise<void>[] = []
-  
-  // Save to localStorage (fastest, always available)
-  savePromises.push(
-    Promise.resolve().then(() => {
-      localStorage.setItem(`airis_${key}`, JSON.stringify(value))
-    }).catch(() => {})
-  )
-  
-  // Save to IndexedDB
-  savePromises.push(
-    (async () => {
-      try {
-        const db = await openDB()
-        await new Promise<void>((resolve, reject) => {
-          const transaction = db.transaction([STORE_NAME], 'readwrite')
-          const store = transaction.objectStore(STORE_NAME)
-          const request = store.put(value, key)
-          
-          request.onsuccess = () => resolve()
-          request.onerror = () => reject(request.error)
-        })
-      } catch (error) {
-        // Silent failure
-      }
-    })()
-  )
-  
-  // Save to KV storage
-  savePromises.push(
-    (async () => {
-      try {
-        await window.spark.kv.set(key, value)
-      } catch (error) {
-        // Silent failure
-      }
-    })()
-  )
-  
-  await Promise.allSettled(savePromises)
 }
 
 class ErrorLogger {
@@ -170,7 +66,8 @@ class ErrorLogger {
 
   private async persistLogs() {
     try {
-      await saveToStorage('error-logs', this.logs)
+      // Use silent mode to avoid infinite loops if error logging fails
+      await saveToStorage('error-logs', this.logs, true)
     } catch (e) {
       // Silent failure to avoid infinite error loops
     }
@@ -178,7 +75,8 @@ class ErrorLogger {
 
   async loadLogs() {
     try {
-      const stored = await getFromStorage('error-logs')
+      // Use silent mode to avoid infinite loops
+      const stored = await getFromStorage('error-logs', true)
       if (stored && Array.isArray(stored)) {
         this.logs = stored
       }
