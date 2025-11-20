@@ -132,17 +132,15 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               <ClockClockwise size={20} weight="duotone" />
               История
             </Button>
-            {isOwner && (
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={onAdmin}
-                className="px-8 py-6 text-lg font-semibold gap-2"
-              >
-                <Gear size={20} weight="duotone" />
-                Настройки
-              </Button>
-            )}
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={onAdmin}
+              className="px-8 py-6 text-lg font-semibold gap-2"
+            >
+              <Gear size={20} weight="duotone" />
+              Настройки
+            </Button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button
