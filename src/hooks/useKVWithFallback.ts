@@ -1,92 +1,114 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 
 /**
  * A wrapper around useKV that provides localStorage fallback when KV storage is unavailable.
  * This ensures the app remains functional even when KV storage permissions are not configured.
+ * 
+ * Priority: localStorage is the primary storage, KV is used as backup when available.
  */
 export function useKVWithFallback<T>(
   key: string,
   defaultValue: T
 ): [T | null, (value: T | ((current: T | null) => T)) => Promise<void>] {
   const [kvValue, setKvValue] = useKV<T>(key, defaultValue)
-  const [localValue, setLocalValue] = useState<T | null>(() => {
-    // Try to load from localStorage as fallback
+  
+  // Initialize from localStorage first (primary storage)
+  const [value, setValue_] = useState<T | null>(() => {
     try {
       const stored = localStorage.getItem(`airis_${key}`)
-      if (stored) {
-        return JSON.parse(stored)
+      if (stored && stored !== 'null' && stored !== 'undefined') {
+        const parsed = JSON.parse(stored)
+        console.log(`[KV_FALLBACK] Loaded ${key} from localStorage:`, parsed)
+        return parsed
       }
     } catch (error) {
       console.warn(`[KV_FALLBACK] Failed to load ${key} from localStorage:`, error)
     }
+    
+    // Try to get from KV if localStorage is empty
+    if (kvValue !== null && kvValue !== undefined) {
+      console.log(`[KV_FALLBACK] Using KV value for ${key}:`, kvValue)
+      return kvValue
+    }
+    
+    console.log(`[KV_FALLBACK] Using default value for ${key}:`, defaultValue)
     return defaultValue
   })
   
-  const [useLocalStorage, setUseLocalStorage] = useState(false)
-  const [hasKVError, setHasKVError] = useState(false)
+  const isInitialized = useRef(false)
+  const [useLocalStorageOnly, setUseLocalStorageOnly] = useState(false)
 
-  // Try to detect KV storage failures
+  // Sync KV to localStorage on mount and when KV changes
   useEffect(() => {
-    const checkKVHealth = async () => {
+    if (!isInitialized.current && kvValue !== null && kvValue !== undefined) {
       try {
-        // If kvValue is null and we haven't set a localStorage flag, KV might be failing
-        if (kvValue === null && defaultValue !== null && !hasKVError) {
-          console.warn(`[KV_FALLBACK] KV storage may be unavailable for key: ${key}`)
-          setHasKVError(true)
-          setUseLocalStorage(true)
-        } else if (kvValue !== null) {
-          // KV is working, sync to localStorage as backup
-          try {
-            localStorage.setItem(`airis_${key}`, JSON.stringify(kvValue))
-          } catch (e) {
-            console.warn(`[KV_FALLBACK] Failed to backup to localStorage:`, e)
-          }
+        const stored = localStorage.getItem(`airis_${key}`)
+        
+        // If localStorage is empty but KV has data, use KV data
+        if (!stored || stored === 'null' || stored === 'undefined') {
+          console.log(`[KV_FALLBACK] Syncing KV to localStorage for ${key}`)
+          localStorage.setItem(`airis_${key}`, JSON.stringify(kvValue))
+          setValue_(kvValue)
         }
-      } catch (error) {
-        console.error(`[KV_FALLBACK] Error checking KV health:`, error)
-        setHasKVError(true)
-        setUseLocalStorage(true)
+      } catch (e) {
+        console.warn(`[KV_FALLBACK] Failed to sync KV to localStorage for ${key}:`, e)
       }
+      
+      isInitialized.current = true
     }
-
-    checkKVHealth()
-  }, [kvValue, defaultValue, key, hasKVError])
+  }, [kvValue, key])
 
   const setValue = useCallback(
-    async (value: T | ((current: T | null) => T)) => {
-      const newValue = typeof value === 'function' 
-        ? (value as (current: T | null) => T)(useLocalStorage ? localValue : kvValue)
-        : value
-
-      // Always try to save to localStorage first as fallback
+    async (newValue: T | ((current: T | null) => T)) => {
       try {
-        localStorage.setItem(`airis_${key}`, JSON.stringify(newValue))
-        setLocalValue(newValue)
-      } catch (error) {
-        console.error(`[KV_FALLBACK] Failed to save to localStorage:`, error)
-      }
+        // Get current value
+        const currentValue = value
+        
+        // Compute new value if it's a function
+        const resolvedValue = typeof newValue === 'function' 
+          ? (newValue as (current: T | null) => T)(currentValue)
+          : newValue
 
-      // Try to save to KV storage if available
-      if (!useLocalStorage) {
+        console.log(`[KV_FALLBACK] Saving ${key}:`, resolvedValue)
+
+        // ALWAYS save to localStorage first (primary storage)
         try {
-          await setKvValue(newValue)
+          localStorage.setItem(`airis_${key}`, JSON.stringify(resolvedValue))
+          setValue_(resolvedValue)
+          console.log(`[KV_FALLBACK] ✓ Saved ${key} to localStorage`)
         } catch (error) {
-          console.warn(`[KV_FALLBACK] KV storage failed for ${key}, using localStorage:`, error)
-          
-          // Check if it's a permission error
-          if (error instanceof Error && (error.message?.includes('Forbidden') || error.message?.includes('403'))) {
-            setHasKVError(true)
-            setUseLocalStorage(true)
+          console.error(`[KV_FALLBACK] ✗ Failed to save ${key} to localStorage:`, error)
+          throw error // Don't continue if localStorage fails
+        }
+
+        // Try to save to KV storage as backup (non-critical)
+        if (!useLocalStorageOnly) {
+          try {
+            await setKvValue(resolvedValue)
+            console.log(`[KV_FALLBACK] ✓ Backed up ${key} to KV storage`)
+          } catch (error) {
+            console.warn(`[KV_FALLBACK] ⚠ KV storage failed for ${key} (non-critical):`, error)
+            
+            // Check if it's a permission error - switch to localStorage-only mode
+            if (error instanceof Error && (
+              error.message?.includes('Forbidden') || 
+              error.message?.includes('403') ||
+              error.message?.includes('permissions')
+            )) {
+              console.log(`[KV_FALLBACK] Switching to localStorage-only mode for ${key}`)
+              setUseLocalStorageOnly(true)
+            }
+            // Don't throw - localStorage save succeeded, that's what matters
           }
         }
+      } catch (error) {
+        console.error(`[KV_FALLBACK] Critical error saving ${key}:`, error)
+        throw error
       }
     },
-    [key, kvValue, localValue, useLocalStorage, setKvValue]
+    [key, value, useLocalStorageOnly, setKvValue]
   )
 
-  // Return the appropriate value based on storage availability
-  const currentValue = useLocalStorage ? localValue : kvValue
-
-  return [currentValue, setValue]
+  return [value, setValue]
 }
