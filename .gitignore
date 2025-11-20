@@ -10,3 +10,4 @@ dist-ssr
 **/agent-eval-report*
 .spark-workbench-id
 node_modules
+node_modules

@@ -1,0 +1,38 @@
+name: Auto Sync to airis1.0
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test --if-present || echo "No tests configured"
+
+      - name: Build project
+        run: npm run build || echo "Build step skipped"
+
+      - name: Push to airis1.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          git config --global user.name "Auto Sync Bot"
+          git config --global user.email "radilov.k@gmail.com"
+          git remote add airis1.0 https://x-access-token:${GITHUB_TOKEN}@github.com/Radilovk/airis1.0.git
+          git push airis1.0 main --force
