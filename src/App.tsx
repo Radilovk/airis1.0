@@ -84,7 +84,13 @@ function App() {
   }
 
   const handleAdminAccess = () => {
+    console.log('🔓 [APP] Admin access requested - granting access to settings panel')
+    console.log('🔓 [APP] No ownership checks - all users can access settings')
     setCurrentScreen('settings')
+    toast.success('Отваряне на настройките...', {
+      description: 'Достъпът е разрешен за всички потребители',
+      duration: 2000
+    })
   }
 
   const handleAboutAccess = () => {
