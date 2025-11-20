@@ -71,11 +71,11 @@ export function useKVWithFallback<T>(
       if (!useLocalStorage) {
         try {
           await setKvValue(newValue)
-        } catch (error: any) {
+        } catch (error) {
           console.warn(`[KV_FALLBACK] KV storage failed for ${key}, using localStorage:`, error)
           
           // Check if it's a permission error
-          if (error?.message?.includes('Forbidden') || error?.message?.includes('403')) {
+          if (error instanceof Error && (error.message?.includes('Forbidden') || error.message?.includes('403'))) {
             setHasKVError(true)
             setUseLocalStorage(true)
           }
