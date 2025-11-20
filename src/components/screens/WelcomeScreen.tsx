@@ -2,7 +2,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import type { QuestionnaireData } from '@/types'
 
@@ -16,22 +15,7 @@ interface WelcomeScreenProps {
 }
 
 export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart, onAbout, onDiagnostics }: WelcomeScreenProps) {
-  const [isOwner, setIsOwner] = useState(false)
   const [questionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
-
-  useEffect(() => {
-    checkOwnership()
-  }, [])
-
-  const checkOwnership = async () => {
-    try {
-      const user = await window.spark.user()
-      setIsOwner(user?.isOwner || false)
-    } catch (error) {
-      console.error('Error checking ownership:', error)
-      setIsOwner(false)
-    }
-  }
   const features = [
     {
       icon: Eye,
@@ -132,17 +116,15 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               <ClockClockwise size={20} weight="duotone" />
               История
             </Button>
-            {isOwner && (
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={onAdmin}
-                className="px-8 py-6 text-lg font-semibold gap-2"
-              >
-                <Gear size={20} weight="duotone" />
-                Настройки
-              </Button>
-            )}
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={onAdmin}
+              className="px-8 py-6 text-lg font-semibold gap-2"
+            >
+              <Gear size={20} weight="duotone" />
+              Настройки
+            </Button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button
@@ -154,17 +136,15 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               <Info size={20} weight="duotone" />
               За airis – как работи системата
             </Button>
-            {isOwner && (
-              <Button
-                size="lg"
-                variant="ghost"
-                onClick={onDiagnostics}
-                className="px-6 py-4 text-base font-medium gap-2 border border-amber-500/20 hover:bg-amber-500/5 text-amber-600"
-              >
-                <Bug size={20} weight="duotone" />
-                Диагностика
-              </Button>
-            )}
+            <Button
+              size="lg"
+              variant="ghost"
+              onClick={onDiagnostics}
+              className="px-6 py-4 text-base font-medium gap-2 border border-amber-500/20 hover:bg-amber-500/5 text-amber-600"
+            >
+              <Bug size={20} weight="duotone" />
+              Диагностика
+            </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-4">
             Процесът отнема около 5-10 минути

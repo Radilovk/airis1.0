@@ -21,7 +21,6 @@ import {
   Upload, 
   Trash, 
   CheckCircle,
-  Warning,
   Image as ImageIcon,
   Eye,
   FileText,
@@ -67,9 +66,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     lastModified: new Date().toISOString()
   })
   
-  const [isOwner, setIsOwner] = useState(false)
-  const [loading, setLoading] = useState(true)
-  
   const [provider, setProvider] = useState<'openai' | 'gemini' | 'github-spark'>(aiConfig?.provider || 'github-spark')
   const [model, setModel] = useState(aiConfig?.model || 'gpt-4o')
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
@@ -90,10 +86,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     }
     return 'gpt-4o'
   }
-
-  useEffect(() => {
-    checkOwnership()
-  }, [])
 
   useEffect(() => {
     if (aiConfig) {
@@ -122,16 +114,31 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     }
   }, [aiPromptTemplate])
 
-  const checkOwnership = async () => {
-    try {
-      const user = await window.spark.user()
-      setIsOwner(user?.isOwner || false)
-    } catch (error) {
-      console.error('Error checking ownership:', error)
-      setIsOwner(false)
-    } finally {
-      setLoading(false)
+  const validateApiKey = (provider: string, key: string): { valid: boolean; message?: string } => {
+    if (!key.trim()) {
+      return { valid: false, message: 'API ключът не може да бъде празен' }
     }
+    
+    switch (provider) {
+      case 'openai':
+        if (!key.startsWith('sk-')) {
+          return { valid: false, message: 'OpenAI API ключът трябва да започва с "sk-"' }
+        }
+        if (key.length < 20) {
+          return { valid: false, message: 'OpenAI API ключът е твърде кратък' }
+        }
+        break
+      case 'gemini':
+        if (!key.startsWith('AIza')) {
+          return { valid: false, message: 'Google Gemini API ключът трябва да започва с "AIza"' }
+        }
+        if (key.length < 30) {
+          return { valid: false, message: 'Google Gemini API ключът е твърде кратък' }
+        }
+        break
+    }
+    
+    return { valid: true }
   }
 
   const handleSaveConfig = async () => {
@@ -141,6 +148,20 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         duration: 6000
       })
       return
+    }
+
+    // Validate API key format if custom key is being used
+    if ((provider === 'openai' || provider === 'gemini') && apiKey.trim()) {
+      const validation = validateApiKey(provider, apiKey)
+      if (!validation.valid) {
+        toast.error(`❌ Невалиден API ключ: ${validation.message}`, {
+          description: provider === 'openai' 
+            ? 'OpenAI ключовете започват с "sk-" и са поне 20 символа.'
+            : 'Gemini ключовете започват с "AIza" и са поне 30 символа.',
+          duration: 6000
+        })
+        return
+      }
     }
 
     try {
@@ -321,41 +342,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       lastModified: new Date().toISOString()
     })
     toast.success('Промптът е възстановен до оригиналната версия')
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Зареждане...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isOwner) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Warning className="w-6 h-6 text-destructive" />
-              Достъп отказан
-            </CardTitle>
-            <CardDescription>
-              Само собственикът на приложението има достъп до административния панел.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={onBack} className="w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Назад към началото
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']

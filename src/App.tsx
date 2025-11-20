@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster } from '@/components/ui/sonner'
@@ -6,17 +6,29 @@ import { toast } from 'sonner'
 import WelcomeScreen from '@/components/screens/WelcomeScreen'
 import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
-import AnalysisScreen from '@/components/screens/AnalysisScreen'
-import ReportScreen from '@/components/screens/ReportScreen'
-import HistoryScreen from '@/components/screens/HistoryScreen'
-import AdminScreen from '@/components/screens/AdminScreen'
-import AboutAirisScreen from '@/components/screens/AboutAirisScreen'
-import DiagnosticScreen from '@/components/screens/DiagnosticScreen'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import { estimateStorageUsage, estimateDataSize } from '@/lib/storage-utils'
 import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
+
+// Lazy load heavy components
+const AnalysisScreen = lazy(() => import('@/components/screens/AnalysisScreen'))
+const ReportScreen = lazy(() => import('@/components/screens/ReportScreen'))
+const HistoryScreen = lazy(() => import('@/components/screens/HistoryScreen'))
+const AdminScreen = lazy(() => import('@/components/screens/AdminScreen'))
+const AboutAirisScreen = lazy(() => import('@/components/screens/AboutAirisScreen'))
+const DiagnosticScreen = lazy(() => import('@/components/screens/DiagnosticScreen'))
+
+// Loading component for lazy loaded screens
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+      <p className="text-muted-foreground">Зареждане...</p>
+    </div>
+  </div>
+)
 
 type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'admin' | 'about' | 'diagnostics'
 
@@ -412,12 +424,14 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <AnalysisScreen
-              questionnaireData={questionnaireData!}
-              leftIris={leftIrisRef.current}
-              rightIris={rightIrisRef.current}
-              onComplete={handleAnalysisComplete}
-            />
+            <Suspense fallback={<LoadingScreen />}>
+              <AnalysisScreen
+                questionnaireData={questionnaireData!}
+                leftIris={leftIrisRef.current}
+                rightIris={rightIrisRef.current}
+                onComplete={handleAnalysisComplete}
+              />
+            </Suspense>
           </motion.div>
         )}
         {currentScreen === 'report' && analysisReport && (
@@ -428,7 +442,9 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <ReportScreen report={analysisReport} onRestart={handleRestart} />
+            <Suspense fallback={<LoadingScreen />}>
+              <ReportScreen report={analysisReport} onRestart={handleRestart} />
+            </Suspense>
           </motion.div>
         )}
         {currentScreen === 'history' && (
@@ -439,7 +455,9 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <HistoryScreen onViewReport={handleViewReport} onBack={() => setCurrentScreen('welcome')} />
+            <Suspense fallback={<LoadingScreen />}>
+              <HistoryScreen onViewReport={handleViewReport} onBack={() => setCurrentScreen('welcome')} />
+            </Suspense>
           </motion.div>
         )}
         {currentScreen === 'admin' && (
@@ -450,7 +468,9 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <AdminScreen onBack={() => setCurrentScreen('welcome')} />
+            <Suspense fallback={<LoadingScreen />}>
+              <AdminScreen onBack={() => setCurrentScreen('welcome')} />
+            </Suspense>
           </motion.div>
         )}
         {currentScreen === 'about' && (
@@ -461,7 +481,9 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <AboutAirisScreen onBack={() => setCurrentScreen('welcome')} />
+            <Suspense fallback={<LoadingScreen />}>
+              <AboutAirisScreen onBack={() => setCurrentScreen('welcome')} />
+            </Suspense>
           </motion.div>
         )}
         {currentScreen === 'diagnostics' && (
@@ -472,7 +494,9 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <DiagnosticScreen onBack={() => setCurrentScreen('welcome')} />
+            <Suspense fallback={<LoadingScreen />}>
+              <DiagnosticScreen onBack={() => setCurrentScreen('welcome')} />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>
