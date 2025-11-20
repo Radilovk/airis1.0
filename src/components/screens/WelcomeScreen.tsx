@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useKV } from '@github/spark/hooks'
 import type { QuestionnaireData } from '@/types'
+import AdminPasswordDialog from '@/components/admin/AdminPasswordDialog'
 
 interface WelcomeScreenProps {
   onStart: () => void
@@ -16,6 +18,7 @@ interface WelcomeScreenProps {
 
 export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart, onAbout, onDiagnostics }: WelcomeScreenProps) {
   const [questionnaireData] = useKV<QuestionnaireData | null>('questionnaire-data', null)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const features = [
     {
       icon: Eye,
@@ -38,6 +41,14 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
       description: 'Индивидуални препоръки за хранене и хранителни добавки'
     }
   ]
+
+  const handleAdminClick = () => {
+    setShowPasswordDialog(true)
+  }
+
+  const handlePasswordSuccess = () => {
+    onAdmin()
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
@@ -119,14 +130,14 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
             <Button
               size="lg"
               variant="secondary"
-              onClick={onAdmin}
+              onClick={handleAdminClick}
               className="px-8 py-6 text-lg font-semibold gap-2 bg-amber-500/10 border-2 border-amber-500/30 hover:bg-amber-500/20"
             >
               <Gear size={20} weight="duotone" />
               Админ Панел
             </Button>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">{' '}
             <Button
               size="lg"
               variant="ghost"
@@ -150,6 +161,12 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
             Процесът отнема около 5-10 минути
           </p>
         </motion.div>
+
+        <AdminPasswordDialog
+          open={showPasswordDialog}
+          onOpenChange={setShowPasswordDialog}
+          onSuccess={handlePasswordSuccess}
+        />
       </div>
     </div>
   )
