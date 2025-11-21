@@ -321,6 +321,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       
       console.log('✅ [CROP] Canvas context създаден')
       
+      // Fill with black background
       cropCtx.fillStyle = '#000000'
       cropCtx.fillRect(0, 0, cropSize, cropSize)
       
@@ -343,6 +344,18 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       cropCtx.restore()
       
       console.log('✅ [CROP] Основното изображение нарисувано')
+      
+      // Apply circular mask to remove areas outside the iris
+      console.log('🎭 [CROP] Прилагане на кръгова маска за премахване на зони извън ириса...')
+      cropCtx.save()
+      cropCtx.globalCompositeOperation = 'destination-in'
+      cropCtx.beginPath()
+      const radius = cropSize * 0.48 // 48% of canvas size (96% of radius) for the circular mask
+      cropCtx.arc(cropSize / 2, cropSize / 2, radius, 0, Math.PI * 2)
+      cropCtx.fillStyle = '#FFFFFF'
+      cropCtx.fill()
+      cropCtx.restore()
+      console.log('✅ [CROP] Кръгова маска приложена - зоните извън ириса премахнати')
       
       await new Promise(resolve => setTimeout(resolve, 50))
       
