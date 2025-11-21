@@ -375,12 +375,12 @@ function App() {
   }
 
   const handleRestart = () => {
-    setQuestionnaireData(() => null)
+    setIsReanalysis(false)
+    setQuestionnaireData(null)
     leftIrisRef.current = null
     rightIrisRef.current = null
     setImagesReady(false)
     setAnalysisReport(null)
-    setIsReanalysis(false)
     setTimeout(() => setCurrentScreen('welcome'), 50)
   }
 
@@ -391,7 +391,7 @@ function App() {
       
       // If report is provided, use its questionnaire data
       if (report) {
-        setQuestionnaireData(() => report.questionnaireData)
+        setQuestionnaireData(report.questionnaireData)
         
         // Check if the current report has iris images
         if (analysisReport && 
@@ -418,7 +418,7 @@ function App() {
         leftIrisRef.current = analysisReport.leftIrisImage
         rightIrisRef.current = analysisReport.rightIrisImage
         setImagesReady(true)
-        setQuestionnaireData(() => analysisReport.questionnaireData)
+        setQuestionnaireData(analysisReport.questionnaireData)
         setTimeout(() => setCurrentScreen('analysis'), 50)
         toast.success('Започване на повторен анализ')
       } else {
