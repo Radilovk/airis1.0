@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import type { EditorModeConfig, ReportModuleComment } from '@/types'
 import { cn } from '@/lib/utils'
 import EditorCommentsExport from './EditorCommentsExport'
+import GitHubSyncPanel from './GitHubSyncPanel'
 
 export default function EditorModeTab() {
   const [editorConfig, setEditorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
@@ -213,6 +214,8 @@ export default function EditorModeTab() {
       </Card>
 
       <EditorCommentsExport />
+
+      <GitHubSyncPanel />
 
       <Card>
         <CardHeader>

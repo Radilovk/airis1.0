@@ -9,7 +9,8 @@ import {
   Trash,
   Eye,
   ArrowLeft,
-  ArrowsClockwise
+  ArrowsClockwise,
+  PencilSimple
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -19,9 +20,10 @@ interface HistoryScreenProps {
   onViewReport: (report: AnalysisReport) => void
   onBack: () => void
   onReanalyze?: (report: AnalysisReport) => void
+  onEditReport?: (report: AnalysisReport) => void
 }
 
-export default function HistoryScreen({ onViewReport, onBack, onReanalyze }: HistoryScreenProps) {
+export default function HistoryScreen({ onViewReport, onBack, onReanalyze, onEditReport }: HistoryScreenProps) {
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
 
   const handleDelete = (timestamp: string) => {
@@ -171,6 +173,17 @@ export default function HistoryScreen({ onViewReport, onBack, onReanalyze }: His
                             <Eye size={16} />
                             Преглед
                           </Button>
+                          {onEditReport && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onEditReport(report)}
+                              className="gap-2 hover:bg-purple-500/10 hover:text-purple-600 hover:border-purple-500"
+                            >
+                              <PencilSimple size={16} />
+                              Редактирай
+                            </Button>
+                          )}
                           {onReanalyze && (
                             <Button
                               variant="outline"
