@@ -21,14 +21,17 @@ import { toast } from 'sonner'
 import type { EditorModeConfig, ReportModuleComment } from '@/types'
 import { cn } from '@/lib/utils'
 import EditorCommentsExport from './EditorCommentsExport'
-import GitHubSyncPanel from './GitHubSyncPanel'
-import { createDefaultEditorConfig } from '@/lib/editor-config'
 
 export default function EditorModeTab() {
-  const [editorConfig, setEditorConfig] = useKVWithFallback<EditorModeConfig>(
-    'editor-mode-config', 
-    createDefaultEditorConfig()
-  )
+  const [editorConfig, setEditorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
+    enabled: false,
+    moduleOrder: [
+      { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },
+      { id: 'iridology', type: 'iridology', title: 'Иридологичен Анализ', visible: true, order: 1, comments: [], containers: [] },
+      { id: 'plan', type: 'plan', title: 'План за Действие', visible: true, order: 2, comments: [], containers: [] },
+    ],
+    lastModified: new Date().toISOString()
+  })
 
   const handleToggleEditor = (enabled: boolean) => {
     setEditorConfig((current) => ({
@@ -42,8 +45,13 @@ export default function EditorModeTab() {
   const handleResetModules = () => {
     if (confirm('Сигурни ли сте, че искате да нулирате всички модули и коментари?')) {
       setEditorConfig(() => ({
-        ...createDefaultEditorConfig(),
         enabled: editorConfig?.enabled || false,
+        moduleOrder: [
+          { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },
+          { id: 'iridology', type: 'iridology', title: 'Иридологичен Анализ', visible: true, order: 1, comments: [], containers: [] },
+          { id: 'plan', type: 'plan', title: 'План за Действие', visible: true, order: 2, comments: [], containers: [] },
+        ],
+        lastModified: new Date().toISOString()
       }))
       toast.success('Модулите са нулирани')
     }
@@ -205,8 +213,6 @@ export default function EditorModeTab() {
       </Card>
 
       <EditorCommentsExport />
-
-      <GitHubSyncPanel />
 
       <Card>
         <CardHeader>
