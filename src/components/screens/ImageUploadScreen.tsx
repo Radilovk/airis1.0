@@ -63,7 +63,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }, [])
 
-  const compressImage = async (dataUrl: string, maxWidth: number = 800, quality: number = 0.92): Promise<string> => {
+  const compressImage = async (dataUrl: string, maxWidth: number = 800, quality: number = 0.93): Promise<string> => {
     const startTime = performance.now()
     return new Promise((resolve, reject) => {
       const img = new Image()
@@ -83,11 +83,22 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           canvas.width = width
           canvas.height = height
           
-          const ctx = canvas.getContext('2d')
+          const ctx = canvas.getContext('2d', { 
+            willReadFrequently: false,
+            alpha: false 
+          })
           if (!ctx) {
             reject(new Error('Не може да се създаде canvas context'))
             return
           }
+          
+          // Fill with black background for better JPEG compression
+          ctx.fillStyle = '#000000'
+          ctx.fillRect(0, 0, width, height)
+          
+          // Enable image smoothing for better quality
+          ctx.imageSmoothingEnabled = true
+          ctx.imageSmoothingQuality = 'high'
           
           ctx.drawImage(img, 0, 0, width, height)
           
@@ -222,7 +233,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           fileType: file.type,
           side
         })
-        let compressedDataUrl = await compressImage(dataUrl, 800, 0.92)
+        let compressedDataUrl = await compressImage(dataUrl, 800, 0.93)
         const afterFirstPassKB = Math.round(compressedDataUrl.length / 1024)
         uploadDiagnostics.log('COMPRESS_END_1ST_PASS', 'success', {
           compressedSizeKB: afterFirstPassKB,
@@ -236,7 +247,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           uploadDiagnostics.log('COMPRESS_START_2ND_PASS', 'start', {
             currentSizeKB: afterFirstPassKB
           })
-          compressedDataUrl = await compressImage(compressedDataUrl, 700, 0.88)
+          compressedDataUrl = await compressImage(compressedDataUrl, 700, 0.90)
           const afterSecondPassKB = Math.round(compressedDataUrl.length / 1024)
           uploadDiagnostics.log('COMPRESS_END_2ND_PASS', 'success', {
             finalSizeKB: afterSecondPassKB,
@@ -402,7 +413,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_START', 'start', {
         sizeBefore: Math.round(croppedDataUrl.length / 1024)
       })
-      let finalImage = await compressImage(croppedDataUrl, 800, 0.92)
+      let finalImage = await compressImage(croppedDataUrl, 800, 0.93)
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_SUCCESS', 'success', {
         sizeAfter: Math.round(finalImage.length / 1024)
       })
@@ -413,7 +424,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_START', 'start', {
           currentSize: Math.round(finalImage.length / 1024)
         })
-        finalImage = await compressImage(finalImage, 700, 0.88)
+        finalImage = await compressImage(finalImage, 700, 0.90)
         uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_SUCCESS', 'success', {
           finalSize: Math.round(finalImage.length / 1024)
         })
