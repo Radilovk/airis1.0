@@ -321,7 +321,12 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       
       console.log('✅ [CROP] Canvas context създаден')
       
-      cropCtx.fillStyle = '#000000'
+      // Enable high-quality image smoothing for better crop quality
+      cropCtx.imageSmoothingEnabled = true
+      cropCtx.imageSmoothingQuality = 'high'
+      
+      // Use white background for better JPEG compression
+      cropCtx.fillStyle = '#FFFFFF'
       cropCtx.fillRect(0, 0, cropSize, cropSize)
       
       const centerX = canvas.width / 2
@@ -349,13 +354,14 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       const finalizeCrop = () => {
         try {
           console.log('🔄 [CROP] Конвертиране на canvas към dataURL...')
-          const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.95)
+          const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.92)
           const sizeKB = Math.round(croppedDataUrl.length / 1024)
           console.log(`📊 [CROP] Размер на cropped изображение: ${sizeKB} KB`)
           
-          if (croppedDataUrl.length > 800 * 1024) {
+          // Allow up to 3MB for raw cropped image (will be compressed later in handleCropSave)
+          if (croppedDataUrl.length > 3072 * 1024) {
             console.warn(`⚠️ [CROP] Изображението е твърде голямо след crop (${sizeKB} KB)`)
-            toast.error('Изображението е твърде голямо. Моля, опитайте с по-малък мащаб.')
+            toast.error(`Изображението е твърде голямо (${sizeKB} KB). Моля, опитайте с по-малък мащаб или зуум.`)
             return
           }
           
