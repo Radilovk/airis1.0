@@ -48,36 +48,9 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   useEffect(() => {
     const loadOverlay = async () => {
       try {
-        // Try to load custom overlay from IndexedDB/localStorage
-        const dbName = 'airis_storage'
-        const storeName = 'settings'
-        const key = 'custom-overlay'
-        
-        try {
-          const db = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(dbName, 1)
-            request.onerror = () => reject(request.error)
-            request.onsuccess = () => resolve(request.result)
-          })
-          
-          const overlay = await new Promise<CustomOverlay | null>((resolve) => {
-            const transaction = db.transaction([storeName], 'readonly')
-            const store = transaction.objectStore(storeName)
-            const request = store.get(key)
-            request.onsuccess = () => resolve(request.result || null)
-            request.onerror = () => resolve(null)
-          })
-          
-          if (overlay) {
-            customOverlayRef.current = overlay
-          }
-        } catch {
-          // Try localStorage fallback
-          const localValue = localStorage.getItem('airis_custom-overlay')
-          if (localValue && localValue !== 'null') {
-            const parsed = JSON.parse(localValue)
-            customOverlayRef.current = parsed
-          }
+        const overlay = await window.spark.kv.get<CustomOverlay>('custom-overlay')
+        if (overlay) {
+          customOverlayRef.current = overlay
         }
       } catch (error) {
         console.warn('Няма custom overlay')
