@@ -304,7 +304,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       console.log(`📊 [CROP] Transform:`, transform)
       
       const cropCanvas = document.createElement('canvas')
-      const cropSize = 380
+      const cropSize = 800
       cropCanvas.width = cropSize
       cropCanvas.height = cropSize
       
@@ -349,11 +349,11 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       const finalizeCrop = () => {
         try {
           console.log('🔄 [CROP] Конвертиране на canvas към dataURL...')
-          const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.6)
+          const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.95)
           const sizeKB = Math.round(croppedDataUrl.length / 1024)
           console.log(`📊 [CROP] Размер на cropped изображение: ${sizeKB} KB`)
           
-          if (croppedDataUrl.length > 300 * 1024) {
+          if (croppedDataUrl.length > 800 * 1024) {
             console.warn(`⚠️ [CROP] Изображението е твърде голямо след crop (${sizeKB} KB)`)
             toast.error('Изображението е твърде голямо. Моля, опитайте с по-малък мащаб.')
             return
