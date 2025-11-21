@@ -25,7 +25,6 @@ import {
   Eye,
   FileText,
   Robot,
-  PencilSimple,
   ClockCounterClockwise,
   DownloadSimple
 } from '@phosphor-icons/react'
@@ -35,7 +34,6 @@ import IridologyOverlay from '@/components/iris/IridologyOverlay'
 import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
 import IridologyManualTab from '@/components/admin/IridologyManualTab'
 import AIPromptTab from '@/components/admin/AIPromptTab'
-import EditorModeTab from '@/components/admin/EditorModeTab'
 import ChangelogTab from '@/components/admin/ChangelogTab'
 import ProjectExportTab from '@/components/admin/ProjectExportTab'
 import AIModelStrategyTab from '@/components/admin/AIModelStrategyTab'
@@ -347,8 +345,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     toast.success('Промптът е възстановен до оригиналната версия')
   }
 
-  const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-  const geminiModels = ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash']
+  const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
+  const geminiModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash-thinking-exp', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
   const githubSparkModels = ['gpt-4o', 'gpt-4o-mini']
 
   return (
@@ -384,7 +382,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         </div>
 
         <Tabs defaultValue="ai-config" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 md:grid-cols-9 gap-1 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-5 md:grid-cols-8 gap-1 h-auto p-1">
             <TabsTrigger value="ai-config" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <Brain className="w-4 h-4 md:mr-1" />
               <span className="hidden sm:inline">AI Модел</span>
@@ -394,11 +392,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               <Brain className="w-4 h-4 md:mr-1" />
               <span className="hidden sm:inline">AI Стратегия</span>
               <span className="sm:hidden">Страт</span>
-            </TabsTrigger>
-            <TabsTrigger value="editor" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
-              <PencilSimple className="w-4 h-4 md:mr-1" />
-              <span className="hidden sm:inline">Editor</span>
-              <span className="sm:hidden">Edit</span>
             </TabsTrigger>
             <TabsTrigger value="manual" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <BookOpen className="w-4 h-4 md:mr-1" />
@@ -656,16 +649,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               transition={{ duration: 0.3 }}
             >
               <AIModelStrategyTab />
-            </motion.div>
-          </TabsContent>
-
-          <TabsContent value="editor">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <EditorModeTab />
             </motion.div>
           </TabsContent>
 

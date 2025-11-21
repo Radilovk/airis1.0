@@ -428,34 +428,47 @@ ${response}
         }
         
         console.log('⚙️ [ANALYSIS] Зареждане на AI конфигурация от KV storage...')
-        const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-        const finalConfig = storedConfig || aiConfig
         
-        if (!finalConfig) {
-          console.warn('⚠️ [CONFIG] Няма конфигурация - използване на default')
-          if (mounted) {
-            setConfigLoaded(true)
-            setAnalysisStarted(true)
-            setAnalysisRunning(true)
-            performAnalysis()
+        // Wait a bit longer to ensure KV storage has fully loaded
+        await sleep(300)
+        
+        const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
+        
+        // Give priority to stored config, then to aiConfig from hook
+        let finalConfig: AIModelConfig | null = null
+        
+        if (storedConfig && storedConfig.apiKey && storedConfig.apiKey.trim() !== '') {
+          finalConfig = storedConfig
+          console.log('✅ [CONFIG] Използване на конфигурация от KV storage')
+        } else if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
+          finalConfig = aiConfig
+          console.log('✅ [CONFIG] Използване на конфигурация от hook')
+        } else {
+          // Wait a bit more and try again - sometimes the hook takes longer to load
+          console.log('⏳ [CONFIG] Конфигурацията все още се зарежда, изчакване...')
+          await sleep(700)
+          
+          const retryConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
+          if (retryConfig && retryConfig.apiKey && retryConfig.apiKey.trim() !== '') {
+            finalConfig = retryConfig
+            console.log('✅ [CONFIG] Конфигурация заредена след повторен опит')
           }
-          return
         }
         
-        const apiKey = finalConfig.apiKey || ''
-        
-        if (!apiKey || apiKey.trim() === '') {
+        if (!finalConfig || !finalConfig.apiKey || finalConfig.apiKey.trim() === '') {
           addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
           throw new Error('Липсва API ключ за AI анализ')
         }
         
         const providerToUse = finalConfig.provider
         const modelToUse = finalConfig.model
+        const apiKey = finalConfig.apiKey
         
         console.log('🔍 [CONFIG] finalConfig от KV:', finalConfig)
         console.log('🔍 [CONFIG] Provider:', providerToUse)
         console.log('🔍 [CONFIG] Model:', modelToUse)
         console.log('🔍 [CONFIG] Has API key:', !!apiKey)
+        console.log('🔍 [CONFIG] API key length:', apiKey?.length || 0)
         
         if (!mounted) {
           console.log('⚠️ [ANALYSIS] Component unmounted before starting analysis, aborting')
