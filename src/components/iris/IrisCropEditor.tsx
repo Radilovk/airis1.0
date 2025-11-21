@@ -7,6 +7,10 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { CustomOverlay } from '@/types'
 
+// Size limit constants
+const MAX_RAW_CROP_SIZE_BYTES = 3072 * 1024 // 3 MB (will be compressed later)
+const MAX_RAW_CROP_SIZE_KB = 3072
+
 interface IrisCropEditorProps {
   imageDataUrl: string
   side: 'left' | 'right'
@@ -359,7 +363,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
           console.log(`📊 [CROP] Размер на cropped изображение: ${sizeKB} KB`)
           
           // Allow up to 3MB for raw cropped image (will be compressed later in handleCropSave)
-          if (croppedDataUrl.length > 3072 * 1024) {
+          if (croppedDataUrl.length > MAX_RAW_CROP_SIZE_BYTES) {
             console.warn(`⚠️ [CROP] Изображението е твърде голямо след crop (${sizeKB} KB)`)
             toast.error(`Изображението е твърде голямо (${sizeKB} KB). Моля, опитайте с по-малък мащаб или зуум.`)
             return

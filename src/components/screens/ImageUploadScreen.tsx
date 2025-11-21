@@ -10,6 +10,11 @@ import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import type { IrisImage } from '@/types'
 
+// Compression and size limit constants
+const SECOND_PASS_THRESHOLD_BYTES = 1024 * 1024 // 1 MB
+const MAX_FINAL_SIZE_BYTES = 2048 * 1024 // 2 MB
+const MAX_FINAL_SIZE_KB = 2048
+
 interface ImageUploadScreenProps {
   onComplete: (left: IrisImage, right: IrisImage) => void
   initialLeft?: IrisImage | null
@@ -83,7 +88,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           canvas.width = width
           canvas.height = height
           
-          const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: false })
+          const ctx = canvas.getContext('2d', { alpha: false })
           if (!ctx) {
             reject(new Error('Не може да се създаде canvas context'))
             return
@@ -241,7 +246,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         console.log(`📸 [UPLOAD] Компресиран размер (1st pass): ${afterFirstPassKB} KB (намаление: ${Math.round(((originalSizeKB - afterFirstPassKB) / originalSizeKB) * 100)}%)`)
         
         // Second pass: Only if very large (>1MB), use slightly lower quality (0.88 = still very good quality)
-        if (compressedDataUrl.length > 1024 * 1024) {
+        if (compressedDataUrl.length > SECOND_PASS_THRESHOLD_BYTES) {
           console.warn('⚠️ [UPLOAD] Изображението е все още голямо, допълнителна компресия...')
           uploadDiagnostics.log('COMPRESS_START_2ND_PASS', 'start', {
             currentSizeKB: afterFirstPassKB
@@ -259,19 +264,19 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         console.log(`📸 [UPLOAD] ========== FINAL COMPRESSION RESULT ==========`)
         console.log(`📸 [UPLOAD] Original: ${originalSizeKB} KB → Final: ${finalSizeKB} KB`)
         console.log(`📸 [UPLOAD] Total reduction: ${Math.round(((originalSizeKB - finalSizeKB) / originalSizeKB) * 100)}%`)
-        console.log(`📸 [UPLOAD] Checking against limit: ${finalSizeKB} KB vs 2048 KB max`)
+        console.log(`📸 [UPLOAD] Checking against limit: ${finalSizeKB} KB vs ${MAX_FINAL_SIZE_KB} KB max`)
         
         // Allow up to 2MB after compression (reasonable for high quality 800x800 JPEG)
-        if (compressedDataUrl.length > 2048 * 1024) {
+        if (compressedDataUrl.length > MAX_FINAL_SIZE_BYTES) {
           uploadDiagnostics.log('COMPRESS_ERROR_TOO_LARGE', 'error', {
             finalSizeKB,
-            maxSizeKB: 2048,
+            maxSizeKB: MAX_FINAL_SIZE_KB,
             originalSizeKB,
             fileName: file.name,
             fileType: file.type,
             side
           })
-          console.error(`❌ [UPLOAD] Изображението е твърде голямо дори след компресия! (${finalSizeKB} KB > 2048 KB)`)
+          console.error(`❌ [UPLOAD] Изображението е твърде голямо дори след компресия! (${finalSizeKB} KB > ${MAX_FINAL_SIZE_KB} KB)`)
           toast.error(`Изображението е твърде голямо (${finalSizeKB} KB). Моля, опитайте с по-малка снимка или по-ниска резолюция.`)
           setIsProcessing(false)
           return
@@ -421,7 +426,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       console.log(`📊 [UPLOAD] Size after 1st pass: ${Math.round(finalImage.length / 1024)} KB`)
       
       // Second pass: Only if very large (>1MB), use good quality (0.88 = good quality, better compression)
-      if (finalImage.length > 1024 * 1024) {
+      if (finalImage.length > SECOND_PASS_THRESHOLD_BYTES) {
         console.warn('⚠️ [UPLOAD] Additional compression needed (2nd pass)...')
         uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_START', 'start', {
           currentSize: Math.round(finalImage.length / 1024)
@@ -434,10 +439,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       }
       
       // Allow up to 2MB for final cropped image (reasonable for high quality 800x800 JPEG)
-      if (finalImage.length > 2048 * 1024) {
+      if (finalImage.length > MAX_FINAL_SIZE_BYTES) {
         uploadDiagnostics.log('CROP_COMPRESS_ERROR_TOO_LARGE', 'error', {
           finalSize: Math.round(finalImage.length / 1024),
-          maxSize: 2048
+          maxSize: MAX_FINAL_SIZE_KB
         })
         console.error('❌ [UPLOAD] Image too large even after high-quality compression!')
         errorLogger.error('UPLOAD_CROP_SAVE', 'Image too large after compression', undefined, {
