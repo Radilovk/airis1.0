@@ -31,7 +31,6 @@ export function performStartupChecks(): StartupResult {
         passed: false,
         error: 'window.spark is not defined'
       })
-      criticalErrors.push('Spark API липсва - приложението не може да работи')
     } else {
       checks.push({
         name: 'Spark API',
@@ -44,7 +43,6 @@ export function performStartupChecks(): StartupResult {
           passed: false,
           error: 'window.spark.kv is not defined'
         })
-        criticalErrors.push('KV Storage липсва - данните не могат да се запазват')
       } else {
         checks.push({
           name: 'KV Storage',
@@ -58,7 +56,6 @@ export function performStartupChecks(): StartupResult {
           passed: false,
           error: 'window.spark.llm is not defined'
         })
-        criticalErrors.push('LLM API липсва - анализът не може да работи')
       } else {
         checks.push({
           name: 'LLM API',
