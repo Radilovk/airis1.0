@@ -350,7 +350,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       cropCtx.save()
       cropCtx.globalCompositeOperation = 'destination-in'
       cropCtx.beginPath()
-      const radius = cropSize * 0.48 // Use 96% of half the size for the circular mask
+      const radius = cropSize * 0.48 // 48% of canvas size (96% of radius) for the circular mask
       cropCtx.arc(cropSize / 2, cropSize / 2, radius, 0, Math.PI * 2)
       cropCtx.fillStyle = '#FFFFFF'
       cropCtx.fill()
