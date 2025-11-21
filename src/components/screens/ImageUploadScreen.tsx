@@ -63,7 +63,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }, [])
 
-  const compressImage = async (dataUrl: string, maxWidth: number = 400, quality: number = 0.55): Promise<string> => {
+  const compressImage = async (dataUrl: string, maxWidth: number = 800, quality: number = 0.92): Promise<string> => {
     const startTime = performance.now()
     return new Promise((resolve, reject) => {
       const img = new Image()
@@ -222,7 +222,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           fileType: file.type,
           side
         })
-        let compressedDataUrl = await compressImage(dataUrl, 400, 0.55)
+        let compressedDataUrl = await compressImage(dataUrl, 800, 0.92)
         const afterFirstPassKB = Math.round(compressedDataUrl.length / 1024)
         uploadDiagnostics.log('COMPRESS_END_1ST_PASS', 'success', {
           compressedSizeKB: afterFirstPassKB,
@@ -231,12 +231,12 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         
         console.log(`📸 [UPLOAD] Компресиран размер (1st pass): ${afterFirstPassKB} KB (намаление: ${Math.round(((originalSizeKB - afterFirstPassKB) / originalSizeKB) * 100)}%)`)
         
-        if (compressedDataUrl.length > 120 * 1024) {
+        if (compressedDataUrl.length > 400 * 1024) {
           console.warn('⚠️ [UPLOAD] Изображението е все още голямо, допълнителна компресия...')
           uploadDiagnostics.log('COMPRESS_START_2ND_PASS', 'start', {
             currentSizeKB: afterFirstPassKB
           })
-          compressedDataUrl = await compressImage(compressedDataUrl, 350, 0.45)
+          compressedDataUrl = await compressImage(compressedDataUrl, 700, 0.88)
           const afterSecondPassKB = Math.round(compressedDataUrl.length / 1024)
           uploadDiagnostics.log('COMPRESS_END_2ND_PASS', 'success', {
             finalSizeKB: afterSecondPassKB,
@@ -249,18 +249,18 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         console.log(`📸 [UPLOAD] ========== FINAL COMPRESSION RESULT ==========`)
         console.log(`📸 [UPLOAD] Original: ${originalSizeKB} KB → Final: ${finalSizeKB} KB`)
         console.log(`📸 [UPLOAD] Total reduction: ${Math.round(((originalSizeKB - finalSizeKB) / originalSizeKB) * 100)}%`)
-        console.log(`📸 [UPLOAD] Checking against limit: ${finalSizeKB} KB vs 200 KB max`)
+        console.log(`📸 [UPLOAD] Checking against limit: ${finalSizeKB} KB vs 600 KB max`)
         
-        if (compressedDataUrl.length > 200 * 1024) {
+        if (compressedDataUrl.length > 600 * 1024) {
           uploadDiagnostics.log('COMPRESS_ERROR_TOO_LARGE', 'error', {
             finalSizeKB,
-            maxSizeKB: 200,
+            maxSizeKB: 600,
             originalSizeKB,
             fileName: file.name,
             fileType: file.type,
             side
           })
-          console.error(`❌ [UPLOAD] Изображението е твърде голямо дори след компресия! (${finalSizeKB} KB > 200 KB)`)
+          console.error(`❌ [UPLOAD] Изображението е твърде голямо дори след компресия! (${finalSizeKB} KB > 600 KB)`)
           toast.error(`Изображението е твърде голямо (${finalSizeKB} KB). Моля, опитайте с по-малка снимка.`)
           setIsProcessing(false)
           return
@@ -402,28 +402,28 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_START', 'start', {
         sizeBefore: Math.round(croppedDataUrl.length / 1024)
       })
-      let finalImage = await compressImage(croppedDataUrl, 400, 0.55)
+      let finalImage = await compressImage(croppedDataUrl, 800, 0.92)
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_SUCCESS', 'success', {
         sizeAfter: Math.round(finalImage.length / 1024)
       })
       console.log(`📊 [UPLOAD] Size after 1st pass: ${Math.round(finalImage.length / 1024)} KB`)
       
-      if (finalImage.length > 120 * 1024) {
+      if (finalImage.length > 400 * 1024) {
         console.warn('⚠️ [UPLOAD] Additional compression needed (2nd pass)...')
         uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_START', 'start', {
           currentSize: Math.round(finalImage.length / 1024)
         })
-        finalImage = await compressImage(finalImage, 350, 0.45)
+        finalImage = await compressImage(finalImage, 700, 0.88)
         uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_SUCCESS', 'success', {
           finalSize: Math.round(finalImage.length / 1024)
         })
         console.log(`📊 [UPLOAD] Size after 2nd pass: ${Math.round(finalImage.length / 1024)} KB`)
       }
       
-      if (finalImage.length > 200 * 1024) {
+      if (finalImage.length > 600 * 1024) {
         uploadDiagnostics.log('CROP_COMPRESS_ERROR_TOO_LARGE', 'error', {
           finalSize: Math.round(finalImage.length / 1024),
-          maxSize: 200
+          maxSize: 600
         })
         console.error('❌ [UPLOAD] Image too large even after aggressive compression!')
         errorLogger.error('UPLOAD_CROP_SAVE', 'Image too large after compression', undefined, {
