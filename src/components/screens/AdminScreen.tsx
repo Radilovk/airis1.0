@@ -531,16 +531,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       <SelectValue placeholder="Изберете модел" />
                     </SelectTrigger>
                     <SelectContent>
-                      {provider === 'github-spark' && (
-                        <>
-                          <SelectItem value="gpt-4o">
-                            gpt-4o
-                          </SelectItem>
-                          <SelectItem value="gpt-4o-mini">
-                            gpt-4o-mini
-                          </SelectItem>
-                        </>
-                      )}
                       {provider === 'openai' && (
                         <>
                           {openaiModels.map((m) => (
