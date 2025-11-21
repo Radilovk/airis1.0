@@ -3,7 +3,7 @@
  * UI for syncing editor mode changes to GitHub repository
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -81,8 +81,9 @@ export default function GitHubSyncPanel() {
       setPreviewChanges(changes)
       setShowPreview(true)
       toast.success(`Generated ${changes.length} file changes`)
-    } catch (error: any) {
-      toast.error(`Failed to generate preview: ${error.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Failed to generate preview: ${errorMessage}`)
     }
   }
 
@@ -100,8 +101,9 @@ export default function GitHubSyncPanel() {
       URL.revokeObjectURL(url)
       
       toast.success('Patch file downloaded')
-    } catch (error: any) {
-      toast.error(`Failed to download patch: ${error.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Failed to download patch: ${errorMessage}`)
     }
   }
 
@@ -118,8 +120,9 @@ export default function GitHubSyncPanel() {
       URL.revokeObjectURL(url)
       
       toast.success('Configuration downloaded')
-    } catch (error: any) {
-      toast.error(`Failed to download config: ${error.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Failed to download config: ${errorMessage}`)
     }
   }
 
@@ -145,11 +148,12 @@ export default function GitHubSyncPanel() {
       } else {
         toast.error(result.message)
       }
-    } catch (error: any) {
-      toast.error(`Sync failed: ${error.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Sync failed: ${errorMessage}`)
       setLastSyncResult({
         success: false,
-        message: error.message,
+        message: errorMessage,
       })
     } finally {
       setIsSyncing(false)
@@ -187,27 +191,32 @@ export default function GitHubSyncPanel() {
       } else {
         toast.error(result.message)
       }
-    } catch (error: any) {
-      toast.error(`Failed to create PR: ${error.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Failed to create PR: ${errorMessage}`)
       setLastSyncResult({
         success: false,
-        message: error.message,
+        message: errorMessage,
       })
     } finally {
       setIsSyncing(false)
     }
   }
 
-  const totalChanges = Object.keys(elementsConfig).reduce((sum, moduleId) => {
-    return sum + Object.keys(elementsConfig[moduleId] || {}).length
-  }, 0)
-
-  const totalComments = Object.keys(elementsConfig).reduce((sum, moduleId) => {
-    const module = elementsConfig[moduleId] || {}
-    return sum + Object.values(module).reduce((s: number, el: any) => {
-      return s + (el.comments?.filter((c: any) => !c.resolved).length || 0)
+  const totalChanges = useMemo(() => {
+    return Object.keys(elementsConfig).reduce((sum, moduleId) => {
+      return sum + Object.keys(elementsConfig[moduleId] || {}).length
     }, 0)
-  }, 0)
+  }, [elementsConfig])
+
+  const totalComments = useMemo(() => {
+    return Object.keys(elementsConfig).reduce((sum, moduleId) => {
+      const module = elementsConfig[moduleId] || {}
+      return sum + Object.values(module).reduce((s: number, el: any) => {
+        return s + (el.comments?.filter((c: any) => !c.resolved).length || 0)
+      }, 0)
+    }, 0)
+  }, [elementsConfig])
 
   return (
     <div className="space-y-6">

@@ -1,17 +1,17 @@
-/**
- * Editor Code Generator
- * Generates actual React component code based on editor mode changes
- * This allows editor mode edits to be persisted directly in the repository
- */
-
-import type { EditableElementsConfig } from '@/hooks/use-editable-elements'
-import type { EditorModeConfig, ReportModule } from '@/types'
+import type { EditableElementsConfig, EditableElementState } from '@/hooks/use-editable-elements'
+import type { EditorModeConfig, ReportModule, ReportModuleComment } from '@/types'
+import { getModuleFilePath } from './editor-config'
 
 export interface CodeGenerationResult {
   filePath: string
   originalCode: string
   generatedCode: string
   description: string
+}
+
+interface CommentWithElement {
+  elementId: string
+  comment: ReportModuleComment
 }
 
 /**
@@ -42,7 +42,7 @@ export function generateCodeFromEditorConfig(
  */
 function generateTabComponentCode(
   module: ReportModule,
-  elements: Record<string, any>
+  elements: Record<string, EditableElementState>
 ): CodeGenerationResult | null {
   const filePath = getTabComponentPath(module.id)
   
@@ -52,15 +52,15 @@ function generateTabComponentCode(
     .map(([id]) => id)
 
   // Collect all comments with unresolved status
-  const activeComments = Object.entries(elements)
+  const activeComments: CommentWithElement[] = Object.entries(elements)
     .flatMap(([elementId, state]) => 
       state.comments
-        .filter((c: any) => !c.resolved)
-        .map((c: any) => ({ elementId, comment: c }))
+        .filter((c) => !c.resolved)
+        .map((c) => ({ elementId, comment: c }))
     )
 
   // Generate comment annotations
-  let generatedCode = generateComponentWithComments(module, hiddenElements, activeComments)
+  const generatedCode = generateComponentWithComments(module, hiddenElements, activeComments)
 
   return {
     filePath,
@@ -71,39 +71,87 @@ function generateTabComponentCode(
 }
 
 /**
+ * Generate component header with metadata
+ */
+function generateComponentHeader(
+  moduleTitle: string,
+  hiddenCount: number,
+  commentCount: number
+): string {
+  const timestamp = new Date().toISOString()
+  let header = `/**\n * ${moduleTitle}\n * Auto-generated from Editor Mode\n * Last modified: ${timestamp}\n`
+  
+  if (hiddenCount > 0 || commentCount > 0) {
+    header += ' * \n * EDITOR MODE CHANGES:\n'
+    if (hiddenCount > 0) {
+      header += ` * - ${hiddenCount} elements are hidden\n`
+    }
+    if (commentCount > 0) {
+      header += ` * - ${commentCount} active comments/TODO items\n`
+    }
+  }
+  
+  header += ' */\n\n'
+  return header
+}
+
+/**
  * Generate component code with JSX comments and conditional rendering
  */
 function generateComponentWithComments(
   module: ReportModule,
   hiddenElements: string[],
-  activeComments: Array<{ elementId: string; comment: any }>
+  activeComments: CommentWithElement[]
 ): string {
-  let code = `/**
- * ${module.title}
- * Auto-generated from Editor Mode
- * Last modified: ${new Date().toISOString()}
- */\n\n`
+  let code = generateComponentHeader(
+    module.title,
+    hiddenElements.length,
+    activeComments.length
+  )
 
   // Add editor mode changes as code comments
   if (hiddenElements.length > 0) {
-    code += `// EDITOR MODE: Hidden Elements\n`
-    code += `// The following elements are hidden by editor mode:\n`
+    code += `/**
+ * EDITOR MODE: Hidden Elements
+ * The following elements are hidden by editor mode configuration.
+ * To show them again, edit the editor mode config in Admin Panel.
+ */\n`
     hiddenElements.forEach(id => {
-      code += `//   - ${id}\n`
+      code += `// HIDDEN: ${id}\n`
     })
     code += '\n'
   }
 
   if (activeComments.length > 0) {
-    code += `// EDITOR MODE: Active Comments\n`
+    code += `/**
+ * EDITOR MODE: Active Comments & TODO Items
+ * These are instructions for future improvements.
+ */\n`
     activeComments.forEach(({ elementId, comment }) => {
-      code += `// TODO [${elementId}]: ${comment.text}\n`
+      const timestamp = new Date(comment.timestamp).toLocaleDateString('bg-BG')
+      code += `// TODO [${elementId}] (${timestamp}): ${comment.text}\n`
     })
     code += '\n'
   }
 
-  // Generate conditional rendering logic
+  // Generate the actual conditional rendering configuration
   code += generateConditionalRenderingLogic(hiddenElements)
+  
+  // Generate usage example
+  code += `\n/**
+ * USAGE:
+ * Wrap elements with conditional rendering:
+ * 
+ * {shouldRenderElement('element-id') && (
+ *   <YourElement />
+ * )}
+ * 
+ * Or use the helper in className:
+ * <div className={cn(getElementClassName('element-id'))}>
+ * 
+ * INTEGRATION:
+ * Import this configuration in your tab component and apply the logic.
+ */\n`
 
   return code
 }
@@ -112,17 +160,49 @@ function generateComponentWithComments(
  * Generate conditional rendering helper
  */
 function generateConditionalRenderingLogic(hiddenElements: string[]): string {
-  if (hiddenElements.length === 0) return ''
+  if (hiddenElements.length === 0) {
+    return `// No elements are hidden by editor mode\n`
+  }
 
   return `
-// Editor Mode visibility configuration
-const editorHiddenElements = new Set([
+// Editor Mode Visibility Configuration
+// Generated from editor mode settings
+const EDITOR_HIDDEN_ELEMENTS = new Set([
 ${hiddenElements.map(id => `  '${id}',`).join('\n')}
 ])
 
-// Helper function to check if element should be rendered
-const shouldRenderElement = (elementId: string): boolean => {
-  return !editorHiddenElements.has(elementId)
+/**
+ * Check if an element should be rendered based on editor mode config
+ * @param elementId - The unique identifier of the element
+ * @returns true if the element should be rendered, false otherwise
+ */
+export const shouldRenderElement = (elementId: string): boolean => {
+  return !EDITOR_HIDDEN_ELEMENTS.has(elementId)
+}
+
+/**
+ * Get className helper for conditional styling
+ * @param elementId - The unique identifier of the element
+ * @returns className string for hidden elements
+ */
+export const getElementClassName = (elementId: string): string => {
+  return EDITOR_HIDDEN_ELEMENTS.has(elementId) ? 'hidden' : ''
+}
+
+/**
+ * Get all hidden element IDs
+ * @returns Array of hidden element IDs
+ */
+export const getHiddenElements = (): string[] => {
+  return Array.from(EDITOR_HIDDEN_ELEMENTS)
+}
+
+/**
+ * Check if editor mode has hidden elements
+ * @returns true if there are hidden elements
+ */
+export const hasHiddenElements = (): boolean => {
+  return EDITOR_HIDDEN_ELEMENTS.size > 0
 }
 `
 }
@@ -131,13 +211,7 @@ const shouldRenderElement = (elementId: string): boolean => {
  * Get the file path for a module's tab component
  */
 function getTabComponentPath(moduleId: string): string {
-  const pathMap: Record<string, string> = {
-    overview: 'src/components/report/tabs/OverviewTab.tsx',
-    iridology: 'src/components/report/tabs/IridologyTab.tsx',
-    plan: 'src/components/report/tabs/PlanTab.tsx',
-  }
-  
-  return pathMap[moduleId] || `src/components/report/tabs/${moduleId}Tab.tsx`
+  return getModuleFilePath(moduleId)
 }
 
 /**

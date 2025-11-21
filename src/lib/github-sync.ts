@@ -13,6 +13,36 @@ export interface GitHubConfig {
   branch?: string
 }
 
+/**
+ * Default repository configuration
+ * In production, these should be loaded from environment variables or configuration
+ */
+const DEFAULT_REPO_CONFIG: Omit<GitHubConfig, 'token'> = {
+  owner: 'Radilovk',
+  repo: 'airis1.0',
+  branch: 'main',
+}
+
+/**
+ * Helper to extract repo info from current location or use defaults
+ * Note: This is a fallback mechanism. Production apps should have explicit configuration.
+ */
+export function detectGitHubRepo(): GitHubConfig | null {
+  // Try to get from environment variables if available
+  if (typeof process !== 'undefined' && process.env) {
+    const owner = process.env.VITE_GITHUB_OWNER
+    const repo = process.env.VITE_GITHUB_REPO
+    const branch = process.env.VITE_GITHUB_BRANCH
+    
+    if (owner && repo) {
+      return { owner, repo, branch: branch || 'main' }
+    }
+  }
+
+  // Use default configuration for this project
+  return DEFAULT_REPO_CONFIG
+}
+
 export interface SyncResult {
   success: boolean
   message: string
@@ -44,6 +74,21 @@ export class GitHubRepoSync {
    */
   isConfigured(): boolean {
     return this.octokit !== null && !!this.config.token
+  }
+
+  /**
+   * Update the branch for operations
+   * @param branch - The branch name to use
+   */
+  setBranch(branch: string): void {
+    this.config.branch = branch
+  }
+
+  /**
+   * Get current branch
+   */
+  getCurrentBranch(): string {
+    return this.config.branch || 'main'
   }
 
   /**
@@ -188,15 +233,15 @@ export class GitHubRepoSync {
       })
 
       // Commit changes to the new branch
-      const tempSync = new GitHubRepoSync({
-        ...this.config,
-        branch: branchName,
-      })
+      this.setBranch(branchName)
       
-      const commitResult = await tempSync.commitChanges(
+      const commitResult = await this.commitChanges(
         changes,
         'Apply editor mode changes'
       )
+      
+      // Restore original branch
+      this.setBranch(this.config.branch || 'main')
 
       if (!commitResult.success) {
         return commitResult
@@ -260,38 +305,25 @@ export class GitHubRepoSync {
 }
 
 /**
- * Helper to extract repo info from current location
- */
-export function detectGitHubRepo(): GitHubConfig | null {
-  // Try to detect from window location or git remote
-  // This is a placeholder - in production, this should be configured
-  const urlMatch = window.location.hostname.match(/github\.com/)
-  
-  if (urlMatch) {
-    // Try to parse from URL
-    const pathMatch = window.location.pathname.match(/\/([^\/]+)\/([^\/]+)/)
-    if (pathMatch) {
-      return {
-        owner: pathMatch[1],
-        repo: pathMatch[2],
-      }
-    }
-  }
-
-  // Return configured values for this project
-  return {
-    owner: 'Radilovk',
-    repo: 'airis1.0',
-  }
-}
-
-/**
  * Get GitHub token from storage or environment
+ * Note: For production, consider using more secure storage like:
+ * - Server-side session storage
+ * - Encrypted storage with proper key management
+ * - OAuth flow with refresh tokens
  */
 export function getGitHubToken(): string | null {
-  // Check localStorage
+  // Check sessionStorage first (more secure than localStorage)
+  const sessionToken = sessionStorage.getItem('github-token')
+  if (sessionToken) return sessionToken
+
+  // Fall back to localStorage for backwards compatibility
   const stored = localStorage.getItem('github-token')
-  if (stored) return stored
+  if (stored) {
+    // Migrate to sessionStorage
+    sessionStorage.setItem('github-token', stored)
+    localStorage.removeItem('github-token')
+    return stored
+  }
 
   // In production, this might come from environment or secure storage
   return null
@@ -299,14 +331,18 @@ export function getGitHubToken(): string | null {
 
 /**
  * Save GitHub token securely
+ * Uses sessionStorage which is cleared when the tab/browser closes
  */
 export function saveGitHubToken(token: string): void {
-  localStorage.setItem('github-token', token)
+  sessionStorage.setItem('github-token', token)
+  // Clear from localStorage if it exists there
+  localStorage.removeItem('github-token')
 }
 
 /**
  * Clear GitHub token
  */
 export function clearGitHubToken(): void {
+  sessionStorage.removeItem('github-token')
   localStorage.removeItem('github-token')
 }

@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import type { AnalysisReport, EditorModeConfig } from '@/types'
 import type { EditableElementsConfig } from '@/hooks/use-editable-elements'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { createEnabledEditorConfig } from '@/lib/editor-config'
 
 interface HistoricalReportEditorProps {
   report: AnalysisReport
@@ -35,15 +36,7 @@ export default function HistoricalReportEditor({
   const storageKey = `editor-config-${report.id}`
   const [reportEditorConfig, setReportEditorConfig] = useKVWithFallback<EditorModeConfig>(
     storageKey,
-    {
-      enabled: true,
-      moduleOrder: [
-        { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },
-        { id: 'iridology', type: 'iridology', title: 'Иридологичен Анализ', visible: true, order: 1, comments: [], containers: [] },
-        { id: 'plan', type: 'plan', title: 'План за Действие', visible: true, order: 2, comments: [], containers: [] },
-      ],
-      lastModified: new Date().toISOString()
-    }
+    createEnabledEditorConfig()
   )
 
   const elementsStorageKey = `editable-elements-${report.id}`
