@@ -64,6 +64,54 @@ export default function AnalysisScreen({
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+  // Helper function to safely get configuration from storage
+  const getConfigFromStorage = async (): Promise<AIModelConfig | null> => {
+    try {
+      // Try IndexedDB first
+      const dbName = 'airis_storage'
+      const storeName = 'settings'
+      const key = 'ai-model-config'
+      
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1)
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => resolve(request.result)
+        request.onupgradeneeded = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName)
+          }
+        }
+      })
+      
+      const config = await new Promise<AIModelConfig | null>((resolve) => {
+        const transaction = db.transaction([storeName], 'readonly')
+        const store = transaction.objectStore(storeName)
+        const request = store.get(key)
+        request.onsuccess = () => resolve(request.result || null)
+        request.onerror = () => resolve(null)
+      })
+      
+      if (config) {
+        console.log('✅ [CONFIG] Loaded from IndexedDB:', config)
+        return config
+      }
+      
+      // Try localStorage as fallback
+      const localValue = localStorage.getItem('airis_ai-model-config')
+      if (localValue && localValue !== 'null' && localValue !== 'undefined') {
+        const parsed = JSON.parse(localValue)
+        console.log('✅ [CONFIG] Loaded from localStorage:', parsed)
+        return parsed
+      }
+      
+      return null
+    } catch (error) {
+      console.error('❌ [CONFIG] Error loading config from storage:', error)
+      return null
+    }
+  }
+
   const callExternalAPI = async (
     prompt: string,
     provider: 'openai' | 'gemini',
@@ -166,8 +214,8 @@ export default function AnalysisScreen({
   ): Promise<string> => {
     let lastError: Error | null = null
     
-    const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-    const finalConfig = storedConfig || aiConfig || {
+    // Use the loaded config or aiConfig from hook (don't try window.spark.kv)
+    const finalConfig = loadedConfig || aiConfig || {
       provider: 'openai',
       model: 'gpt-4o',
       apiKey: '',
@@ -464,17 +512,18 @@ ${response}
         
         console.log('⚙️ [ANALYSIS] Зареждане на AI конфигурация от KV storage...')
         
-        // Wait a bit longer to ensure KV storage has fully loaded
+        // Wait a bit to ensure storage has initialized
         await sleep(300)
         
-        const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
+        // Try to load from storage (IndexedDB/localStorage)
+        const storedConfig = await getConfigFromStorage()
         
         // Give priority to stored config, then to aiConfig from hook
         let finalConfig: AIModelConfig | null = null
         
         if (storedConfig && storedConfig.apiKey && storedConfig.apiKey.trim() !== '') {
           finalConfig = storedConfig
-          console.log('✅ [CONFIG] Използване на конфигурация от KV storage')
+          console.log('✅ [CONFIG] Използване на конфигурация от storage')
         } else if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
           finalConfig = aiConfig
           console.log('✅ [CONFIG] Използване на конфигурация от hook')
@@ -483,10 +532,13 @@ ${response}
           console.log('⏳ [CONFIG] Конфигурацията все още се зарежда, изчакване...')
           await sleep(700)
           
-          const retryConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
+          const retryConfig = await getConfigFromStorage()
           if (retryConfig && retryConfig.apiKey && retryConfig.apiKey.trim() !== '') {
             finalConfig = retryConfig
             console.log('✅ [CONFIG] Конфигурация заредена след повторен опит')
+          } else if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
+            finalConfig = aiConfig
+            console.log('✅ [CONFIG] Използване на конфигурация от hook след изчакване')
           }
         }
         
@@ -552,8 +604,8 @@ ${response}
     console.log('📊 [АНАЛИЗ] questionnaireData валиден:', !!questionnaireData)
     
     try {
-      const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-      const finalConfig = storedConfig || aiConfig || {
+      // Use the already loaded config or fall back to hook
+      const finalConfig = loadedConfig || aiConfig || {
         provider: 'openai',
         model: 'gpt-4o',
         apiKey: '',
