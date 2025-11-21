@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
-import { createIrisWithOverlay } from '@/lib/image-utils'
+import { createIrisWithOverlay, MAX_VISION_TOKENS } from '@/lib/image-utils'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -98,7 +98,7 @@ export default function AnalysisScreen({
           messages: [{ role: 'user', content: imageDataUrl ? content : prompt }],
           response_format: jsonMode ? { type: 'json_object' } : undefined,
           temperature: 0.7,
-          max_tokens: 4096
+          max_tokens: MAX_VISION_TOKENS
         })
       })
 
@@ -114,8 +114,8 @@ export default function AnalysisScreen({
       const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = []
       
       if (imageDataUrl) {
-        // Extract base64 data from data URL
-        const base64Match = imageDataUrl.match(/^data:image\/[a-z]+;base64,(.+)$/i)
+        // Extract base64 data from data URL - handle both uppercase and lowercase
+        const base64Match = imageDataUrl.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/i)
         if (base64Match) {
           parts.push({
             inline_data: {

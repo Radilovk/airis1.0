@@ -2,15 +2,18 @@
  * Utility functions for image manipulation and composite creation
  */
 
+// Maximum tokens for vision API calls
+export const MAX_VISION_TOKENS = 4096
+
 /**
  * Creates a composite image by overlaying the iridology map on top of an iris image
  * @param irisImageDataUrl - Base64 data URL of the iris image
- * @param side - Which side of the iris (left or right)
+ * @param side - Which side of the iris (left or right) - reserved for future use
  * @returns Promise<string> - Base64 data URL of the composite image
  */
 export async function createIrisWithOverlay(
   irisImageDataUrl: string,
-  side: 'left' | 'right'
+  _side: 'left' | 'right' // Prefixed with underscore as it's reserved for future use
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
@@ -41,7 +44,7 @@ export async function createIrisWithOverlay(
         const offsetY = (canvas.height - size) / 2
         
         // Draw the iridology overlay
-        drawIridologyOverlay(ctx, size, offsetX, offsetY, side)
+        drawIridologyOverlay(ctx, size, offsetX, offsetY)
         
         // Convert canvas to data URL
         const compositeDataUrl = canvas.toDataURL('image/jpeg', 0.95)
@@ -66,8 +69,7 @@ function drawIridologyOverlay(
   ctx: CanvasRenderingContext2D,
   size: number,
   offsetX: number,
-  offsetY: number,
-  side: 'left' | 'right'
+  offsetY: number
 ) {
   const centerX = offsetX + size / 2
   const centerY = offsetY + size / 2
