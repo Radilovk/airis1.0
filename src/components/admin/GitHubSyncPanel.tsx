@@ -204,12 +204,14 @@ export default function GitHubSyncPanel() {
   }
 
   const totalChanges = useMemo(() => {
+    if (!elementsConfig) return 0
     return Object.keys(elementsConfig).reduce((sum, moduleId) => {
       return sum + Object.keys(elementsConfig[moduleId] || {}).length
     }, 0)
   }, [elementsConfig])
 
   const totalComments = useMemo(() => {
+    if (!elementsConfig) return 0
     return Object.keys(elementsConfig).reduce((sum, moduleId) => {
       const module = elementsConfig[moduleId] || {}
       return sum + Object.values(module).reduce((s: number, el: any) => {
