@@ -10,7 +10,8 @@ import {
   Activity,
   ClipboardText,
   FloppyDisk,
-  Warning
+  Warning,
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
@@ -32,6 +33,7 @@ import { Card } from '@/components/ui/card'
 interface ReportScreenProps {
   report: AnalysisReport
   onRestart: () => void
+  onReanalyze?: () => void
 }
 
 function ErrorFallback({ error }: { error: Error }) {
@@ -55,7 +57,7 @@ function ErrorFallback({ error }: { error: Error }) {
   )
 }
 
-export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
+export default function ReportScreen({ report, onRestart, onReanalyze }: ReportScreenProps) {
   const [activeTab, setActiveTab] = useState('overview')
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
@@ -215,6 +217,20 @@ export default function ReportScreen({ report, onRestart }: ReportScreenProps) {
                   <span className="hidden sm:inline">Експорт HTML</span>
                 </Button>
               </motion.div>
+              {onReanalyze && (
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={onReanalyze} 
+                    className="gap-2 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500 transition-colors"
+                    title="Повторен анализ"
+                  >
+                    <ArrowsClockwise size={18} />
+                    <span className="hidden sm:inline">Повторен анализ</span>
+                  </Button>
+                </motion.div>
+              )}
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
                   variant="ghost" 

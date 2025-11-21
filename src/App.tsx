@@ -43,6 +43,7 @@ function App() {
   const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null)
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
   const screenTransitionLockRef = useRef(false)
+  const [isReanalysis, setIsReanalysis] = useState(false)
 
   useEffect(() => {
     errorLogger.info('APP_MOUNT', 'Application mounted successfully')
@@ -374,12 +375,62 @@ function App() {
   }
 
   const handleRestart = () => {
-    setQuestionnaireData(() => null)
+    setIsReanalysis(false)
+    setQuestionnaireData(null)
     leftIrisRef.current = null
     rightIrisRef.current = null
     setImagesReady(false)
     setAnalysisReport(null)
     setTimeout(() => setCurrentScreen('welcome'), 50)
+  }
+
+  const handleReanalyze = (report?: AnalysisReport) => {
+    try {
+      // Set reanalysis flag
+      setIsReanalysis(true)
+      
+      // If report is provided, use its questionnaire data
+      if (report) {
+        setQuestionnaireData(report.questionnaireData)
+        
+        // Check if the current report has iris images
+        if (analysisReport && 
+            analysisReport.id === report.id && 
+            analysisReport.leftIrisImage?.dataUrl && 
+            analysisReport.rightIrisImage?.dataUrl) {
+          // We have the images in memory, reuse them
+          leftIrisRef.current = analysisReport.leftIrisImage
+          rightIrisRef.current = analysisReport.rightIrisImage
+          setImagesReady(true)
+          
+          // Skip to analysis
+          setTimeout(() => setCurrentScreen('analysis'), 50)
+          toast.success('Започване на повторен анализ с текущите изображения')
+        } else {
+          // No images available, need to upload new ones
+          setTimeout(() => setCurrentScreen('upload'), 50)
+          toast.info('Моля, качете изображения на ириси за повторен анализ')
+        }
+      } else if (analysisReport && 
+                 analysisReport.leftIrisImage?.dataUrl && 
+                 analysisReport.rightIrisImage?.dataUrl) {
+        // Re-analyze current report with existing images
+        leftIrisRef.current = analysisReport.leftIrisImage
+        rightIrisRef.current = analysisReport.rightIrisImage
+        setImagesReady(true)
+        setQuestionnaireData(analysisReport.questionnaireData)
+        setTimeout(() => setCurrentScreen('analysis'), 50)
+        toast.success('Започване на повторен анализ')
+      } else {
+        // No images available at all, go to upload
+        setTimeout(() => setCurrentScreen('upload'), 50)
+        toast.info('Моля, качете изображения на ириси за повторен анализ')
+      }
+    } catch (error) {
+      console.error('Грешка при стартиране на повторен анализ:', error)
+      toast.error('Грешка при стартиране на повторен анализ')
+      setIsReanalysis(false)
+    }
   }
 
   return (
@@ -419,6 +470,7 @@ function App() {
           >
             <ImageUploadScreen 
               onComplete={handleImagesComplete}
+              isReanalysis={isReanalysis}
             />
           </motion.div>
         )}
@@ -449,7 +501,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <ReportScreen report={analysisReport} onRestart={handleRestart} />
+              <ReportScreen report={analysisReport} onRestart={handleRestart} onReanalyze={handleReanalyze} />
             </Suspense>
           </motion.div>
         )}
@@ -462,7 +514,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <HistoryScreen onViewReport={handleViewReport} onBack={() => setCurrentScreen('welcome')} />
+              <HistoryScreen onViewReport={handleViewReport} onBack={() => setCurrentScreen('welcome')} onReanalyze={handleReanalyze} />
             </Suspense>
           </motion.div>
         )}

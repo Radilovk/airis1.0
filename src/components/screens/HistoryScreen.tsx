@@ -8,7 +8,8 @@ import {
   FileText, 
   Trash,
   Eye,
-  ArrowLeft 
+  ArrowLeft,
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -17,9 +18,10 @@ import type { AnalysisReport } from '@/types'
 interface HistoryScreenProps {
   onViewReport: (report: AnalysisReport) => void
   onBack: () => void
+  onReanalyze?: (report: AnalysisReport) => void
 }
 
-export default function HistoryScreen({ onViewReport, onBack }: HistoryScreenProps) {
+export default function HistoryScreen({ onViewReport, onBack, onReanalyze }: HistoryScreenProps) {
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
 
   const handleDelete = (timestamp: string) => {
@@ -169,6 +171,17 @@ export default function HistoryScreen({ onViewReport, onBack }: HistoryScreenPro
                             <Eye size={16} />
                             Преглед
                           </Button>
+                          {onReanalyze && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onReanalyze(report)}
+                              className="gap-2 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500"
+                            >
+                              <ArrowsClockwise size={16} />
+                              Повторен анализ
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
