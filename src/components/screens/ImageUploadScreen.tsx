@@ -14,9 +14,10 @@ interface ImageUploadScreenProps {
   onComplete: (left: IrisImage, right: IrisImage) => void
   initialLeft?: IrisImage | null
   initialRight?: IrisImage | null
+  isReanalysis?: boolean
 }
 
-export default function ImageUploadScreen({ onComplete, initialLeft = null, initialRight = null }: ImageUploadScreenProps) {
+export default function ImageUploadScreen({ onComplete, initialLeft = null, initialRight = null, isReanalysis = false }: ImageUploadScreenProps) {
   const leftImageRef = useRef<IrisImage | null>(initialLeft)
   const rightImageRef = useRef<IrisImage | null>(initialRight)
   const [imagesVersion, setImagesVersion] = useState(0)
@@ -752,11 +753,27 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
               <Camera size={32} weight="duotone" className="text-primary" />
             </div>
-            <h2 className="text-3xl font-bold mb-2">Качване на Снимки</h2>
+            <h2 className="text-3xl font-bold mb-2">
+              {isReanalysis ? 'Качване на Снимки за Повторен Анализ' : 'Качване на Снимки'}
+            </h2>
             <p className="text-muted-foreground">
-              Качете ясни снимки на левия и десния си ирис
+              {isReanalysis 
+                ? 'Качете нови снимки на левия и десния си ирис за повторен анализ'
+                : 'Качете ясни снимки на левия и десния си ирис'
+              }
             </p>
           </motion.div>
+
+          {isReanalysis && (
+            <Card className="p-4 mb-6 bg-blue-500/10 border-blue-500/20">
+              <div className="flex items-center gap-3">
+                <div className="text-blue-500">ℹ️</div>
+                <p className="text-sm font-medium">
+                  Ще използваме вашите предишни данни от въпросника за повторен анализ с новите изображения.
+                </p>
+              </div>
+            </Card>
+          )}
 
           <Card className="p-6 mb-6 bg-secondary/30">
             <h3 className="font-semibold mb-3">📋 Инструкции за качествени снимки:</h3>
