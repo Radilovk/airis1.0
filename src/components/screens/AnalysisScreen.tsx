@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
+import { createIrisWithOverlay } from '@/lib/image-utils'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -68,11 +69,24 @@ export default function AnalysisScreen({
     provider: 'openai' | 'gemini',
     model: string,
     apiKey: string,
-    jsonMode: boolean = true
+    jsonMode: boolean = true,
+    imageDataUrl?: string
   ): Promise<string> => {
-    addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}`)
+    addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''}`)
     
     if (provider === 'openai') {
+      // Build content array - text + optional image
+      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+        { type: 'text', text: prompt }
+      ]
+      
+      if (imageDataUrl) {
+        content.push({
+          type: 'image_url',
+          image_url: { url: imageDataUrl }
+        })
+      }
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -81,9 +95,10 @@ export default function AnalysisScreen({
         },
         body: JSON.stringify({
           model: model,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{ role: 'user', content: imageDataUrl ? content : prompt }],
           response_format: jsonMode ? { type: 'json_object' } : undefined,
-          temperature: 0.7
+          temperature: 0.7,
+          max_tokens: 4096
         })
       })
 
@@ -95,6 +110,28 @@ export default function AnalysisScreen({
       const data = await response.json()
       return data.choices[0].message.content
     } else {
+      // Gemini supports vision
+      const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = []
+      
+      if (imageDataUrl) {
+        // Extract base64 data from data URL
+        const base64Match = imageDataUrl.match(/^data:image\/[a-z]+;base64,(.+)$/i)
+        if (base64Match) {
+          parts.push({
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: base64Match[1]
+            }
+          })
+        }
+      }
+      
+      parts.push({
+        text: jsonMode 
+          ? `${prompt}\n\nВърни САМО валиден JSON обект, без допълнителен текст.`
+          : prompt
+      })
+      
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -102,11 +139,7 @@ export default function AnalysisScreen({
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{
-              text: jsonMode 
-                ? `${prompt}\n\nВърни САМО валиден JSON обект, без допълнителен текст.`
-                : prompt
-            }]
+            parts: parts
           }],
           generationConfig: {
             temperature: 0.7,
@@ -128,7 +161,8 @@ export default function AnalysisScreen({
   const callLLMWithRetry = async (
     prompt: string,
     jsonMode: boolean = true,
-    maxRetries: number = 2
+    maxRetries: number = 2,
+    imageDataUrl?: string
   ): Promise<string> => {
     let lastError: Error | null = null
     
@@ -170,13 +204,14 @@ export default function AnalysisScreen({
         console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${provider} с модел ${configuredModel}`)
         
         addLog('info', `→ ✅ Извикване на ${provider} API с модел ${configuredModel}`)
-        console.log(`🔑 [API CALL] Използване на ${provider} API`)
+        console.log(`🔑 [API CALL] Използване на ${provider} API${imageDataUrl ? ' с изображение' : ''}`)
         const response = await callExternalAPI(
           prompt,
           provider,
           configuredModel,
           apiKey,
-          jsonMode
+          jsonMode,
+          imageDataUrl
         )
         
         if (response && response.length > 0) {
@@ -770,6 +805,20 @@ GitHub Spark API има ограничения за брой заявки в м�
       console.log(`📝 [ИРИС ${side}] BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] Цели: ${goalsText}`)
       
+      // Create composite image with overlay
+      addLog('info', '🎨 Създаване на композитно изображение с топографска карта...')
+      console.log(`🎨 [ИРИС ${side}] Създаване на композитно изображение...`)
+      let compositeImageUrl: string
+      try {
+        compositeImageUrl = await createIrisWithOverlay(iris.dataUrl, side)
+        addLog('success', `Композитно изображение създадено успешно (${Math.round(compositeImageUrl.length / 1024)} KB)`)
+        console.log(`✅ [ИРИС ${side}] Композитно изображение създадено`)
+      } catch (overlayError) {
+        addLog('warning', `Грешка при създаване на overlay, използване на оригинално изображение: ${overlayError}`)
+        console.warn(`⚠️ [ИРИС ${side}] Overlay грешка:`, overlayError)
+        compositeImageUrl = iris.dataUrl // Fallback to original
+      }
+      
       addLog('info', 'Използване на AIRIS база знания за контекст...')
       const knowledgeContext = `
 РЕФЕРЕНТНА КАРТА НА ИРИСА(12h=0°,часовн_посока,360°_пълен_кръг):
@@ -789,10 +838,33 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
       addLog('info', 'Подготовка на prompt за LLM...')
       const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`ИРИДОЛОГ|IMG_ID:${imageHash}|СТРАНА:${sideName}
 
+⚠️ ВАЖНО - ИЗОБРАЖЕНИЕТО ВКЛЮЧВА ТОПОГРАФСКА КАРТА:
+Изображението на ириса е с наложена топографска карта, показваща 12-те зони (като часовник).
+Сините линии и етикети са САМО ЗА РЕФЕРЕНЦИЯ и не са част от ириса.
+АНАЛИЗИРАЙ ИРИСА ПОД тези линии, НЕ самите линии!
+
+Линиите показват:
+- Концентрични кръгове: вътрешни зони (зеница, автономен пръстен)
+- 12 радиални линии: разделят зоните (12h=връх=Мозък, 3h=Белодробна, 6h=Панкреас и т.н.)
+- Етикети: имена на органи за всяка зона
+
 ⚠️ КРИТИЧНО ПРАВИЛО - ОБЕКТИВЕН АНАЛИЗ:
-АНАЛИЗИРАЙ САМО ТОВА, КОЕТО РЕАЛНО ВИЖДАШ НА СНИМКАТА!
+АНАЛИЗИРАЙ САМО ТОВА, КОЕТО РЕАЛНО ВИЖДАШ В ИРИСА (ПОД сините линии)!
 НЕ създавай "виртуални" находки базирани на въпросника.
 Топографската карта отразява ЕДИНСТВЕНО визуално наблюдаваното.
+
+ИГНОРИРАЙ:
+- Сините линии на картата (те са само за ориентация)
+- Етикетите с текст (те са за твоя референция)
+- Ярки бели отражения от светлина
+- Огледални ефекти
+
+АНАЛИЗИРАЙ:
+- Реални структурни промени в ириса
+- Дисколорации, пигментни петна
+- Лакуни (тъмни процепи)
+- Крипти (малки дупки)
+- Радиални линии (ако са ЧАСТ от ириса, не от картата)
 
 Въпросникът се използва САМО ЗА:
 - Тълкуване на реално съществуващите находки
@@ -835,14 +907,14 @@ Per_зона:id(1-12)|name(БГ)|organ(БГ)|status(normal/attention/concern)|fi
 НЕ ПИШИ симптоми от въпросника!
 
 2.АРТЕФАКТИ(0-8)–САМО_реално_видими:
-ИГНОРИРАЙ:ярки_бели_отражения,огледални_ефекти,сенки_от_светлина
-ВКЛЮЧИ_САМО_АКО_ВИДИШ:лакуни(тъмни_процепи)|крипти(малки_дупки)|пигменти(цветни_петна)|радиални_линии(център→ръб)|автоном_пръстен(кръг_зеница)
+ИГНОРИРАЙ:ярки_бели_отражения,огледални_ефекти,сенки_от_светлина,СИНИТЕ_ЛИНИИ_НА_КАРТАТА
+ВКЛЮЧИ_САМО_АКО_ВИДИШ_В_ИРИСА:лакуни(тъмни_процепи)|крипти(малки_дупки)|пигменти(цветни_петна)|радиални_линии(център→ръб)|автоном_пръстен(кръг_зеница)
 
 Per_артефакт:type(БГ)|location(часовник_БГ)|description(<60симв_БГ_визуално_описание)|severity(low/med/high)
 
-⚠️ АКО_НЕ_ВИЖДАШ_артефакти → върни_празен_масив_[]
+⚠️ АКО_НЕ_ВИЖДАШ_артефакти_В_САМИЯ_ИРИС → върни_празен_масив_[]
 
-3.ОБЩО_ЗДРАВЕ:int 0-100 базирано_САМО_на_реални_визуални_находки
+3.ОБЩО_ЗДРАВЕ:int 0-100 базирано_САМО_на_реални_визуални_находки_В_ИРИСА
 
 4.СИСТЕМНИ_ОЦЕНКИ(6 системи,0-100):
 Храносмилателна,Имунна,Нервна,Сърдечно-съдова,Детоксикация,Ендокринна
@@ -871,12 +943,13 @@ JSON:
   }
 }`
 
-      addLog('info', `Изпращане на prompt до LLM (${prompt.length} символа)...`)
-      console.log(`🤖 [ИРИС ${side}] Изпращане на prompt до LLM...`)
+      addLog('info', `Изпращане на prompt + изображение до LLM (${prompt.length} символа)...`)
+      console.log(`🤖 [ИРИС ${side}] Изпращане на prompt + изображение до LLM...`)
       console.log(`📄 [ИРИС ${side}] Prompt дължина: ${prompt.length} символа`)
+      console.log(`📷 [ИРИС ${side}] Изображение дължина: ${Math.round(compositeImageUrl.length / 1024)} KB`)
       
       addLog('warning', 'Изчакване на отговор от AI модела... (това може да отнеме 10-30 сек)')
-      const response = await callLLMWithRetry(prompt, true)
+      const response = await callLLMWithRetry(prompt, true, 2, compositeImageUrl)
       
       addLog('success', `Получен отговор от LLM (${response.length} символа)`)
       console.log(`✅ [ИРИС ${side}] Получен отговор от LLM`)
