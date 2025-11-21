@@ -423,7 +423,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       if (finalImage.length > 600 * 1024) {
         uploadDiagnostics.log('CROP_COMPRESS_ERROR_TOO_LARGE', 'error', {
           finalSize: Math.round(finalImage.length / 1024),
-          maxSize: 200
+          maxSize: 600
         })
         console.error('❌ [UPLOAD] Image too large even after aggressive compression!')
         errorLogger.error('UPLOAD_CROP_SAVE', 'Image too large after compression', undefined, {
