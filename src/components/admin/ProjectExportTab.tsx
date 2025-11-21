@@ -12,7 +12,6 @@ import {
   Package, 
   FileCode, 
   CheckCircle,
-  Warning,
   Info,
   GitBranch,
   FolderOpen,
@@ -100,9 +99,7 @@ export default function ProjectExportTab() {
       'TROUBLESHOOTING.md',
       'README_BG.md',
       '.gitignore',
-      'extract-project.py',
-      'runtime.config.json',
-      'spark.meta.json'
+      'extract-project.py'
     ]
 
     for (const file of filesToScan) {
@@ -387,7 +384,7 @@ ${exportLog.join('\n')}
     {
       title: 'Достъп до кода',
       steps: [
-        'Използвайте GitHub Spark Workbench за пълен достъп',
+        'Използвайте GitHub repository за достъп до кода',
         'Изтеглете детайлните инструкции с бутона "Инструкции за експорт"',
         'Следвайте стъпките за пълна синхронизация'
       ]
@@ -396,7 +393,7 @@ ${exportLog.join('\n')}
       title: 'Методи за експорт',
       steps: [
         'Git Clone - най-надежден метод (препоръчително)',
-        'Spark Workbench Download - бърз, но понякога непълен',
+        'GitHub Download ZIP - бърз и надежден',
         'Ръчно копиране - бавен, но 100% гарантира пълнота'
       ]
     },
@@ -412,7 +409,7 @@ ${exportLog.join('\n')}
       title: 'Синхронизация с GitHub',
       steps: [
         'git add . - добави всички промени',
-        'git commit -m "Manual sync from Spark"',
+        'git commit -m "Manual sync"',
         'git push origin main - синхронизирай с repository'
       ]
     }
@@ -455,8 +452,7 @@ ${exportLog.join('\n')}
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Важно:</strong> Автоматичната синхронизация между Spark и GitHub repository може да е нарушена. 
-                  Използвайте тези инструменти за пълен експорт и ръчна синхронизация.
+                  Използвайте тези инструменти за експорт и синхронизация на проекта.
                 </AlertDescription>
               </Alert>
 
@@ -675,9 +671,8 @@ ${exportLog.join('\n')}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm">Стъпки за Git Clone:</h4>
                 <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-                  <li>Отворете GitHub Spark Dashboard</li>
-                  <li>Намерете "View on GitHub" линк за проекта</li>
-                  <li>Копирайте repository URL</li>
+                  <li>Отворете GitHub repository</li>
+                  <li>Копирайте repository URL (Code → HTTPS)</li>
                   <li>В терминал: <code className="bg-muted px-2 py-0.5 rounded text-xs">git clone [repo-url]</code></li>
                   <li>Влезте в директорията: <code className="bg-muted px-2 py-0.5 rounded text-xs">cd [repo-name]</code></li>
                   <li>Инсталирайте: <code className="bg-muted px-2 py-0.5 rounded text-xs">npm install</code></li>
@@ -688,13 +683,11 @@ ${exportLog.join('\n')}
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold text-sm">Ръчна синхронизация (ако auto-sync е нарушена):</h4>
+                <h4 className="font-semibold text-sm">Ръчна синхронизация:</h4>
                 <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-                  <li>Експортирайте всички файлове от Spark Workbench</li>
-                  <li>Клонирайте вашия GitHub repository локално</li>
-                  <li>Копирайте всички файлове от Spark експорта в локалния repo</li>
+                  <li>Копирайте всички файлове в локалния repo</li>
                   <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git add .</code></li>
-                  <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git commit -m "Manual sync from Spark"</code></li>
+                  <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git commit -m "Manual sync"</code></li>
                   <li><code className="bg-muted px-2 py-0.5 rounded text-xs">git push origin main</code></li>
                 </ol>
               </div>
@@ -704,18 +697,9 @@ ${exportLog.join('\n')}
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs text-muted-foreground">
                   💡 <strong>Съвет:</strong> След успешна синхронизация, можете да работите директно 
-                  в локалния Git repository и да push-вате промените. GitHub Spark може да се използва 
-                  само за бърза разработка, а production кодът да се управлява през Git.
+                  в локалния Git repository и да push-вате промените.
                 </p>
               </div>
-
-              <Alert variant="destructive">
-                <Warning className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Внимание:</strong> Ако правите промени едновременно в Spark и локално, 
-                  ще имате конфликти. Изберете един основен източник на истина - или Spark, или Git.
-                </AlertDescription>
-              </Alert>
             </CardContent>
           </Card>
 
