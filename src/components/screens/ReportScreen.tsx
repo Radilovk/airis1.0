@@ -15,17 +15,10 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import type { AnalysisReport, EditorModeConfig, ReportModule } from '@/types'
+import type { AnalysisReport } from '@/types'
 import OverviewTab from '@/components/report/tabs/OverviewTab'
-import OverviewTabEditable from '@/components/report/tabs/OverviewTabEditable'
-import OverviewTabFullyEditable from '@/components/report/tabs/OverviewTabFullyEditable'
-import OverviewTabWithEditor from '@/components/report/tabs/OverviewTabWithEditor'
 import IridologyTab from '@/components/report/tabs/IridologyTab'
-import IridologyTabEditable from '@/components/report/tabs/IridologyTabEditable'
 import PlanTab from '@/components/report/tabs/PlanTab'
-import PlanTabEditable from '@/components/report/tabs/PlanTabEditable'
-import ReportEditorMode from '@/components/report/ReportEditorMode'
-import EditorSidebar from '@/components/report/EditorSidebar'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
@@ -61,15 +54,6 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
   const [activeTab, setActiveTab] = useState('overview')
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
-  const [editorConfig] = useKVWithFallback<EditorModeConfig>('editor-mode-config', {
-    enabled: false,
-    moduleOrder: [
-      { id: 'overview', type: 'overview', title: 'Обща Информация', visible: true, order: 0, comments: [], containers: [] },
-      { id: 'iridology', type: 'iridology', title: 'Иридологичен Анализ', visible: true, order: 1, comments: [], containers: [] },
-      { id: 'plan', type: 'plan', title: 'План за Действие', visible: true, order: 2, comments: [], containers: [] },
-    ],
-    lastModified: new Date().toISOString()
-  })
   
   const handleSaveToHistory = () => {
     setHistory((current) => {
@@ -121,34 +105,6 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
     } else {
       navigator.clipboard.writeText(shareText)
       toast.success('Копирано в клипборда')
-    }
-  }
-
-  const renderModuleContent = (module: ReportModule) => {
-    if (!module.visible && !editorConfig?.enabled) return null
-    
-    switch (module.type) {
-      case 'overview':
-        return editorConfig?.enabled 
-          ? <OverviewTabWithEditor report={report} avgHealth={avgHealth} editorMode={editorConfig.enabled} />
-          : <OverviewTab report={report} avgHealth={avgHealth} />
-      case 'iridology':
-        return editorConfig?.enabled
-          ? <IridologyTabEditable report={report} />
-          : <IridologyTab report={report} />
-      case 'plan':
-        return editorConfig?.enabled
-          ? <PlanTabEditable report={report} />
-          : <PlanTab report={report} />
-      case 'custom':
-        return (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>Персонализиран модул: {module.title}</p>
-            <p className="text-xs mt-2">Добавете съдържание чрез AI инструкции в коментарите</p>
-          </div>
-        )
-      default:
-        return null
     }
   }
 
@@ -266,31 +222,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
           </div>
         </motion.div>
 
-        {editorConfig?.enabled ? (
-          <div className="space-y-4">
-            <div className="flex justify-end gap-2">
-              <EditorSidebar moduleId="overview-tab" moduleName="Общо състояние" />
-              <EditorSidebar moduleId="iridology-tab" moduleName="Иридологичен Анализ" />
-              <EditorSidebar moduleId="plan-tab" moduleName="План за Действие" />
-            </div>
-            
-            <ReportEditorMode>
-              {(modules) => (
-                <div className="space-y-3">
-                  {modules.map((module) => (
-                    <ErrorBoundary 
-                      key={module.id} 
-                      fallbackRender={({ error }) => <ErrorFallback error={error} />}
-                    >
-                      {renderModuleContent(module)}
-                    </ErrorBoundary>
-                  ))}
-                </div>
-              )}
-            </ReportEditorMode>
-          </div>
-        ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 h-auto p-1.5 bg-muted/50 rounded-xl shadow-inner">
               <TabsTrigger 
                 value="overview" 
@@ -333,7 +265,6 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
               </ErrorBoundary>
             </TabsContent>
           </Tabs>
-        )}
       </div>
     </div>
   )
