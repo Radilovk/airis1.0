@@ -137,7 +137,7 @@ export interface SupplementRecommendation {
 }
 
 export interface AIModelConfig {
-  provider: 'openai' | 'gemini' | 'github-spark'
+  provider: 'openai' | 'gemini'
   model: string
   apiKey: string
   useCustomKey: boolean

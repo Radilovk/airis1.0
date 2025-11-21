@@ -47,7 +47,7 @@ interface AdminScreenProps {
 
 export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [aiConfig, setAiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
-    provider: 'github-spark',
+    provider: 'openai',
     model: 'gpt-4o',
     apiKey: '',
     useCustomKey: false,
@@ -66,7 +66,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     lastModified: new Date().toISOString()
   })
   
-  const [provider, setProvider] = useState<'openai' | 'gemini' | 'github-spark'>(aiConfig?.provider || 'github-spark')
+  const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
   const [model, setModel] = useState(aiConfig?.model || 'gpt-4o')
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
@@ -108,10 +108,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 60000)
       setRequestCount(aiConfig.requestCount || 8)
-      
-      if (aiConfig.provider === 'github-spark') {
-        console.log(`ℹ️ [ADMIN] GitHub Spark Provider зареден - модел: ${aiConfig.model}`)
-      }
     }
   }, [aiConfig])
 
@@ -183,7 +179,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       const config: AIModelConfig = {
         provider,
         model: model,
-        apiKey: actualUseCustomKey && provider !== 'github-spark' ? apiKey : '',
+        apiKey: actualUseCustomKey ? apiKey : '',
         useCustomKey: actualUseCustomKey,
         requestDelay,
         requestCount
@@ -194,16 +190,10 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       
       await setAiConfig(config)
       
-      if (provider === 'github-spark') {
-        toast.success(`✓ Конфигурацията е запазена: GitHub Spark / ${model}`, {
-          duration: 5000
-        })
-      } else {
-        toast.success(`✓ AI конфигурация запазена: ${provider} / ${model}`, {
-          description: 'Вашият собствен API ключ ще бъде използван за анализите.',
-          duration: 5000
-        })
-      }
+      toast.success(`✓ AI конфигурация запазена: ${provider} / ${model}`, {
+        description: actualUseCustomKey ? 'Вашият собствен API ключ ще бъде използван за анализите.' : undefined,
+        duration: 5000
+      })
     } catch (error) {
       console.error('Error saving config:', error)
       toast.error('Грешка при запазване на конфигурацията')
@@ -458,43 +448,22 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                 Изберете AI модел и конфигурирайте API достъп за анализ на ирисите
               </CardDescription>
               
-              {aiConfig && aiConfig.provider === 'github-spark' && !aiConfig.useCustomKey && (
-                <div className="mt-3 p-2 md:p-3 bg-primary/10 rounded-lg border-2 border-primary/30">
-                  <p className="text-xs md:text-sm font-bold text-primary flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                    <span className="break-words">GitHub Spark API - Активен модел: {aiConfig.model}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    GitHub Spark поддържа <strong>gpt-4o</strong> и <strong>gpt-4o-mini</strong>. 
-                    За достъп до други модели (GPT-4 Turbo, Gemini и др.), добавете 
-                    <strong> собствен API ключ</strong> от OpenAI или Google.
-                  </p>
-                </div>
-              )}
-              
               {aiConfig && (
                 <div className={`mt-3 p-2 md:p-3 rounded-lg border ${
-                  (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey
+                  !aiConfig.apiKey
                     ? 'bg-destructive/10 border-destructive/30'
                     : 'bg-primary/10 border-primary/20'
                 }`}>
                   <p className={`text-xs md:text-sm font-medium break-words ${
-                    (aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey
+                    !aiConfig.apiKey
                       ? 'text-destructive'
                       : 'text-primary'
                   }`}>
-                    {(aiConfig.provider === 'gemini' || aiConfig.provider === 'openai') && !aiConfig.apiKey ? (
+                    {!aiConfig.apiKey ? (
                       <>
                         ❌ ГРЕШНА КОНФИГУРАЦИЯ: {aiConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI'} / {aiConfig.model}
                         <span className="block md:inline md:ml-2 text-xs mt-1 md:mt-0">
                           (няма API ключ - анализът НЯМА ДА РАБОТИ)
-                        </span>
-                      </>
-                    ) : aiConfig.provider === 'github-spark' ? (
-                      <>
-                        ✓ Активна конфигурация: <span className="font-mono">GitHub Spark / {aiConfig.model}</span>
-                        <span className="block md:inline md:ml-2 text-xs text-muted-foreground mt-1 md:mt-0">
-                          (вграден API)
                         </span>
                       </>
                     ) : (
@@ -517,13 +486,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-sm md:text-base">Доставчик на AI модел</Label>
-                  <RadioGroup value={provider} onValueChange={(v) => setProvider(v as 'openai' | 'gemini' | 'github-spark')}>
-                    <div className="flex items-start space-x-2">
-                      <RadioGroupItem value="github-spark" id="github-spark" className="mt-0.5 flex-shrink-0" />
-                      <Label htmlFor="github-spark" className="font-normal cursor-pointer text-sm leading-relaxed">
-                        GitHub Spark (вграден - поддържа gpt-4o и gpt-4o-mini)
-                      </Label>
-                    </div>
+                  <RadioGroup value={provider} onValueChange={(v) => setProvider(v as 'openai' | 'gemini')}>
                     <div className="flex items-start space-x-2">
                       <RadioGroupItem value="openai" id="openai" className="mt-0.5 flex-shrink-0" />
                       <Label htmlFor="openai" className="font-normal cursor-pointer text-sm leading-relaxed">
@@ -537,16 +500,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       </Label>
                     </div>
                   </RadioGroup>
-                  
-                  {provider === 'github-spark' && (
-                    <div className="mt-2 p-2 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground">
-                        ℹ️ GitHub Spark API поддържа <strong>gpt-4o</strong> и <strong>gpt-4o-mini</strong>. 
-                        Изборът ви по-долу ще бъде използван. За достъп до други модели (GPT-4 Turbo, Gemini), 
-                        използвайте собствен API ключ.
-                      </p>
-                    </div>
-                  )}
                   
                   {(provider === 'openai' || provider === 'gemini') && (
                     <div className="mt-2 p-2 md:p-3 bg-accent/10 rounded-lg border border-accent/30">
@@ -578,16 +531,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       <SelectValue placeholder="Изберете модел" />
                     </SelectTrigger>
                     <SelectContent>
-                      {provider === 'github-spark' && (
-                        <>
-                          <SelectItem value="gpt-4o">
-                            gpt-4o
-                          </SelectItem>
-                          <SelectItem value="gpt-4o-mini">
-                            gpt-4o-mini
-                          </SelectItem>
-                        </>
-                      )}
                       {provider === 'openai' && (
                         <>
                           {openaiModels.map((m) => (
@@ -628,7 +571,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       step={1000}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Препоръчително: 30000ms (30 сек) за GitHub Spark, 5000ms (5 сек) за собствен API ключ
+                      Препоръчително: 5000-10000ms (5-10 сек) за API заявки
                     </p>
                   </div>
 
@@ -662,12 +605,12 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   <div className="space-y-2">
                     <Label htmlFor="api-key" className="flex items-center gap-2 text-sm md:text-base flex-wrap">
                       <Key className="w-4 h-4 flex-shrink-0" />
-                      <span>API ключ {provider === 'gemini' || provider === 'openai' ? '(задължителен)' : '(опционален)'}</span>
+                      <span>API ключ (задължителен)</span>
                     </Label>
                     <Input
                       id="api-key"
                       type="password"
-                      placeholder={provider === 'openai' ? 'sk-...' : provider === 'gemini' ? 'AIza...' : 'Оставете празно за GitHub Spark'}
+                      placeholder={provider === 'openai' ? 'sk-...' : 'AIza...'}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       className="font-mono text-sm"
@@ -675,9 +618,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     <p className="text-xs text-muted-foreground break-words">
                       {provider === 'openai' 
                         ? 'Вашият OpenAI API ключ (започва с sk-)'
-                        : provider === 'gemini'
-                        ? 'Вашият Google AI API ключ (започва с AIza)'
-                        : 'GitHub Spark не изисква API ключ'
+                        : 'Вашият Google AI API ключ (започва с AIza)'
                       }
                     </p>
                   </div>
@@ -688,21 +629,10 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                         💡 <strong>Предимства на {provider === 'gemini' ? 'Gemini' : 'OpenAI'}:</strong>
                       </p>
                       <ul className="text-xs text-accent-foreground/80 mt-2 space-y-1 list-disc list-inside pl-1">
-                        <li className="break-words">По-бързо време за анализ (30-60 сек. вместо 90-150 сек.)</li>
-                        <li className="break-words">Без GitHub Spark rate limit ограничения</li>
+                        <li className="break-words">Бързо време за анализ (30-60 сек.)</li>
                         <li>Достъп до най-новите AI модели</li>
                         {provider === 'gemini' && <li className="break-words">Отличен за многоезични анализи (включително български)</li>}
                       </ul>
-                    </div>
-                  )}
-                  
-                  {provider === 'github-spark' && apiKey.trim() === '' && (
-                    <div className="p-2 md:p-3 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground break-words">
-                        ℹ️ <strong>Използва се GitHub Spark вграден модел</strong><br/>
-                        Анализът ще отнеме по-дълго време (90-150 сек.) и може да срещнете rate limit грешки при много заявки. 
-                        За по-бързо и стабилно изпълнение, изберете OpenAI или Gemini с собствен API ключ.
-                      </p>
                     </div>
                   )}
                 </div>

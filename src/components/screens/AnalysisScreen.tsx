@@ -39,21 +39,13 @@ export default function AnalysisScreen({
   const [analysisRunning, setAnalysisRunning] = useState(false)
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
-    provider: 'github-spark',
+    provider: 'openai',
     model: 'gpt-4o',
     apiKey: '',
     useCustomKey: false,
     requestDelay: 60000,
     requestCount: 8
   })
-
-  const getValidSparkModel = (model: string): 'gpt-4o' | 'gpt-4o-mini' => {
-    if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
-      return model
-    }
-    console.warn(`⚠️ [МОДЕЛ] Невалиден модел за GitHub Spark: "${model}", използва се по подразбиране "gpt-4o"`)
-    return 'gpt-4o'
-  }
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
@@ -73,7 +65,7 @@ export default function AnalysisScreen({
 
   const callExternalAPI = async (
     prompt: string,
-    provider: 'openai' | 'gemini' | 'github-spark',
+    provider: 'openai' | 'gemini',
     model: string,
     apiKey: string,
     jsonMode: boolean = true
@@ -142,7 +134,7 @@ export default function AnalysisScreen({
     
     const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
     const finalConfig = storedConfig || aiConfig || {
-      provider: 'github-spark',
+      provider: 'openai',
       model: 'gpt-4o',
       apiKey: '',
       useCustomKey: false,
@@ -153,75 +145,43 @@ export default function AnalysisScreen({
     const provider = finalConfig.provider
     const configuredModel = finalConfig.model
     const requestDelay = finalConfig.requestDelay || 60000
+    const apiKey = finalConfig.apiKey || ''
     
-    const hasAPIKey = finalConfig.apiKey && finalConfig.apiKey.trim() !== ''
-    const isExternalProvider = provider === 'gemini' || provider === 'openai'
-    const hasCustomAPI = hasAPIKey && isExternalProvider
-    const useCustomAPI = hasCustomAPI || (finalConfig.useCustomKey && hasAPIKey && isExternalProvider)
-    
-    console.log(`🔍 [LLM CONFIG DEBUG] Provider от конфигурация: "${provider}"`)
-    console.log(`🔍 [LLM CONFIG DEBUG] Model от конфигурация: "${configuredModel}"`)
-    console.log(`🔍 [LLM CONFIG DEBUG] useCustomKey flag: ${finalConfig.useCustomKey}`)
-    console.log(`🔍 [LLM CONFIG DEBUG] Has API key: ${hasAPIKey}`)
-    console.log(`🔍 [LLM CONFIG DEBUG] isExternalProvider: ${isExternalProvider}`)
-    console.log(`🔍 [LLM CONFIG DEBUG] hasCustomAPI: ${hasCustomAPI}`)
-    console.log(`🔍 [LLM CONFIG DEBUG] useCustomAPI (final): ${useCustomAPI}`)
-    
-    let actualModel: string
-    let actualProvider: string
-    let sparkModel: 'gpt-4o' | 'gpt-4o-mini' = 'gpt-4o'
-    
-    if (useCustomAPI) {
-      actualModel = configuredModel
-      actualProvider = provider
-      console.log(`🎯 [LLM CONFIG] ✅ Използване на СОБСТВЕН API`)
-      console.log(`🎯 [LLM CONFIG] Provider: ${actualProvider}`)
-      console.log(`🎯 [LLM CONFIG] Model: ${actualModel}`)
-      addLog('info', `✓ AI Конфигурация заредена: ${actualProvider} / ${actualModel}`)
-      addLog('info', `🔧 Режим: Собствен API (${actualProvider} - ${actualModel}) | Забавяне: ${requestDelay}ms`)
-    } else {
-      actualProvider = 'github-spark'
-      sparkModel = getValidSparkModel(configuredModel)
-      actualModel = sparkModel
-      console.log(`✓ [LLM CONFIG] Използване на GitHub Spark API`)
-      console.log(`🎯 [LLM CONFIG] Provider (актуален): ${actualProvider}`)
-      console.log(`🎯 [LLM CONFIG] Настроен модел: "${configuredModel}"`)
-      console.log(`🎯 [LLM CONFIG] Актуален модел: "${actualModel}"`)
-      addLog('info', `✓ AI Конфигурация заредена: ${actualProvider} / ${actualModel}`)
-      addLog('info', `🔧 Режим: GitHub Spark вграден модел (${actualModel}) | Забавяне: ${requestDelay}ms`)
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
     }
+    
+    console.log(`🔍 [LLM CONFIG] Provider: "${provider}"`)
+    console.log(`🔍 [LLM CONFIG] Model: "${configuredModel}"`)
+    console.log(`🔍 [LLM CONFIG] Has API key: ${!!apiKey}`)
+    
+    addLog('info', `✓ AI Конфигурация заредена: ${provider} / ${configuredModel}`)
+    addLog('info', `🔧 Режим: ${provider} / ${configuredModel} | Забавяне: ${requestDelay}ms`)
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 1) {
-          const waitTime = useCustomAPI ? 20000 : 180000
+          const waitTime = 20000
           addLog('warning', `Изчакване ${(waitTime / 1000).toFixed(0)}s преди опит ${attempt}/${maxRetries}...`)
           await sleep(waitTime)
         }
         
-        addLog('info', `LLM заявка (опит ${attempt}/${maxRetries}) към ${actualProvider}/${actualModel}...`)
-        console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${actualProvider} с модел ${actualModel}`)
+        addLog('info', `LLM заявка (опит ${attempt}/${maxRetries}) към ${provider}/${configuredModel}...`)
+        console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${provider} с модел ${configuredModel}`)
         
-        let response: string
-        if (useCustomAPI) {
-          addLog('info', `→ ✅ Извикване на СОБСТВЕН ${actualProvider} API с модел ${actualModel}`)
-          console.log(`🔑 [API CALL] Използване на собствен ${actualProvider} API ключ`)
-          response = await callExternalAPI(
-            prompt,
-            actualProvider as 'openai' | 'gemini',
-            actualModel,
-            finalConfig.apiKey,
-            jsonMode
-          )
-        } else {
-          addLog('info', `→ ✅ Използване на GitHub Spark API с модел ${actualModel}`)
-          console.log(`🌟 [SPARK] Извикване на window.spark.llm с модел ${actualModel}`)
-          response = await window.spark.llm(prompt, actualModel as 'gpt-4o' | 'gpt-4o-mini', jsonMode)
-        }
+        addLog('info', `→ ✅ Извикване на ${provider} API с модел ${configuredModel}`)
+        console.log(`🔑 [API CALL] Използване на ${provider} API`)
+        const response = await callExternalAPI(
+          prompt,
+          provider,
+          configuredModel,
+          apiKey,
+          jsonMode
+        )
         
         if (response && response.length > 0) {
           addLog('success', `LLM отговори успешно (${response.length} символа)`)
-          console.log(`✅ [LLM] Успешен отговор от ${actualProvider}/${actualModel}`)
+          console.log(`✅ [LLM] Успешен отговор от ${provider}/${configuredModel}`)
           return response
         } else {
           throw new Error('Празен отговор от LLM')
@@ -233,12 +193,12 @@ export default function AnalysisScreen({
         if (errorMsg.includes('429') || errorMsg.includes('Too many requests') || errorMsg.includes('rate limit')) {
           addLog('error', `⏱️ Rate limit достигнат - твърде много заявки!`)
           if (attempt < maxRetries) {
-            const backoffTime = useCustomAPI ? 30000 : 300000
+            const backoffTime = 30000
             addLog('warning', `⏳ Изчакване ${(backoffTime / 60000).toFixed(1)} минути преди повторен опит...`)
             await sleep(backoffTime)
             continue
           } else {
-            throw new Error(`Rate limit достигнат. ${useCustomAPI ? 'Проверете вашия API лимит и изчакайте.' : 'GitHub Spark API има ограничения. Моля изчакайте 5-10 минути или добавете собствен API ключ в Admin панела.'}`)
+            throw new Error(`Rate limit достигнат. Проверете вашия API лимит и изчакайте.`)
           }
         } else {
           addLog('error', `LLM грешка (опит ${attempt}): ${errorMsg}`)
@@ -482,29 +442,20 @@ ${response}
           return
         }
         
-        const hasAPIKey = finalConfig.apiKey && finalConfig.apiKey.trim() !== ''
-        const isExternalProvider = finalConfig.provider === 'gemini' || finalConfig.provider === 'openai'
-        const hasCustomAPI = hasAPIKey && isExternalProvider
-        const useCustomAPI = hasCustomAPI || (finalConfig.useCustomKey && hasAPIKey && isExternalProvider)
+        const apiKey = finalConfig.apiKey || ''
         
-        let modelToUse: string
-        let providerToUse: string
-        
-        console.log('🔍 [CONFIG DEBUG] finalConfig от KV:', finalConfig)
-        console.log('🔍 [CONFIG DEBUG] hasAPIKey:', hasAPIKey)
-        console.log('🔍 [CONFIG DEBUG] isExternalProvider:', isExternalProvider)
-        console.log('🔍 [CONFIG DEBUG] hasCustomAPI:', hasCustomAPI)
-        console.log('🔍 [CONFIG DEBUG] useCustomAPI (final):', useCustomAPI)
-        
-        if (!useCustomAPI) {
-          providerToUse = 'github-spark'
-          modelToUse = getValidSparkModel(finalConfig.model)
-          console.log(`🔧 [CONFIG] GitHub Spark режим - Конфигуриран модел: "${finalConfig.model}", валиден Spark модел: "${modelToUse}"`)
-        } else {
-          providerToUse = finalConfig.provider
-          modelToUse = finalConfig.model
-          console.log(`🔧 [CONFIG] Собствен API режим - Provider: ${providerToUse}, модел: "${modelToUse}"`)
+        if (!apiKey || apiKey.trim() === '') {
+          addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
+          throw new Error('Липсва API ключ за AI анализ')
         }
+        
+        const providerToUse = finalConfig.provider
+        const modelToUse = finalConfig.model
+        
+        console.log('🔍 [CONFIG] finalConfig от KV:', finalConfig)
+        console.log('🔍 [CONFIG] Provider:', providerToUse)
+        console.log('🔍 [CONFIG] Model:', modelToUse)
+        console.log('🔍 [CONFIG] Has API key:', !!apiKey)
         
         if (!mounted) {
           console.log('⚠️ [ANALYSIS] Component unmounted before starting analysis, aborting')
@@ -555,7 +506,7 @@ ${response}
     try {
       const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
       const finalConfig = storedConfig || aiConfig || {
-        provider: 'github-spark',
+        provider: 'openai',
         model: 'gpt-4o',
         apiKey: '',
         useCustomKey: false,
@@ -567,27 +518,20 @@ ${response}
       const configuredModel = finalConfig.model
       const requestDelay = finalConfig.requestDelay || 60000
       const requestCount = finalConfig.requestCount || 8
+      const apiKey = finalConfig.apiKey || ''
       
-      const hasAPIKey = finalConfig.apiKey && finalConfig.apiKey.trim() !== ''
-      const isExternalProvider = provider === 'gemini' || provider === 'openai'
-      const hasCustomAPI = hasAPIKey && isExternalProvider
-      const useCustomAPI = hasCustomAPI || (finalConfig.useCustomKey && hasAPIKey && isExternalProvider)
-      
-      let actualModel: string
-      let actualProvider: string = provider
-      
-      if (!useCustomAPI) {
-        actualProvider = 'github-spark'
-        actualModel = getValidSparkModel(configuredModel)
-        console.log(`🚀 [АНАЛИЗ] GitHub Spark режим - Конфигуриран: "${configuredModel}", валиден: "${actualModel}"`)
-      } else {
-        actualModel = configuredModel
-        actualProvider = provider
-        console.log(`🚀 [АНАЛИЗ] Собствен API режим - Provider: ${actualProvider}, модел: "${actualModel}"`)
+      if (!apiKey || apiKey.trim() === '') {
+        addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
+        throw new Error('Липсва API ключ за AI анализ')
       }
       
+      const actualModel = configuredModel
+      const actualProvider = provider
+      
+      console.log(`🚀 [АНАЛИЗ] Provider: ${actualProvider}, модел: "${actualModel}"`)
+      
       addLog('info', 'Стартиране на анализ...')
-      addLog('info', `⚙️ AI Настройки: Provider=${actualProvider}, Model=${actualModel}, CustomAPI=${useCustomAPI}`)
+      addLog('info', `⚙️ AI Настройки: Provider=${actualProvider}, Model=${actualModel}`)
       addLog('info', `⚙️ Параметри: Забавяне=${requestDelay}ms, Заявки=${requestCount}`)
       addLog('info', `Данни от въпросник: Възраст ${questionnaireData.age}, Пол ${questionnaireData.gender}`)
       addLog('info', `Здравни цели: ${questionnaireData.goals.join(', ')}`)
@@ -1839,9 +1783,7 @@ JSON формат:
                   </div>
                   <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      ℹ️ {loadedConfig?.useCustomKey && loadedConfig.provider !== 'github-spark'
-                        ? `Процесът с вашия ${loadedConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI'} API ключ отнема 1-2 минути.` 
-                        : 'Процесът с GitHub Spark модела отнема 8-10 минути. Приложението изчаква 60 секунди между заявките за избягване на rate limit.'}
+                      ℹ️ Процесът с вашия {loadedConfig?.provider === 'gemini' ? 'Gemini' : 'OpenAI'} API ключ отнема 1-2 минути.
                     </p>
                   </div>
                 </div>
