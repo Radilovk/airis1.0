@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
-import { createIrisWithOverlay, MAX_VISION_TOKENS } from '@/lib/image-utils'
+import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -38,6 +38,8 @@ export default function AnalysisScreen({
   const [configLoaded, setConfigLoaded] = useState(false)
   const [loadedConfig, setLoadedConfig] = useState<AIModelConfig | null>(null)
   const [analysisRunning, setAnalysisRunning] = useState(false)
+  const [diagnosticResponses, setDiagnosticResponses] = useState<{left?: string, right?: string}>({})
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'openai',
@@ -45,7 +47,8 @@ export default function AnalysisScreen({
     apiKey: '',
     useCustomKey: false,
     requestDelay: 60000,
-    requestCount: 8
+    requestCount: 8,
+    enableDiagnostics: true  // Default: enable diagnostic checks
   })
 
   const addLog = (level: LogEntry['level'], message: string) => {
@@ -805,18 +808,72 @@ GitHub Spark API има ограничения за брой заявки в м�
       console.log(`📝 [ИРИС ${side}] BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] Цели: ${goalsText}`)
       
-      // Create composite image with overlay
-      addLog('info', '🎨 Създаване на композитно изображение с топографска карта...')
-      console.log(`🎨 [ИРИС ${side}] Създаване на композитно изображение...`)
-      let compositeImageUrl: string
-      try {
-        compositeImageUrl = await createIrisWithOverlay(iris.dataUrl, side)
-        addLog('success', `Композитно изображение създадено успешно (${Math.round(compositeImageUrl.length / 1024)} KB)`)
-        console.log(`✅ [ИРИС ${side}] Композитно изображение създадено`)
-      } catch (overlayError) {
-        addLog('warning', `Грешка при създаване на overlay, използване на оригинално изображение: ${overlayError}`)
-        console.warn(`⚠️ [ИРИС ${side}] Overlay грешка:`, overlayError)
-        compositeImageUrl = iris.dataUrl // Fallback to original
+      // Note: We create composite image with overlay for display purposes only
+      // The AI analysis will use the ORIGINAL image WITHOUT overlay to avoid visual interference
+      addLog('info', '📷 Подготовка на изображение за AI анализ...')
+      console.log(`📷 [ИРИС ${side}] Използване на ОРИГИНАЛНО изображение БЕЗ overlay за AI анализ`)
+      console.log(`📷 [ИРИС ${side}] Оригинално изображение размер: ${Math.round(iris.dataUrl.length / 1024)} KB`)
+      
+      // Store original image URL for AI analysis (without overlay)
+      const imageForAnalysis = iris.dataUrl
+      
+      addLog('success', `Изображение подготвено за анализ (${Math.round(imageForAnalysis.length / 1024)} KB - БЕЗ overlay)`)
+      console.log(`✅ [ИРИС ${side}] Изображението ще се изпрати към AI БЕЗ топографска карта`)
+      
+      // Get diagnostic setting from config (default: true)
+      const enableDiagnostics = loadedConfig?.enableDiagnostics ?? aiConfig?.enableDiagnostics ?? true
+      
+      // OPTIONAL: Diagnostic pre-check - ask AI to describe what it sees in free text
+      // This helps verify the image quality and that AI can see the iris properly
+      // Can be disabled in Admin panel AIModelConfig
+      if (enableDiagnostics) {
+        addLog('info', '🔍 Диагностична проверка: Питане на AI какво вижда...')
+        console.log(`🔍 [ИРИС ${side}] ДИАГНОСТИЧНА ПРОВЕРКА - Свободен текст анализ`)
+        
+        const diagnosticPrompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си експертен иридолог. Получаваш чисто изображение на ${sideName} ирис БЕЗ топографска карта.
+
+ЗАДАЧА: Опиши в СВОБОДЕН ТЕКСТ (4-6 изречения) какво РЕАЛНО виждаш:
+
+1. КАЧЕСТВО НА ИЗОБРАЖЕНИЕТО:
+   - Можеш ли ясно да видиш ириса и неговата структура?
+   - Има ли проблеми с осветлението, фокуса или резолюцията?
+   - Пречат ли ти светлинни отражения?
+
+2. ВИДИМИ СТРУКТУРНИ НАХОДКИ в ириса:
+   - Виждаш ли лакуни (тъмни процепи/празнини в тъканта)?
+   - Виждаш ли крипти (малки дълбоки дупки)?
+   - Виждаш ли пигментни петна (кафяви, оранжеви, жълти)?
+   - Виждаш ли радиални линии (от центъра навън)?
+   - Виждаш ли концентрични пръстени или промени в плътността?
+   - Каква е общата текстура на тъканта?
+
+3. ЗАКЛЮЧЕНИЕ:
+   - Изглежда ли изображението подходящо за пълноценен иридологичен анализ?
+   - Виждаш ли НЯКАКВИ проблемни находки или зони?
+   - Ако НЕ виждаш находки - обясни защо (например "ирисът изглежда визуално чист и хомогенен")
+
+Върни само ТЕКСТ на БЪЛГАРСКИ език, без JSON.`
+
+        try {
+          const diagnosticResponse = await callLLMWithRetry(diagnosticPrompt, false, 1, imageForAnalysis)
+          addLog('success', `✅ Диагностика завършена: ${diagnosticResponse.substring(0, 100)}...`)
+          console.log(`🔍 [ИРИС ${side}] =============== ДИАГНОСТИЧЕН ОТГОВОР ===============`)
+          console.log(diagnosticResponse)
+          console.log(`🔍 [ИРИС ${side}] ====================================================`)
+          
+          // Store diagnostic response in state
+          setDiagnosticResponses(prev => ({ ...prev, [side]: diagnosticResponse }))
+          
+          // Log a short version to the UI logs
+          const shortDiag = diagnosticResponse.length > 200 
+            ? diagnosticResponse.substring(0, 200) + '...' 
+            : diagnosticResponse
+          addLog('info', `📊 AI диагностика: ${shortDiag}`)
+        } catch (diagError) {
+          addLog('warning', `⚠️ Диагностичната проверка се провали: ${diagError}`)
+          console.warn(`⚠️ [ИРИС ${side}] Диагностична грешка:`, diagError)
+          // Continue with main analysis even if diagnostic fails
+        }
       }
       
       addLog('info', 'Използване на AIRIS база знания за контекст...')
@@ -836,18 +893,13 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
       addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
       addLog('info', 'Подготовка на prompt за LLM...')
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си опитен иридолог с 20 години клинична практика. Ще ти предоставя изображение на ${sideName} ирис с наложена топографска карта и данни от пациента.
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си опитен иридолог с 20 години клинична практика. Ще ти предоставя изображение на ${sideName} ирис (БЕЗ топографска карта) и данни от пациента.
 
-⚠️ ИЗОБРАЖЕНИЕТО ВКЛЮЧВА ТОПОГРАФСКА КАРТА:
-Изображението показва ирис с наложени сини линии и етикети за ориентация:
-- Концентрични кръгове: показват вътрешни зони (зеница, автономен пръстен, периферия)
-- 12 радиални линии: разделят 12-те зони като часовник (12h=връх, 3h=дясно и т.н.)
-- Етикети: показват имена на органи за всяка зона
+⚠️ ВАЖНО: Получаваш ЧИСТО изображение на ириса БЕЗ наложени линии или етикети. Анализирай директно самата ирисова тъкан.
 
-АНАЛИЗИРАЙ САМИЯ ИРИС (тъканта под линиите), НЕ линиите!
+АНАЛИЗИРАЙ ИРИСА И ТЪРСИ АРТЕФАКТИ:
 
 ИГНОРИРАЙ при анализа:
-- Сините линии и етикети на картата
 - Ярки бели светлинни отражения (често в центъра)
 - Огледални ефекти от осветлението
 
@@ -958,10 +1010,10 @@ ${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}�
       addLog('info', `Изпращане на prompt + изображение до LLM (${prompt.length} символа)...`)
       console.log(`🤖 [ИРИС ${side}] Изпращане на prompt + изображение до LLM...`)
       console.log(`📄 [ИРИС ${side}] Prompt дължина: ${prompt.length} символа`)
-      console.log(`📷 [ИРИС ${side}] Изображение дължина: ${Math.round(compositeImageUrl.length / 1024)} KB`)
+      console.log(`📷 [ИРИС ${side}] Изображение дължина: ${Math.round(imageForAnalysis.length / 1024)} KB (БЕЗ overlay)`)
       
       addLog('warning', 'Изчакване на отговор от AI модела... (това може да отнеме 10-30 сек)')
-      const response = await callLLMWithRetry(prompt, true, 2, compositeImageUrl)
+      const response = await callLLMWithRetry(prompt, true, 2, imageForAnalysis)
       
       addLog('success', `Получен отговор от LLM (${response.length} символа)`)
       console.log(`✅ [ИРИС ${side}] Получен отговор от LLM`)
@@ -1930,7 +1982,7 @@ JSON формат:
               </>
             )}
 
-            <div className="mt-8">
+            <div className="mt-8 flex gap-2 justify-center">
               <Button
                 variant="outline"
                 size="sm"
@@ -1940,6 +1992,18 @@ JSON формат:
                 <Bug size={16} />
                 {showDebug ? 'Скрий логове' : 'Покажи логове'}
               </Button>
+              
+              {(diagnosticResponses.left || diagnosticResponses.right) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDiagnostics(!showDiagnostics)}
+                  className="gap-2"
+                >
+                  <Sparkle size={16} />
+                  {showDiagnostics ? 'Скрий диагностика' : 'Покажи AI диагностика'}
+                </Button>
+              )}
             </div>
 
             {showDebug && (
@@ -1983,6 +2047,48 @@ JSON формат:
                       )}
                     </div>
                   </ScrollArea>
+                </Card>
+              </motion.div>
+            )}
+            
+            {showDiagnostics && (diagnosticResponses.left || diagnosticResponses.right) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-6"
+              >
+                <Card className="p-4 bg-muted/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkle size={20} className="text-primary" />
+                    <h3 className="text-sm font-semibold">AI Диагностика - Какво Вижда Моделът</h3>
+                  </div>
+                  <div className="space-y-4 text-left">
+                    {diagnosticResponses.left && (
+                      <div className="p-3 bg-background rounded-lg border border-border">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">
+                          👁️ ЛЯВ ИРИС:
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                          {diagnosticResponses.left}
+                        </p>
+                      </div>
+                    )}
+                    {diagnosticResponses.right && (
+                      <div className="p-3 bg-background rounded-lg border border-border">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">
+                          👁️ ДЕСЕН ИРИС:
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                          {diagnosticResponses.right}
+                        </p>
+                      </div>
+                    )}
+                    <div className="mt-3 p-2 bg-accent/10 rounded text-xs text-muted-foreground">
+                      ℹ️ Тази диагностика показва какво AI моделът реално вижда в изображенията преди структурирания анализ. 
+                      Използвайте я за да проверите дали изображенията са качествени и дали AI може да открие находки.
+                    </div>
+                  </div>
                 </Card>
               </motion.div>
             )}
