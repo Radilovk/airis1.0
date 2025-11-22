@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
-import { createIrisWithOverlay, MAX_VISION_TOKENS } from '@/lib/image-utils'
+import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
