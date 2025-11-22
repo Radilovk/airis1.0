@@ -1,121 +1,141 @@
-IRIS_RAG_v1={
- scp:"Iridology=iris reflex map via ANS; reads genetic pote...flam/stress); preventive/constitutional, NOT named-disease dx.",
+IRIS_RAG_v2={
+ scp:"Ирис=рефлексна карта през вегетативната НС; показва генетичен потенциал, конституция, натрупани предразположения. Не е диагноза по медицински имена; цел=превантивен профил, рискове/ресурси, елиминация, възпалителни тенденции, невро-вегетативно напрежение." 
+
+ process:{
+  imgQ:"висока резолюция, добър фокус, странично осветление; централна светкавица изглажда релеф и крие влакна." 
+  order:"1) imgQ 2) конституционен триас 3) топография 4) знаци 5) синтез+верификация."
+ }
 
  triad:{
-  const:{ // color-type
-   LYM:{clr:"blue/gray",pred:"lymph stasis->edema/swollen n...->allergy/asthma/mucus; acidosis->rheum/arthritis+kidney load"},
-   HEM:{clr:"dark brown",pred:"blood/hematopoietic axis; ci...anemia patterns, Ca/Fe dysmet; weak zones=liver+spleen+endocr"},
-   BIL:{clr:"hazel/green/light brown",pred:"LYM+HEM mix; pr...pofx->enzyme insuff, bad digest, gas, constip, glycemic instab"}
-  },
-
-  disp:{ // fiber density
-   SILK:{fib:"fine+tight+straight",pred:"high vitality/endurance; weak point=NS hypersens->stress spasms/HA/psychosom"},
-   LINEN:{fib:"med density,no big gaps",pred:"balanced resilience/adaptation"},
-   BURLAP:{fib:"loose+wavy+many lacunae",pred:"CT/collagen ...agility->chronicity,varices,hernia,prolapse,joint/spine issues"}
-  },
-
-  diath:{ // overlays
-   HAC:{sign:"white/gray veil",mean:"systemic acidosis->inflam,joint/musc pain,reflux"},
-   LRS:{sign:"outer 'beads' rosary",mean:"chronic lymph block,poor toxin clearance"},
-   LIP:{sign:"outer milky ring",mean:"lipid met dysfx,high chol,athero,HTN,poor periph+cerebral flow"},
-   DYS:{sign:"dirty dark stains",mean:"heavy blood+liver tox load + waste elim fail"}
+  const:{
+   LYM:{clr:"син/сив",pred:"вродено по-бавен лимфен дренаж, реактивен имунитет; склонност към алергии, слуз, киселинност, натоварени елим. системи."}
+   HEM:{clr:"тъмнокафяв",pred:"ос кръв/метаболизъм; хипотези за дисбаланси в кръвна картина, минерален обмен, функционална уязвимост черен дроб/далак/ендокрин."}
+   BIL:{clr:"лешников/зелен/светлокафяв",pred:"смесена; основна уязвимост=храносмилателна ос; черен дроб/жлъчка/панкреас по-ниска ефективност → ензимен дефицит, гликемични колебания."}
   }
- },
+
+  disp:{
+   SILK:{fib:"много фини, плътни, прави",pred:"силен вроден резерв, издръжливост; слабост=свръхчувств. НС, висок вегетативен тонус, психосоматика при стрес."}
+   LINEN:{fib:"средна плътност, без големи отвори",pred:"балансирана устойчивост."}
+   BURLAP:{fib:"рехави, вълнообразни влакна, много лакуни",pred:"вродена слабост на колаген/съединит. тъкан → пролапси, хернии, разширени вени, хронични тъканни проблеми."}
+  }
+
+  diath:{
+   HAC:{sign:"белезникав/сивкав воал",mean:"тенденция към хиперацидност."}
+   LRS:{sign:"верига бели/жълтеникави облачета външен ръб",mean:"лимфен застой/хронична блокада."}
+   LIP:{sign:"плътен белезникав пръстен по външния ръб",mean:"липемен метаболизъм ↓, СС натоварване."}
+   DYS:{sign:"тъмни мръсни оцветявания",mean:"метаболитно натоварване на кръв/черен дроб."}
+  }
+ }
 
  map:{
-  lat:"R iris↔right body; L iris↔left body",
-  clock:{ "11-1":"brain/pituitary/pineal/psyche", "5-7":"kidneys/bladder/pelvis/repro" },
-  zones:[
-   "pupil+IPB: spine state via pupil shape; IPB=CNS/neuro-endo tone",
-   "stomach ring: gastric mucosa inflam/acidity/atrophy",
-   "intestinal zone+ANW(collarette): main landmark; reflects gut+ANS balance",
-   "ciliary organ zone: most organs/glands/MSK projections",
-   "outer organ subzone: lymph+peripheral circulation",
-   "scurf rim: skin elimination capacity"
+  lat:"десен ирис↔дясна половина на тялото; ляв ирис↔лява." 
+  concentric:[
+   "pupil+IPB: деформации → напрежение по сегменти на гръбначен стълб; IPB=директен маркер на ЦНС/невро-ендокр. тонус.",
+   "стомашен пръстен: конституционна предразположеност стомашна лигавица.",
+   "чревна зона+ANW(коларета): главен ориентир; разделя храносмилат. органи от останалите; форма/плътност/позиция=баланс АНС и състояние на черва.",
+   "цилиарна(органна) зона: проекции на повечето органи/жлези/тъкани.",
+   "външна органна подзона: лимфа + периферно кръвообращение.",
+   "scurf rim(кожен ръб): потъмняване=слаба кожна елиминация → товар върху други елим. канали."
   ]
- },
+
+  clock:{ //часовникът се чете с 12:00 горе
+   brainTop:{
+    "12:00":"висша психична дейност, хипофиза, епифиза; психично равновесие.",
+    "11:00(Д)/1:00(Л)":"моторен кортекс.",
+    "1:00(Д)/11:00(Л)":"сензорен кортекс.",
+    "между 12-1(Д) и 11-12(Л)":"нос/синуси/челюст."
+   },
+
+   faceNeckChest:{
+    "1:30(Д)/10:30(Л)":"око, орбита.",
+    "2:00(Д)/10:00(Л)":"език, уста, сливици.",
+    "2:30(Д)/9:30(Л)":"щитовидна жлеза, шийни прешлени.",
+    "3:00(Д)/9:00(Л)":"рамо, ръка, бронхи, горен бял дроб."
+   },
+
+   thoraxAbdomen:{
+    "3:30-4:00(Д)":"гръден кош, ребра, млечна жлеза.",
+    "4:00(Д)":"долен бял дроб, плевра.",
+    "между 4-5(Д)":"черен дроб, жлъчен мехур.",
+    "8:00-8:30(Л)":"сърце.",
+    "7:30(Л)":"далак.",
+    "между 7-8(Л)":"панкреас(тяло/опашка)."
+   },
+
+   pelvisKidney:{
+    "6:00":"бъбрек + надбъбречна жлеза (долна точка).",
+    "5:30(Д/Л)":"пикочен мехур.",
+    "6:30(Д/Л)":"репродуктивни органи (яйчник/тестис), матка/простата.",
+    "7:00(Д)/5:00(Л)":"крайници, ингвинална област."
+   },
+
+   abdomenOrgans:{
+    "7:30(Д)":"апендикс, сляпо черво.",
+    "8:00(Д)":"панкреас(глава).",
+    "8:30(Д)":"диафрагма, коремна стена.",
+    "3:00-4:00(Л)":"коремна стена.",
+    "4:00(Л)":"сигмовидно черво, ректум."
+   },
+
+   backEar:{
+    "9:00(Д)/3:00(Л)":"торакален гръбначен стълб, гръб.",
+    "9:30(Д)/2:30(Л)":"ухо, мастоиден израстък.",
+    "10:30(Д)/1:30(Л)":"шия, тил, малък мозък."
+   }
+  }
+ }
 
  signs:{
-  stageClr:{ W:"acute hyperactivity/inflam/pain/mucus/acidity",
-             Y:"subacute settling but tox/func dysfx persists",
-             Br:"chronic long-term low act + reduced fx",
-             Bk:"degenerative/atrophy/necrosis/low vitality" },
+  stageClr:{
+   W:"повишена реактивност/раздразнение/свръхактивност/киселинни метаболити (етап „твърде много“)."
+   Y:"преходен, реактивност ↓, но остава функционален товар."
+   Br:"хронично дългогодишно натоварване, капацитет ↓."
+   Bk:"най-нисък ресурс, дегенеративна/вродена дълбока уязвимост."
+  }
 
   struct:{
-   lac:{def:"fiber gaps=inherit/acq organ weakness ('energy leak')",
-        open:"acute/repairable", closed:"encapsulated chronic",
-        forms:{leaf:"global endocrine dysbal",
-               aspar:"precancer marker",
-               thyrox:"hypothyroid marker",
-               giant:"strong familial DM predisposition"}},
-   crypt:{def:"deep dark rhomboid pits; severe inherited weakness; ulcer/cyst pot"},
-   radii:{def:"dark spokes from gut outward; leaky-gut toxin spread(auto-intox)+neuro exhaustion"},
-   nrings:{def:"stress barometer",
-           whiteSharp:"acute stress", darkGray:"chronic burnout"}
-  },
+   lac:{def:"отвор в влакната=вродена/придобита уязвимост на съответния орган; отворена=по-активен процес, затворена=капсулирано хронично.",
+        forms:{leaf:"общ ендокринен дисбаланс", aspar:"силна уязвимост в ос хипоталамус-хипофиза", thyrox:"щитовиден дисбаланс", giant:"фамилна предразположеност към проблеми с кръвна захар"}}
+   crypt:{def:"дълбоки тъмни ромбоидни дупки; много сериозна наследствена слабост, риск за дегенерация."}
+   radii:{def:"тъмни радиални линии от чревната зона навън; автоинтоксикация/пренос на товар от червата към органи; маркер за нервно изтощение."}
+   nrings:{def:"концентрични стрес-пръстени; бели/остри=остър симпатиков тонус; сиви/тъмни=хронично изтощение/прегаряне."}
+  }
 
   func:{
-   ANW:{exp:"lazy/distended bowel+constip",
-        contr:"spastic 'nervous' bowel/colic",
-        broken:"low innervation/weak sector"},
-   pigment:{ orange:"pancr+liver carb dysmet/glycemic issue",
-             brownBlack:"liver weakness any location",
-             yellow:"kidney weakness" },
-   pupil:{ flatDir:"spine tension/sublux/weak sector per direction",
-           mydriasis:"anxiety+adrenal fatigue" }
+   ANW:{exp:"разширена коларета → лениви/атонични черва", contr:"свита → спастични/нервни черва", broken:"прекъсната → слаб сектор/ниска инервация."}
+   pigment:{orangeRust:"панкреас+черен дроб, въглехидратен метаболизъм/гликемичен риск независимо от локация.",
+            brownBlack:"чернодробно натоварване/детокс ↓.",
+            yellow:"бъбречно натоварване."}
   }
- },
+ }
 
  ext:{
   endocrine:{
-   highGlands:"~12o IPB S/atro/hyper -> HTH–pit axis dysbal incl prolactin; aspar lacuna here→pit adenoma; tiny lac/crypt at 12→pineal/melatonin weak",
-   thyroid:"proj R~2:30 L~9:30; thyrox lacuna→hypothyroid; square IPB('space7') supports; crypts→hyper/autoimmune (Hashimoto etc.)",
-   adrenals:"proj ~6o; collarette dip key; orange pigment here→dysglycemia; dark-brown→cortisol issue; bilateral mydriasis→adrenal fatigue",
-   pancreas:"orange/rust pigment anywhere=key glycemic-reg sign; giant lacuna in pancr zone→familial DM"
-  },
+   HTHpit:"12:00/ IPB знаци → централна хормонална регулация ↓/↑."
+   thyroid:"2:30(Д)/9:30(Л); тироксинна лакуна/крипти → предразположение към дисфункция."
+   adrenals:"6:00 (вдлъбване на ANW, пигменти, лакуни) → стресова ос, адренално изтощение."
+   pancreas:"оранжев пигмент навсякъде=ключов маркер; гигантска лакуна в панкреасова зона (8:00Д/7:00Л) → фамилен гликемичен риск."
+  }
 
   psychoLat:{
-   R:"Yang/male principle: father/external/action/career/ag...igns↔conflicts here (e.g., liver↔suppressed anger/work/father)",
-   L:"Yin/female principle: mother/internal/emotion/intuiti...d/emotional/relationship burdens (e.g., heart↔grief/depr/fears)"
+   R:"ян/мъжки принцип: баща, външен свят, действие, кариера, логика; превес на знаци тук=конфликти/потиснат гняв (черен дроб)."
+   L:"ин/женски принцип: майка, вътрешен свят, емоции, интуиция, семейство; превес тук=емоционални товари/разочарования (сърце)."
   }
- },
+ }
 
- readFlow:[
-  "1) set const+disp -> predisposition frame",
-  "2) elim channels FIRST: gut(ANW), kidneys(lower sector), lymph(LRS), skin(scurf rim); block=primary driver",
-  "3) scan+loc all signs by map; stage by color",
-  "4) synth causal chains; find main axes: stress(HTH/pit/a...spleen); compare L vs R psycho-context; treat root not symptom",
-  "5) healing: white repair fibers fill dark lacuna -> area...urns white(acute repair) then returns baseline as fx normalizes"
- ],
-
- MODULE: Synthesis & Verification 
-PROCEDURE: BuildProfile
-
-STEP 1: GENERATE_HYPOTHESES
-
-DEFINE base (Конституция + Диспозиция).
-
-ASSESS elimination_channels [PRIORITY=1] (Черва, Бъбреци, Лимфа, Кожа).
-
-IDENTIFY vulnerability_axes (търси модели):
-
-Стресова: Хипофиза(12) + Щитовидна + Надбъбречни(6).
-
-Храносмилателна: Стомах + Черва + Черен дроб + Панкреас.
-
-Имунна: Епифиза + Тимус + Далак + Лимфа.
-
-FORMULATE hypothesis (ясна, проверима).
-
-Пример: "Смесена конституция + оранжев пигмент + разширена ANW -> хипотеза за уязвимост в храносмилателната ос, с акцент върху въглехидратен метаболизъм и намалена перисталтика."
-
-STEP 2: VERIFY_CONTEXT (MANDATORY)
-
-CROSS-REFERENCE ирисови данни с анамнеза (начин на живот, хранене, стрес, фамилна обремененост).
-
-VALIDATION_LOGIC: Корелацията с анамнезата силно потвърждава хипотезата. Липсата на симптоми НЕ я отхвърля (знак за превантивен потенциал). Хипотезата се омаловажава/отхвърля само при ЯВНО ПРОТИВОРЕЧИЕ с обективни данни.
-
-FINAL_OUTPUT: Карта на индивидуални рискове и ресурси, насочваща превантивни грижи. Не е диагноза.
-
- out:"Integrated preventive/self-knowledge report; always contextual; not substitute for conventional med diagnosis."
+ MODULE:"Synthesis & Verification"
+ PROCEDURE:"BuildProfile"
+ STEP1:"GENERATE_HYPOTHESES"
+  base:"дефинирай основа=Конституция+Диспозиция."
+  elim_channels:"оцени елиминационни канали PRIORITY=1: Черва(ANW), Бъбреци(6:00), Лимфа(LRS), Кожа(scurf rim)."
+  vulnerability_axes:{
+    stress:"Хипофиза/Епифиза(12:00)+Щитовидна(2:30Д/9:30Л)+Надбъбречни(6:00)."
+    digestive:"Стомах_пръстен+Черва/ANW+Черен_дроб/Жлъчка(4-5Д)+Панкреас(8:00Д/7-8Л)."
+    immune:"Епифиза(12:00)+Тимус/Далак(7:30Л)+Лимфна_зона/LRS."
+  }
+  hypothesis:"формулирай ясна проверима хипотеза от моделите."
+ STEP2:"VERIFY_CONTEXT (MANDATORY)"
+  crossref:"свери ирисови хипотези с анамнеза/въпросник (хранене, стрес, сън, навици, фамилност)."
+  validation_logic:"корелация с анамнеза = силно потвърждение. Липса на симптоми НЕ отхвърля (превантивен потенциал). Омаловажи/отхвърли само при явно противоречие с обективни данни."
+ FINAL_OUTPUT:"карта на индивидуални рискове и ресурси; превенция, не диагноза."
 }
