@@ -50,7 +50,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     apiKey: '',
     useCustomKey: false,
     requestDelay: 60000,
-    requestCount: 8
+    requestCount: 8,
+    enableDiagnostics: true
   })
   
   const [textbooks, setTextbooks] = useKVWithFallback<IridologyTextbook[]>('iridology-textbooks', [])
@@ -70,6 +71,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || 60000)
   const [requestCount, setRequestCount] = useState(aiConfig?.requestCount || 8)
+  const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
   
   const [textbookName, setTextbookName] = useState('')
   const [textbookContent, setTextbookContent] = useState('')
@@ -106,6 +108,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 60000)
       setRequestCount(aiConfig.requestCount || 8)
+      setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
     }
   }, [aiConfig])
 
@@ -180,7 +183,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         apiKey: actualUseCustomKey ? apiKey : '',
         useCustomKey: actualUseCustomKey,
         requestDelay,
-        requestCount
+        requestCount,
+        enableDiagnostics
       }
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
@@ -589,6 +593,22 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       Повече заявки = по-прецизен, задълбочен и персонализиран анализ с множество слоеве на корелация между иридологични находки и данни от въпросника. 
                       8 заявки включва: ляв ирис, десен ирис, хранителен план, добавки, психология, специални препоръки, изследвания, детайлен анализ + резюмета.
                     </p>
+                  </div>
+                  
+                  <div className="flex items-center justify-between space-x-2 pt-2">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="enable-diagnostics" className="text-base">
+                        AI Диагностична проверка
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        AI описва в свободен текст какво вижда в изображенията преди структурирания анализ
+                      </p>
+                    </div>
+                    <Switch
+                      id="enable-diagnostics"
+                      checked={enableDiagnostics}
+                      onCheckedChange={setEnableDiagnostics}
+                    />
                   </div>
                 </div>
 

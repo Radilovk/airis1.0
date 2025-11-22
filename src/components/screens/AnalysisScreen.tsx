@@ -47,7 +47,8 @@ export default function AnalysisScreen({
     apiKey: '',
     useCustomKey: false,
     requestDelay: 60000,
-    requestCount: 8
+    requestCount: 8,
+    enableDiagnostics: true  // Default: enable diagnostic checks
   })
 
   const addLog = (level: LogEntry['level'], message: string) => {
@@ -819,10 +820,12 @@ GitHub Spark API има ограничения за брой заявки в м�
       addLog('success', `Изображение подготвено за анализ (${Math.round(imageForAnalysis.length / 1024)} KB - БЕЗ overlay)`)
       console.log(`✅ [ИРИС ${side}] Изображението ще се изпрати към AI БЕЗ топографска карта`)
       
+      // Get diagnostic setting from config (default: true)
+      const enableDiagnostics = loadedConfig?.enableDiagnostics ?? aiConfig?.enableDiagnostics ?? true
+      
       // OPTIONAL: Diagnostic pre-check - ask AI to describe what it sees in free text
       // This helps verify the image quality and that AI can see the iris properly
-      const enableDiagnostics = true // Set to false to skip diagnostics
-      
+      // Can be disabled in Admin panel AIModelConfig
       if (enableDiagnostics) {
         addLog('info', '🔍 Диагностична проверка: Питане на AI какво вижда...')
         console.log(`🔍 [ИРИС ${side}] ДИАГНОСТИЧНА ПРОВЕРКА - Свободен текст анализ`)

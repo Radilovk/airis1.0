@@ -143,6 +143,7 @@ export interface AIModelConfig {
   useCustomKey: boolean
   requestDelay?: number
   requestCount?: number
+  enableDiagnostics?: boolean  // Enable AI diagnostic pre-check before analysis
 }
 
 export interface IridologyTextbook {
