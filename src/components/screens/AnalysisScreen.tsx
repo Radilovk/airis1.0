@@ -38,6 +38,8 @@ export default function AnalysisScreen({
   const [configLoaded, setConfigLoaded] = useState(false)
   const [loadedConfig, setLoadedConfig] = useState<AIModelConfig | null>(null)
   const [analysisRunning, setAnalysisRunning] = useState(false)
+  const [diagnosticResponses, setDiagnosticResponses] = useState<{left?: string, right?: string}>({})
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'openai',
@@ -855,6 +857,9 @@ GitHub Spark API има ограничения за брой заявки в м�
           console.log(`🔍 [ИРИС ${side}] =============== ДИАГНОСТИЧЕН ОТГОВОР ===============`)
           console.log(diagnosticResponse)
           console.log(`🔍 [ИРИС ${side}] ====================================================`)
+          
+          // Store diagnostic response in state
+          setDiagnosticResponses(prev => ({ ...prev, [side]: diagnosticResponse }))
           
           // Log a short version to the UI logs
           const shortDiag = diagnosticResponse.length > 200 
@@ -1974,7 +1979,7 @@ JSON формат:
               </>
             )}
 
-            <div className="mt-8">
+            <div className="mt-8 flex gap-2 justify-center">
               <Button
                 variant="outline"
                 size="sm"
@@ -1984,6 +1989,18 @@ JSON формат:
                 <Bug size={16} />
                 {showDebug ? 'Скрий логове' : 'Покажи логове'}
               </Button>
+              
+              {(diagnosticResponses.left || diagnosticResponses.right) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDiagnostics(!showDiagnostics)}
+                  className="gap-2"
+                >
+                  <Sparkle size={16} />
+                  {showDiagnostics ? 'Скрий диагностика' : 'Покажи AI диагностика'}
+                </Button>
+              )}
             </div>
 
             {showDebug && (
@@ -2027,6 +2044,48 @@ JSON формат:
                       )}
                     </div>
                   </ScrollArea>
+                </Card>
+              </motion.div>
+            )}
+            
+            {showDiagnostics && (diagnosticResponses.left || diagnosticResponses.right) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-6"
+              >
+                <Card className="p-4 bg-muted/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkle size={20} className="text-primary" />
+                    <h3 className="text-sm font-semibold">AI Диагностика - Какво Вижда Моделът</h3>
+                  </div>
+                  <div className="space-y-4 text-left">
+                    {diagnosticResponses.left && (
+                      <div className="p-3 bg-background rounded-lg border border-border">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">
+                          👁️ ЛЯВ ИРИС:
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                          {diagnosticResponses.left}
+                        </p>
+                      </div>
+                    )}
+                    {diagnosticResponses.right && (
+                      <div className="p-3 bg-background rounded-lg border border-border">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">
+                          👁️ ДЕСЕН ИРИС:
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                          {diagnosticResponses.right}
+                        </p>
+                      </div>
+                    )}
+                    <div className="mt-3 p-2 bg-accent/10 rounded text-xs text-muted-foreground">
+                      ℹ️ Тази диагностика показва какво AI моделът реално вижда в изображенията преди структурирания анализ. 
+                      Използвайте я за да проверите дали изображенията са качествени и дали AI може да открие находки.
+                    </div>
+                  </div>
                 </Card>
               </motion.div>
             )}
