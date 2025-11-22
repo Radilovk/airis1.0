@@ -1,4 +1,7 @@
-export const DEFAULT_IRIDOLOGY_MANUAL = `IRIS_MAP_12H:
+import manualContent from '../../manual.json?raw'
+import promptTemplate from '../../prompt.json?raw'
+
+const FALLBACK_MANUAL = `IRIS_MAP_12H:
 12h→мозък/ЦНС|1-2h→щ.жлеза/ендокр|3h→бял_дроб(R)|4h→черен_дроб|5-6h→стомах/панкреас|7-8h→черва|9h→урогенит(L)|10h→бъбреци|11h→далак/имун
 
 АРТЕФАКТИ:
@@ -27,7 +30,7 @@ arcus_senilis→бял/сив_периф→липиден_дисметаб/СС_
 
 РЕФ:Jensen,Sharan,Tart-Jensen,Andrews,Hall`
 
-export const DEFAULT_AI_PROMPT = `РОЛЯ:старши_иридолог_20г_опит|ЗАДАЧА:анализирай_{{side}}_ирис+КОРЕЛИРАЙ_с_въпросник
+const FALLBACK_PROMPT = `РОЛЯ:старши_иридолог_20г_опит|ЗАДАЧА:анализирай_{{side}}_ирис+КОРЕЛИРАЙ_с_въпросник
 
 ПРИОРИТЕТ_ВАЛИДАЦИЯ:
 1.ВИСОК→ирис_находки_ПОТВЪРДЕНИ_от_В(оплаквания,здраве,навици)
@@ -50,7 +53,7 @@ IMG_ID={{imageHash}}→същ_ID+същ_В=ИДЕНТИЧЕН_резултат
 1.ЗОНИ(8-12)–angle_ВИНАГИ_0-360°,12h=0°,3h=90°,6h=180°,9h=270°:
 12h(0-30°)→мозък/ЦНС|1-2h(30-90°)→щ.жлеза|3h(90-120°)→бял_дроб(R={{isRight}})|4h(120-150°)→черен_дроб|5-6h(150-210°)→стомах/панкреас|7-8h(210-270°)→черва|9h(270-300°)→урогенит(L={{isLeft}})|10h(300-330°)→бъбреци|11h(330-360°)→далак
 
-Per_зона:id(1-12)|name|organ|status(normal/attention/concern)|findings(<60симв_БГ)|angle=[start,end]°(ПРОВЕРИ:0-360)
+Per_зоа:id(1-12)|name|organ|status(normal/attention/concern)|findings(<60симв_БГ)|angle=[start,end]°(ПРОВЕРИ:0-360)
 
 2.АРТЕФАКТИ(2-5)–САМО_реални:
 ИГНОРИРАЙ:ярки_бели_отражения,огледални_ефекти
@@ -66,7 +69,7 @@ Per_система:system(име_БГ)|score(int)|description(<60симв_БГ)
 
 ФОРМАТ:
 -САМО_валиден_JSON
--БЕЗ_markdown(БЕЗ \`\`\`json или \`\`\`)
+-БЕЗ_markdown блокове или code fences
 -БЕЗ_нови_редове_в_текст
 -БЕЗ_двойни_кавички_в_strings
 -САМО_БЪЛГАРСКИ_език
@@ -87,3 +90,7 @@ JSON:
     ]
   }
 }`
+
+export const DEFAULT_IRIDOLOGY_MANUAL = (manualContent?.trim() || FALLBACK_MANUAL).trim()
+
+export const DEFAULT_AI_PROMPT = (promptTemplate?.trim() || FALLBACK_PROMPT).trim()
