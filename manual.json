@@ -1,0 +1,121 @@
+IRIS_RAG_v1={
+ scp:"Iridology=iris reflex map via ANS; reads genetic pote...flam/stress); preventive/constitutional, NOT named-disease dx.",
+
+ triad:{
+  const:{ // color-type
+   LYM:{clr:"blue/gray",pred:"lymph stasis->edema/swollen n...->allergy/asthma/mucus; acidosis->rheum/arthritis+kidney load"},
+   HEM:{clr:"dark brown",pred:"blood/hematopoietic axis; ci...anemia patterns, Ca/Fe dysmet; weak zones=liver+spleen+endocr"},
+   BIL:{clr:"hazel/green/light brown",pred:"LYM+HEM mix; pr...pofx->enzyme insuff, bad digest, gas, constip, glycemic instab"}
+  },
+
+  disp:{ // fiber density
+   SILK:{fib:"fine+tight+straight",pred:"high vitality/endurance; weak point=NS hypersens->stress spasms/HA/psychosom"},
+   LINEN:{fib:"med density,no big gaps",pred:"balanced resilience/adaptation"},
+   BURLAP:{fib:"loose+wavy+many lacunae",pred:"CT/collagen ...agility->chronicity,varices,hernia,prolapse,joint/spine issues"}
+  },
+
+  diath:{ // overlays
+   HAC:{sign:"white/gray veil",mean:"systemic acidosis->inflam,joint/musc pain,reflux"},
+   LRS:{sign:"outer 'beads' rosary",mean:"chronic lymph block,poor toxin clearance"},
+   LIP:{sign:"outer milky ring",mean:"lipid met dysfx,high chol,athero,HTN,poor periph+cerebral flow"},
+   DYS:{sign:"dirty dark stains",mean:"heavy blood+liver tox load + waste elim fail"}
+  }
+ },
+
+ map:{
+  lat:"R iris↔right body; L iris↔left body",
+  clock:{ "11-1":"brain/pituitary/pineal/psyche", "5-7":"kidneys/bladder/pelvis/repro" },
+  zones:[
+   "pupil+IPB: spine state via pupil shape; IPB=CNS/neuro-endo tone",
+   "stomach ring: gastric mucosa inflam/acidity/atrophy",
+   "intestinal zone+ANW(collarette): main landmark; reflects gut+ANS balance",
+   "ciliary organ zone: most organs/glands/MSK projections",
+   "outer organ subzone: lymph+peripheral circulation",
+   "scurf rim: skin elimination capacity"
+  ]
+ },
+
+ signs:{
+  stageClr:{ W:"acute hyperactivity/inflam/pain/mucus/acidity",
+             Y:"subacute settling but tox/func dysfx persists",
+             Br:"chronic long-term low act + reduced fx",
+             Bk:"degenerative/atrophy/necrosis/low vitality" },
+
+  struct:{
+   lac:{def:"fiber gaps=inherit/acq organ weakness ('energy leak')",
+        open:"acute/repairable", closed:"encapsulated chronic",
+        forms:{leaf:"global endocrine dysbal",
+               aspar:"precancer marker",
+               thyrox:"hypothyroid marker",
+               giant:"strong familial DM predisposition"}},
+   crypt:{def:"deep dark rhomboid pits; severe inherited weakness; ulcer/cyst pot"},
+   radii:{def:"dark spokes from gut outward; leaky-gut toxin spread(auto-intox)+neuro exhaustion"},
+   nrings:{def:"stress barometer",
+           whiteSharp:"acute stress", darkGray:"chronic burnout"}
+  },
+
+  func:{
+   ANW:{exp:"lazy/distended bowel+constip",
+        contr:"spastic 'nervous' bowel/colic",
+        broken:"low innervation/weak sector"},
+   pigment:{ orange:"pancr+liver carb dysmet/glycemic issue",
+             brownBlack:"liver weakness any location",
+             yellow:"kidney weakness" },
+   pupil:{ flatDir:"spine tension/sublux/weak sector per direction",
+           mydriasis:"anxiety+adrenal fatigue" }
+  }
+ },
+
+ ext:{
+  endocrine:{
+   highGlands:"~12o IPB S/atro/hyper -> HTH–pit axis dysbal incl prolactin; aspar lacuna here→pit adenoma; tiny lac/crypt at 12→pineal/melatonin weak",
+   thyroid:"proj R~2:30 L~9:30; thyrox lacuna→hypothyroid; square IPB('space7') supports; crypts→hyper/autoimmune (Hashimoto etc.)",
+   adrenals:"proj ~6o; collarette dip key; orange pigment here→dysglycemia; dark-brown→cortisol issue; bilateral mydriasis→adrenal fatigue",
+   pancreas:"orange/rust pigment anywhere=key glycemic-reg sign; giant lacuna in pancr zone→familial DM"
+  },
+
+  psychoLat:{
+   R:"Yang/male principle: father/external/action/career/ag...igns↔conflicts here (e.g., liver↔suppressed anger/work/father)",
+   L:"Yin/female principle: mother/internal/emotion/intuiti...d/emotional/relationship burdens (e.g., heart↔grief/depr/fears)"
+  }
+ },
+
+ readFlow:[
+  "1) set const+disp -> predisposition frame",
+  "2) elim channels FIRST: gut(ANW), kidneys(lower sector), lymph(LRS), skin(scurf rim); block=primary driver",
+  "3) scan+loc all signs by map; stage by color",
+  "4) synth causal chains; find main axes: stress(HTH/pit/a...spleen); compare L vs R psycho-context; treat root not symptom",
+  "5) healing: white repair fibers fill dark lacuna -> area...urns white(acute repair) then returns baseline as fx normalizes"
+ ],
+
+ MODULE: Synthesis & Verification 
+PROCEDURE: BuildProfile
+
+STEP 1: GENERATE_HYPOTHESES
+
+DEFINE base (Конституция + Диспозиция).
+
+ASSESS elimination_channels [PRIORITY=1] (Черва, Бъбреци, Лимфа, Кожа).
+
+IDENTIFY vulnerability_axes (търси модели):
+
+Стресова: Хипофиза(12) + Щитовидна + Надбъбречни(6).
+
+Храносмилателна: Стомах + Черва + Черен дроб + Панкреас.
+
+Имунна: Епифиза + Тимус + Далак + Лимфа.
+
+FORMULATE hypothesis (ясна, проверима).
+
+Пример: "Смесена конституция + оранжев пигмент + разширена ANW -> хипотеза за уязвимост в храносмилателната ос, с акцент върху въглехидратен метаболизъм и намалена перисталтика."
+
+STEP 2: VERIFY_CONTEXT (MANDATORY)
+
+CROSS-REFERENCE ирисови данни с анамнеза (начин на живот, хранене, стрес, фамилна обремененост).
+
+VALIDATION_LOGIC: Корелацията с анамнезата силно потвърждава хипотезата. Липсата на симптоми НЕ я отхвърля (знак за превантивен потенциал). Хипотезата се омаловажава/отхвърля само при ЯВНО ПРОТИВОРЕЧИЕ с обективни данни.
+
+FINAL_OUTPUT: Карта на индивидуални рискове и ресурси, насочваща превантивни грижи. Не е диагноза.
+
+ out:"Integrated preventive/self-knowledge report; always contextual; not substitute for conventional med diagnosis."
+}
