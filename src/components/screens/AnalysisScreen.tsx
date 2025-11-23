@@ -39,14 +39,14 @@ export default function AnalysisScreen({
   const [loadedConfig, setLoadedConfig] = useState<AIModelConfig | null>(null)
   const [analysisRunning, setAnalysisRunning] = useState(false)
   const [diagnosticResponses, setDiagnosticResponses] = useState<{left?: string, right?: string}>({})
-  const [showDiagnostics, setShowDiagnostics] = useState(false)
+  const [showDiagnostics, setShowDiagnostics] = useState(true)
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'openai',
     model: 'gpt-4o',
     apiKey: '',
     useCustomKey: false,
-    requestDelay: 60000,
+    requestDelay: 20000,
     requestCount: 8,
     enableDiagnostics: true  // Default: enable diagnostic checks
   })
@@ -170,18 +170,18 @@ export default function AnalysisScreen({
     let lastError: Error | null = null
     
     const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-    const finalConfig = storedConfig || aiConfig || {
-      provider: 'openai',
-      model: 'gpt-4o',
-      apiKey: '',
-      useCustomKey: false,
-      requestDelay: 60000,
-      requestCount: 8
-    }
+      const finalConfig = storedConfig || aiConfig || {
+        provider: 'openai',
+        model: 'gpt-4o',
+        apiKey: '',
+        useCustomKey: false,
+        requestDelay: 20000,
+        requestCount: 8
+      }
     
     const provider = finalConfig.provider
     const configuredModel = finalConfig.model
-    const requestDelay = finalConfig.requestDelay || 60000
+    const requestDelay = Math.max(finalConfig.requestDelay ?? 20000, 15000)
     const apiKey = finalConfig.apiKey || ''
     
     if (!apiKey || apiKey.trim() === '') {
@@ -561,13 +561,13 @@ ${response}
         model: 'gpt-4o',
         apiKey: '',
         useCustomKey: false,
-        requestDelay: 60000,
+        requestDelay: 20000,
         requestCount: 8
       }
       
       const provider = finalConfig.provider
       const configuredModel = finalConfig.model
-      const requestDelay = finalConfig.requestDelay || 60000
+      const requestDelay = Math.max(finalConfig.requestDelay ?? 20000, 15000)
       const requestCount = finalConfig.requestCount || 8
       const apiKey = finalConfig.apiKey || ''
       
@@ -899,6 +899,9 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
 
 АНАЛИЗИРАЙ ИРИСА И ТЪРСИ АРТЕФАКТИ:
 
+ДОПЪЛНИТЕЛЕН КОНТЕКСТ (AIRIS база знания):
+${knowledgeContext}
+
 ИГНОРИРАЙ при анализа:
 - Ярки бели светлинни отражения (често в центъра)
 - Огледални ефекти от осветлението
@@ -1022,20 +1025,42 @@ ${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}�
       
       addLog('info', 'Парсиране на JSON отговор...')
       const parsed = await robustJSONParse(response, `ИРИС ${side}`)
-      
+
       addLog('success', 'JSON парсиран успешно')
       console.log(`✅ [ИРИС ${side}] JSON парсиран успешно`)
       console.log(`📊 [ИРИС ${side}] Парсиран обект:`, parsed)
-      
+
       if (!parsed.analysis) {
         addLog('error', `Липсва 'analysis' property в отговора!`)
         console.error(`❌ [ИРИС ${side}] ГРЕШКА: Липсва 'analysis' property в отговора!`)
         throw new Error(`Невалиден формат на отговор - липсва 'analysis' property`)
       }
-      
+
+      const rawZones = Array.isArray(parsed.analysis.zones) ? parsed.analysis.zones : []
+      const rawArtifacts = Array.isArray(parsed.analysis.artifacts) ? parsed.analysis.artifacts : []
+
+      const normalizedZones = rawZones.map(zone => {
+        const hasFindingText = typeof zone.findings === 'string' && zone.findings.trim().length > 0
+        const isCleanPhrase = typeof zone.findings === 'string'
+          ? zone.findings.toLowerCase().includes('визуално чист')
+          : false
+        const shouldElevate = zone.status === 'normal' && !isCleanPhrase && (hasFindingText || rawArtifacts.length > 0)
+
+        return shouldElevate
+          ? { ...zone, status: 'attention' as const }
+          : zone
+      })
+
+      const elevatedCount = normalizedZones.filter((zone, index) => rawZones[index]?.status === 'normal' && zone.status !== 'normal').length
+      if (elevatedCount > 0) {
+        addLog('info', `⚡ Повишени ${elevatedCount} зони до 'attention' заради видими находки/артефакти`)
+      }
+
       const result = {
         side,
-        ...parsed.analysis
+        ...parsed.analysis,
+        zones: normalizedZones,
+        artifacts: rawArtifacts
       }
       
       addLog('success', `Анализ завършен: ${result.zones.length} зони, ${result.artifacts.length} артефакта`)
