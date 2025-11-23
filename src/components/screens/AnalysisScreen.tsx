@@ -449,6 +449,50 @@ ${response}
     }
   }
 
+  const extractAnalysisPayload = (parsed: any): { analysis: any, source: string } | null => {
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
+
+    if (parsed.analysis && typeof parsed.analysis === 'object') {
+      return { analysis: parsed.analysis, source: 'analysis' }
+    }
+
+    const altPaths = [
+      { value: parsed.result?.analysis, source: 'result.analysis' },
+      { value: parsed.data?.analysis, source: 'data.analysis' },
+      { value: parsed.response?.analysis, source: 'response.analysis' }
+    ] as const
+
+    for (const { value, source } of altPaths) {
+      if (value && typeof value === 'object') {
+        return { analysis: value, source }
+      }
+    }
+
+    const altKey = Object.keys(parsed).find(key =>
+      key.toLowerCase().includes('analysis') && parsed[key] && typeof parsed[key] === 'object'
+    )
+
+    if (altKey) {
+      return { analysis: parsed[altKey], source: altKey }
+    }
+
+    if (parsed.zones || parsed.artifacts || parsed.overallHealth || parsed.systemScores) {
+      return {
+        analysis: {
+          zones: parsed.zones ?? [],
+          artifacts: parsed.artifacts ?? [],
+          overallHealth: parsed.overallHealth ?? 0,
+          systemScores: parsed.systemScores ?? []
+        },
+        source: 'top-level fields'
+      }
+    }
+
+    return null
+  }
+
   useEffect(() => {
     let mounted = true
     
@@ -987,14 +1031,24 @@ ${basePromptContent}
       console.log(`✅ [ИРИС ${side}] JSON парсиран успешно`)
       console.log(`📊 [ИРИС ${side}] Парсиран обект:`, parsed)
 
-      if (!parsed.analysis) {
+      const extractedAnalysis = extractAnalysisPayload(parsed)
+
+      if (!extractedAnalysis) {
         addLog('error', `Липсва 'analysis' property в отговора!`)
         console.error(`❌ [ИРИС ${side}] ГРЕШКА: Липсва 'analysis' property в отговора!`)
         throw new Error(`Невалиден формат на отговор - липсва 'analysis' property`)
       }
 
-      const rawZones = Array.isArray(parsed.analysis.zones) ? parsed.analysis.zones : []
-      const rawArtifacts = Array.isArray(parsed.analysis.artifacts) ? parsed.analysis.artifacts : []
+      if (extractedAnalysis.source !== 'analysis') {
+        addLog('warning', `Открит алтернативен 'analysis' ключ (${extractedAnalysis.source}) - използваме него`)
+        console.warn(`⚠️ [ИРИС ${side}] Използван е ${extractedAnalysis.source} вместо стандартния 'analysis'`)
+      }
+
+      const analysisData = extractedAnalysis.analysis || {}
+      const rawZones = Array.isArray(analysisData.zones) ? analysisData.zones : []
+      const rawArtifacts = Array.isArray(analysisData.artifacts) ? analysisData.artifacts : []
+      const overallHealth = typeof analysisData.overallHealth === 'number' ? analysisData.overallHealth : 0
+      const systemScores = Array.isArray(analysisData.systemScores) ? analysisData.systemScores : []
 
       const normalizedZones = rawZones.map(zone => {
         const hasFindingText = typeof zone.findings === 'string' && zone.findings.trim().length > 0
@@ -1015,9 +1069,11 @@ ${basePromptContent}
 
       const result = {
         side,
-        ...parsed.analysis,
+        ...analysisData,
         zones: normalizedZones,
-        artifacts: rawArtifacts
+        artifacts: rawArtifacts,
+        overallHealth,
+        systemScores
       }
       
       addLog('success', `Анализ завършен: ${result.zones.length} зони, ${result.artifacts.length} артефакта`)
