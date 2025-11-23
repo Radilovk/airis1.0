@@ -900,27 +900,19 @@ GitHub Spark API има ограничения за брой заявки в м�
       }
       
       // Load strategy weights, manual, and prompt template
+      // Use the state variables loaded by useKVWithFallback hooks
       addLog('info', 'Зареждане на AI стратегия и ръководства...')
-      const strategy = await window.spark.kv.get<AIModelStrategy>('ai-model-strategy') || aiStrategy
-      const manual = await window.spark.kv.get<IridologyManual>('iridology-manual') || iridologyManual
-      const promptTemplate = await window.spark.kv.get<AIPromptTemplate>('ai-prompt-template') || aiPromptTemplate
+      const strategy = aiStrategy
+      const manual = iridologyManual
+      const promptTemplate = aiPromptTemplate
       
-      addLog('success', `✓ Стратегия: Manual ${strategy?.manualWeight}%, Prompt ${strategy?.promptWeight}%, LLM ${strategy?.llmKnowledgeWeight}%`)
+      addLog('success', `✓ Стратегия: Manual ${strategy.manualWeight}%, Prompt ${strategy.promptWeight}%, LLM ${strategy.llmKnowledgeWeight}%`)
       console.log(`⚙️ [ИРИС ${side}] AI Стратегия:`, strategy)
       
       // Build the manual knowledge context (weighted by manualWeight)
       // This is ONLY for identifying findings topographically and by type
-      const manualContext = manual?.content || DEFAULT_IRIDOLOGY_MANUAL
+      const manualContext = manual.content
       addLog('info', `📚 Ръководство заредено (${manualContext.length} символа)`)
-      
-      // Build fallback AIRIS knowledge for backward compatibility
-      const airisKnowledge = `
-РЕФЕРЕНТНА КАРТА НА ИРИСА(12h=0°,часовн_посока,360°_пълен_кръг):
-${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}°):${z.organ}(${z.system})`).join('|')}
-
-АРТЕФАКТИ_И_ЗНАЧЕНИЯ:
-${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join('|')}
-`
       
       // Prepare patient data
       const patientData = `
@@ -936,7 +928,7 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
       // The prompt template orchestrates the process (weighted by promptWeight)
       addLog('info', 'Подготовка на prompt с приложена стратегия...')
       
-      let basePromptContent = promptTemplate?.content || DEFAULT_AI_PROMPT
+      let basePromptContent = promptTemplate.content
       
       // Replace template variables
       basePromptContent = basePromptContent
@@ -963,15 +955,12 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
       
       // Construct the final prompt with strategy emphasis
       const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`⚙️ AI СТРАТЕГИЯ ЗА АНАЛИЗ:
-- Иридологично Ръководство (за идентификация на находки): ${strategy?.manualWeight || 40}%
-- Prompt Template (за процес и структура): ${strategy?.promptWeight || 30}%
-- LLM Знания (за интерпретация и корелация): ${strategy?.llmKnowledgeWeight || 25}%
-${strategy?.useWebSearch ? `- Интернет Търсене: ${strategy.webSearchWeight || 5}%` : ''}
+- Иридологично Ръководство (за идентификация на находки): ${strategy.manualWeight}%
+- Prompt Template (за процес и структура): ${strategy.promptWeight}%
+- LLM Знания (за интерпретация и корелация): ${strategy.llmKnowledgeWeight}%
+${strategy.useWebSearch ? `- Интернет Търсене: ${strategy.webSearchWeight}%` : ''}
 
 ${basePromptContent}
-
-⚠️ ВАЖНО: Получаваш ЧИСТО изображение на ириса БЕЗ наложени линии или етикети. Анализирай директно самата ирисова тъкан.
-⚠️ ВАЖНО: Получаваш ЧИСТО изображение на ириса БЕЗ наложени линии или етикети. Анализирай директно самата ирисова тъкан.
 
 ИГНОРИРАЙ при анализа:
 - Ярки бели светлинни отражения (често в центъра)
