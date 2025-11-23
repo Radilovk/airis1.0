@@ -424,20 +424,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         sizeAfter: Math.round(finalImage.length / 1024)
       })
       console.log(`📊 [UPLOAD] Size after 1st pass: ${Math.round(finalImage.length / 1024)} KB`)
-      
-      // Second pass: Only if very large (>1MB), use good quality (0.88 = good quality, better compression)
-      if (finalImage.length > SECOND_PASS_THRESHOLD_BYTES) {
-        console.warn('⚠️ [UPLOAD] Additional compression needed (2nd pass)...')
-        uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_START', 'start', {
-          currentSize: Math.round(finalImage.length / 1024)
-        })
-        finalImage = await compressImage(finalImage, 800, 0.88)
-        uploadDiagnostics.log('CROP_COMPRESS_2ND_PASS_SUCCESS', 'success', {
-          finalSize: Math.round(finalImage.length / 1024)
-        })
-        console.log(`📊 [UPLOAD] Size after 2nd pass: ${Math.round(finalImage.length / 1024)} KB`)
-      }
-      
+
       // Allow up to 2MB for final cropped image (reasonable for high quality 800x800 JPEG)
       if (finalImage.length > MAX_FINAL_SIZE_BYTES) {
         uploadDiagnostics.log('CROP_COMPRESS_ERROR_TOO_LARGE', 'error', {

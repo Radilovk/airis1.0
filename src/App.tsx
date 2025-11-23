@@ -231,26 +231,26 @@ function App() {
       console.log(`📊 [APP] Left image: ${Math.round(left.dataUrl.length / 1024)} KB`)
       console.log(`📊 [APP] Right image: ${Math.round(right.dataUrl.length / 1024)} KB`)
 
-      if (left.dataUrl.length > 200 * 1024) {
+      if (left.dataUrl.length > 400 * 1024) {
         uploadDiagnostics.log('APP_ERROR_LEFT_TOO_LARGE', 'error', {
           size: Math.round(left.dataUrl.length / 1024)
         })
         errorLogger.warning('APP_IMAGES_COMPLETE', 'Left image is too large', {
           size: Math.round(left.dataUrl.length / 1024)
         })
-        toast.error('Лявото изображение е твърде голямо (>200KB). Моля, опитайте с по-малка снимка.')
+        toast.error('Лявото изображение е твърде голямо (>400KB). Моля, опитайте с по-малка снимка.')
         screenTransitionLockRef.current = false
         return
       }
 
-      if (right.dataUrl.length > 200 * 1024) {
+      if (right.dataUrl.length > 400 * 1024) {
         uploadDiagnostics.log('APP_ERROR_RIGHT_TOO_LARGE', 'error', {
           size: Math.round(right.dataUrl.length / 1024)
         })
         errorLogger.warning('APP_IMAGES_COMPLETE', 'Right image is too large', {
           size: Math.round(right.dataUrl.length / 1024)
         })
-        toast.error('Дясното изображение е твърде голямо (>200KB). Моля, опитайте с по-малка снимка.')
+        toast.error('Дясното изображение е твърде голямо (>400KB). Моля, опитайте с по-малка снимка.')
         screenTransitionLockRef.current = false
         return
       }
