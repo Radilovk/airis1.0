@@ -7,6 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
+import { pipelinePromptCatalog } from '@/lib/pipeline-prompts'
+import type { PipelinePromptCatalog } from '@/lib/pipeline-prompts'
 import { runMultistepPipeline } from '@/lib/multi-step-pipeline'
 import type {
   QuestionnaireData,
@@ -77,7 +79,7 @@ export default function AnalysisScreen({
     version?: string
     sources: Array<{ stage: string; checksum: string; source?: string }>
   }>({ sources: [] })
-  
+
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'openai',
     model: 'gpt-4o',
@@ -87,6 +89,7 @@ export default function AnalysisScreen({
     requestCount: 8,
     enableDiagnostics: true  // Default: enable diagnostic checks
   })
+  const [pipelinePromptSettings] = useKVWithFallback<PipelinePromptCatalog>('pipeline-prompt-catalog', pipelinePromptCatalog)
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
@@ -915,6 +918,7 @@ GitHub Spark API има ограничения за брой заявки в м�
           callModel: (prompt, allowJson, maxRetries = 2, imageDataUrl) =>
             callLLMWithRetry(prompt, allowJson, maxRetries, imageDataUrl),
         },
+        promptCatalog: pipelinePromptSettings ?? pipelinePromptCatalog,
       })
 
       const promptSources = pipelineResult.outcome.ctx.prompts?.sources ?? []
