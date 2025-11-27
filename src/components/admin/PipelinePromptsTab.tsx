@@ -53,6 +53,20 @@ export default function PipelinePromptsTab() {
         </Badge>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="p-3 md:p-4 rounded-lg border bg-muted/60 text-xs md:text-sm space-y-1">
+          <div className="font-semibold">Как влияе на анализа</div>
+          <p className="text-muted-foreground">
+            Целият LLM анализ следва точно тези 7 стъпки и съдържанията им от <code>steps/</code>. Настройките ги правят
+            видими, но промяна изисква актуализиране на файловете и rebuild. Финалният UI JSON се сглобява след като всяка
+            стъпка върне резултат в правилния ред.
+          </p>
+          <div className="font-semibold">Практичен пример</div>
+          <p className="text-muted-foreground break-words">
+            Ако редактираш <code>STEP3_mapper_v9.txt</code> (напр. добавиш нов маркер), новият mapping ще се отрази в UI само след
+            обновяване на билдa. Текстовите настройки в другите табове (AI Prompt, Manual) допълват, но не заменят тези стъпки.
+          </p>
+        </div>
+
         <div className={`p-3 md:p-4 rounded-lg border ${statusVariant === 'destructive' ? 'border-destructive/40 bg-destructive/10' : statusVariant === 'secondary' ? 'border-amber-400/50 bg-amber-400/10' : 'border-emerald-400/40 bg-emerald-400/10'}`}>
           <div className="flex items-center text-sm font-semibold">
             {statusIcon}
