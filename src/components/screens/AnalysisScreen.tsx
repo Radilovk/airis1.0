@@ -8,6 +8,7 @@ import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
+import { runMultistepPipeline } from '@/lib/multi-step-pipeline'
 import type {
   QuestionnaireData,
   IrisImage,
@@ -15,9 +16,34 @@ import type {
   IrisAnalysis,
   AIModelConfig,
   Recommendation,
-  SupplementRecommendation
+  SupplementRecommendation,
+  Step5FrontendReport
 } from '@/types'
 import type { ZoneSummary } from '@/types/iris-pipeline'
+
+const mapFrontendReportToAnalysis = (report: Step5FrontendReport, side: 'left' | 'right'): IrisAnalysis => ({
+  side,
+  zones: report.analysis.zones.map(zone => ({
+    id: zone.id,
+    name: zone.name,
+    organ: zone.organ,
+    status: zone.status,
+    findings: zone.findings,
+    angle: zone.angle,
+  })),
+  artifacts: report.analysis.artifacts.map(artifact => ({
+    type: artifact.type,
+    location: artifact.location,
+    description: artifact.description,
+    severity: artifact.severity,
+  })),
+  overallHealth: report.analysis.overallHealth,
+  systemScores: report.analysis.systemScores.map(score => ({
+    system: score.system,
+    score: score.score,
+    description: score.description,
+  })),
+})
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -886,7 +912,7 @@ GitHub Spark API има ограничения за брой заявки в м�
       
       // Store original image URL for AI analysis (without overlay)
       const imageForAnalysis = iris.dataUrl
-      
+
       addLog('success', `Изображение подготвено за анализ (${Math.round(imageForAnalysis.length / 1024)} KB - БЕЗ overlay)`)
       console.log(`✅ [ИРИС ${side}] Изображението ще се изпрати към AI БЕЗ топографска карта`)
       
@@ -945,6 +971,24 @@ GitHub Spark API има ограничения за брой заявки в м�
           // Continue with main analysis even if diagnostic fails
         }
       }
+
+      addLog('info', '🚦 Старт на мулти-стъпковия pipeline по папка steps...')
+      const pipelineResult = await runMultistepPipeline({
+        side,
+        image: iris,
+        questionnaire,
+        llm: {
+          callModel: (prompt, allowJson, maxRetries = 2, imageDataUrl) =>
+            callLLMWithRetry(prompt, allowJson, maxRetries, imageDataUrl),
+        },
+      })
+
+      if (pipelineResult.outcome.ok && pipelineResult.report) {
+        addLog('success', `STEP5 доклад генериран (${pipelineResult.report.analysis.zones.length} зони, ${pipelineResult.report.analysis.artifacts.length} артефакта)`)
+        return mapFrontendReportToAnalysis(pipelineResult.report, side)
+      }
+
+      addLog('warning', 'Стъпковият pipeline не върна финален резултат - преминаване към резервния (legacy) prompt')
       
       addLog('info', 'Използване на AIRIS база знания за контекст...')
       const knowledgeContext = `
