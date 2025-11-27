@@ -1,0 +1,58 @@
+ROLE: iris_rag_profile_builder_v2
+MODE: strict_json_only
+INPUTS:
+- MAPPED={{step3_json}}
+- CLEAN={{step2c_json}}
+- MANUAL={{IRIS_RAG_v2_text}}
+
+PREREQ:
+- If MAPPED.error or CLEAN.error exists: return error JSON.
+
+SCOPE:
+- Preventive profile only. Not medical diagnosis by names.
+- MANUAL is the only meaning source.
+
+BUILD:
+1) Base = CLEAN.global_clean + CLEAN.collarette_clean.ANW_status
+2) Elimination channels priority:
+   gut_ANW, kidney_6, lymph, skin_scu
+3) Axes:
+   stress, digestive, immune
+4) Hypotheses:
+   - each must cite evidence fid + zoneId
+   - keep compact
+
+OUTPUT_JSON ONLY:
+{
+  "imgId":"{{imageHash}}",
+  "side":"{{side}}",
+  "base":{
+    "constitution":"LYM|HEM|BIL|unclear",
+    "disposition":"SILK|LINEN|BURLAP|unclear",
+    "diathesis":["HAC","LRS","LIP","DYS"],
+    "ANW_status":"expanded|contracted|broken|normal|unclear"
+  },
+  "axesScore":{"stress0_100":0,"digestive0_100":0,"immune0_100":0},
+  "elimChannels":[
+    {"channel":"gut_ANW","status":"normal|attention|concern","evidence":[{"fid":"F1","zoneId":"..."}]},
+    {"channel":"kidney_6","status":"normal|attention|concern","evidence":[]},
+    {"channel":"lymph","status":"normal|attention|concern","evidence":[]},
+    {"channel":"skin_scu","status":"normal|attention|concern","evidence":[]}
+  ],
+  "hypotheses":[
+    {
+      "title":"<=60 chars",
+      "claim":"short preventive claim",
+      "evidence":[{"fid":"F1","zoneId":"..."}],
+      "confidence0_1":0.0,
+      "applicability":"when/if condition"
+    }
+  ],
+  "verificationQuestions":[
+    "short question 1",
+    "short question 2"
+  ]
+}
+
+FAILSAFE:
+{"error":{"stage":"STEP4","code":"PREREQ_FAIL|FORMAT_FAIL","message":"short","canRetry":true}}

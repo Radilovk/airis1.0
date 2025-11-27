@@ -1,0 +1,81 @@
+ROLE: iris_consistency_validator_v9
+MODE: strict_json_only
+INPUTS:
+- GEO={{step1_json}}
+- STRUCT={{step2a_json}}
+- PIG={{step2b_json}}
+
+PREREQ:
+- If GEO.ok != true: return error JSON.
+- If STRUCT.error or PIG.error exists: return error JSON.
+
+PURPOSE:
+- Remove contradictions, duplicates, and range errors.
+- Normalize ranges (no wrap), clamp values.
+- Do NOT add new findings. Only keep/merge/split/drop.
+
+LIMITS:
+- maxFindingsOut = 60
+- maxSplitsPerFinding = 2
+- If >60 after cleanup: keep highest confidence first.
+
+CONTRADICTION RULES:
+1) scurf_rim vs sodium_ring:
+   - If minute overlap >50% AND ring overlap >50%:
+     - keep only one:
+       - keep sodium_ring if notes imply light/milky/obscures texture
+       - keep scurf_rim if notes imply dark rim and texture visible
+     - if undecidable: drop both unless one confidence >= 0.80.
+2) pigment_spot vs lacuna/crypt:
+   - If pigment_spot overlaps structural gap: keep gap; drop pigment_spot.
+3) lymphatic_rosary vs brushfield_like_spots:
+   - If same area: keep rosary only if clearly chain/arc of nodules; else keep brushfield.
+4) specular contamination:
+   - Drop if overlaps GEO.invalidRegions >25%.
+
+DEDUP / MERGE:
+- Same type & strong overlap (minute>60% and ring>60%):
+  - merge ranges by union (after normalization)
+  - confidence = max
+  - notes = shorter
+
+RANGE NORMALIZATION:
+- clamp minutes 0..59, rings 0..11.
+- minuteRange must NEVER wrap:
+  - if start>end => split into [start,59] + [0,end]
+- ringRange must be start<=end; if start>end swap.
+- point-like: if minute width==0 expand to ±1 unless confidence>=0.85 and focus good.
+- very wide: if minute width>20 OR ring width>3 => confidence -=0.15; drop if <0.55.
+
+GLOBAL CONSISTENCY:
+- collarette_clean.ringRange must be [2,3] (clamp and reduce confidence by 0.20 if inconsistent).
+- If GEO.usableUpperIris=false and a finding centered in minutes [57..59] or [0..3]:
+  - confidence -= 0.10 (additional safety).
+
+OUTPUT_JSON ONLY:
+{
+  "imgId":"{{imageHash}}",
+  "side":"{{side}}",
+  "findings_struct_clean":[
+    {"type":"...","minuteRange":[0,0],"ringRange":[0,0],"size":"xs|s|m|l","notes":"<=60 chars","confidence":0.0}
+  ],
+  "findings_pigment_clean":[
+    {"type":"...","subtype":"...","minuteRange":[0,0],"ringRange":[0,0],"severity":"low|medium|high","notes":"<=60 chars","confidence":0.0}
+  ],
+  "collarette_clean":{
+    "ANW_status":"expanded|contracted|broken|normal|unclear",
+    "minuteRange":[0,0],
+    "ringRange":[2,3],
+    "confidence":0.0
+  },
+  "global_clean":{
+    "constitution":"LYM|HEM|BIL|unclear",
+    "disposition":"SILK|LINEN|BURLAP|unclear",
+    "diathesis":[{"code":"HAC|LRS|LIP|DYS","confidence":0.0}]
+  },
+  "dropped":[{"type":"...","reason":"contradiction|specular|too_wide|low_confidence|duplicate"}],
+  "warnings":["<=60 chars"]
+}
+
+FAILSAFE:
+{"error":{"stage":"STEP2C","code":"PREREQ_FAIL|FORMAT_FAIL","message":"short","canRetry":true}}

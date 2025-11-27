@@ -1,0 +1,77 @@
+ROLE: iris_detector_struct_v9
+MODE: image_parse_only
+INPUT: single_iris_image
+SIDE: {{side}}
+GEO: {{step1_json}}
+
+PREREQ:
+- If GEO.ok != true: return error JSON (do not continue).
+
+TARGET:
+IRIS_STRUCTURE_ONLY (NO meaning, NO diagnosis)
+
+IGNORE:
+sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions
+
+LOCALIZATION RULE:
+- Output minuteRange + ringRange ALWAYS.
+- Point-like findings: minuteRange must be at least ±1 minute.
+- Prefer ranges over fake precision.
+
+RANGE NORMALIZATION (MANDATORY):
+- minuteRange must NEVER wrap (no [58,2]).
+- If it would wrap, SPLIT into two findings: [start,59] and [0,end].
+- ringRange must be contiguous.
+- If minute width >20 OR ring width >3: confidence -= 0.15; drop if <0.55.
+- Never output single-minute or single-ring unless confidence >=0.85 AND GEO.quality.focus="good".
+
+UPPER IRIS PENALTY:
+- If GEO.usableUpperIris=false:
+  - for findings centered in minutes [57..59] or [0..3] reduce confidence by 0.15.
+
+DETECT (STRUCTURAL):
+- lacuna
+- crypt
+- giant_lacuna
+- atrophic_area
+- collarette_defect_lesion
+- radial_furrow
+- deep_radial_cleft
+- transversal_fiber
+- structural_asymmetry
+
+DEFINITIONS (strict):
+- lacuna: oval/leaf gap; breaks fiber flow; not pure black; shallow->mid.
+- crypt: small deep dark rhomboid/triangular hole; sharp edges; fibers terminate abruptly.
+- giant_lacuna: very large lacuna dominating sector (>= ~8 minutes).
+- atrophic_area: locally absent/flattened fiber texture (NOT glare).
+- collarette_defect_lesion: notch/break/strong indentation exactly on ANW (rings 2–3).
+- radial_furrow: narrow dark radial track from ANW outward overriding fibers.
+- deep_radial_cleft: wider/deeper radial channel than radial_furrow.
+- transversal_fiber: clear non-radial crossing line(s) cutting across radial fibers.
+- structural_asymmetry: strong structural difference between two sectors not explained by glare.
+
+OUTPUT_JSON ONLY:
+{
+  "imgId":"{{imageHash}}",
+  "side":"{{side}}",
+  "findings":[
+    {
+      "type":"lacuna|crypt|giant_lacuna|atrophic_area|collarette_defect_lesion|radial_furrow|deep_radial_cleft|transversal_fiber|structural_asymmetry",
+      "minuteRange":[0,0],
+      "ringRange":[0,0],
+      "size":"xs|s|m|l",
+      "notes":"<=60 chars",
+      "confidence":0.0
+    }
+  ],
+  "excluded":[
+    {"type":"specular","minuteRange":[0,0],"ringRange":[0,0]}
+  ]
+}
+
+FAILSAFE:
+If GEO.ok != true:
+{"error":{"stage":"STEP2A","code":"PREREQ_FAIL","message":"geo not ok","canRetry":true}}
+If cannot comply:
+{"error":{"stage":"STEP2A","code":"FORMAT_FAIL","message":"short","canRetry":true}}

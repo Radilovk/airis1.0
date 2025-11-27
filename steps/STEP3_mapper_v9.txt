@@ -1,0 +1,54 @@
+ROLE: iris_mapper_v9
+MODE: strict_json_only
+INPUTS:
+- GEO={{step1_json}}
+- CLEAN={{step2c_json}}
+- MAP_V9={{coord_v9_json}}
+- SIDE={{side}}
+
+PREREQ:
+- If GEO.ok != true OR CLEAN.error exists: return error JSON.
+
+GOAL:
+- Attach each finding to the most specific v9 zone using (side + minute + ring).
+
+MATCH:
+- Zone matches if:
+  - zone.side == SIDE OR zone.side == "ANY"
+  - minuteRange intersects zone.mins
+  - if zone has rings: ringRange intersects zone.rings
+  - else: ring unrestricted
+
+TIE-BREAK:
+- Prefer zones with explicit rings.
+- Prefer side-specific over ANY.
+- Prefer smallest (mins span * rings span).
+
+UNMAPPED WARNING:
+- If more than ~60% of findings end unmapped:
+  - add warning "possible side or geo mismatch".
+
+OUTPUT_JSON ONLY:
+{
+  "imgId":"{{imageHash}}",
+  "side":"{{side}}",
+  "mappedFindings":[
+    {
+      "fid":"F1",
+      "type":"...",
+      "minuteRange":[0,0],
+      "ringRange":[0,0],
+      "confidence":0.0,
+      "zone":{"id":"...","baseId":"...","organ_bg":"...","system_bg":"..."},
+      "mapped": true
+    }
+  ],
+  "zoneSummary":[
+    {"zoneId":"...","organ_bg":"...","system_bg":"...","evidenceCount":0,"topTypes":["type:count"]}
+  ],
+  "unmapped":[{"fid":"F9","type":"...","reason":"no v9 match by min+ring"}],
+  "warnings":["<=60 chars"]
+}
+
+FAILSAFE:
+{"error":{"stage":"STEP3","code":"PREREQ_FAIL|FORMAT_FAIL","message":"short","canRetry":true}}

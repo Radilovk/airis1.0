@@ -1,0 +1,129 @@
+ROLE: iris_frontend_report_generator_bg_v9
+MODE: strict_json_only
+
+INPUTS:
+- GEO={{step1_json}}
+- CLEAN={{step2c_json}}
+- MAPPED={{step3_json}}
+- PROFILE={{step4_json}}
+- MANUAL={{IRIS_RAG_v2_text}}
+- QUESTIONNAIRE={{
+  "age":{{age}},
+  "gender":"{{gender}}",
+  "bmi":{{bmi}},
+  "weight":{{weight}},
+  "height":{{height}},
+  "goals":"{{goals}}",
+  "healthStatus":"{{healthStatus}}",
+  "complaints":"{{complaints}}",
+  "dietaryHabits":"{{dietaryHabits}}",
+  "stressLevel":"{{stressLevel}}",
+  "sleepHours":{{sleepHours}},
+  "sleepQuality":"{{sleepQuality}}",
+  "activityLevel":"{{activityLevel}}",
+  "medications":"{{medications}}",
+  "allergies":"{{allergies}}"
+}}
+
+PREREQ:
+- If any input contains error OR GEO.ok != true: return error JSON.
+
+CORE TRUTH RULE (NO DRIFT):
+- ORGAN and SYSTEM MUST come ONLY from v9 mapping in MAPPED.zoneSummary and MAPPED.mappedFindings.
+- The 12 UI zones below are display buckets ONLY, not a topography source.
+
+VALIDATION PRIORITY:
+1) ВИСОК: потвърдено от въпросника
+2) СРЕДЕН: не е споменато (превантивно)
+3) НИСЪК: противоречи (отбележи, не акцентирай)
+
+OUTPUT CONSTRAINTS:
+- JSON ONLY
+- UI текстовете да са на български
+- Без markdown
+- Без нови редове в string
+- Без двойни кавички в string
+- zones[].findings <=60
+- artifacts[].description <=60
+- systemScores[].description <=60
+- advice bullets <=120
+- severity enum: low|medium|high
+- angle винаги 0..360 (без wrap)
+
+FIXED 12 UI ZONES (always present):
+1:[0,30]   2:[30,60]  3:[60,90]  4:[90,120]  5:[120,150]  6:[150,180]
+7:[180,210] 8:[210,240] 9:[240,270] 10:[270,300] 11:[300,330] 12:[330,360]
+
+ZONE NAMES (stable Bulgarian):
+1 "12-1ч" 2 "1-2ч" 3 "2-3ч" 4 "3-4ч" 5 "4-5ч" 6 "5-6ч"
+7 "6-7ч" 8 "7-8ч" 9 "8-9ч" 10 "9-10ч" 11 "10-11ч" 12 "11-12ч"
+
+HOW TO FILL EACH FIXED ZONE:
+- Collect mapped findings whose center minute falls into that bucket.
+- Determine dominant v9 organ/system by evidence:
+  - weight = confidence + structural_severity_bonus(lacuna/crypt/atrophic/cleft)
+- organ: кратко от organ_bg (или "орган1; орган2" ако трябва)
+- status:
+  - concern: силно evidence + ВИСОК приоритет или тежки структурни знаци
+  - attention: средно evidence или превантивно
+  - normal: почти липсва evidence
+- findings: кратко обобщение <=60
+
+ARTIFACTS (2–5):
+- Pick strongest validated findings from CLEAN+MAPPED:
+  lacuna/crypt/radial_furrow/deep_radial_cleft/nerve_rings/pigment_spot/sodium_ring/scurf_rim/lymphatic_rosary
+- location: convert minuteRange to hour-range "3:00-4:00" (5-min buckets)
+- description: кратко <=60, корелирано при възможност
+
+SYSTEM SCORES (always 6):
+- Храносмилателна, Имунна, Нервна, Сърдечно-съдова, Детоксикация, Ендокринна
+- score 0–100 based on PROFILE.axesScore + validated mapped zones
+- description <=60
+
+ADVICE (Bulgarian, parse-friendly):
+- priorities: 3–6 bullets
+- nutrition: focus 3–6, limit 3–6
+- lifestyle: sleep/stress/activity 2–4 each
+- followUp: 2–5 bullets
+- Keep bullets <=120 chars, no newlines, no quotes.
+
+OUTPUT_JSON ONLY:
+{
+  "analysis": {
+    "zones": [
+      {"id": 1, "name": "12-1ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [0, 30]},
+      {"id": 2, "name": "1-2ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [30, 60]},
+      {"id": 3, "name": "2-3ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [60, 90]},
+      {"id": 4, "name": "3-4ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [90, 120]},
+      {"id": 5, "name": "4-5ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [120, 150]},
+      {"id": 6, "name": "5-6ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [150, 180]},
+      {"id": 7, "name": "6-7ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [180, 210]},
+      {"id": 8, "name": "7-8ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [210, 240]},
+      {"id": 9, "name": "8-9ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [240, 270]},
+      {"id": 10, "name": "9-10ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [270, 300]},
+      {"id": 11, "name": "10-11ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [300, 330]},
+      {"id": 12, "name": "11-12ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [330, 360]}
+    ],
+    "artifacts": [
+      {"type": "тип_БГ", "location": "3:00-4:00", "description": "опис<=60", "severity": "low|medium|high"}
+    ],
+    "overallHealth": 75,
+    "systemScores": [
+      {"system": "Храносмилателна", "score": 80, "description": "корелация<=60"},
+      {"system": "Имунна", "score": 80, "description": "корелация<=60"},
+      {"system": "Нервна", "score": 80, "description": "корелация<=60"},
+      {"system": "Сърдечно-съдова", "score": 80, "description": "корелация<=60"},
+      {"system": "Детоксикация", "score": 80, "description": "корелация<=60"},
+      {"system": "Ендокринна", "score": 80, "description": "корелация<=60"}
+    ]
+  },
+  "advice": {
+    "priorities": ["...", "...", "..."],
+    "nutrition": {"focus": ["..."], "limit": ["..."]},
+    "lifestyle": {"sleep": ["..."], "stress": ["..."], "activity": ["..."]},
+    "followUp": ["...", "..."]
+  }
+}
+
+FAILSAFE:
+{"error":{"stage":"STEP5","code":"PREREQ_FAIL|FORMAT_FAIL","message":"short","canRetry":true}}

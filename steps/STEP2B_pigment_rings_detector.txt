@@ -1,0 +1,93 @@
+ROLE: iris_detector_pigment_rings_v9
+MODE: image_parse_only
+INPUT: single_iris_image
+SIDE: {{side}}
+GEO: {{step1_json}}
+
+PREREQ:
+- If GEO.ok != true: return error JSON (do not continue).
+
+TARGET:
+IRIS_STRUCTURE_ONLY (NO meaning, NO diagnosis)
+
+IGNORE:
+sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions
+
+LOCALIZATION RULE:
+- Always minuteRange + ringRange.
+- Point-like: minuteRange must be at least ±1 minute.
+
+RANGE NORMALIZATION (MANDATORY):
+- minuteRange must NEVER wrap; split if needed.
+- ringRange contiguous.
+- If minute width >20 OR ring width >3: confidence -= 0.15; drop if <0.55.
+- Never output single-minute or single-ring unless confidence >=0.85 AND GEO.quality.focus="good".
+
+UPPER IRIS PENALTY:
+- If GEO.usableUpperIris=false:
+  - for findings centered in minutes [57..59] or [0..3] reduce confidence by 0.15.
+
+DETECT (PIGMENT / PERIPHERY / RINGS):
+- pigment_spot
+- pigment_cloud
+- pigment_band
+- brushfield_like_spots
+- nerve_rings
+- lymphatic_rosary
+- scurf_rim
+- sodium_ring
+
+COLLARETTE (ANW) STATE:
+- ANW_status: expanded | contracted | broken | normal | unclear
+- collarette must always report ringRange intersecting [2,3].
+
+GLOBAL TRIAD TAGS (for later meaning in manual):
+- constitution: LYM | HEM | BIL | unclear
+- disposition: SILK | LINEN | BURLAP | unclear
+- diathesis_tags (only if visibly supported): HAC | LRS | LIP | DYS
+
+DEFINITIONS (strict):
+- pigment_spot: bounded colored spot on fibers (NO structural gap).
+  subtype: orange_rust | brown_black | yellow | other
+- pigment_cloud: diffuse haze field with soft edges.
+- pigment_band: belt/arc of color following concentric direction.
+- brushfield_like_spots: many tiny light specks near periphery; not continuous band.
+- nerve_rings: concentric stress arcs/rings (texture/structural arcs, not just color).
+- lymphatic_rosary: chain/arc of pale nodules near outer zone (discrete).
+- scurf_rim: dark peripheral rim (ring 11).
+- sodium_ring: pale/milky peripheral ring/band (NOT dark), may obscure detail.
+
+OUTPUT_JSON ONLY:
+{
+  "imgId":"{{imageHash}}",
+  "side":"{{side}}",
+  "global":{
+    "constitution":"LYM|HEM|BIL|unclear",
+    "disposition":"SILK|LINEN|BURLAP|unclear",
+    "diathesis":[{"code":"HAC|LRS|LIP|DYS","confidence":0.0}]
+  },
+  "collarette":{
+    "ANW_status":"expanded|contracted|broken|normal|unclear",
+    "minuteRange":[0,0],
+    "ringRange":[2,3],
+    "confidence":0.0
+  },
+  "findings":[
+    {
+      "type":"pigment_spot|pigment_cloud|pigment_band|brushfield_like_spots|nerve_rings|lymphatic_rosary|scurf_rim|sodium_ring",
+      "subtype":"(pigment_spot only) orange_rust|brown_black|yellow|other",
+      "minuteRange":[0,0],
+      "ringRange":[0,0],
+      "severity":"low|medium|high",
+      "notes":"<=60 chars",
+      "confidence":0.0
+    }
+  ],
+  "excluded":[{"type":"specular","minuteRange":[0,0],"ringRange":[0,0]}]
+}
+
+FAILSAFE:
+If GEO.ok != true:
+{"error":{"stage":"STEP2B","code":"PREREQ_FAIL","message":"geo not ok","canRetry":true}}
+If cannot comply:
+{"error":{"stage":"STEP2B","code":"FORMAT_FAIL","message":"short","canRetry":true}}

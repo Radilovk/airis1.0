@@ -1,0 +1,96 @@
+ROLE: iris_geo_calibrator_v9
+MODE: image_parse_only
+INPUT: single_iris_image
+SIDE: {{side}}   # "R" or "L"
+IMG_ID: {{imageHash}}
+
+GOAL:
+- Decide if image is usable for iris analysis.
+- Establish v9 coordinates:
+  - minutes 0..59: 12:00=0, 3:00=15, 6:00=30, 9:00=45 (clockwise)
+  - 12 rings 0..11 along PUPIL_EDGE -> IRIS_EDGE
+  - ring width = 1/12 of reference thickness measured on minute=15 ray
+
+IGNORE:
+sclera | pupil interior | eyelashes | eyelids | makeup | glare | reflections
+
+AXIS (CRITICAL):
+- Do NOT use upper eyelid as reference.
+- Detect limbus ellipse:
+  - irisCenter = center of limbus ellipse
+  - limbus_left = leftmost visible limbus point
+  - limbus_right = rightmost visible limbus point
+- Define:
+  - ex = normalize(limbus_right - irisCenter)  # 3:00 direction
+  - ey = perpendicular(ex) chosen toward image-up  # 12:00 direction
+
+ANGLE -> MINUTE:
+- For point p: v = normalize(p - irisCenter)
+- angleDeg = ( atan2( dot(v, ex), dot(v, ey) ) * 180/pi ) mod 360
+- minute = round(angleDeg / 6) mod 60
+
+RINGS (YOUR RULE):
+- Reference thickness MUST be measured on minute=15 ray (3:00):
+  - rP15 = distance irisCenter -> pupil_edge along ex
+  - rI15 = distance irisCenter -> iris_edge along ex
+  - Lref = rI15 - rP15   (must be >0 and reliable)
+- For any point at direction v:
+  - rP(theta) = distance irisCenter -> pupil_edge along v
+  - rX(theta) = distance irisCenter -> point along v
+  - d = rX(theta) - rP(theta)
+  - ring = clamp( floor( (d / Lref) * 12 ), 0, 11 )
+
+SPECULAR HANDLING:
+- Detect specular highlights: near-white saturated patches with no iris texture.
+- Mark invalidRegions with minuteRange/ringRange if possible.
+
+UPPER IRIS USABILITY:
+- Determine if upper iris around 12:00 is occluded by eyelid substantially.
+- If occluded: usableUpperIris=false.
+
+QUALITY GATE:
+Set ok=false if any:
+- focus="poor"
+- limbus edge unreliable OR pupil edge cannot be traced
+- >35% iris occluded
+- specular/glare covers large portion of ANW region
+- minute=15 reference ray is not usable (pupil edge or iris edge cannot be traced reliably on ex)
+- Lref cannot be computed reliably (<=0 or obstructed)
+
+OUTPUT_JSON ONLY:
+{
+  "imgId":"{{imageHash}}",
+  "side":"{{side}}",
+  "ok": true,
+  "rejectReasons": [],
+  "quality": {
+    "score0_100": 0,
+    "focus": "good|med|poor",
+    "glare": "none|low|med|high",
+    "occlusion": "none|low|med|high",
+    "issues": []
+  },
+  "geo": {
+    "mins": 60,
+    "rings": 12,
+    "degPerMin": 6,
+    "refMinute": 15,
+    "ringGroups": {
+      "IPB":[0,0],
+      "STOM":[1,1],
+      "ANW":[2,3],
+      "ORG":[4,9],
+      "LYM":[10,10],
+      "SCU":[11,11]
+    }
+  },
+  "refRay15Usable": true,
+  "usableUpperIris": true,
+  "invalidRegions": [
+    {"type":"specular","minuteRange":[0,0],"ringRange":[0,0],"confidence":0.0}
+  ]
+}
+
+FAILSAFE (if cannot comply):
+Return ONLY:
+{"error":{"stage":"STEP1","code":"FORMAT_FAIL|LOW_QUALITY|NO_LIMBUS|NO_PUPIL_EDGE|REF_RAY_15_NOT_USABLE","message":"short","canRetry":true}}
