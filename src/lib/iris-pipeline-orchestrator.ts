@@ -13,6 +13,7 @@ import {
   type MinuteRange,
   type RingRange,
 } from '../types/iris-pipeline'
+import { type PipelinePromptCatalog, getPromptForStage } from './pipeline-prompts'
 import { type StepPrereqContext, validatePrerequisites } from './step-validators'
 
 type RangeCarrier = { minuteRange: MinuteRange; ringRange: RingRange }
@@ -41,11 +42,28 @@ export interface RangeNormalizer {
 export interface IrisPipelineState extends StepPrereqContext {
   normalizer?: RangeNormalizer
   failedAt?: StepStage
+  prompts?: {
+    version?: string
+    sources: Array<{ stage: StepStage; source: string; checksum: string }>
+  }
 }
 
 export interface IrisPipelineOutcome {
   ok: boolean
   ctx: IrisPipelineState
+}
+
+export interface PipelineLogEntry {
+  stage: StepStage | 'INIT'
+  message: string
+  details?: Record<string, unknown>
+}
+
+export type PipelineLogger = (entry: PipelineLogEntry) => void
+
+export interface IrisPipelineOptions {
+  prompts?: PipelinePromptCatalog
+  logger?: PipelineLogger
 }
 
 const isError = (value: StepResult | undefined): value is StepError => Boolean(value && 'error' in value)
@@ -58,6 +76,10 @@ const prereqToError = (stage: StepStage, reason: string, blockingError?: StepErr
     canRetry: true,
   },
 })
+
+const emitLog = (logger: PipelineLogger | undefined, entry: PipelineLogEntry) => {
+  if (logger) logger(entry)
+}
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 const wrap = (value: number, total: number) => {
@@ -129,6 +151,18 @@ const storeStageResult = (ctx: IrisPipelineState, stage: StepStage, payload: Ste
   }
 }
 
+const trackPromptUsage = (ctx: IrisPipelineState, stage: StepStage, prompts?: PipelinePromptCatalog) => {
+  if (!ctx.prompts || !prompts) return
+  const prompt = getPromptForStage(stage, prompts)
+  if (prompt) {
+    ctx.prompts.sources.push({
+      stage,
+      source: prompt.source,
+      checksum: prompt.checksum,
+    })
+  }
+}
+
 const normalizeStep2A = (normalizer: RangeNormalizer, payload: Step2AStructuralResult): Step2AStructuralResult => ({
   ...payload,
   findings: payload.findings.flatMap((finding) => normalizer.normalizeFinding(finding)),
@@ -146,41 +180,81 @@ const normalizeStep2B = (normalizer: RangeNormalizer, payload: Step2BPigmentResu
   excluded: payload.excluded.flatMap((region) => normalizer.normalizeFinding(region)),
 })
 
+interface StageRuntimeOptions {
+  logger?: PipelineLogger
+  promptCatalog?: PipelinePromptCatalog
+}
+
 const runStage = async <TInput, TOutput extends StepResult>(
   stage: StepStage,
   ctx: IrisPipelineState,
   runner: StepRunner<TInput, TOutput>,
   input: TInput,
+  options: StageRuntimeOptions = {},
 ): Promise<TOutput | StepError> => {
+  const { logger, promptCatalog } = options
+  emitLog(logger, {
+    stage,
+    message: 'Starting stage execution',
+    details: promptCatalog
+      ? {
+          promptSource: getPromptForStage(stage, promptCatalog)?.source,
+          promptChecksum: getPromptForStage(stage, promptCatalog)?.checksum,
+        }
+      : undefined,
+  })
+
   const prereq = validatePrerequisites(stage, ctx)
   if (!prereq.ok) {
     const error = prereqToError(stage, prereq.reason ?? 'Prerequisite failed', prereq.blockingError)
     storeStageResult(ctx, stage, error)
     ctx.failedAt = stage
+    emitLog(logger, {
+      stage,
+      message: 'Stage blocked by prerequisites',
+      details: { reason: prereq.reason, blockingError: prereq.blockingError },
+    })
     return error
   }
 
+  trackPromptUsage(ctx, stage, promptCatalog)
+
   const result = await runner(input)
   storeStageResult(ctx, stage, result)
+  emitLog(logger, {
+    stage,
+    message: isError(result) ? 'Stage completed with error' : 'Stage completed',
+    details: isError(result) ? result.error : undefined,
+  })
   if (isError(result)) ctx.failedAt = stage
   return result
 }
 
-export const runIrisPipeline = async (steps: IrisPipelineSteps): Promise<IrisPipelineOutcome> => {
-  const ctx: IrisPipelineState = {}
+export const runIrisPipeline = async (
+  steps: IrisPipelineSteps,
+  options: IrisPipelineOptions = {},
+): Promise<IrisPipelineOutcome> => {
+  const { prompts, logger } = options
+  const ctx: IrisPipelineState = prompts ? { prompts: { version: prompts.version, sources: [] } } : {}
 
-  const geoResult = await runStage('STEP1', ctx, steps.step1, undefined as unknown as void)
+  emitLog(logger, {
+    stage: 'INIT',
+    message: 'Launching iris pipeline',
+    details: prompts ? { promptVersion: prompts.version } : undefined,
+  })
+
+  const geoResult = await runStage('STEP1', ctx, steps.step1, undefined as unknown as void, { logger, promptCatalog: prompts })
   if (isError(geoResult)) return { ok: false, ctx }
 
   const normalizer = createRangeNormalizer(geoResult.geo)
   ctx.normalizer = normalizer
 
-  const structuralResult = await runStage('STEP2A', ctx, steps.step2A, geoResult)
+  const structuralResult = await runStage('STEP2A', ctx, steps.step2A, geoResult, { logger, promptCatalog: prompts })
   if (isError(structuralResult)) return { ok: false, ctx }
   const normalizedStructural = normalizeStep2A(normalizer, structuralResult)
   ctx.structural = normalizedStructural
 
-  const pigmentResult = await runStage('STEP2B', ctx, steps.step2B, geoResult)
+  const pigmentResult = await runStage('STEP2B', ctx, steps.step2B, geoResult, { logger, promptCatalog: prompts })
   if (isError(pigmentResult)) return { ok: false, ctx }
   const normalizedPigment = normalizeStep2B(normalizer, pigmentResult)
   ctx.pigment = normalizedPigment
@@ -190,17 +264,20 @@ export const runIrisPipeline = async (steps: IrisPipelineSteps): Promise<IrisPip
     ctx,
     steps.step2C,
     { structural: normalizedStructural, pigment: normalizedPigment, normalizer },
+    { logger, promptCatalog: prompts },
   )
   if (isError(step2CResult)) return { ok: false, ctx }
 
-  const step3Result = await runStage('STEP3', ctx, steps.step3, step2CResult)
+  const step3Result = await runStage('STEP3', ctx, steps.step3, step2CResult, { logger, promptCatalog: prompts })
   if (isError(step3Result)) return { ok: false, ctx }
 
-  const step4Result = await runStage('STEP4', ctx, steps.step4, step3Result)
+  const step4Result = await runStage('STEP4', ctx, steps.step4, step3Result, { logger, promptCatalog: prompts })
   if (isError(step4Result)) return { ok: false, ctx }
 
-  const step5Result = await runStage('STEP5', ctx, steps.step5, step4Result)
+  const step5Result = await runStage('STEP5', ctx, steps.step5, step4Result, { logger, promptCatalog: prompts })
   if (isError(step5Result)) return { ok: false, ctx }
+
+  emitLog(logger, { stage: 'INIT', message: 'Pipeline finished successfully' })
 
   return { ok: true, ctx }
 }
