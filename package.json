@@ -8,7 +8,7 @@
     "kill": "fuser -k 5000/tcp",
     "build": "tsc -b --noCheck && vite build",
     "lint": "eslint .",
-    "test": "echo \"Vitest временно недостъпен; tests не са стартирани.\"",
+    "test": "vitest run",
     "optimize": "vite optimize",
     "preview": "vite preview"
   },
@@ -91,7 +91,8 @@
     "globals": "^16.0.0",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.7.2",
-    "typescript-eslint": "^8.38.0"
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^2.1.9"
   },
     "workspaces": {
         "packages": [
