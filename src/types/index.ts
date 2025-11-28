@@ -182,6 +182,3 @@ export interface AIModelStrategy {
   topP: number
   lastModified: string
 }
-
-export * from './iris-pipeline'
-export * from './iris-schemas'
