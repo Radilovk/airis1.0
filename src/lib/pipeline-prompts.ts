@@ -7,8 +7,6 @@ import step4 from '../../steps/STEP4_profile_builder.txt?raw'
 import step5 from '../../steps/STEP5_frontend_report_bg.txt?raw'
 import { type StepStage } from '@/types/iris-pipeline'
 
-const REQUIRED_STAGES: StepStage[] = ['STEP1', 'STEP2A', 'STEP2B', 'STEP2C', 'STEP3', 'STEP4', 'STEP5']
-
 export interface PipelinePrompt {
   stage: StepStage
   title: string
@@ -22,7 +20,7 @@ export interface PipelinePromptCatalog {
   prompts: Record<StepStage, PipelinePrompt>
 }
 
-export const simpleChecksum = (value: string): string => {
+const simpleChecksum = (value: string): string => {
   let acc = 0
   for (let i = 0; i < value.length; i++) {
     acc = (acc + value.charCodeAt(i) * (i + 1)) % 0xffffffff
@@ -51,30 +49,6 @@ export const pipelinePromptCatalog: PipelinePromptCatalog = {
   },
 }
 
-export const mergePromptCatalog = (
-  overrides?: Partial<PipelinePromptCatalog>,
-): PipelinePromptCatalog => {
-  const merged: PipelinePromptCatalog = {
-    version: overrides?.version || pipelinePromptCatalog.version,
-    prompts: { ...pipelinePromptCatalog.prompts },
-  }
-
-  if (overrides?.prompts) {
-    (Object.keys(overrides.prompts) as StepStage[]).forEach((stage) => {
-      const current = overrides.prompts?.[stage]
-      if (current?.body) {
-        merged.prompts[stage] = {
-          ...pipelinePromptCatalog.prompts[stage],
-          ...current,
-          checksum: current.checksum || simpleChecksum(current.body),
-        }
-      }
-    })
-  }
-
-  return merged
-}
-
 export const getPromptForStage = (stage: StepStage, catalog: PipelinePromptCatalog = pipelinePromptCatalog) =>
   catalog.prompts[stage]
 
@@ -85,16 +59,3 @@ export const getPromptSummaries = (catalog: PipelinePromptCatalog = pipelineProm
     checksum,
     version: catalog.version,
   }))
-
-export const validatePromptCatalog = (catalog: PipelinePromptCatalog) => {
-  const missingStages = REQUIRED_STAGES.filter((stage) => !catalog.prompts[stage])
-  const emptyStages = REQUIRED_STAGES.filter((stage) =>
-    !catalog.prompts[stage]?.body || catalog.prompts[stage]?.body.trim() === '',
-  )
-
-  return {
-    ok: missingStages.length === 0 && emptyStages.length === 0,
-    missingStages,
-    emptyStages,
-  }
-}
