@@ -8,16 +8,7 @@ import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
-import type {
-  QuestionnaireData,
-  IrisImage,
-  AnalysisReport,
-  IrisAnalysis,
-  AIModelConfig,
-  Recommendation,
-  SupplementRecommendation
-} from '@/types'
-import type { ZoneSummary } from '@/types/iris-pipeline'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -435,29 +426,13 @@ ${response}
     }
   }
 
-  const extractAnalysisPayload = (parsed: any): { analysis: any, source: string, step3?: { zoneSummary?: ZoneSummary[] } } | null => {
+  const extractAnalysisPayload = (parsed: any): { analysis: any, source: string } | null => {
     if (!parsed || typeof parsed !== 'object') {
       return null
     }
 
-    const step3 = parsed.STEP3 || parsed.step3 || parsed.steps?.STEP3 || parsed.steps?.step3 || parsed.mapping
-
-    const step5Candidates = [
-      { value: parsed.STEP5, source: 'STEP5' },
-      { value: parsed.step5, source: 'step5' },
-      { value: parsed.steps?.STEP5, source: 'steps.STEP5' },
-      { value: parsed.steps?.step5, source: 'steps.step5' },
-      { value: parsed.report, source: 'report' }
-    ] as const
-
-    for (const { value, source } of step5Candidates) {
-      if (value && typeof value === 'object' && value.analysis) {
-        return { analysis: value.analysis, source: `${source}.analysis`, step3 }
-      }
-    }
-
     if (parsed.analysis && typeof parsed.analysis === 'object') {
-      return { analysis: parsed.analysis, source: 'analysis', step3 }
+      return { analysis: parsed.analysis, source: 'analysis' }
     }
 
     const altPaths = [
@@ -468,7 +443,7 @@ ${response}
 
     for (const { value, source } of altPaths) {
       if (value && typeof value === 'object') {
-        return { analysis: value, source, step3 }
+        return { analysis: value, source }
       }
     }
 
@@ -477,7 +452,7 @@ ${response}
     )
 
     if (altKey) {
-      return { analysis: parsed[altKey], source: altKey, step3 }
+      return { analysis: parsed[altKey], source: altKey }
     }
 
     if (parsed.zones || parsed.artifacts || parsed.overallHealth || parsed.systemScores) {
@@ -488,8 +463,7 @@ ${response}
           overallHealth: parsed.overallHealth ?? 0,
           systemScores: parsed.systemScores ?? []
         },
-        source: 'top-level fields',
-        step3
+        source: 'top-level fields'
       }
     }
 
@@ -1119,15 +1093,22 @@ ${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}�
       const overallHealth = typeof analysisData.overallHealth === 'number' ? analysisData.overallHealth : 0
       const systemScores = Array.isArray(analysisData.systemScores) ? analysisData.systemScores : []
 
-      const step3Zones = extractedAnalysis.step3?.zoneSummary
-      const normalizedZones = rawZones.map((zone, index) => {
-        const summaryByIndex = step3Zones?.[index]
-        const numericZoneId = typeof zone.id === 'number' ? zone.id : Number.parseInt(String(zone.id), 10)
-        const summaryById = step3Zones?.find(z => Number.parseInt(String(z.zoneId).replace(/\D+/g, ''), 10) === numericZoneId)
-        const summary = summaryById || summaryByIndex
+      const normalizedZones = rawZones.map(zone => {
+        const hasFindingText = typeof zone.findings === 'string' && zone.findings.trim().length > 0
+        const isCleanPhrase = typeof zone.findings === 'string'
+          ? zone.findings.toLowerCase().includes('визуално чист')
+          : false
+        const shouldElevate = zone.status === 'normal' && !isCleanPhrase && (hasFindingText || rawArtifacts.length > 0)
 
-        return summary ? { ...zone, organ: summary.organ_bg } : zone
+        return shouldElevate
+          ? { ...zone, status: 'attention' as const }
+          : zone
       })
+
+      const elevatedCount = normalizedZones.filter((zone, index) => rawZones[index]?.status === 'normal' && zone.status !== 'normal').length
+      if (elevatedCount > 0) {
+        addLog('info', `⚡ Повишени ${elevatedCount} зони до 'attention' заради видими находки/артефакти`)
+      }
 
       const result = {
         side,
