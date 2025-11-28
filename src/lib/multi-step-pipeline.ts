@@ -4,10 +4,11 @@ import {
   type IrisPipelineSteps,
   runIrisPipeline,
 } from './iris-pipeline-orchestrator'
-import { pipelinePromptCatalog } from './pipeline-prompts'
+import { mergePromptCatalog, validatePromptCatalog } from './pipeline-prompts'
 import type {
   QuestionnaireData,
   IrisImage,
+  PipelinePromptCatalog,
   Step1GeoCalibrationResult,
   Step2AStructuralResult,
   Step2BPigmentResult,
@@ -68,6 +69,7 @@ export interface MultistepPipelineParams {
   image: IrisImage
   questionnaire: QuestionnaireData
   llm: PipelineLLMClient
+  promptCatalog?: PipelinePromptCatalog
 }
 
 export interface MultistepPipelineResult {
@@ -80,11 +82,24 @@ export const runMultistepPipeline = async ({
   image,
   questionnaire,
   llm,
+  promptCatalog,
 }: MultistepPipelineParams): Promise<MultistepPipelineResult> => {
   const sideCode = side === 'left' ? 'L' : 'R'
   const manual = buildManualContext()
   const coordV9 = buildV9Map()
   const bmi = Number((questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1))
+
+  const prompts = mergePromptCatalog(promptCatalog)
+  const validation = validatePromptCatalog(prompts)
+  if (!validation.ok) {
+    const reasons = [
+      validation.missingStages.length ? `липсват: ${validation.missingStages.join(', ')}` : null,
+      validation.emptyStages.length ? `празни: ${validation.emptyStages.join(', ')}` : null,
+    ]
+      .filter(Boolean)
+      .join(' | ')
+    throw new Error(`Невалидна конфигурация на LLM стъпки – ${reasons}.`)
+  }
 
   let geoResult: Step1GeoCalibrationResult | StepError | undefined
   let structuralResult: Step2AStructuralResult | StepError | undefined
@@ -95,7 +110,7 @@ export const runMultistepPipeline = async ({
 
   const steps: IrisPipelineSteps = {
     step1: async () => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP1.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP1.body, {
         side: sideCode,
         imageHash: withImageHash(image),
       })
@@ -104,7 +119,7 @@ export const runMultistepPipeline = async ({
       return geoResult
     },
     step2A: async (geo) => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP2A.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP2A.body, {
         step1_json: stringify(geo),
         imageHash: withImageHash(image),
       })
@@ -113,7 +128,7 @@ export const runMultistepPipeline = async ({
       return structuralResult
     },
     step2B: async (geo) => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP2B.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP2B.body, {
         step1_json: stringify(geo),
         imageHash: withImageHash(image),
       })
@@ -122,7 +137,7 @@ export const runMultistepPipeline = async ({
       return pigmentResult
     },
     step2C: async ({ structural, pigment }) => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP2C.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP2C.body, {
         step1_json: stringify(geoResult ?? structural),
         step2a_json: stringify(structuralResult ?? structural),
         step2b_json: stringify(pigmentResult ?? pigment),
@@ -132,7 +147,7 @@ export const runMultistepPipeline = async ({
       return cleanedResult
     },
     step3: async (cleaned) => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP3.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP3.body, {
         side: sideCode,
         coord_v9_json: stringify(coordV9),
         step1_json: stringify(geoResult ?? cleaned),
@@ -144,7 +159,7 @@ export const runMultistepPipeline = async ({
       return mappingResult
     },
     step4: async (mapping) => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP4.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP4.body, {
         step1_json: stringify(geoResult ?? mapping),
         step2c_json: stringify(cleanedResult ?? mapping),
         step3_json: stringify(mappingResult ?? mapping),
@@ -171,7 +186,7 @@ export const runMultistepPipeline = async ({
       return profileResult
     },
     step5: async (profile) => {
-      const prompt = fillTemplate(pipelinePromptCatalog.prompts.STEP5.body, {
+      const prompt = fillTemplate(prompts.prompts.STEP5.body, {
         step1_json: stringify(geoResult ?? profile),
         step2c_json: stringify(cleanedResult ?? profile),
         step3_json: stringify(mappingResult ?? profile),
@@ -199,7 +214,7 @@ export const runMultistepPipeline = async ({
   }
 
   const outcome = await runIrisPipeline(steps, {
-    prompts: pipelinePromptCatalog,
+    prompts,
     logger: (entry) => {
       console.log(`[PIPELINE][${entry.stage}] ${entry.message}`, entry.details ?? '')
     },
