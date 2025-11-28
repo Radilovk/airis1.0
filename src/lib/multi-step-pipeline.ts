@@ -75,12 +75,7 @@ export interface MultistepPipelineResult {
   outcome: IrisPipelineOutcome
 }
 
-export const runMultistepPipeline = async ({
-  side,
-  image,
-  questionnaire,
-  llm,
-}: MultistepPipelineParams): Promise<MultistepPipelineResult> => {
+export const runMultistepPipeline = async ({ side, image, questionnaire, llm }: MultistepPipelineParams): Promise<MultistepPipelineResult> => {
   const sideCode = side === 'left' ? 'L' : 'R'
   const manual = buildManualContext()
   const coordV9 = buildV9Map()
@@ -108,7 +103,7 @@ export const runMultistepPipeline = async ({
         step1_json: stringify(geo),
         imageHash: withImageHash(image),
       })
-      const raw = await llm.callModel(prompt, true, 2, image.dataUrl)
+      const raw = await llm.callModel(prompt, true)
       structuralResult = parseJson<Step2AStructuralResult | StepError>(raw, 'STEP2A')
       return structuralResult
     },
@@ -117,7 +112,7 @@ export const runMultistepPipeline = async ({
         step1_json: stringify(geo),
         imageHash: withImageHash(image),
       })
-      const raw = await llm.callModel(prompt, true, 2, image.dataUrl)
+      const raw = await llm.callModel(prompt, true)
       pigmentResult = parseJson<Step2BPigmentResult | StepError>(raw, 'STEP2B')
       return pigmentResult
     },
