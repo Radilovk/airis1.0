@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
+import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { runMultistepPipeline } from '@/lib/multi-step-pipeline'
 import type {
@@ -16,8 +17,9 @@ import type {
   AIModelConfig,
   Recommendation,
   SupplementRecommendation,
-  Step5FrontendReport,
+  Step5FrontendReport
 } from '@/types'
+import type { ZoneSummary } from '@/types/iris-pipeline'
 
 const mapFrontendReportToAnalysis = (report: Step5FrontendReport, side: 'left' | 'right'): IrisAnalysis => ({
   side,
@@ -73,10 +75,6 @@ export default function AnalysisScreen({
   const [analysisRunning, setAnalysisRunning] = useState(false)
   const [diagnosticResponses, setDiagnosticResponses] = useState<{left?: string, right?: string}>({})
   const [showDiagnostics, setShowDiagnostics] = useState(true)
-  const [promptCatalogInfo, setPromptCatalogInfo] = useState<{
-    version?: string
-    sources: Array<{ stage: string; checksum: string; source?: string }>
-  }>({ sources: [] })
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'openai',
@@ -463,6 +461,67 @@ ${response}
     }
   }
 
+  const extractAnalysisPayload = (parsed: any): { analysis: any, source: string, step3?: { zoneSummary?: ZoneSummary[] } } | null => {
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
+
+    const step3 = parsed.STEP3 || parsed.step3 || parsed.steps?.STEP3 || parsed.steps?.step3 || parsed.mapping
+
+    const step5Candidates = [
+      { value: parsed.STEP5, source: 'STEP5' },
+      { value: parsed.step5, source: 'step5' },
+      { value: parsed.steps?.STEP5, source: 'steps.STEP5' },
+      { value: parsed.steps?.step5, source: 'steps.step5' },
+      { value: parsed.report, source: 'report' }
+    ] as const
+
+    for (const { value, source } of step5Candidates) {
+      if (value && typeof value === 'object' && value.analysis) {
+        return { analysis: value.analysis, source: `${source}.analysis`, step3 }
+      }
+    }
+
+    if (parsed.analysis && typeof parsed.analysis === 'object') {
+      return { analysis: parsed.analysis, source: 'analysis', step3 }
+    }
+
+    const altPaths = [
+      { value: parsed.result?.analysis, source: 'result.analysis' },
+      { value: parsed.data?.analysis, source: 'data.analysis' },
+      { value: parsed.response?.analysis, source: 'response.analysis' }
+    ] as const
+
+    for (const { value, source } of altPaths) {
+      if (value && typeof value === 'object') {
+        return { analysis: value, source, step3 }
+      }
+    }
+
+    const altKey = Object.keys(parsed).find(key =>
+      key.toLowerCase().includes('analysis') && parsed[key] && typeof parsed[key] === 'object'
+    )
+
+    if (altKey) {
+      return { analysis: parsed[altKey], source: altKey, step3 }
+    }
+
+    if (parsed.zones || parsed.artifacts || parsed.overallHealth || parsed.systemScores) {
+      return {
+        analysis: {
+          zones: parsed.zones ?? [],
+          artifacts: parsed.artifacts ?? [],
+          overallHealth: parsed.overallHealth ?? 0,
+          systemScores: parsed.systemScores ?? []
+        },
+        source: 'top-level fields',
+        step3
+      }
+    }
+
+    return null
+  }
+
   useEffect(() => {
     let mounted = true
     
@@ -839,16 +898,23 @@ GitHub Spark API има ограничения за брой заявки в м�
       const goalsText = questionnaire.goals.join(', ')
       const complaintsText = questionnaire.complaints || 'Няма'
       
-      const imageHash = iris.dataUrl.substring(0, 18)
+      const imageHash = iris.dataUrl.substring(0, 50)
       
       addLog('info', `BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] BMI: ${bmi}, Възраст: ${questionnaire.age}, Пол: ${genderName}`)
       console.log(`📝 [ИРИС ${side}] Цели: ${goalsText}`)
-
-      addLog('info', '📷 Подготовка на оригиналното изображение за AI анализ...')
-      console.log(`📷 [ИРИС ${side}] Използване на чистото изображение за стъпките от папка steps (вече съдържат координатна система)`)
+      
+      // Note: We create composite image with overlay for display purposes only
+      // The AI analysis will use the ORIGINAL image WITHOUT overlay to avoid visual interference
+      addLog('info', '📷 Подготовка на изображение за AI анализ...')
+      console.log(`📷 [ИРИС ${side}] Използване на ОРИГИНАЛНО изображение БЕЗ overlay за AI анализ`)
       console.log(`📷 [ИРИС ${side}] Оригинално изображение размер: ${Math.round(iris.dataUrl.length / 1024)} KB`)
+      
+      // Store original image URL for AI analysis (without overlay)
       const imageForAnalysis = iris.dataUrl
+
+      addLog('success', `Изображение подготвено за анализ (${Math.round(imageForAnalysis.length / 1024)} KB - БЕЗ overlay)`)
+      console.log(`✅ [ИРИС ${side}] Изображението ще се изпрати към AI БЕЗ топографска карта`)
       
       // Get diagnostic setting from config (default: true)
       const enableDiagnostics = loadedConfig?.enableDiagnostics ?? aiConfig?.enableDiagnostics ?? true
@@ -917,42 +983,209 @@ GitHub Spark API има ограничения за брой заявки в м�
         },
       })
 
-      const promptSources = pipelineResult.outcome.ctx.prompts?.sources ?? []
-      const promptVersion = pipelineResult.outcome.ctx.prompts?.version
-      if (promptSources.length) {
-        addLog('info', `Използвани стъпки: ${promptSources.map(s => `${s.stage} (${s.checksum})`).join(' | ')}`)
-      }
-
-      if (promptSources.length || promptVersion) {
-        setPromptCatalogInfo(prev => {
-          const mergedSources = [...(prev?.sources ?? [])]
-          promptSources.forEach(src => {
-            const exists = mergedSources.some(item => item.stage === src.stage && item.checksum === src.checksum)
-            if (!exists) {
-              mergedSources.push(src)
-            }
-          })
-
-          return {
-            version: promptVersion ?? prev?.version,
-            sources: mergedSources.sort((a, b) => a.stage.localeCompare(b.stage)),
-          }
-        })
-
-        if (promptVersion) {
-          addLog('info', `Версия на prompt каталога: ${promptVersion}`)
-        }
-      }
-
       if (pipelineResult.outcome.ok && pipelineResult.report) {
         addLog('success', `STEP5 доклад генериран (${pipelineResult.report.analysis.zones.length} зони, ${pipelineResult.report.analysis.artifacts.length} артефакта)`)
         return mapFrontendReportToAnalysis(pipelineResult.report, side)
       }
 
-      const failedStage = pipelineResult.outcome.ctx.failedAt
-      const errorStageLabel = failedStage ? `Стъпка ${failedStage}` : 'Многостъпковият анализ'
-      addLog('error', `${errorStageLabel} няма валиден резултат от prompts в папка steps.`)
-      throw new Error(`${errorStageLabel} се провали без финален доклад`)
+      addLog('warning', 'Стъпковият pipeline не върна финален резултат - преминаване към резервния (legacy) prompt')
+      
+      addLog('info', 'Използване на AIRIS база знания за контекст...')
+      const knowledgeContext = `
+РЕФЕРЕНТНА КАРТА НА ИРИСА(12h=0°,часовн_посока,360°_пълен_кръг):
+${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}°):${z.organ}(${z.system})`).join('|')}
+
+АРТЕФАКТИ_И_ЗНАЧЕНИЯ:
+${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join('|')}
+
+ПРЕПОРЪКИ_СИСТЕМИ:
+Храносмилателна:${AIRIS_KNOWLEDGE.systemAnalysis.digestive.recommendations.join(',')}
+Имунна:${AIRIS_KNOWLEDGE.systemAnalysis.immune.recommendations.join(',')}
+Нервна:${AIRIS_KNOWLEDGE.systemAnalysis.nervous.recommendations.join(',')}
+Детоксикация:${AIRIS_KNOWLEDGE.systemAnalysis.detox.recommendations.join(',')}
+`
+      addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
+      
+      addLog('info', 'Подготовка на prompt за LLM...')
+      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си опитен иридолог с 20 години клинична практика. Ще ти предоставя изображение на ${sideName} ирис (БЕЗ топографска карта) и данни от пациента.
+
+⚠️ ВАЖНО: Получаваш ЧИСТО изображение на ириса БЕЗ наложени линии или етикети. Анализирай директно самата ирисова тъкан.
+
+АНАЛИЗИРАЙ ИРИСА И ТЪРСИ АРТЕФАКТИ:
+
+ДОПЪЛНИТЕЛЕН КОНТЕКСТ (AIRIS база знания):
+${knowledgeContext}
+
+ИГНОРИРАЙ при анализа:
+- Ярки бели светлинни отражения (често в центъра)
+- Огледални ефекти от осветлението
+
+ТЪРСИ И ДОКУМЕНТИРАЙ всички реални находки:
+- Структурни промени: лакуни (тъмни процепи), крипти (малки дупки)
+- Дисколорации: пигментни петна, локални промени в цвета
+- Радиални знаци: линии от центъра навън (ако са част от ириса)
+- Концентрични пръстени: кръгове около зеницата (автономен пръстен)
+- Плътност и текстура: промени в тъканта
+
+ВАЖНО - БАЛАНСИРАН ПОДХОД:
+- Бъди ОБЕКТИВЕН: Докладвай само това, което ВИЖДАШ в изображението
+- Бъди ВНИМАТЕЛЕН: Не пропускай находки, дори малки или съмнителни
+- Ако виждаш нещо съмнително, отбележи го - по-добре превантивно отколкото да пропуснеш
+- НЕ създавай "виртуални" находки само защото има симптом
+
+ДАННИ ЗА ПАЦИЕНТА (за контекст и приоритизиране):
+Възраст: ${questionnaire.age} години | Пол: ${genderName} | BMI: ${bmi}
+Оплаквания: ${complaintsText}
+Здравни цели: ${goalsText}
+
+РЕФЕРЕНТНА КАРТА (12h=0°, по часовниковата стрелка):
+${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}°): ${z.organ} (${z.system})`).join('\n')}
+
+ЛОГИКА ЗА ОЦЕНКА НА ЗОНИТЕ:
+1. ВИДИМА НАХОДКА + СЪОТВЕТЕН СИМПТОМ → status:"concern", priority:high (активен проблем)
+2. ВИДИМА НАХОДКА БЕЗ СИМПТОМ → status:"attention", priority:medium (латентна слабост)
+3. НЯМА НАХОДКА + ИМА СИМПТОМ → status:"normal" (не маркирай - проблемът е от друга система)
+4. НЯМА НАХОДКА + НЯМА СИМПТОМ → status:"normal"
+
+ЗАДАЧА: Анализирай ${sideName} ирис и върни JSON с:
+
+1. ЗОНИ (12 зони, angle винаги 0-360°):
+   Зона 1 (0-30°): Мозък/Нервна система
+   Зона 2 (30-60°): Хипофиза/Ендокринна
+   Зона 3 (60-90°): Щитовидна жлеза/Ендокринна
+   Зона 4 (90-120°): Белодробна${side==='right'?' (дясна страна)':''}
+   Зона 5 (120-150°): Черен дроб/Детоксикация
+   Зона 6 (150-180°): Стомах/Храносмилателна
+   Зона 7 (180-210°): Панкреас/Храносмилателна
+   Зона 8 (210-240°): Бъбреци/Урогенитална
+   Зона 9 (240-270°): Надбъбречни жлези/Ендокринна
+   Зона 10 (270-300°): Сърце/Сърдечно-съдова${side==='left'?' (лява страна)':''}
+   Зона 11 (300-330°): Далак/Имунна
+   Зона 12 (330-360°): Лимфна система/Имунна
+
+За всяка зона посочи:
+- id: 1-12
+- name: Име на зоната на български
+- organ: Орган на български  
+- status: "normal" | "attention" | "concern"
+- findings: Кратко описание (max 80 символа) на ВИЗУАЛНО ВИДИМОТО:
+  * Ако е чисто: "Визуално чиста зона без забележими находки"
+  * Ако има находка: "Две малки тъмни лакуни в долния сектор" (описвай само видимото!)
+- angle: [начален_ъгъл, краен_ъгъл] (ВИНАГИ между 0-360)
+
+2. АРТЕФАКТИ (0-много, всички които ВИЖДАШ):
+За всеки артефакт:
+- type: Вид артефакт на български (Лакуни, Крипти, Пигментни петна, Радиални линии и др.)
+- location: Позиция като часовник (напр. "3:00-4:00", "около 6h")
+- description: Визуално описание (max 60 символа)
+- severity: "low" | "medium" | "high"
+
+⚠️ Ако НЕ виждаш артефакти в ириса, върни празен масив: []
+⚠️ Ако виждаш дори и малки/съмнителни артефакти, включи ги!
+
+3. ОБЩО ЗДРАВЕ (0-100):
+Базирай оценката на:
+- Брой и тежест на находките
+- Общо състояние на тъканта
+- Видими структурни промени
+Стандарт: 70-85 (средно), 85-95 (добро), 50-70 (нужда от внимание), <50 (сериозни проблеми)
+
+4. СИСТЕМНИ ОЦЕНКИ (6 системи, 0-100):
+За всяка система: Храносмилателна, Имунна, Нервна, Сърдечно-съдова, Детоксикация, Ендокринна
+- system: Име на системата
+- score: Оценка 0-100 базирана на находки в съответните зони
+- description: Кратко описание (max 60 символа)
+
+ФОРМАТ НА ОТГОВОРА:
+- САМО валиден JSON
+- БЕЗ markdown блокове (\`\`\`json или \`\`\`)
+- БЕЗ нови редове (\\n) в текстовете
+- БЕЗ вътрешни двойни кавички в strings
+- САМО БЪЛГАРСКИ език
+
+{
+  "analysis": {
+    "zones": [
+      {"id": 1, "name": "Мозъчна зона", "organ": "Мозък", "status": "normal", "findings": "Визуално чиста зона", "angle": [0, 30]},
+      {"id": 2, "name": "Хипофизна зона", "organ": "Хипофиза", "status": "attention", "findings": "Лека дисколорация в горния сектор", "angle": [30, 60]}
+    ],
+    "artifacts": [
+      {"type": "Лакуни", "location": "3:00-4:00", "description": "Две малки тъмни лакуни", "severity": "low"}
+    ],
+    "overallHealth": 75,
+    "systemScores": [
+      {"system": "Храносмилателна", "score": 70, "description": "Умерени находки в стомашната зона"},
+      {"system": "Имунна", "score": 80, "description": "Добро състояние"},
+      {"system": "Нервна", "score": 85, "description": "Без значими находки"},
+      {"system": "Сърдечно-съдова", "score": 75, "description": "Леки периферни знаци"},
+      {"system": "Детоксикация", "score": 65, "description": "Пигментация в чернодробната зона"},
+      {"system": "Ендокринна", "score": 78, "description": "Леки промени в щитовидната зона"}
+    ]
+  }
+}`
+
+      addLog('info', `Изпращане на prompt + изображение до LLM (${prompt.length} символа)...`)
+      console.log(`🤖 [ИРИС ${side}] Изпращане на prompt + изображение до LLM...`)
+      console.log(`📄 [ИРИС ${side}] Prompt дължина: ${prompt.length} символа`)
+      console.log(`📷 [ИРИС ${side}] Изображение дължина: ${Math.round(imageForAnalysis.length / 1024)} KB (БЕЗ overlay)`)
+      
+      addLog('warning', 'Изчакване на отговор от AI модела... (това може да отнеме 10-30 сек)')
+      const response = await callLLMWithRetry(prompt, true, 2, imageForAnalysis)
+      
+      addLog('success', `Получен отговор от LLM (${response.length} символа)`)
+      console.log(`✅ [ИРИС ${side}] Получен отговор от LLM`)
+      console.log(`📄 [ИРИС ${side}] Отговор дължина: ${response.length} символа`)
+      console.log(`📄 [ИРИС ${side}] RAW отговор:`, response)
+      
+      addLog('info', 'Парсиране на JSON отговор...')
+      const parsed = await robustJSONParse(response, `ИРИС ${side}`)
+
+      addLog('success', 'JSON парсиран успешно')
+      console.log(`✅ [ИРИС ${side}] JSON парсиран успешно`)
+      console.log(`📊 [ИРИС ${side}] Парсиран обект:`, parsed)
+
+      const extractedAnalysis = extractAnalysisPayload(parsed)
+
+      if (!extractedAnalysis) {
+        addLog('error', `Липсва 'analysis' property в отговора!`)
+        console.error(`❌ [ИРИС ${side}] ГРЕШКА: Липсва 'analysis' property в отговора!`)
+        throw new Error(`Невалиден формат на отговор - липсва 'analysis' property`)
+      }
+
+      if (extractedAnalysis.source !== 'analysis') {
+        addLog('warning', `Открит алтернативен 'analysis' ключ (${extractedAnalysis.source}) - използваме него`)
+        console.warn(`⚠️ [ИРИС ${side}] Използван е ${extractedAnalysis.source} вместо стандартния 'analysis'`)
+      }
+
+      const analysisData = extractedAnalysis.analysis || {}
+      const rawZones = Array.isArray(analysisData.zones) ? analysisData.zones : []
+      const rawArtifacts = Array.isArray(analysisData.artifacts) ? analysisData.artifacts : []
+      const overallHealth = typeof analysisData.overallHealth === 'number' ? analysisData.overallHealth : 0
+      const systemScores = Array.isArray(analysisData.systemScores) ? analysisData.systemScores : []
+
+      const step3Zones = extractedAnalysis.step3?.zoneSummary
+      const normalizedZones = rawZones.map((zone, index) => {
+        const summaryByIndex = step3Zones?.[index]
+        const numericZoneId = typeof zone.id === 'number' ? zone.id : Number.parseInt(String(zone.id), 10)
+        const summaryById = step3Zones?.find(z => Number.parseInt(String(z.zoneId).replace(/\D+/g, ''), 10) === numericZoneId)
+        const summary = summaryById || summaryByIndex
+
+        return summary ? { ...zone, organ: summary.organ_bg } : zone
+      })
+
+      const result = {
+        side,
+        ...analysisData,
+        zones: normalizedZones,
+        artifacts: rawArtifacts,
+        overallHealth,
+        systemScores
+      }
+      
+      addLog('success', `Анализ завършен: ${result.zones.length} зони, ${result.artifacts.length} артефакта`)
+      console.log(`✅ [ИРИС ${side}] Финален резултат:`, result)
+      
+      return result
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       addLog('error', `ГРЕШКА при анализ на ${side} ирис: ${errorMsg}`)
@@ -1891,40 +2124,6 @@ JSON формат:
                   </Button>
                 </div>
               </>
-            )}
-
-            {promptCatalogInfo.sources.length > 0 && (
-              <div className="mt-6 text-left">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold">Prompt стъпки от папка steps</h3>
-                  {promptCatalogInfo.version && (
-                    <span className="text-[11px] text-muted-foreground">
-                      Каталог: {promptCatalogInfo.version}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Всеки ред показва LLM prompt файл и неговия checksum за валидация на съдържанието.
-                </p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {promptCatalogInfo.sources.map(source => (
-                    <div
-                      key={`${source.stage}-${source.checksum}`}
-                      className="p-3 rounded-lg border border-border/60 bg-muted/50 flex items-start justify-between gap-2"
-                    >
-                      <div>
-                        <div className="text-sm font-semibold">{source.stage}</div>
-                        {source.source && (
-                          <div className="text-[11px] text-muted-foreground break-all">{source.source}</div>
-                        )}
-                      </div>
-                      <span className="text-[11px] font-mono bg-background px-2 py-1 rounded border border-border">
-                        #{source.checksum}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
 
             <div className="mt-8 flex gap-2 justify-center">
