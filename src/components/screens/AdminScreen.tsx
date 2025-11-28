@@ -26,8 +26,7 @@ import {
   FileText,
   Robot,
   ClockCounterClockwise,
-  DownloadSimple,
-  ListNumbers
+  DownloadSimple
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AIModelConfig, IridologyTextbook, CustomOverlay, IridologyManual, AIPromptTemplate } from '@/types'
@@ -35,7 +34,6 @@ import IridologyOverlay from '@/components/iris/IridologyOverlay'
 import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
 import IridologyManualTab from '@/components/admin/IridologyManualTab'
 import AIPromptTab from '@/components/admin/AIPromptTab'
-import PipelinePromptsTab from '@/components/admin/PipelinePromptsTab'
 import ChangelogTab from '@/components/admin/ChangelogTab'
 import ProjectExportTab from '@/components/admin/ProjectExportTab'
 import AIModelStrategyTab from '@/components/admin/AIModelStrategyTab'
@@ -409,11 +407,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               <span className="hidden sm:inline">AI Промпт</span>
               <span className="sm:hidden">Промпт</span>
             </TabsTrigger>
-            <TabsTrigger value="pipeline" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
-              <ListNumbers className="w-4 h-4 md:mr-1" />
-              <span className="hidden sm:inline">LLM Стъпки</span>
-              <span className="sm:hidden">Стъпки</span>
-            </TabsTrigger>
             <TabsTrigger value="resources" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <FileText className="w-4 h-4 md:mr-1" />
               <span className="hidden sm:inline">Ресурси</span>
@@ -687,49 +680,39 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
             <AIPromptTab />
           </TabsContent>
 
-          <TabsContent value="pipeline">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.05 }}
-            >
-              <PipelinePromptsTab />
-            </motion.div>
-          </TabsContent>
-
           <TabsContent value="resources">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-                    <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-                    Учебници по иридология
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                    Качете учебници и референтни материали за подобряване на анализа
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="textbook-file" className="flex items-center gap-2 text-sm md:text-base">
-                        <Upload className="w-4 h-4" />
-                        Качи файл (опционално)
-                      </Label>
-                      <Input
-                        id="textbook-file"
-                        type="file"
-                        accept=".txt,.md"
-                        onChange={handleFileUpload}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Поддържани формати: .txt, .md
-                      </p>
-                    </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                Учебници по иридология
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Качете учебници и референтни материали за подобряване на анализа
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="textbook-file" className="flex items-center gap-2 text-sm md:text-base">
+                    <Upload className="w-4 h-4" />
+                    Качи файл (опционално)
+                  </Label>
+                  <Input
+                    id="textbook-file"
+                    type="file"
+                    accept=".txt,.md"
+                    onChange={handleFileUpload}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Поддържани формати: .txt, .md
+                  </p>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="textbook-name" className="text-sm md:text-base">Име на учебника</Label>
