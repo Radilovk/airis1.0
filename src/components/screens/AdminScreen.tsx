@@ -38,7 +38,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     useCustomKey: false,
     requestDelay: 60000,
     requestCount: 8,
-    enableDiagnostics: true
+    enableDiagnostics: true,
+    usePipelineV9: true  // Default: use new pipeline
   })
   
   const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
@@ -48,6 +49,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || 60000)
   const [requestCount, setRequestCount] = useState(aiConfig?.requestCount || 8)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
+  const [usePipelineV9, setUsePipelineV9] = useState(aiConfig?.usePipelineV9 ?? true)
 
   // Log successful admin panel access
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setRequestDelay(aiConfig.requestDelay || 60000)
       setRequestCount(aiConfig.requestCount || 8)
       setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
+      setUsePipelineV9(aiConfig.usePipelineV9 ?? true)
     }
   }, [aiConfig])
 
@@ -134,16 +137,19 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         useCustomKey: actualUseCustomKey,
         requestDelay,
         requestCount,
-        enableDiagnostics
+        enableDiagnostics,
+        usePipelineV9
       }
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
-      console.log(`🔍 [ADMIN] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}`)
+      console.log(`🔍 [ADMIN] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}, usePipelineV9: ${usePipelineV9}`)
       
       await setAiConfig(config)
       
       toast.success(`✓ AI конфигурация запазена: ${provider} / ${model}`, {
-        description: actualUseCustomKey ? 'Вашият собствен API ключ ще бъде използван за анализите.' : undefined,
+        description: usePipelineV9 
+          ? 'Използва се новият v9 pipeline с промпти от steps/ папката.' 
+          : 'Използва се класическият анализ.',
         duration: 5000
       })
     } catch (error) {
@@ -380,6 +386,22 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       Повече заявки = по-прецизен, задълбочен и персонализиран анализ с множество слоеве на корелация между иридологични находки и данни от въпросника. 
                       8 заявки включва: ляв ирис, десен ирис, хранителен план, добавки, психология, специални препоръки, изследвания, детайлен анализ + резюмета.
                     </p>
+                  </div>
+                  
+                  <div className="flex items-center justify-between space-x-2 pt-2">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="use-pipeline-v9" className="text-base">
+                        🆕 Използвай Pipeline v9 (Нов)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Използва новия многоетапен pipeline с промпти от папка steps/ за по-структуриран и точен анализ
+                      </p>
+                    </div>
+                    <Switch
+                      id="use-pipeline-v9"
+                      checked={usePipelineV9}
+                      onCheckedChange={setUsePipelineV9}
+                    />
                   </div>
                   
                   <div className="flex items-center justify-between space-x-2 pt-2">

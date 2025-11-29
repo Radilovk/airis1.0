@@ -144,6 +144,7 @@ export interface AIModelConfig {
   requestDelay?: number
   requestCount?: number
   enableDiagnostics?: boolean  // Enable AI diagnostic pre-check before analysis
+  usePipelineV9?: boolean  // Use the new v9 pipeline with step prompts from steps/ folder
 }
 
 export interface IridologyTextbook {
