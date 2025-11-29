@@ -4,40 +4,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { 
   ArrowLeft, 
   Brain, 
   Key, 
-  BookOpen, 
-  Upload, 
-  Trash, 
   CheckCircle,
-  Image as ImageIcon,
-  Eye,
-  FileText,
-  Robot,
   ClockCounterClockwise,
   DownloadSimple
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import type { AIModelConfig, IridologyTextbook, CustomOverlay, IridologyManual, AIPromptTemplate } from '@/types'
-import IridologyOverlay from '@/components/iris/IridologyOverlay'
+import type { AIModelConfig } from '@/types'
 import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
-import IridologyManualTab from '@/components/admin/IridologyManualTab'
-import AIPromptTab from '@/components/admin/AIPromptTab'
 import ChangelogTab from '@/components/admin/ChangelogTab'
 import ProjectExportTab from '@/components/admin/ProjectExportTab'
-import AIModelStrategyTab from '@/components/admin/AIModelStrategyTab'
-import { DEFAULT_IRIDOLOGY_MANUAL, DEFAULT_AI_PROMPT } from '@/lib/default-prompts'
 
 interface AdminScreenProps {
   onBack: () => void
@@ -54,17 +39,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     enableDiagnostics: true
   })
   
-  const [textbooks, setTextbooks] = useKVWithFallback<IridologyTextbook[]>('iridology-textbooks', [])
-  const [customOverlay, setCustomOverlay] = useKVWithFallback<CustomOverlay | null>('custom-overlay', null)
-  const [iridologyManual, setIridologyManual] = useKVWithFallback<IridologyManual>('iridology-manual', {
-    content: DEFAULT_IRIDOLOGY_MANUAL,
-    lastModified: new Date().toISOString()
-  })
-  const [aiPromptTemplate, setAiPromptTemplate] = useKVWithFallback<AIPromptTemplate>('ai-prompt-template', {
-    content: DEFAULT_AI_PROMPT,
-    lastModified: new Date().toISOString()
-  })
-  
   const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
   const [model, setModel] = useState(aiConfig?.model || 'gpt-4o')
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
@@ -72,20 +46,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || 60000)
   const [requestCount, setRequestCount] = useState(aiConfig?.requestCount || 8)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
-  
-  const [textbookName, setTextbookName] = useState('')
-  const [textbookContent, setTextbookContent] = useState('')
-  const [showOverlayPreview, setShowOverlayPreview] = useState(false)
-  
-  const [manualContent, setManualContent] = useState(iridologyManual?.content || DEFAULT_IRIDOLOGY_MANUAL)
-  const [promptContent, setPromptContent] = useState(aiPromptTemplate?.content || DEFAULT_AI_PROMPT)
-
-  const getValidSparkModel = (model: string): string => {
-    if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
-      return model
-    }
-    return 'gpt-4o'
-  }
 
   // Log successful admin panel access
   useEffect(() => {
@@ -111,18 +71,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
     }
   }, [aiConfig])
-
-  useEffect(() => {
-    if (iridologyManual) {
-      setManualContent(iridologyManual.content)
-    }
-  }, [iridologyManual])
-
-  useEffect(() => {
-    if (aiPromptTemplate) {
-      setPromptContent(aiPromptTemplate.content)
-    }
-  }, [aiPromptTemplate])
 
   const validateApiKey = (provider: string, key: string): { valid: boolean; message?: string } => {
     if (!key.trim()) {
@@ -202,156 +150,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     }
   }
 
-  const handleAddTextbook = async () => {
-    if (!textbookName.trim() || !textbookContent.trim()) {
-      toast.error('Моля, попълнете име и съдържание на учебника')
-      return
-    }
-
-    try {
-      const newTextbook: IridologyTextbook = {
-        id: `textbook-${Date.now()}`,
-        name: textbookName,
-        content: textbookContent,
-        uploadDate: new Date().toISOString(),
-        fileSize: new Blob([textbookContent]).size
-      }
-
-      await setTextbooks((current) => [...(current || []), newTextbook])
-      
-      setTextbookName('')
-      setTextbookContent('')
-      toast.success('Учебникът е добавен успешно')
-    } catch (error) {
-      console.error('Error adding textbook:', error)
-      toast.error('Грешка при добавяне на учебника')
-    }
-  }
-
-  const handleDeleteTextbook = async (id: string) => {
-    try {
-      await setTextbooks((current) => (current || []).filter(tb => tb.id !== id))
-      toast.success('Учебникът е изтрит успешно')
-    } catch (error) {
-      console.error('Error deleting textbook:', error)
-      toast.error('Грешка при изтриване на учебника')
-    }
-  }
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
-      toast.error('Моля, качете текстов файл (.txt или .md)')
-      return
-    }
-
-    try {
-      const content = await file.text()
-      setTextbookName(file.name.replace(/\.(txt|md)$/, ''))
-      setTextbookContent(content)
-      toast.success('Файлът е зареден успешно')
-    } catch (error) {
-      console.error('Error reading file:', error)
-      toast.error('Грешка при четене на файла')
-    }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
-  }
-
-  const handleOverlayUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const fileType = file.type
-    if (!fileType.includes('svg') && !fileType.includes('png')) {
-      toast.error('Моля, качете SVG или PNG файл')
-      return
-    }
-
-    try {
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const dataUrl = e.target?.result as string
-        const overlay: CustomOverlay = {
-          dataUrl,
-          type: fileType.includes('svg') ? 'svg' : 'png',
-          name: file.name,
-          uploadDate: new Date().toISOString()
-        }
-        
-        await setCustomOverlay(overlay)
-        toast.success('Overlay map е качен успешно')
-      }
-      reader.readAsDataURL(file)
-    } catch (error) {
-      console.error('Error uploading overlay:', error)
-      toast.error('Грешка при качване на overlay map')
-    }
-  }
-
-  const handleRemoveOverlay = async () => {
-    try {
-      await setCustomOverlay(null)
-      toast.success('Overlay map е премахнат. Използва се стандартния.')
-    } catch (error) {
-      console.error('Error removing overlay:', error)
-      toast.error('Грешка при премахване на overlay map')
-    }
-  }
-
-  const handleSaveManual = async () => {
-    try {
-      await setIridologyManual({
-        content: manualContent,
-        lastModified: new Date().toISOString()
-      })
-      toast.success('Иридологичното ръководство е запазено успешно')
-    } catch (error) {
-      console.error('Error saving manual:', error)
-      toast.error('Грешка при запазване на ръководството')
-    }
-  }
-
-  const handleResetManual = async () => {
-    setManualContent(DEFAULT_IRIDOLOGY_MANUAL)
-    await setIridologyManual({
-      content: DEFAULT_IRIDOLOGY_MANUAL,
-      lastModified: new Date().toISOString()
-    })
-    toast.success('Ръководството е възстановено до оригиналната версия')
-  }
-
-  const handleSavePrompt = async () => {
-    try {
-      await setAiPromptTemplate({
-        content: promptContent,
-        lastModified: new Date().toISOString()
-      })
-      toast.success('AI промптът е запазен успешно')
-    } catch (error) {
-      console.error('Error saving prompt:', error)
-      toast.error('Грешка при запазване на промпта')
-    }
-  }
-
-  const handleResetPrompt = async () => {
-    setPromptContent(DEFAULT_AI_PROMPT)
-    await setAiPromptTemplate({
-      content: DEFAULT_AI_PROMPT,
-      lastModified: new Date().toISOString()
-    })
-    toast.success('Промптът е възстановен до оригиналната версия')
-  }
-
   const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
   const geminiModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash-thinking-exp', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
-  const githubSparkModels = ['gpt-4o', 'gpt-4o-mini']
 
   return (
     <div className="min-h-screen bg-background">
@@ -386,31 +186,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         </div>
 
         <Tabs defaultValue="ai-config" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 md:grid-cols-8 gap-1 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-4 gap-1 h-auto p-1">
             <TabsTrigger value="ai-config" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <Brain className="w-4 h-4 md:mr-1" />
               <span className="hidden sm:inline">AI Модел</span>
               <span className="sm:hidden">AI</span>
-            </TabsTrigger>
-            <TabsTrigger value="ai-strategy" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
-              <Brain className="w-4 h-4 md:mr-1" />
-              <span className="hidden sm:inline">AI Стратегия</span>
-              <span className="sm:hidden">Страт</span>
-            </TabsTrigger>
-            <TabsTrigger value="manual" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
-              <BookOpen className="w-4 h-4 md:mr-1" />
-              <span className="hidden sm:inline">Ръководство</span>
-              <span className="sm:hidden">Книга</span>
-            </TabsTrigger>
-            <TabsTrigger value="prompt" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
-              <Robot className="w-4 h-4 md:mr-1" />
-              <span className="hidden sm:inline">AI Промпт</span>
-              <span className="sm:hidden">Промпт</span>
-            </TabsTrigger>
-            <TabsTrigger value="resources" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
-              <FileText className="w-4 h-4 md:mr-1" />
-              <span className="hidden sm:inline">Ресурси</span>
-              <span className="sm:hidden">Файлове</span>
             </TabsTrigger>
             <TabsTrigger value="questionnaire" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <CheckCircle className="w-4 h-4 md:mr-1" />
@@ -656,144 +436,6 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Запази настройките
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-          </TabsContent>
-
-          <TabsContent value="ai-strategy">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <AIModelStrategyTab />
-            </motion.div>
-          </TabsContent>
-
-          <TabsContent value="manual">
-            <IridologyManualTab />
-          </TabsContent>
-
-          <TabsContent value="prompt">
-            <AIPromptTab />
-          </TabsContent>
-
-          <TabsContent value="resources">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-                <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-                Учебници по иридология
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Качете учебници и референтни материали за подобряване на анализа
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="textbook-file" className="flex items-center gap-2 text-sm md:text-base">
-                    <Upload className="w-4 h-4" />
-                    Качи файл (опционално)
-                  </Label>
-                  <Input
-                    id="textbook-file"
-                    type="file"
-                    accept=".txt,.md"
-                    onChange={handleFileUpload}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Поддържани формати: .txt, .md
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="textbook-name" className="text-sm md:text-base">Име на учебника</Label>
-                  <Input
-                    id="textbook-name"
-                    placeholder="напр. Основи на иридологията - Д-р Иванов"
-                    value={textbookName}
-                    onChange={(e) => setTextbookName(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="textbook-content" className="text-sm md:text-base">Съдържание</Label>
-                  <Textarea
-                    id="textbook-content"
-                    placeholder="Въведете или поставете текста от учебника..."
-                    value={textbookContent}
-                    onChange={(e) => setTextbookContent(e.target.value)}
-                    className="min-h-[200px] font-mono text-xs md:text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Този текст ще бъде използван като контекст при AI анализа
-                  </p>
-                </div>
-
-                <Button onClick={handleAddTextbook} className="w-full text-sm md:text-base">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Добави учебник
-                </Button>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm md:text-base">Налични учебници ({textbooks?.length || 0})</Label>
-                </div>
-
-                {textbooks && textbooks.length > 0 ? (
-                  <ScrollArea className="h-[250px] md:h-[300px] rounded-md border p-2 md:p-4">
-                    <div className="space-y-3">
-                      {textbooks.map((textbook) => (
-                        <motion.div
-                          key={textbook.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="flex items-start justify-between gap-2 md:gap-4 p-2 md:p-3 rounded-lg border bg-card"
-                        >
-                          <div className="flex-1 space-y-1 min-w-0">
-                            <p className="font-medium text-sm md:text-base break-words">{textbook.name}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                              <Badge variant="outline" className="text-xs">
-                                {formatFileSize(textbook.fileSize)}
-                              </Badge>
-                              <span>•</span>
-                              <span>
-                                {new Date(textbook.uploadDate).toLocaleDateString('bg-BG')}
-                              </span>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteTextbook(textbook.id)}
-                            className="flex-shrink-0"
-                          >
-                            <Trash className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                ) : (
-                  <div className="text-center py-12 border rounded-lg">
-                    <BookOpen className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                    <p className="text-sm text-muted-foreground">
-                      Все още няма качени учебници
-                    </p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
