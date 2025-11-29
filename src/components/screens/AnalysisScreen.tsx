@@ -534,7 +534,8 @@ ${response}
             if (attempt < maxRetries) {
               console.log(`⏳ [CONFIG] Конфигурацията не е намерена, изчакване ${delayMs}ms...`)
               await sleep(delayMs)
-              // Increase delay for each retry (exponential backoff)
+              // Progressive backoff with 1.5x multiplier - gentler than 2x to avoid long waits
+              // for a config that might be ready soon, while still providing increasing delays
               delayMs = Math.min(delayMs * 1.5, 2000)
             }
           }

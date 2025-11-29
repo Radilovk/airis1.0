@@ -128,12 +128,27 @@ const kvStorage = {
 
   async delete(key: string): Promise<void> {
     try {
-      // Delete from both storages
+      // Delete from both localStorage storages
       localStorage.removeItem(`airis_${key}`)
       localStorage.removeItem(`spark-kv:${key}`) // Legacy cleanup
       
-      // Note: We don't delete from IndexedDB here to keep it simple
-      // The next write will overwrite the value anyway
+      // Delete from IndexedDB
+      try {
+        const db = await openDB()
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readwrite')
+          const store = transaction.objectStore(STORE_NAME)
+          const request = store.delete(key)
+          request.onsuccess = () => {
+            console.log(`[KV] ✓ Deleted ${key} from IndexedDB`)
+            resolve()
+          }
+          request.onerror = () => reject(request.error)
+        })
+      } catch (idbError) {
+        console.warn(`[KV] Failed to delete ${key} from IndexedDB:`, idbError)
+        // Continue even if IndexedDB delete fails
+      }
     } catch (error) {
       console.error(`[KV] Error deleting key "${key}":`, error)
       throw error

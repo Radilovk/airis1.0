@@ -502,7 +502,19 @@ export async function executeV9Pipeline(
   onProgress: (step: string, progress: number) => void,
   addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void
 ): Promise<IrisAnalysis> {
-  const imageHash = iris.dataUrl.substring(22, 42) // Extract part of data URL as hash
+  // Generate a simple hash from the data URL for tracking
+  const generateSimpleHash = (dataUrl: string): string => {
+    // Validate it's a data URL
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+      return `invalid_${Date.now()}`
+    }
+    // Use a combination of length, timestamp, and a sample of the content
+    const len = dataUrl.length
+    const sample = dataUrl.substring(Math.floor(len * 0.25), Math.floor(len * 0.25) + 20)
+    return `img_${len}_${sample.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10)}`
+  }
+  
+  const imageHash = generateSimpleHash(iris.dataUrl)
   const sideCode = side === 'left' ? 'L' : 'R'
   
   const stepResults: Record<string, any> = {}
@@ -586,13 +598,6 @@ export async function executeV9Pipeline(
     addLog('error', `[V9] Грешка в pipeline: ${error instanceof Error ? error.message : String(error)}`)
     throw error
   }
-}
-
-/**
- * Check if v9 pipeline is available and configured
- */
-export function isV9PipelineAvailable(): boolean {
-  return true // Always available since prompts are embedded
 }
 
 /**
