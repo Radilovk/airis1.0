@@ -182,3 +182,37 @@ export interface AIModelStrategy {
   topP: number
   lastModified: string
 }
+
+// Pipeline Step configuration for admin management
+export interface PipelineStepConfig {
+  id: string
+  name: string
+  description: string
+  order: number
+  enabled: boolean
+  prompt: string
+  modelSettings: {
+    provider: 'openai' | 'gemini'
+    model: string
+    temperature: number
+    maxTokens: number
+    topP: number
+  }
+  inputFrom: string | null  // Previous step ID or null for first step
+  outputTo: string | null   // Next step ID or null for last step
+  lastModified: string
+}
+
+export interface PipelineConfig {
+  version: string
+  steps: PipelineStepConfig[]
+  lastModified: string
+}
+
+export interface GitHubAdminConfig {
+  apiKey: string
+  repoOwner: string
+  repoName: string
+  branch: string
+  pipelinePath: string
+}
