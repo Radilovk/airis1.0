@@ -8,6 +8,7 @@ import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
+import { executeV9Pipeline } from '@/lib/pipeline-v9'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -48,7 +49,8 @@ export default function AnalysisScreen({
     useCustomKey: false,
     requestDelay: 20000,
     requestCount: 8,
-    enableDiagnostics: true  // Default: enable diagnostic checks
+    enableDiagnostics: true,  // Default: enable diagnostic checks
+    usePipelineV9: true       // Default: use new v9 pipeline
   })
 
   const addLog = (level: LogEntry['level'], message: string) => {
@@ -511,31 +513,35 @@ ${response}
         
         console.log('⚙️ [ANALYSIS] Зареждане на AI конфигурация от KV storage...')
         
-        // Wait a bit longer to ensure KV storage has fully loaded
-        await sleep(300)
-        
-        const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-        
-        // Give priority to stored config, then to aiConfig from hook
-        let finalConfig: AIModelConfig | null = null
-        
-        if (storedConfig && storedConfig.apiKey && storedConfig.apiKey.trim() !== '') {
-          finalConfig = storedConfig
-          console.log('✅ [CONFIG] Използване на конфигурация от KV storage')
-        } else if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
-          finalConfig = aiConfig
-          console.log('✅ [CONFIG] Използване на конфигурация от hook')
-        } else {
-          // Wait a bit more and try again - sometimes the hook takes longer to load
-          console.log('⏳ [CONFIG] Конфигурацията все още се зарежда, изчакване...')
-          await sleep(700)
-          
-          const retryConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-          if (retryConfig && retryConfig.apiKey && retryConfig.apiKey.trim() !== '') {
-            finalConfig = retryConfig
-            console.log('✅ [CONFIG] Конфигурация заредена след повторен опит')
+        // Helper function to try loading config with retries
+        const loadConfigWithRetries = async (maxRetries: number = 5, delayMs: number = 500): Promise<AIModelConfig | null> => {
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            console.log(`🔄 [CONFIG] Опит ${attempt}/${maxRetries} за зареждане на конфигурация...`)
+            
+            // Try from KV storage (which now uses IndexedDB)
+            const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
+            if (storedConfig && storedConfig.apiKey && storedConfig.apiKey.trim() !== '') {
+              console.log(`✅ [CONFIG] Конфигурация заредена от KV storage (опит ${attempt})`)
+              return storedConfig
+            }
+            
+            // Try from hook state
+            if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
+              console.log(`✅ [CONFIG] Конфигурация заредена от hook (опит ${attempt})`)
+              return aiConfig
+            }
+            
+            if (attempt < maxRetries) {
+              console.log(`⏳ [CONFIG] Конфигурацията не е намерена, изчакване ${delayMs}ms...`)
+              await sleep(delayMs)
+              // Increase delay for each retry (exponential backoff)
+              delayMs = Math.min(delayMs * 1.5, 2000)
+            }
           }
+          return null
         }
+        
+        const finalConfig = await loadConfigWithRetries(5, 300)
         
         if (!finalConfig || !finalConfig.apiKey || finalConfig.apiKey.trim() === '') {
           addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
@@ -606,7 +612,8 @@ ${response}
         apiKey: '',
         useCustomKey: false,
         requestDelay: 20000,
-        requestCount: 8
+        requestCount: 8,
+        usePipelineV9: true
       }
       
       const provider = finalConfig.provider
@@ -614,6 +621,7 @@ ${response}
       const requestDelay = Math.max(finalConfig.requestDelay ?? 20000, 15000)
       const requestCount = finalConfig.requestCount || 8
       const apiKey = finalConfig.apiKey || ''
+      const usePipelineV9 = finalConfig.usePipelineV9 ?? true
       
       if (!apiKey || apiKey.trim() === '') {
         addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
@@ -623,46 +631,103 @@ ${response}
       const actualModel = configuredModel
       const actualProvider = provider
       
-      console.log(`🚀 [АНАЛИЗ] Provider: ${actualProvider}, модел: "${actualModel}"`)
+      console.log(`🚀 [АНАЛИЗ] Provider: ${actualProvider}, модел: "${actualModel}", v9 pipeline: ${usePipelineV9}`)
       
       addLog('info', 'Стартиране на анализ...')
       addLog('info', `⚙️ AI Настройки: Provider=${actualProvider}, Model=${actualModel}`)
       addLog('info', `⚙️ Параметри: Забавяне=${requestDelay}ms, Заявки=${requestCount}`)
+      addLog('info', `🔧 Pipeline: ${usePipelineV9 ? 'v9 (нов многоетапен)' : 'класически'}`)
       addLog('info', `Данни от въпросник: Възраст ${questionnaireData.age}, Пол ${questionnaireData.gender}`)
       addLog('info', `Здравни цели: ${questionnaireData.goals.join(', ')}`)
       console.log('🚀 [АНАЛИЗ] Стартиране на анализ...')
       console.log('⚙️ [АНАЛИЗ] AI Конфигурация:', finalConfig)
       console.log('🎯 [АНАЛИЗ] Provider който ще се използва:', actualProvider)
       console.log('🎯 [АНАЛИЗ] Модел който ще се използва:', actualModel)
+      console.log('🎯 [АНАЛИЗ] Pipeline v9:', usePipelineV9)
       console.log('📊 [АНАЛИЗ] Данни от въпросник:', questionnaireData)
       
       const progressPerStep = 90 / requestCount
       let currentProgress = 5
       
       setProgress(currentProgress)
-      setStatus('Анализиране на ляв ирис - структура...')
-      addLog('info', 'Започване анализ на ляв ирис...')
-      console.log('👁️ [АНАЛИЗ] Започване анализ на ляв ирис...')
       
-      const leftAnalysis = await analyzeIris(leftIris, 'left', questionnaireData)
-      addLog('success', 'Ляв ирис анализиран успешно')
-      console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
+      let leftAnalysis: IrisAnalysis
+      let rightAnalysis: IrisAnalysis
       
-      currentProgress += progressPerStep
-      setProgress(currentProgress)
-      addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
-      await sleep(requestDelay)
+      // Use v9 pipeline if configured
+      if (usePipelineV9) {
+        addLog('info', '🆕 Използване на v9 pipeline с многоетапен анализ...')
+        
+        // Wrapper for callLLMWithRetry that matches the pipeline's expected signature
+        const callLLMWrapper = async (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => {
+          return callLLMWithRetry(prompt, jsonMode, retries, imageDataUrl)
+        }
+        
+        setStatus('V9 Pipeline: Анализ на ляв ирис...')
+        leftAnalysis = await executeV9Pipeline(
+          leftIris,
+          'left',
+          questionnaireData,
+          callLLMWrapper,
+          (step, stepProgress) => {
+            setStatus(`V9 Pipeline (ляв): ${step}`)
+            setProgress(5 + (stepProgress / 2) * 0.4)
+          },
+          addLog
+        )
+        addLog('success', 'V9 Pipeline: Ляв ирис анализиран успешно')
+        
+        currentProgress = 45
+        setProgress(currentProgress)
+        addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+        await sleep(requestDelay)
+        
+        setStatus('V9 Pipeline: Анализ на десен ирис...')
+        rightAnalysis = await executeV9Pipeline(
+          rightIris,
+          'right',
+          questionnaireData,
+          callLLMWrapper,
+          (step, stepProgress) => {
+            setStatus(`V9 Pipeline (десен): ${step}`)
+            setProgress(45 + (stepProgress / 2) * 0.4)
+          },
+          addLog
+        )
+        addLog('success', 'V9 Pipeline: Десен ирис анализиран успешно')
+        
+        currentProgress = 85
+        setProgress(currentProgress)
+        
+      } else {
+        // Use classic analysis method
+        addLog('info', '📋 Използване на класически анализ...')
+        
+        setStatus('Анализиране на ляв ирис - структура...')
+        addLog('info', 'Започване анализ на ляв ирис...')
+        console.log('👁️ [АНАЛИЗ] Започване анализ на ляв ирис...')
+        
+        leftAnalysis = await analyzeIris(leftIris, 'left', questionnaireData)
+        addLog('success', 'Ляв ирис анализиран успешно')
+        console.log('✅ [АНАЛИЗ] Ляв ирис анализиран успешно:', leftAnalysis)
+        
+        currentProgress += progressPerStep
+        setProgress(currentProgress)
+        addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
+        await sleep(requestDelay)
+        
+        setStatus('Анализиране на десен ирис - структура...')
+        addLog('info', 'Започване анализ на десен ирис...')
+        console.log('👁️ [АНАЛИЗ] Започване анализ на десен ирис...')
+        
+        rightAnalysis = await analyzeIris(rightIris, 'right', questionnaireData)
+        addLog('success', 'Десен ирис анализиран успешно')
+        console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
+        
+        currentProgress += progressPerStep
+        setProgress(currentProgress)
+      }
       
-      setStatus('Анализиране на десен ирис - структура...')
-      addLog('info', 'Започване анализ на десен ирис...')
-      console.log('👁️ [АНАЛИЗ] Започване анализ на десен ирис...')
-      
-      const rightAnalysis = await analyzeIris(rightIris, 'right', questionnaireData)
-      addLog('success', 'Десен ирис анализиран успешно')
-      console.log('✅ [АНАЛИЗ] Десен ирис анализиран успешно:', rightAnalysis)
-      
-      currentProgress += progressPerStep
-      setProgress(currentProgress)
       addLog('info', `⏳ Изчакване ${requestDelay/1000} сек. за избягване на rate limit...`)
       await sleep(requestDelay)
       
