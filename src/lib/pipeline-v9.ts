@@ -524,8 +524,8 @@ function isSinglePromptMode(pipelineConfig?: PipelineConfig): boolean {
   if (!pipelineConfig) return false
   
   const enabledSteps = pipelineConfig.steps.filter(s => s.enabled)
-  // Single prompt mode if only "one" is enabled OR only one step is enabled total
-  return enabledSteps.length === 1 && (enabledSteps[0].id === 'one' || enabledSteps.length === 1)
+  // Single prompt mode if only one step is enabled (any single step can serve as comprehensive prompt)
+  return enabledSteps.length === 1
 }
 
 /**
