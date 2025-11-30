@@ -34,13 +34,16 @@ interface AdminScreenProps {
   onBack: () => void
 }
 
+// Default configuration constants
+const DEFAULT_REQUEST_DELAY_MS = 5000
+
 export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [aiConfig, setAiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
     provider: 'openai',
     model: 'gpt-4o',
     apiKey: '',
     useCustomKey: false,
-    requestDelay: 60000,
+    requestDelay: DEFAULT_REQUEST_DELAY_MS,
     enableDiagnostics: true
   })
   
@@ -48,7 +51,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [model, setModel] = useState(aiConfig?.model || 'gpt-4o')
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
-  const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || 60000)
+  const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || DEFAULT_REQUEST_DELAY_MS)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
 
   // Log successful admin panel access
@@ -265,7 +268,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Забавяне: {aiConfig.requestDelay || 5000}ms между заявки | 
+                    Забавяне: {aiConfig.requestDelay || DEFAULT_REQUEST_DELAY_MS}ms между заявки | 
                     Брой стъпки се определя от Pipeline конфигурацията
                   </p>
                 </div>
@@ -354,7 +357,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       id="request-delay"
                       type="number"
                       value={requestDelay}
-                      onChange={(e) => setRequestDelay(parseInt(e.target.value) || 5000)}
+                      onChange={(e) => setRequestDelay(parseInt(e.target.value) || DEFAULT_REQUEST_DELAY_MS)}
                       min={1000}
                       max={120000}
                       step={1000}

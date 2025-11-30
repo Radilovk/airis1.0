@@ -398,10 +398,10 @@ export default function PipelineManagerTab() {
     if (!pipelineConfig || !newPresetName.trim()) return
     
     const newPreset: PipelinePreset = {
-      id: `preset_${Date.now()}`,
+      id: `preset_${crypto.randomUUID()}`,
       name: newPresetName.trim(),
       description: newPresetDescription.trim(),
-      config: JSON.parse(JSON.stringify(pipelineConfig)), // Deep clone
+      config: structuredClone(pipelineConfig),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -417,7 +417,7 @@ export default function PipelineManagerTab() {
 
   // Load preset
   const handleLoadPreset = async (preset: PipelinePreset) => {
-    setPipelineConfig(JSON.parse(JSON.stringify(preset.config))) // Deep clone
+    setPipelineConfig(structuredClone(preset.config))
     setConfigSha(undefined) // Clear sha since this is a local preset
     setStepShas({})
     setIsLoadPresetDialogOpen(false)
