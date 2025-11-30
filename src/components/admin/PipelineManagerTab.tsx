@@ -30,10 +30,13 @@ import {
   Warning,
   Gear,
   TextT,
-  ListNumbers
+  ListNumbers,
+  BookmarkSimple,
+  BookmarksSimple,
+  Info
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { GitHubAdminConfig, PipelineConfig, PipelineStepConfig } from '@/types'
+import type { GitHubAdminConfig, PipelineConfig, PipelineStepConfig, PipelinePreset } from '@/types'
 import { getGitHubApiService, initializeGitHubApiService, DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 
 const OPENAI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
@@ -78,6 +81,13 @@ export default function PipelineManagerTab() {
       topP: 0.9
     }
   })
+
+  // Preset management state
+  const [savedPresets, setSavedPresets] = useKVWithFallback<PipelinePreset[]>('pipeline-presets', [])
+  const [isSavePresetDialogOpen, setIsSavePresetDialogOpen] = useState(false)
+  const [isLoadPresetDialogOpen, setIsLoadPresetDialogOpen] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
+  const [newPresetDescription, setNewPresetDescription] = useState('')
 
   // Load saved config
   useEffect(() => {
@@ -383,6 +393,48 @@ export default function PipelineManagerTab() {
     toast.info('Конфигурацията е възстановена до стойности по подразбиране')
   }
 
+  // Save current config as preset
+  const handleSavePreset = async () => {
+    if (!pipelineConfig || !newPresetName.trim()) return
+    
+    const newPreset: PipelinePreset = {
+      id: `preset_${crypto.randomUUID()}`,
+      name: newPresetName.trim(),
+      description: newPresetDescription.trim(),
+      config: structuredClone(pipelineConfig),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    
+    const currentPresets = savedPresets || []
+    await setSavedPresets([...currentPresets, newPreset])
+    
+    setNewPresetName('')
+    setNewPresetDescription('')
+    setIsSavePresetDialogOpen(false)
+    toast.success(`Пресетът "${newPreset.name}" е запазен успешно`)
+  }
+
+  // Load preset
+  const handleLoadPreset = async (preset: PipelinePreset) => {
+    setPipelineConfig(structuredClone(preset.config))
+    setConfigSha(undefined) // Clear sha since this is a local preset
+    setStepShas({})
+    setIsLoadPresetDialogOpen(false)
+    toast.success(`Пресетът "${preset.name}" е зареден`)
+  }
+
+  // Delete preset
+  const handleDeletePreset = async (presetId: string) => {
+    const currentPresets = savedPresets || []
+    const updatedPresets = currentPresets.filter(p => p.id !== presetId)
+    await setSavedPresets(updatedPresets)
+    toast.success('Пресетът е изтрит')
+  }
+
+  // Get count of enabled steps
+  const enabledStepsCount = pipelineConfig?.steps.filter(s => s.enabled).length || 0
+
   return (
     <div className="space-y-6">
       {/* GitHub Connection Card */}
@@ -488,8 +540,108 @@ export default function PipelineManagerTab() {
             <div className="flex items-center gap-2">
               <ListNumbers className="w-5 h-5 md:w-6 md:h-6 text-primary flex-shrink-0" />
               <span>Pipeline Стъпки</span>
+              {enabledStepsCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {enabledStepsCount} активни
+                </Badge>
+              )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {/* Preset management buttons */}
+              <Dialog open={isLoadPresetDialogOpen} onOpenChange={setIsLoadPresetDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <BookmarksSimple className="w-4 h-4 mr-1" />
+                    <span className="hidden sm:inline">Зареди пресет</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Зареждане на пресет</DialogTitle>
+                    <DialogDescription>
+                      Изберете запазена конфигурация за зареждане
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    {(!savedPresets || savedPresets.length === 0) ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Няма запазени пресети. Запазете текущата конфигурация първо.
+                      </p>
+                    ) : (
+                      <ScrollArea className="h-[300px]">
+                        <div className="space-y-2">
+                          {savedPresets.map((preset) => (
+                            <div key={preset.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                              <div>
+                                <p className="font-medium">{preset.name}</p>
+                                {preset.description && (
+                                  <p className="text-xs text-muted-foreground">{preset.description}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                  {preset.config.steps.filter(s => s.enabled).length} стъпки | {new Date(preset.createdAt).toLocaleDateString('bg-BG')}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleLoadPreset(preset)}>
+                                  Зареди
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleDeletePreset(preset.id)}>
+                                  <Trash className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isSavePresetDialogOpen} onOpenChange={setIsSavePresetDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={!pipelineConfig}>
+                    <BookmarkSimple className="w-4 h-4 mr-1" />
+                    <span className="hidden sm:inline">Запази пресет</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Запазване на пресет</DialogTitle>
+                    <DialogDescription>
+                      Запазете текущата конфигурация за бъдещо използване
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Име на пресета</Label>
+                      <Input
+                        value={newPresetName}
+                        onChange={(e) => setNewPresetName(e.target.value)}
+                        placeholder="напр. Стандартен анализ"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Описание (опционално)</Label>
+                      <Input
+                        value={newPresetDescription}
+                        onChange={(e) => setNewPresetDescription(e.target.value)}
+                        placeholder="Кратко описание на пресета"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsSavePresetDialogOpen(false)}>
+                      Отказ
+                    </Button>
+                    <Button onClick={handleSavePreset} disabled={!newPresetName.trim()}>
+                      <FloppyDisk className="w-4 h-4 mr-1" />
+                      Запази
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <Dialog open={isNewStepDialogOpen} onOpenChange={setIsNewStepDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline">
@@ -567,6 +719,19 @@ export default function PipelineManagerTab() {
           <CardDescription className="text-sm">
             Управлявайте стъпките, промптовете и настройките на моделите
           </CardDescription>
+          
+          {/* Pipeline Documentation Alert */}
+          <Alert className="mt-3">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              <strong>Как работи Pipeline системата:</strong><br/>
+              • Активните стъпки се изпълняват последователно при всеки анализ<br/>
+              • Ако е активна само една стъпка (напр. "One"), тя изпълнява цялостен анализ с един промпт<br/>
+              • Ако са активни множество стъпки, всяка обработва специфичен аспект на анализа<br/>
+              • Редактирайте промптите директно в разгънатите стъпки по-долу<br/>
+              • Запазвайте конфигурации като пресети за бърз достъп
+            </AlertDescription>
+          </Alert>
         </CardHeader>
         <CardContent>
           {!pipelineConfig ? (
