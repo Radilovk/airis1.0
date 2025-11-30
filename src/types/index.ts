@@ -142,9 +142,17 @@ export interface AIModelConfig {
   apiKey: string
   useCustomKey: boolean
   requestDelay?: number
-  requestCount?: number
   enableDiagnostics?: boolean  // Enable AI diagnostic pre-check before analysis
-  usePipelineV9?: boolean  // Use the new v9 pipeline with step prompts from steps/ folder
+}
+
+// Pipeline preset for saving/loading configurations
+export interface PipelinePreset {
+  id: string
+  name: string
+  description: string
+  config: PipelineConfig
+  createdAt: string
+  updatedAt: string
 }
 
 export interface IridologyTextbook {

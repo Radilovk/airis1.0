@@ -1,17 +1,45 @@
 import { Octokit } from '@octokit/core'
-import type { PipelineStepConfig, PipelineConfig, GitHubAdminConfig } from '@/types'
+import type { PipelineConfig, GitHubAdminConfig } from '@/types'
+import {
+  ONE_PROMPT,
+  STEP1_GEO_CALIBRATION_PROMPT,
+  STEP2A_STRUCTURAL_DETECTOR_PROMPT,
+  STEP2B_PIGMENT_RINGS_DETECTOR_PROMPT,
+  STEP2C_CONSISTENCY_VALIDATOR_PROMPT,
+  STEP3_MAPPER_PROMPT,
+  STEP4_PROFILE_BUILDER_PROMPT,
+  STEP5_FRONTEND_REPORT_PROMPT
+} from './default-pipeline-prompts'
 
 // Default pipeline configuration based on existing steps
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   version: '1.0.0',
   steps: [
     {
+      id: 'one',
+      name: 'One - Цялостен анализ',
+      description: 'Единичен цялостен промпт за пълен иридологичен анализ',
+      order: 1,
+      enabled: true,
+      prompt: ONE_PROMPT,
+      modelSettings: {
+        provider: 'openai',
+        model: 'gpt-4o',
+        temperature: 0.5,
+        maxTokens: 4000,
+        topP: 0.9
+      },
+      inputFrom: null,
+      outputTo: null,
+      lastModified: new Date().toISOString()
+    },
+    {
       id: 'step1_geo_calibration',
       name: 'Geo Calibration',
       description: 'Геометрична калибрация на ириса - определяне на координатна система',
-      order: 1,
-      enabled: true,
-      prompt: '',
+      order: 2,
+      enabled: false,
+      prompt: STEP1_GEO_CALIBRATION_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',
@@ -27,9 +55,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
       id: 'step2a_structural_detector',
       name: 'Structural Detector',
       description: 'Детектор на структурни находки - лакуни, крипти, бразди',
-      order: 2,
-      enabled: true,
-      prompt: '',
+      order: 3,
+      enabled: false,
+      prompt: STEP2A_STRUCTURAL_DETECTOR_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',
@@ -45,9 +73,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
       id: 'step2b_pigment_rings_detector',
       name: 'Pigment & Rings Detector',
       description: 'Детектор на пигментация и пръстени',
-      order: 3,
-      enabled: true,
-      prompt: '',
+      order: 4,
+      enabled: false,
+      prompt: STEP2B_PIGMENT_RINGS_DETECTOR_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',
@@ -63,9 +91,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
       id: 'step2c_consistency_validator',
       name: 'Consistency Validator',
       description: 'Валидатор за съгласуваност на находките',
-      order: 4,
-      enabled: true,
-      prompt: '',
+      order: 5,
+      enabled: false,
+      prompt: STEP2C_CONSISTENCY_VALIDATOR_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',
@@ -81,9 +109,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
       id: 'step3_mapper',
       name: 'Zone Mapper',
       description: 'Мапиране на находките към зони по v9 схемата',
-      order: 5,
-      enabled: true,
-      prompt: '',
+      order: 6,
+      enabled: false,
+      prompt: STEP3_MAPPER_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',
@@ -99,9 +127,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
       id: 'step4_profile_builder',
       name: 'Profile Builder',
       description: 'Изграждане на профил на пациента',
-      order: 6,
-      enabled: true,
-      prompt: '',
+      order: 7,
+      enabled: false,
+      prompt: STEP4_PROFILE_BUILDER_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',
@@ -117,9 +145,9 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
       id: 'step5_frontend_report',
       name: 'Frontend Report Generator',
       description: 'Генериране на финалния репорт за фронтенда',
-      order: 7,
-      enabled: true,
-      prompt: '',
+      order: 8,
+      enabled: false,
+      prompt: STEP5_FRONTEND_REPORT_PROMPT,
       modelSettings: {
         provider: 'openai',
         model: 'gpt-4o',

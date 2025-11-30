@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { 
   ArrowLeft, 
@@ -17,7 +18,9 @@ import {
   CheckCircle,
   ClockCounterClockwise,
   DownloadSimple,
-  GitBranch
+  GitBranch,
+  Info,
+  BookOpen
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AIModelConfig } from '@/types'
@@ -25,6 +28,7 @@ import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
 import ChangelogTab from '@/components/admin/ChangelogTab'
 import ProjectExportTab from '@/components/admin/ProjectExportTab'
 import PipelineManagerTab from '@/components/admin/PipelineManagerTab'
+import SettingsDocumentation from '@/components/admin/SettingsDocumentation'
 
 interface AdminScreenProps {
   onBack: () => void
@@ -37,9 +41,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     apiKey: '',
     useCustomKey: false,
     requestDelay: 60000,
-    requestCount: 8,
-    enableDiagnostics: true,
-    usePipelineV9: true  // Default: use new pipeline
+    enableDiagnostics: true
   })
   
   const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
@@ -47,9 +49,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || 60000)
-  const [requestCount, setRequestCount] = useState(aiConfig?.requestCount || 8)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
-  const [usePipelineV9, setUsePipelineV9] = useState(aiConfig?.usePipelineV9 ?? true)
 
   // Log successful admin panel access
   useEffect(() => {
@@ -71,9 +71,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setApiKey(aiConfig.apiKey)
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 60000)
-      setRequestCount(aiConfig.requestCount || 8)
       setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
-      setUsePipelineV9(aiConfig.usePipelineV9 ?? true)
     }
   }, [aiConfig])
 
@@ -136,20 +134,16 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         apiKey: actualUseCustomKey ? apiKey : '',
         useCustomKey: actualUseCustomKey,
         requestDelay,
-        requestCount,
-        enableDiagnostics,
-        usePipelineV9
+        enableDiagnostics
       }
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
-      console.log(`🔍 [ADMIN] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}, usePipelineV9: ${usePipelineV9}`)
+      console.log(`🔍 [ADMIN] Provider: ${provider}, Model: ${model}, useCustomKey: ${actualUseCustomKey}`)
       
       await setAiConfig(config)
       
       toast.success(`✓ AI конфигурация запазена: ${provider} / ${model}`, {
-        description: usePipelineV9 
-          ? 'Използва се новият v9 pipeline с промпти от steps/ папката.' 
-          : 'Използва се класическият анализ.',
+        description: 'Pipeline-ът автоматично ще изпълни всички активни стъпки.',
         duration: 5000
       })
     } catch (error) {
@@ -194,7 +188,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         </div>
 
         <Tabs defaultValue="ai-config" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 gap-1 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-6 gap-1 h-auto p-1">
             <TabsTrigger value="ai-config" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <Brain className="w-4 h-4 md:mr-1" />
               <span className="hidden sm:inline">AI Модел</span>
@@ -209,6 +203,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               <CheckCircle className="w-4 h-4 md:mr-1" />
               <span className="hidden lg:inline">Въпросник</span>
               <span className="lg:hidden">Форма</span>
+            </TabsTrigger>
+            <TabsTrigger value="docs" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
+              <BookOpen className="w-4 h-4 md:mr-1" />
+              <span className="hidden lg:inline">Документация</span>
+              <span className="lg:hidden">Док</span>
             </TabsTrigger>
             <TabsTrigger value="changelog" className="flex items-center justify-center gap-1 text-xs md:text-sm px-2 py-2 md:py-2.5">
               <ClockCounterClockwise className="w-4 h-4 md:mr-1" />
@@ -266,8 +265,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Забавяне: {aiConfig.requestDelay || 30000}ms | Заявки: {aiConfig.requestCount || 8} | 
-                    Очаквано време: ~{Math.round((aiConfig.requestDelay || 30000) * (aiConfig.requestCount || 8) / 60000)} мин
+                    Забавяне: {aiConfig.requestDelay || 5000}ms между заявки | 
+                    Брой стъпки се определя от Pipeline конфигурацията
                   </p>
                 </div>
               )}
@@ -355,7 +354,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       id="request-delay"
                       type="number"
                       value={requestDelay}
-                      onChange={(e) => setRequestDelay(parseInt(e.target.value) || 30000)}
+                      onChange={(e) => setRequestDelay(parseInt(e.target.value) || 5000)}
                       min={1000}
                       max={120000}
                       step={1000}
@@ -364,45 +363,17 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                       Препоръчително: 5000-10000ms (5-10 сек) за API заявки
                     </p>
                   </div>
-
-                  <div>
-                    <Label htmlFor="request-count" className="text-base">Брой AI заявки</Label>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Общ брой заявки за задълбочен мултивалентен анализ с корелация
-                    </p>
-                    <Select value={requestCount.toString()} onValueChange={(v) => setRequestCount(parseInt(v))}>
-                      <SelectTrigger id="request-count">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="4">4 заявки - Базов анализ</SelectItem>
-                        <SelectItem value="6">6 заявки - Разширен анализ</SelectItem>
-                        <SelectItem value="8">8 заявки - Пълен корелиран анализ (препоръчително)</SelectItem>
-                        <SelectItem value="10">10 заявки - Максимално детайлен анализ</SelectItem>
-                        <SelectItem value="12">12 заявки - Изключително задълбочен анализ</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Повече заявки = по-прецизен, задълбочен и персонализиран анализ с множество слоеве на корелация между иридологични находки и данни от въпросника. 
-                      8 заявки включва: ляв ирис, десен ирис, хранителен план, добавки, психология, специални препоръки, изследвания, детайлен анализ + резюмета.
-                    </p>
-                  </div>
                   
-                  <div className="flex items-center justify-between space-x-2 pt-2">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="use-pipeline-v9" className="text-base">
-                        🆕 Използвай Pipeline v9 (Нов)
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Използва новия многоетапен pipeline с промпти от папка steps/ за по-структуриран и точен анализ
-                      </p>
-                    </div>
-                    <Switch
-                      id="use-pipeline-v9"
-                      checked={usePipelineV9}
-                      onCheckedChange={setUsePipelineV9}
-                    />
-                  </div>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <strong>Как работи Pipeline системата:</strong><br/>
+                      • Броят на AI заявките се определя автоматично от активните стъпки в Pipeline таба<br/>
+                      • Ако е активна само една стъпка (напр. "One"), се изпълнява един цялостен промпт<br/>
+                      • Ако са активни множество стъпки, всяка се изпълнява последователно<br/>
+                      • Редактирайте промптите и стъпките от Pipeline таба по-горе
+                    </AlertDescription>
+                  </Alert>
                   
                   <div className="flex items-center justify-between space-x-2 pt-2">
                     <div className="space-y-0.5">
@@ -498,6 +469,16 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
               transition={{ duration: 0.3 }}
             >
               <ChangelogTab />
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="docs">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SettingsDocumentation />
             </motion.div>
           </TabsContent>
 
