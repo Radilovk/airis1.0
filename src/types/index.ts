@@ -142,7 +142,9 @@ export interface AIModelConfig {
   apiKey: string
   useCustomKey: boolean
   requestDelay?: number
+  requestCount?: number  // Number of pipeline steps/requests
   enableDiagnostics?: boolean  // Enable AI diagnostic pre-check before analysis
+  usePipelineV9?: boolean  // Use v9 multi-step pipeline for analysis
 }
 
 // Pipeline preset for saving/loading configurations

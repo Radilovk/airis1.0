@@ -2,14 +2,25 @@
  * Pipeline v9 Implementation
  * 
  * This module implements the new v9 multi-step iris analysis pipeline
- * with prompts loaded from the steps/ folder.
+ * with prompts loaded from frontend configuration (KV storage).
+ * 
+ * The prompts can be customized via the admin panel's Pipeline Manager tab.
  */
 
-import type { QuestionnaireData, IrisImage, IrisAnalysis, AIModelConfig } from '@/types'
+import type { QuestionnaireData, IrisImage, IrisAnalysis, PipelineConfig, PipelineStepConfig } from '@/types'
 
-// Step prompts - loaded from steps/ folder content
+// Custom prompts interface for external configuration
+export interface CustomPipelinePrompts {
+  step1_geo_calibration?: string
+  step2a_structural_detector?: string
+  step2b_pigment_rings_detector?: string
+  step5_frontend_report?: string
+  one_prompt?: string  // Single comprehensive prompt for "one-step" mode
+}
+
+// Default step prompts - used as fallback when no custom prompts are configured
 // These are embedded at build time to avoid runtime file loading issues
-const STEP_PROMPTS = {
+const DEFAULT_STEP_PROMPTS = {
   step1_geo_calibration: `ROLE: iris_geo_calibrator_v9
 MODE: image_parse_only
 INPUT: single_iris_image
@@ -258,6 +269,39 @@ FAILSAFE:
 {"error":{"stage":"STEP5","code":"PREREQ_FAIL|FORMAT_FAIL","message":"short","canRetry":true}}`
 }
 
+// Mutable prompts object - can be updated with custom prompts from frontend
+let STEP_PROMPTS = { ...DEFAULT_STEP_PROMPTS }
+
+/**
+ * Update the pipeline prompts with custom values from frontend configuration
+ * @param customPrompts Custom prompts from the admin panel
+ */
+export function updatePipelinePrompts(customPrompts: CustomPipelinePrompts): void {
+  STEP_PROMPTS = {
+    ...DEFAULT_STEP_PROMPTS,
+    ...(customPrompts.step1_geo_calibration && { step1_geo_calibration: customPrompts.step1_geo_calibration }),
+    ...(customPrompts.step2a_structural_detector && { step2a_structural_detector: customPrompts.step2a_structural_detector }),
+    ...(customPrompts.step2b_pigment_rings_detector && { step2b_pigment_rings_detector: customPrompts.step2b_pigment_rings_detector }),
+    ...(customPrompts.step5_frontend_report && { step5_frontend_report: customPrompts.step5_frontend_report }),
+  }
+  console.log('🔄 [Pipeline] Промптите са обновени от frontend конфигурацията')
+}
+
+/**
+ * Reset prompts to default values
+ */
+export function resetPipelinePrompts(): void {
+  STEP_PROMPTS = { ...DEFAULT_STEP_PROMPTS }
+  console.log('🔄 [Pipeline] Промптите са възстановени до стойности по подразбиране')
+}
+
+/**
+ * Get current prompts (for inspection/debugging)
+ */
+export function getCurrentPrompts(): typeof STEP_PROMPTS {
+  return STEP_PROMPTS
+}
+
 // Pipeline step interface
 interface PipelineStep {
   id: string
@@ -274,33 +318,35 @@ interface PipelineStepResult {
   error?: string
 }
 
-// V9 Pipeline configuration
-const V9_PIPELINE_STEPS: PipelineStep[] = [
-  {
-    id: 'step1_geo_calibration',
-    name: 'Геометрична калибрация',
-    prompt: STEP_PROMPTS.step1_geo_calibration,
-    requiresImage: true
-  },
-  {
-    id: 'step2a_structural_detector',
-    name: 'Структурен детектор',
-    prompt: STEP_PROMPTS.step2a_structural_detector,
-    requiresImage: true
-  },
-  {
-    id: 'step2b_pigment_rings_detector',
-    name: 'Пигмент и пръстени',
-    prompt: STEP_PROMPTS.step2b_pigment_rings_detector,
-    requiresImage: true
-  },
-  {
-    id: 'step5_frontend_report',
-    name: 'Генериране на репорт',
-    prompt: STEP_PROMPTS.step5_frontend_report,
-    requiresImage: false
-  }
-]
+// V9 Pipeline configuration - dynamic getter to use current prompts
+function getV9PipelineSteps(): PipelineStep[] {
+  return [
+    {
+      id: 'step1_geo_calibration',
+      name: 'Геометрична калибрация',
+      prompt: STEP_PROMPTS.step1_geo_calibration,
+      requiresImage: true
+    },
+    {
+      id: 'step2a_structural_detector',
+      name: 'Структурен детектор',
+      prompt: STEP_PROMPTS.step2a_structural_detector,
+      requiresImage: true
+    },
+    {
+      id: 'step2b_pigment_rings_detector',
+      name: 'Пигмент и пръстени',
+      prompt: STEP_PROMPTS.step2b_pigment_rings_detector,
+      requiresImage: true
+    },
+    {
+      id: 'step5_frontend_report',
+      name: 'Генериране на репорт',
+      prompt: STEP_PROMPTS.step5_frontend_report,
+      requiresImage: false
+    }
+  ]
+}
 
 /**
  * Replace template variables in a prompt
@@ -603,6 +649,6 @@ export async function executeV9Pipeline(
 /**
  * Get pipeline step names for progress display
  */
-export function getV9PipelineSteps(): string[] {
-  return V9_PIPELINE_STEPS.map(step => step.name)
+export function getV9PipelineStepNames(): string[] {
+  return getV9PipelineSteps().map(step => step.name)
 }

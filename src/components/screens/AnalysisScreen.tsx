@@ -8,9 +8,9 @@ import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
-import { executeV9Pipeline } from '@/lib/pipeline-v9'
+import { executeV9Pipeline, updatePipelinePrompts, type CustomPipelinePrompts } from '@/lib/pipeline-v9'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy } from '@/types'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -703,6 +703,45 @@ ${response}
       // Use v9 pipeline if configured
       if (usePipelineV9) {
         addLog('info', '🆕 Използване на v9 pipeline с многоетапен анализ...')
+        
+        // Load pipeline configuration from KV storage and update prompts
+        try {
+          const pipelineConfig = await window.spark.kv.get<PipelineConfig>('pipeline-config')
+          if (pipelineConfig && pipelineConfig.steps) {
+            const customPrompts: CustomPipelinePrompts = {}
+            
+            // Extract prompts from pipeline steps
+            for (const step of pipelineConfig.steps) {
+              if (step.enabled && step.prompt) {
+                switch (step.id) {
+                  case 'step1_geo_calibration':
+                    customPrompts.step1_geo_calibration = step.prompt
+                    break
+                  case 'step2a_structural_detector':
+                    customPrompts.step2a_structural_detector = step.prompt
+                    break
+                  case 'step2b_pigment_rings_detector':
+                    customPrompts.step2b_pigment_rings_detector = step.prompt
+                    break
+                  case 'step5_frontend_report':
+                    customPrompts.step5_frontend_report = step.prompt
+                    break
+                  case 'one':
+                    customPrompts.one_prompt = step.prompt
+                    break
+                }
+              }
+            }
+            
+            // Update pipeline prompts with custom configuration
+            if (Object.keys(customPrompts).length > 0) {
+              updatePipelinePrompts(customPrompts)
+              addLog('success', `📝 Заредени ${Object.keys(customPrompts).length} персонализирани промпта от Admin настройки`)
+            }
+          }
+        } catch (pipelineError) {
+          addLog('warning', `⚠️ Не могат да се заредят pipeline промптите: ${pipelineError}. Използват се стойности по подразбиране.`)
+        }
         
         // Wrapper for callLLMWithRetry that matches the pipeline's expected signature
         const callLLMWrapper = async (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => {
