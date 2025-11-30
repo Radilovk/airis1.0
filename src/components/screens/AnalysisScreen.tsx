@@ -9,7 +9,8 @@ import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation } from '@/types'
+import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation, AIPromptTemplate, IridologyManual, AIModelStrategy } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -53,6 +54,31 @@ export default function AnalysisScreen({
     usePipelineV9: true       // Default: use new v9 pipeline
   })
 
+  // Load custom AI prompt template from admin settings
+  const [aiPromptTemplate] = useKVWithFallback<AIPromptTemplate>('ai-prompt-template', {
+    content: DEFAULT_AI_PROMPT,
+    lastModified: new Date().toISOString()
+  })
+
+  // Load custom iridology manual from admin settings
+  const [iridologyManual] = useKVWithFallback<IridologyManual>('iridology-manual', {
+    content: DEFAULT_IRIDOLOGY_MANUAL,
+    lastModified: new Date().toISOString()
+  })
+
+  // Load AI model strategy settings (temperature, maxTokens, topP, weights)
+  const [aiModelStrategy] = useKVWithFallback<AIModelStrategy>('ai-model-strategy', {
+    manualWeight: 40,
+    promptWeight: 30,
+    llmKnowledgeWeight: 25,
+    webSearchWeight: 5,
+    useWebSearch: false,
+    temperature: 0.7,
+    maxTokens: 4000,
+    topP: 0.9,
+    lastModified: new Date().toISOString()
+  })
+
   const addLog = (level: LogEntry['level'], message: string) => {
     const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
     setLogs(prev => [...prev, { timestamp, level, message }])
@@ -75,9 +101,15 @@ export default function AnalysisScreen({
     model: string,
     apiKey: string,
     jsonMode: boolean = true,
-    imageDataUrl?: string
+    imageDataUrl?: string,
+    modelStrategy?: AIModelStrategy | null
   ): Promise<string> => {
-    addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''}`)
+    // Get model settings from strategy or use defaults
+    const temperature = modelStrategy?.temperature ?? 0.7
+    const maxTokens = modelStrategy?.maxTokens ?? 4000
+    const topP = modelStrategy?.topP ?? 0.9
+    
+    addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
     
     if (provider === 'openai') {
       // Build content array - text + optional image
@@ -102,8 +134,9 @@ export default function AnalysisScreen({
           model: model,
           messages: [{ role: 'user', content: imageDataUrl ? content : prompt }],
           response_format: jsonMode ? { type: 'json_object' } : undefined,
-          temperature: 0.7,
-          max_tokens: MAX_VISION_TOKENS
+          temperature: temperature,
+          max_tokens: Math.min(maxTokens, MAX_VISION_TOKENS),
+          top_p: topP
         })
       })
 
@@ -147,8 +180,9 @@ export default function AnalysisScreen({
             parts: parts
           }],
           generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 16384
+            temperature: temperature,
+            maxOutputTokens: Math.min(maxTokens, 16384),
+            topP: topP
           }
         })
       })
@@ -172,14 +206,22 @@ export default function AnalysisScreen({
     let lastError: Error | null = null
     
     const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-      const finalConfig = storedConfig || aiConfig || {
-        provider: 'openai',
-        model: 'gpt-4o',
-        apiKey: '',
-        useCustomKey: false,
-        requestDelay: 20000,
-        requestCount: 8
-      }
+    const finalConfig = storedConfig || aiConfig || {
+      provider: 'openai',
+      model: 'gpt-4o',
+      apiKey: '',
+      useCustomKey: false,
+      requestDelay: 20000,
+      requestCount: 8
+    }
+    
+    // Load AI Model Strategy settings for temperature, maxTokens, topP
+    const storedStrategy = await window.spark.kv.get<AIModelStrategy>('ai-model-strategy')
+    const finalStrategy = storedStrategy || aiModelStrategy || {
+      temperature: 0.7,
+      maxTokens: 4000,
+      topP: 0.9
+    }
     
     const provider = finalConfig.provider
     const configuredModel = finalConfig.model
@@ -193,9 +235,11 @@ export default function AnalysisScreen({
     console.log(`🔍 [LLM CONFIG] Provider: "${provider}"`)
     console.log(`🔍 [LLM CONFIG] Model: "${configuredModel}"`)
     console.log(`🔍 [LLM CONFIG] Has API key: ${!!apiKey}`)
+    console.log(`🔍 [LLM STRATEGY] Temperature: ${finalStrategy.temperature}, MaxTokens: ${finalStrategy.maxTokens}, TopP: ${finalStrategy.topP}`)
     
     addLog('info', `✓ AI Конфигурация заредена: ${provider} / ${configuredModel}`)
     addLog('info', `🔧 Режим: ${provider} / ${configuredModel} | Забавяне: ${requestDelay}ms`)
+    addLog('info', `⚙️ AI Strategy: temp=${finalStrategy.temperature}, maxTokens=${finalStrategy.maxTokens}, topP=${finalStrategy.topP}`)
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -216,7 +260,8 @@ export default function AnalysisScreen({
           configuredModel,
           apiKey,
           jsonMode,
-          imageDataUrl
+          imageDataUrl,
+          finalStrategy  // Pass strategy with temperature, maxTokens, topP
         )
         
         if (response && response.length > 0) {
@@ -986,8 +1031,21 @@ GitHub Spark API има ограничения за брой заявки в м�
         }
       }
       
-      addLog('info', 'Използване на AIRIS база знания за контекст...')
-      const knowledgeContext = `
+      addLog('info', 'Зареждане на ръководство и prompt шаблон от Admin настройки...')
+      
+      // Load custom iridology manual from admin settings (or use default)
+      const storedManual = await window.spark.kv.get<IridologyManual>('iridology-manual')
+      const customManual = storedManual?.content || iridologyManual?.content || DEFAULT_IRIDOLOGY_MANUAL
+      
+      // Load custom AI prompt template from admin settings (or use default)  
+      const storedPromptTemplate = await window.spark.kv.get<AIPromptTemplate>('ai-prompt-template')
+      const customPromptContent = storedPromptTemplate?.content || aiPromptTemplate?.content || DEFAULT_AI_PROMPT
+      
+      addLog('success', `📚 Ръководство заредено: ${customManual.length} символа`)
+      addLog('success', `📝 Prompt шаблон зареден: ${customPromptContent.length} символа`)
+      
+      // Build knowledge context - prefer custom manual, fallback to AIRIS_KNOWLEDGE
+      const knowledgeContext = customManual.length > 0 ? customManual : `
 РЕФЕРЕНТНА КАРТА НА ИРИСА(12h=0°,часовн_посока,360°_пълен_кръг):
 ${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}°):${z.organ}(${z.system})`).join('|')}
 
@@ -1002,8 +1060,48 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
 `
       addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
-      addLog('info', 'Подготовка на prompt за LLM...')
-      const prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си опитен иридолог с 20 години клинична практика. Ще ти предоставя изображение на ${sideName} ирис (БЕЗ топографска карта) и данни от пациента.
+      // Interpolate template variables in the custom prompt
+      addLog('info', 'Интерполиране на променливи в prompt шаблона...')
+      const interpolatePrompt = (template: string): string => {
+        const sideCode = side === 'left' ? 'L' : 'R'
+        const isRight = side === 'right' ? 'true' : 'false'
+        const isLeft = side === 'left' ? 'true' : 'false'
+        
+        return template
+          .replace(/\{\{side\}\}/g, sideName)
+          .replace(/\{\{imageHash\}\}/g, imageHash)
+          .replace(/\{\{age\}\}/g, String(questionnaire.age))
+          .replace(/\{\{gender\}\}/g, genderName)
+          .replace(/\{\{bmi\}\}/g, bmi)
+          .replace(/\{\{weight\}\}/g, String(questionnaire.weight))
+          .replace(/\{\{height\}\}/g, String(questionnaire.height))
+          .replace(/\{\{goals\}\}/g, goalsText)
+          .replace(/\{\{healthStatus\}\}/g, questionnaire.healthStatus?.join(', ') || '')
+          .replace(/\{\{complaints\}\}/g, complaintsText)
+          .replace(/\{\{dietaryHabits\}\}/g, questionnaire.dietaryHabits?.join(', ') || '')
+          .replace(/\{\{stressLevel\}\}/g, questionnaire.stressLevel || '')
+          .replace(/\{\{sleepHours\}\}/g, String(questionnaire.sleepHours || 0))
+          .replace(/\{\{sleepQuality\}\}/g, questionnaire.sleepQuality || '')
+          .replace(/\{\{activityLevel\}\}/g, questionnaire.activityLevel || '')
+          .replace(/\{\{medications\}\}/g, questionnaire.medications || '')
+          .replace(/\{\{allergies\}\}/g, questionnaire.allergies || '')
+          .replace(/\{\{knowledgeContext\}\}/g, knowledgeContext)
+          .replace(/\{\{isRight\}\}/g, isRight)
+          .replace(/\{\{isLeft\}\}/g, isLeft)
+      }
+      
+      // Use custom prompt template if it contains template variables
+      const hasTemplateVariables = customPromptContent.includes('{{') && customPromptContent.includes('}}')
+      
+      let prompt: string
+      if (hasTemplateVariables) {
+        // Use custom prompt template with interpolation
+        prompt = interpolatePrompt(customPromptContent)
+        addLog('info', `✅ Използване на ПЕРСОНАЛИЗИРАН prompt шаблон от Admin настройки (${prompt.length} символа)`)
+      } else {
+        // Fallback to hardcoded prompt (for backward compatibility)
+        addLog('info', 'Използване на вграден prompt (без шаблонни променливи в admin настройките)...')
+        prompt = (window.spark.llmPrompt as unknown as (strings: TemplateStringsArray, ...values: any[]) => string)`Ти си опитен иридолог с 20 години клинична практика. Ще ти предоставя изображение на ${sideName} ирис (БЕЗ топографска карта) и данни от пациента.
 
 ⚠️ ВАЖНО: Получаваш ЧИСТО изображение на ириса БЕЗ наложени линии или етикети. Анализирай директно самата ирисова тъкан.
 
@@ -1119,6 +1217,7 @@ ${AIRIS_KNOWLEDGE.irisMap.zones.map(z => `${z.hour}(${z.angle[0]}-${z.angle[1]}�
     ]
   }
 }`
+      } // End of else block for fallback prompt
 
       addLog('info', `Изпращане на prompt + изображение до LLM (${prompt.length} символа)...`)
       console.log(`🤖 [ИРИС ${side}] Изпращане на prompt + изображение до LLM...`)
