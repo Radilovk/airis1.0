@@ -10,7 +10,7 @@ import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, SupplementRecommendation, AIPromptTemplate, IridologyManual, AIModelStrategy } from '@/types'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -215,9 +215,9 @@ export default function AnalysisScreen({
       requestCount: 8
     }
     
-    // Load AI Model Strategy settings for temperature, maxTokens, topP
-    const storedStrategy = await window.spark.kv.get<AIModelStrategy>('ai-model-strategy')
-    const finalStrategy = storedStrategy || aiModelStrategy || {
+    // Use AI Model Strategy settings from hook (already loaded at mount)
+    // Fallback to stored value only if hook hasn't loaded yet, then to defaults
+    const finalStrategy = aiModelStrategy || await window.spark.kv.get<AIModelStrategy>('ai-model-strategy') || {
       temperature: 0.7,
       maxTokens: 4000,
       topP: 0.9
@@ -1033,13 +1033,9 @@ GitHub Spark API има ограничения за брой заявки в м�
       
       addLog('info', 'Зареждане на ръководство и prompt шаблон от Admin настройки...')
       
-      // Load custom iridology manual from admin settings (or use default)
-      const storedManual = await window.spark.kv.get<IridologyManual>('iridology-manual')
-      const customManual = storedManual?.content || iridologyManual?.content || DEFAULT_IRIDOLOGY_MANUAL
-      
-      // Load custom AI prompt template from admin settings (or use default)  
-      const storedPromptTemplate = await window.spark.kv.get<AIPromptTemplate>('ai-prompt-template')
-      const customPromptContent = storedPromptTemplate?.content || aiPromptTemplate?.content || DEFAULT_AI_PROMPT
+      // Use hook values first (already loaded at mount), fallback to storage if not ready
+      const customManual = iridologyManual?.content || (await window.spark.kv.get<IridologyManual>('iridology-manual'))?.content || DEFAULT_IRIDOLOGY_MANUAL
+      const customPromptContent = aiPromptTemplate?.content || (await window.spark.kv.get<AIPromptTemplate>('ai-prompt-template'))?.content || DEFAULT_AI_PROMPT
       
       addLog('success', `📚 Ръководство заредено: ${customManual.length} символа`)
       addLog('success', `📝 Prompt шаблон зареден: ${customPromptContent.length} символа`)
@@ -1060,34 +1056,36 @@ ${AIRIS_KNOWLEDGE.artifacts.types.map(a => `${a.name}:${a.interpretation}`).join
 `
       addLog('success', `База знания заредена (${knowledgeContext.length} символа)`)
       
-      // Interpolate template variables in the custom prompt
+      // Build template variables mapping for efficient interpolation
       addLog('info', 'Интерполиране на променливи в prompt шаблона...')
+      const templateVariables: Record<string, string> = {
+        side: sideName,
+        imageHash: imageHash,
+        age: String(questionnaire.age),
+        gender: genderName,
+        bmi: bmi,
+        weight: String(questionnaire.weight),
+        height: String(questionnaire.height),
+        goals: goalsText,
+        healthStatus: questionnaire.healthStatus?.join(', ') || '',
+        complaints: complaintsText,
+        dietaryHabits: questionnaire.dietaryHabits?.join(', ') || '',
+        stressLevel: questionnaire.stressLevel || '',
+        sleepHours: String(questionnaire.sleepHours || 0),
+        sleepQuality: questionnaire.sleepQuality || '',
+        activityLevel: questionnaire.activityLevel || '',
+        medications: questionnaire.medications || '',
+        allergies: questionnaire.allergies || '',
+        knowledgeContext: knowledgeContext,
+        isRight: side === 'right' ? 'true' : 'false',
+        isLeft: side === 'left' ? 'true' : 'false'
+      }
+      
+      // Interpolate all template variables in one pass using regex
       const interpolatePrompt = (template: string): string => {
-        const sideCode = side === 'left' ? 'L' : 'R'
-        const isRight = side === 'right' ? 'true' : 'false'
-        const isLeft = side === 'left' ? 'true' : 'false'
-        
-        return template
-          .replace(/\{\{side\}\}/g, sideName)
-          .replace(/\{\{imageHash\}\}/g, imageHash)
-          .replace(/\{\{age\}\}/g, String(questionnaire.age))
-          .replace(/\{\{gender\}\}/g, genderName)
-          .replace(/\{\{bmi\}\}/g, bmi)
-          .replace(/\{\{weight\}\}/g, String(questionnaire.weight))
-          .replace(/\{\{height\}\}/g, String(questionnaire.height))
-          .replace(/\{\{goals\}\}/g, goalsText)
-          .replace(/\{\{healthStatus\}\}/g, questionnaire.healthStatus?.join(', ') || '')
-          .replace(/\{\{complaints\}\}/g, complaintsText)
-          .replace(/\{\{dietaryHabits\}\}/g, questionnaire.dietaryHabits?.join(', ') || '')
-          .replace(/\{\{stressLevel\}\}/g, questionnaire.stressLevel || '')
-          .replace(/\{\{sleepHours\}\}/g, String(questionnaire.sleepHours || 0))
-          .replace(/\{\{sleepQuality\}\}/g, questionnaire.sleepQuality || '')
-          .replace(/\{\{activityLevel\}\}/g, questionnaire.activityLevel || '')
-          .replace(/\{\{medications\}\}/g, questionnaire.medications || '')
-          .replace(/\{\{allergies\}\}/g, questionnaire.allergies || '')
-          .replace(/\{\{knowledgeContext\}\}/g, knowledgeContext)
-          .replace(/\{\{isRight\}\}/g, isRight)
-          .replace(/\{\{isLeft\}\}/g, isLeft)
+        return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+          return templateVariables[key] !== undefined ? templateVariables[key] : match
+        })
       }
       
       // Use custom prompt template if it contains template variables
