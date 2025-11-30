@@ -36,7 +36,7 @@ const fetchWithTimeout = async (
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`${providerName} API таймаут - заявката отне повече от ${timeoutMs / 1000} секунди`)
+      throw new Error(`${providerName} API таймаут - заявката отне повече от ${Math.round(timeoutMs / 1000)} секунди`)
     }
     throw error
   }
