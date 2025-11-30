@@ -109,6 +109,9 @@ export default function AnalysisScreen({
     const maxTokens = modelStrategy?.maxTokens ?? 4000
     const topP = modelStrategy?.topP ?? 0.9
     
+    // Timeout for API requests (90 seconds for image requests, 60 seconds for text)
+    const timeoutMs = imageDataUrl ? 90000 : 60000
+    
     addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
     
     if (provider === 'openai') {
@@ -124,29 +127,44 @@ export default function AnalysisScreen({
         })
       }
       
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [{ role: 'user', content: imageDataUrl ? content : prompt }],
-          response_format: jsonMode ? { type: 'json_object' } : undefined,
-          temperature: temperature,
-          max_tokens: Math.min(maxTokens, MAX_VISION_TOKENS),
-          top_p: topP
+      // Create AbortController for timeout handling
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+      
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: 'user', content: imageDataUrl ? content : prompt }],
+            response_format: jsonMode ? { type: 'json_object' } : undefined,
+            temperature: temperature,
+            max_tokens: Math.min(maxTokens, MAX_VISION_TOKENS),
+            top_p: topP
+          }),
+          signal: controller.signal
         })
-      })
+        
+        clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`OpenAI API грешка ${response.status}: ${errorText}`)
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`OpenAI API грешка ${response.status}: ${errorText}`)
+        }
+
+        const data = await response.json()
+        return data.choices[0].message.content
+      } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error(`OpenAI API таймаут - заявката отне повече от ${timeoutMs / 1000} секунди`)
+        }
+        throw error
       }
-
-      const data = await response.json()
-      return data.choices[0].message.content
     } else {
       // Gemini supports vision
       const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = []
@@ -170,30 +188,45 @@ export default function AnalysisScreen({
           : prompt
       })
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: parts
-          }],
-          generationConfig: {
-            temperature: temperature,
-            maxOutputTokens: Math.min(maxTokens, 16384),
-            topP: topP
-          }
+      // Create AbortController for timeout handling
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+      
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: parts
+            }],
+            generationConfig: {
+              temperature: temperature,
+              maxOutputTokens: Math.min(maxTokens, 16384),
+              topP: topP
+            }
+          }),
+          signal: controller.signal
         })
-      })
+        
+        clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Gemini API грешка ${response.status}: ${errorText}`)
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Gemini API грешка ${response.status}: ${errorText}`)
+        }
+
+        const data = await response.json()
+        return data.candidates[0].content.parts[0].text
+      } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error(`Gemini API таймаут - заявката отне повече от ${timeoutMs / 1000} секунди`)
+        }
+        throw error
       }
-
-      const data = await response.json()
-      return data.candidates[0].content.parts[0].text
     }
   }
 
