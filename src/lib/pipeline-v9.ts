@@ -2,10 +2,10 @@
  * Pipeline v9 Implementation
  * 
  * This module implements the new v9 multi-step iris analysis pipeline
- * with prompts loaded from the steps/ folder.
+ * with prompts loaded from the admin panel configuration or fallback to defaults.
  */
 
-import type { QuestionnaireData, IrisImage, IrisAnalysis, AIModelConfig } from '@/types'
+import type { QuestionnaireData, IrisImage, IrisAnalysis, AIModelConfig, PipelineConfig, PipelineStepConfig } from '@/types'
 
 // Step prompts - loaded from steps/ folder content
 // These are embedded at build time to avoid runtime file loading issues
@@ -258,12 +258,22 @@ FAILSAFE:
 {"error":{"stage":"STEP5","code":"PREREQ_FAIL|FORMAT_FAIL","message":"short","canRetry":true}}`
 }
 
+// Default step prompts - used as fallback when admin config is not available
+const DEFAULT_STEP_PROMPTS = STEP_PROMPTS
+
 // Pipeline step interface
 interface PipelineStep {
   id: string
   name: string
   prompt: string
   requiresImage: boolean
+  modelSettings?: {
+    provider: 'openai' | 'gemini'
+    model: string
+    temperature: number
+    maxTokens: number
+    topP: number
+  }
 }
 
 // Pipeline result interface
@@ -492,7 +502,142 @@ function calculateSystemScores(zones: any[]): any[] {
 }
 
 /**
+ * Get the prompt for a step from pipeline config or fallback to defaults
+ */
+function getStepPrompt(stepId: string, pipelineConfig?: PipelineConfig): string {
+  if (pipelineConfig) {
+    const step = pipelineConfig.steps.find(s => s.id === stepId && s.enabled)
+    if (step && step.prompt && step.prompt.trim().length > 0) {
+      return step.prompt
+    }
+  }
+  
+  // Fallback to default prompts
+  const defaultKey = stepId as keyof typeof DEFAULT_STEP_PROMPTS
+  return DEFAULT_STEP_PROMPTS[defaultKey] || ''
+}
+
+/**
+ * Check if a single comprehensive prompt ("one") is configured and enabled
+ */
+function isSinglePromptMode(pipelineConfig?: PipelineConfig): boolean {
+  if (!pipelineConfig) return false
+  
+  const enabledSteps = pipelineConfig.steps.filter(s => s.enabled)
+  // Single prompt mode if only "one" is enabled OR only one step is enabled total
+  return enabledSteps.length === 1 && (enabledSteps[0].id === 'one' || enabledSteps.length === 1)
+}
+
+/**
+ * Get the enabled steps from pipeline config
+ */
+function getEnabledSteps(pipelineConfig?: PipelineConfig): PipelineStepConfig[] {
+  if (!pipelineConfig) return []
+  return pipelineConfig.steps
+    .filter(s => s.enabled)
+    .sort((a, b) => a.order - b.order)
+}
+
+/**
+ * Execute a single comprehensive analysis using the "one" prompt
+ */
+async function executeSinglePromptAnalysis(
+  iris: IrisImage,
+  side: 'left' | 'right',
+  questionnaire: QuestionnaireData,
+  stepConfig: PipelineStepConfig,
+  callLLM: (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => Promise<string>,
+  onProgress: (step: string, progress: number) => void,
+  addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void
+): Promise<IrisAnalysis> {
+  const generateSimpleHash = (dataUrl: string): string => {
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+      return `invalid_${Date.now()}`
+    }
+    const len = dataUrl.length
+    const sample = dataUrl.substring(Math.floor(len * 0.25), Math.floor(len * 0.25) + 20)
+    return `img_${len}_${sample.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10)}`
+  }
+  
+  const imageHash = generateSimpleHash(iris.dataUrl)
+  const sideCode = side === 'left' ? 'L' : 'R'
+  const sideName = side === 'left' ? 'ляв' : 'десен'
+  const genderName = questionnaire.gender === 'male' ? 'мъж' : questionnaire.gender === 'female' ? 'жена' : 'друго'
+  const bmi = (questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)
+  
+  addLog('info', `[Pipeline] Използване на единичен промпт "${stepConfig.name}" за ${sideName} ирис...`)
+  onProgress(stepConfig.name, 10)
+  
+  // Build template variables for interpolation
+  const templateVariables: Record<string, string> = {
+    side: sideCode,
+    imageHash: imageHash,
+    age: String(questionnaire.age),
+    gender: genderName,
+    bmi: bmi,
+    weight: String(questionnaire.weight),
+    height: String(questionnaire.height),
+    goals: questionnaire.goals.join(', '),
+    healthStatus: questionnaire.healthStatus?.join(', ') || '',
+    complaints: questionnaire.complaints || 'Няма',
+    dietaryHabits: questionnaire.dietaryHabits?.join(', ') || '',
+    stressLevel: questionnaire.stressLevel || '',
+    sleepHours: String(questionnaire.sleepHours || 0),
+    sleepQuality: questionnaire.sleepQuality || '',
+    activityLevel: questionnaire.activityLevel || '',
+    medications: questionnaire.medications || '',
+    allergies: questionnaire.allergies || ''
+  }
+  
+  // Interpolate the prompt with template variables
+  const prompt = interpolatePrompt(stepConfig.prompt, templateVariables)
+  
+  addLog('info', `[Pipeline] Изпращане на заявка с промпт от админ конфигурация (${prompt.length} символа)...`)
+  onProgress(stepConfig.name, 30)
+  
+  try {
+    const response = await callLLM(prompt, true, 2, iris.dataUrl)
+    onProgress(stepConfig.name, 70)
+    
+    // Parse the response
+    let parsed: any
+    try {
+      let cleaned = response.trim()
+      if (cleaned.includes('```json')) {
+        cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      } else if (cleaned.includes('```')) {
+        cleaned = cleaned.replace(/```\s*/g, '').trim()
+      }
+      parsed = JSON.parse(cleaned)
+    } catch (parseError) {
+      addLog('error', `[Pipeline] Грешка при парсиране на JSON: ${parseError}`)
+      throw new Error(`Невалиден JSON отговор: ${parseError}`)
+    }
+    
+    // Extract analysis data from response
+    const analysisData = parsed.analysis || parsed
+    
+    const result: IrisAnalysis = {
+      side,
+      zones: analysisData.zones || [],
+      artifacts: analysisData.artifacts || [],
+      overallHealth: analysisData.overallHealth || 75,
+      systemScores: analysisData.systemScores || []
+    }
+    
+    onProgress(stepConfig.name, 100)
+    addLog('success', `[Pipeline] Анализ завършен: ${result.zones.length} зони, ${result.artifacts.length} артефакти`)
+    
+    return result
+  } catch (error) {
+    addLog('error', `[Pipeline] Грешка: ${error instanceof Error ? error.message : String(error)}`)
+    throw error
+  }
+}
+
+/**
  * Execute the v9 pipeline for a single iris
+ * Now supports configurable pipeline from admin panel
  */
 export async function executeV9Pipeline(
   iris: IrisImage,
@@ -500,8 +645,26 @@ export async function executeV9Pipeline(
   questionnaire: QuestionnaireData,
   callLLM: (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => Promise<string>,
   onProgress: (step: string, progress: number) => void,
-  addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void
+  addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void,
+  pipelineConfig?: PipelineConfig
 ): Promise<IrisAnalysis> {
+  // Check if single prompt mode is configured
+  if (pipelineConfig && isSinglePromptMode(pipelineConfig)) {
+    const enabledSteps = getEnabledSteps(pipelineConfig)
+    if (enabledSteps.length > 0) {
+      addLog('info', `[Pipeline] Използване на конфигуриран единичен промпт от админ панела: "${enabledSteps[0].name}"`)
+      return executeSinglePromptAnalysis(iris, side, questionnaire, enabledSteps[0], callLLM, onProgress, addLog)
+    }
+  }
+  
+  // Multi-step pipeline mode
+  if (pipelineConfig) {
+    const enabledSteps = getEnabledSteps(pipelineConfig)
+    if (enabledSteps.length > 1) {
+      addLog('info', `[Pipeline] Използване на многоетапен pipeline от админ панела с ${enabledSteps.length} стъпки`)
+    }
+  }
+  
   // Generate a simple hash from the data URL for tracking
   const generateSimpleHash = (dataUrl: string): string => {
     // Validate it's a data URL
@@ -524,7 +687,9 @@ export async function executeV9Pipeline(
     addLog('info', `[V9] Step 1: Геометрична калибрация за ${side === 'left' ? 'ляв' : 'десен'} ирис...`)
     onProgress('Геометрична калибрация', 10)
     
-    const step1Prompt = interpolatePrompt(STEP_PROMPTS.step1_geo_calibration, {
+    // Use configured prompt if available, otherwise use default
+    const step1PromptTemplate = getStepPrompt('step1_geo_calibration', pipelineConfig)
+    const step1Prompt = interpolatePrompt(step1PromptTemplate, {
       side: sideCode,
       imageHash
     })
@@ -541,7 +706,9 @@ export async function executeV9Pipeline(
     addLog('info', '[V9] Step 2A: Структурен анализ...')
     onProgress('Структурен анализ', 30)
     
-    const step2aPrompt = interpolatePrompt(STEP_PROMPTS.step2a_structural_detector, {
+    // Use configured prompt if available, otherwise use default
+    const step2aPromptTemplate = getStepPrompt('step2a_structural_detector', pipelineConfig)
+    const step2aPrompt = interpolatePrompt(step2aPromptTemplate, {
       side: sideCode,
       imageHash,
       step1_json: JSON.stringify(stepResults.step1)
@@ -555,7 +722,9 @@ export async function executeV9Pipeline(
     addLog('info', '[V9] Step 2B: Пигментен анализ...')
     onProgress('Пигментен анализ', 50)
     
-    const step2bPrompt = interpolatePrompt(STEP_PROMPTS.step2b_pigment_rings_detector, {
+    // Use configured prompt if available, otherwise use default
+    const step2bPromptTemplate = getStepPrompt('step2b_pigment_rings_detector', pipelineConfig)
+    const step2bPrompt = interpolatePrompt(step2bPromptTemplate, {
       side: sideCode,
       imageHash,
       step1_json: JSON.stringify(stepResults.step1)
