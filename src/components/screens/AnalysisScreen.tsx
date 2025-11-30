@@ -12,6 +12,36 @@ import { executeV9Pipeline } from '@/lib/pipeline-v9'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy } from '@/types'
 
+// Timeout constants for API requests
+const IMAGE_REQUEST_TIMEOUT_MS = 90000  // 90 seconds for image requests (more complex processing)
+const TEXT_REQUEST_TIMEOUT_MS = 60000   // 60 seconds for text-only requests
+
+// Helper function to fetch with timeout - extracted outside component for reusability
+const fetchWithTimeout = async (
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+  providerName: string
+): Promise<Response> => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`${providerName} API таймаут - заявката отне повече от ${timeoutMs / 1000} секунди`)
+    }
+    throw error
+  }
+}
+
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
   leftIris: IrisImage
@@ -95,32 +125,6 @@ export default function AnalysisScreen({
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-  // Helper function to fetch with timeout
-  const fetchWithTimeout = async (
-    url: string,
-    options: RequestInit,
-    timeoutMs: number,
-    providerName: string
-  ): Promise<Response> => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-    
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      })
-      clearTimeout(timeoutId)
-      return response
-    } catch (error) {
-      clearTimeout(timeoutId)
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`${providerName} API таймаут - заявката отне повече от ${timeoutMs / 1000} секунди`)
-      }
-      throw error
-    }
-  }
-
   const callExternalAPI = async (
     prompt: string,
     provider: 'openai' | 'gemini',
@@ -135,8 +139,8 @@ export default function AnalysisScreen({
     const maxTokens = modelStrategy?.maxTokens ?? 4000
     const topP = modelStrategy?.topP ?? 0.9
     
-    // Timeout for API requests (90 seconds for image requests, 60 seconds for text)
-    const timeoutMs = imageDataUrl ? 90000 : 60000
+    // Use appropriate timeout based on request type
+    const timeoutMs = imageDataUrl ? IMAGE_REQUEST_TIMEOUT_MS : TEXT_REQUEST_TIMEOUT_MS
     
     addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
     
