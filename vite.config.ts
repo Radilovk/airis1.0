@@ -36,8 +36,8 @@ export default defineConfig({
     ]
   },
   build: {
-    // Set target for better module support
-    target: 'esnext',
+    // Set target for better module support with wider browser compatibility
+    target: 'es2020',
     rollupOptions: {
       output: {
         // Ensure consistent chunk naming for better caching
