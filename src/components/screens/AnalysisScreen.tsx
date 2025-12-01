@@ -10,7 +10,8 @@ import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy } from '@/types'
+import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -78,6 +79,9 @@ export default function AnalysisScreen({
     topP: 0.9,
     lastModified: new Date().toISOString()
   })
+
+  // Load pipeline configuration from admin panel (with default fallback)
+  const [pipelineConfig] = useKVWithFallback<PipelineConfig>('pipeline-config', DEFAULT_PIPELINE_CONFIG)
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
@@ -700,9 +704,20 @@ ${response}
       let leftAnalysis: IrisAnalysis
       let rightAnalysis: IrisAnalysis
       
+      // Load pipeline configuration from KV storage (prefer stored over hook value)
+      const storedPipelineConfig = await window.spark.kv.get<PipelineConfig>('pipeline-config')
+      const finalPipelineConfig = storedPipelineConfig || pipelineConfig || DEFAULT_PIPELINE_CONFIG
+      
+      // Log pipeline configuration being used
+      const enabledSteps = finalPipelineConfig.steps.filter(s => s.enabled)
+      addLog('info', `⚙️ Pipeline конфигурация: ${enabledSteps.length} активни стъпки`)
+      enabledSteps.forEach(step => {
+        addLog('info', `  📋 ${step.name} (${step.id})`)
+      })
+      
       // Use v9 pipeline if configured
       if (usePipelineV9) {
-        addLog('info', '🆕 Използване на v9 pipeline с многоетапен анализ...')
+        addLog('info', '🆕 Използване на v9 pipeline с конфигурация от админ панела...')
         
         // Wrapper for callLLMWithRetry that matches the pipeline's expected signature
         const callLLMWrapper = async (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => {
@@ -719,7 +734,8 @@ ${response}
             setStatus(`V9 Pipeline (ляв): ${step}`)
             setProgress(5 + (stepProgress / 2) * 0.4)
           },
-          addLog
+          addLog,
+          finalPipelineConfig  // Pass pipeline config from admin panel
         )
         addLog('success', 'V9 Pipeline: Ляв ирис анализиран успешно')
         
@@ -738,7 +754,8 @@ ${response}
             setStatus(`V9 Pipeline (десен): ${step}`)
             setProgress(45 + (stepProgress / 2) * 0.4)
           },
-          addLog
+          addLog,
+          finalPipelineConfig  // Pass pipeline config from admin panel
         )
         addLog('success', 'V9 Pipeline: Десен ирис анализиран успешно')
         
