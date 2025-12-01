@@ -11,6 +11,17 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Plugin to add charset meta tag and ensure proper module loading
+    {
+      name: 'html-transform',
+      transformIndexHtml(html) {
+        // Add charset attribute to script tags to ensure proper UTF-8 encoding
+        return html.replace(
+          /<script type="module"([^>]*)>/g, 
+          '<script type="module" charset="UTF-8"$1>'
+        );
+      }
+    }
   ],
   resolve: {
     alias: {
@@ -25,8 +36,14 @@ export default defineConfig({
     ]
   },
   build: {
+    // Set target for better module support
+    target: 'esnext',
     rollupOptions: {
       output: {
+        // Ensure consistent chunk naming for better caching
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           // React vendor chunk
           'react-vendor': ['react', 'react-dom', 'react-error-boundary'],
