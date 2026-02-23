@@ -551,7 +551,8 @@ async function executeSinglePromptAnalysis(
   stepConfig: PipelineStepConfig,
   callLLM: (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => Promise<string>,
   onProgress: (step: string, progress: number) => void,
-  addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void
+  addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void,
+  unwrappedDataUrl?: string
 ): Promise<IrisAnalysis> {
   const generateSimpleHash = (dataUrl: string): string => {
     if (!dataUrl || !dataUrl.startsWith('data:image/')) {
@@ -562,19 +563,29 @@ async function executeSinglePromptAnalysis(
     return `img_${len}_${sample.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10)}`
   }
   
+  // Use unwrapped (polar→rectangular) image when available; fall back to original circular photo.
+  // imageType is injected into {{imageType}} in the prompt so the AI knows which format it receives.
+  const imageToAnalyze = unwrappedDataUrl || iris.dataUrl
+  const imageType = unwrappedDataUrl
+    // Unwrapped map: X = minute 0-60, Y = ring R0-R11
+    ? 'разгъната (polar→rectangular) карта (X=минута 0–60, Y=пръстен R0–R11) – чисто белите зони са маскирани клепачи/отблясъци'
+    // Original circular photo: pupil at centre, 12 o'clock at top, clockwise
+    : 'оригинална кръгла снимка на ириса (зеницата е в центъра, 12:00 е горе, по часовниковата стрелка)'
+  
   const imageHash = generateSimpleHash(iris.dataUrl)
   const sideCode = side === 'left' ? 'L' : 'R'
   const sideName = side === 'left' ? 'ляв' : 'десен'
   const genderName = questionnaire.gender === 'male' ? 'мъж' : questionnaire.gender === 'female' ? 'жена' : 'друго'
   const bmi = (questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)
   
-  addLog('info', `[Pipeline] Използване на единичен промпт "${stepConfig.name}" за ${sideName} ирис...`)
+  addLog('info', `[Pipeline] Използване на единичен промпт "${stepConfig.name}" за ${sideName} ирис (${unwrappedDataUrl ? 'разгъната карта' : 'оригинална снимка'})...`)
   onProgress(stepConfig.name, 10)
   
   // Build template variables for interpolation
   const templateVariables: Record<string, string> = {
     side: sideCode,
     imageHash: imageHash,
+    imageType: imageType,
     age: String(questionnaire.age),
     gender: genderName,
     bmi: bmi,
@@ -599,7 +610,7 @@ async function executeSinglePromptAnalysis(
   onProgress(stepConfig.name, 30)
   
   try {
-    const response = await callLLM(prompt, true, 2, iris.dataUrl)
+    const response = await callLLM(prompt, true, 2, imageToAnalyze)
     onProgress(stepConfig.name, 70)
     
     // Parse the response
@@ -657,7 +668,7 @@ export async function executeV9Pipeline(
     const enabledSteps = getEnabledSteps(pipelineConfig)
     if (enabledSteps.length > 0) {
       addLog('info', `[Pipeline] Използване на конфигуриран единичен промпт от админ панела: "${enabledSteps[0].name}"`)
-      return executeSinglePromptAnalysis(iris, side, questionnaire, enabledSteps[0], callLLM, onProgress, addLog)
+      return executeSinglePromptAnalysis(iris, side, questionnaire, enabledSteps[0], callLLM, onProgress, addLog, unwrappedDataUrl)
     }
   }
   
