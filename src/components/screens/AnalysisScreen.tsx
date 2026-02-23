@@ -755,7 +755,10 @@ ${response}
             setProgress(5 + (stepProgress / 2) * 0.4)
           },
           addLog,
-          finalPipelineConfig  // Pass pipeline config from admin panel
+          finalPipelineConfig,  // Pass pipeline config from admin panel
+          leftUnwrap?.found && leftUnwrap.mapped
+            ? `data:image/jpeg;base64,${leftUnwrap.mapped}`
+            : undefined
         )
         addLog('success', 'V9 Pipeline: Ляв ирис анализиран успешно')
         
@@ -775,7 +778,10 @@ ${response}
             setProgress(45 + (stepProgress / 2) * 0.4)
           },
           addLog,
-          finalPipelineConfig  // Pass pipeline config from admin panel
+          finalPipelineConfig,  // Pass pipeline config from admin panel
+          rightUnwrap?.found && rightUnwrap.mapped
+            ? `data:image/jpeg;base64,${rightUnwrap.mapped}`
+            : undefined
         )
         addLog('success', 'V9 Pipeline: Десен ирис анализиран успешно')
         

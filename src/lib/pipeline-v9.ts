@@ -81,7 +81,7 @@ Return ONLY:
 
   step2a_structural_detector: `ROLE: iris_detector_struct_v9
 MODE: image_parse_only
-INPUT: single_iris_image
+INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
 SIDE: {{side}}
 GEO: {{step1_json}}
 
@@ -92,7 +92,7 @@ TARGET:
 IRIS_STRUCTURE_ONLY (NO meaning, NO diagnosis)
 
 IGNORE:
-sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions
+sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions | pure_white_zones (R≈G≈B≈255 = masked eyelids or glare reflections)
 
 DETECT (STRUCTURAL):
 - lacuna: oval/leaf gap; breaks fiber flow
@@ -127,7 +127,7 @@ FAILSAFE:
 
   step2b_pigment_rings_detector: `ROLE: iris_detector_pigment_rings_v9
 MODE: image_parse_only
-INPUT: single_iris_image
+INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
 SIDE: {{side}}
 GEO: {{step1_json}}
 
@@ -136,6 +136,9 @@ PREREQ:
 
 TARGET:
 IRIS_STRUCTURE_ONLY (NO meaning, NO diagnosis)
+
+IGNORE:
+sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions | pure_white_zones (R≈G≈B≈255 = masked eyelids or glare reflections)
 
 DETECT (PIGMENT / PERIPHERY / RINGS):
 - pigment_spot (subtype: orange_rust|brown_black|yellow|other)
@@ -646,7 +649,8 @@ export async function executeV9Pipeline(
   callLLM: (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => Promise<string>,
   onProgress: (step: string, progress: number) => void,
   addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void,
-  pipelineConfig?: PipelineConfig
+  pipelineConfig?: PipelineConfig,
+  unwrappedDataUrl?: string
 ): Promise<IrisAnalysis> {
   // Check if single prompt mode is configured
   if (pipelineConfig && isSinglePromptMode(pipelineConfig)) {
@@ -679,11 +683,16 @@ export async function executeV9Pipeline(
   
   const imageHash = generateSimpleHash(iris.dataUrl)
   const sideCode = side === 'left' ? 'L' : 'R'
+  // Use the unwrapped (polar→rectangular) image for detection steps when available
+  const detectionImageUrl = unwrappedDataUrl || iris.dataUrl
+  if (unwrappedDataUrl) {
+    addLog('info', '[V9] Използване на разгъната карта (method1 backend) за структурен/пигментен анализ')
+  }
   
   const stepResults: Record<string, any> = {}
   
   try {
-    // Step 1: Geo Calibration
+    // Step 1: Geo Calibration (always uses original image for limbus/pupil detection)
     addLog('info', `[V9] Step 1: Геометрична калибрация за ${side === 'left' ? 'ляв' : 'десен'} ирис...`)
     onProgress('Геометрична калибрация', 10)
     
@@ -702,7 +711,7 @@ export async function executeV9Pipeline(
     }
     addLog('success', `[V9] Step 1 завършен - качество: ${stepResults.step1.quality?.score0_100 || 'N/A'}/100`)
     
-    // Step 2A: Structural Detector
+    // Step 2A: Structural Detector (uses unwrapped image when available)
     addLog('info', '[V9] Step 2A: Структурен анализ...')
     onProgress('Структурен анализ', 30)
     
@@ -714,11 +723,11 @@ export async function executeV9Pipeline(
       step1_json: JSON.stringify(stepResults.step1)
     })
     
-    const step2aResponse = await callLLM(step2aPrompt, true, 2, iris.dataUrl)
+    const step2aResponse = await callLLM(step2aPrompt, true, 2, detectionImageUrl)
     stepResults.step2a = JSON.parse(step2aResponse)
     addLog('success', `[V9] Step 2A завършен - ${stepResults.step2a.findings?.length || 0} структурни находки`)
     
-    // Step 2B: Pigment & Rings Detector
+    // Step 2B: Pigment & Rings Detector (uses unwrapped image when available)
     addLog('info', '[V9] Step 2B: Пигментен анализ...')
     onProgress('Пигментен анализ', 50)
     
@@ -730,7 +739,7 @@ export async function executeV9Pipeline(
       step1_json: JSON.stringify(stepResults.step1)
     })
     
-    const step2bResponse = await callLLM(step2bPrompt, true, 2, iris.dataUrl)
+    const step2bResponse = await callLLM(step2bPrompt, true, 2, detectionImageUrl)
     stepResults.step2b = JSON.parse(step2bResponse)
     addLog('success', `[V9] Step 2B завършен - ${stepResults.step2b.findings?.length || 0} пигментни находки`)
     addLog('info', `[V9] Конституция: ${stepResults.step2b.global?.constitution || 'unclear'}, Диспозиция: ${stepResults.step2b.global?.disposition || 'unclear'}`)

@@ -33,7 +33,7 @@ DETERMINISM:
 Same IMG_ID + same PATIENT → same JSON output, без случайност.
 
 PHASE 0 – IMAGE (ВЪТРЕШНО):
-Работи само върху ириса. Игнорирай зеница, склера, клепачи, мигли, грим, силни блясъци. Мислено подобри контраста и остротата, за да виждаш ясно влакна, лакуни, крипти, пръстени.
+Работи само върху ириса. Получаваш разгъната (polar→rectangular) карта на ириса (X=минута 0–60, Y=пръстен R0–R11). Игнорирай зеница, склера, клепачи, мигли, грим, силни блясъци и чисто бели зони (R≈G≈B≈255 — маскирани клепачи или отблясъци). Мислено подобри контраста и остротата, за да виждаш ясно влакна, лакуни, крипти, пръстени.
 
 PHASE 1 – ГЕОМЕТРИЯ И КООРДИНАТИ:
 1.1 Намери центъра на зеницата и лимбуса (външен ръб на ириса).
@@ -162,7 +162,7 @@ FAILSAFE:
 // Step 2A: Structural Detector
 export const STEP2A_STRUCTURAL_DETECTOR_PROMPT = `ROLE: iris_detector_struct_v9
 MODE: image_parse_only
-INPUT: single_iris_image
+INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
 SIDE: {{side}}
 GEO: {{step1_json}}
 
@@ -171,6 +171,9 @@ PREREQ:
 
 TARGET:
 IRIS_STRUCTURE_ONLY (NO meaning, NO diagnosis)
+
+IGNORE:
+sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions | pure_white_zones (R≈G≈B≈255 = masked eyelids or glare reflections)
 
 DETECT (STRUCTURAL):
 - lacuna: oval/leaf gap; breaks fiber flow
@@ -206,12 +209,15 @@ FAILSAFE:
 // Step 2B: Pigment & Rings Detector
 export const STEP2B_PIGMENT_RINGS_DETECTOR_PROMPT = `ROLE: iris_detector_pigment_rings_v9
 MODE: image_parse_only
-INPUT: single_iris_image
+INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
 SIDE: {{side}}
 GEO: {{step1_json}}
 
 PREREQ:
 - If GEO.ok != true: return error JSON.
+
+IGNORE:
+sclera | pupil interior | lashes | eyelids | makeup | GEO.invalidRegions | pure_white_zones (R≈G≈B≈255 = masked eyelids or glare reflections)
 
 DETECT (PIGMENT / PERIPHERY / RINGS):
 - pigment_spot (subtype: orange_rust|brown_black|yellow|other)
