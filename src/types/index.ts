@@ -75,6 +75,11 @@ export interface IrisZone {
   status: 'normal' | 'attention' | 'concern'
   findings: string
   angle: [number, number]
+  // New unwrap coordinate system (X = minute 0-60, Y = ring R0-R11)
+  minute_start?: number
+  minute_end?: number
+  ring_start?: number
+  ring_end?: number
 }
 
 export interface IrisAnalysis {
@@ -90,6 +95,10 @@ export interface Artifact {
   location: string
   description: string
   severity: 'low' | 'medium' | 'high'
+  // New unwrap coordinate system fields (optional, backward compatible)
+  clock_pos?: string
+  minute?: number
+  ring?: number
 }
 
 export interface SystemScore {
