@@ -10,6 +10,7 @@ import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import { estimateStorageUsage, estimateDataSize } from '@/lib/storage-utils'
+import { CHUNK_RELOAD_KEY } from '@/ErrorFallback'
 import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 
 // Lazy load heavy components
@@ -70,6 +71,9 @@ function App() {
     }
     
     initializeApp()
+    
+    // Clear chunk-reload guard so future deployments can trigger auto-reload again
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
     
     return () => {
       errorLogger.info('APP_UNMOUNT', 'Application unmounting')
