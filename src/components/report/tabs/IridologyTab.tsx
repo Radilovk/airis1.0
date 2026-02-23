@@ -13,6 +13,7 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
+import UnwrappedIrisMap from '@/components/iris/UnwrappedIrisMap'
 import {
   Collapsible,
   CollapsibleContent,
@@ -171,6 +172,34 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           />
         </Card>
       </motion.div>
+
+      {/* Unwrapped coordinate-system maps (minute × ring) */}
+      {(report.leftIris.zones?.some(z => z.minute_start !== undefined) ||
+        report.rightIris.zones?.some(z => z.minute_start !== undefined)) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+          className="space-y-4"
+        >
+          <h3 className="text-lg font-bold flex items-center gap-2 text-primary px-1">
+            <Eye size={20} weight="duotone" />
+            Разгъвка – Координатна Система (минута × пръстен)
+          </h3>
+          <UnwrappedIrisMap
+            zones={report.leftIris.zones}
+            artifacts={report.leftIris.artifacts}
+            side="left"
+            overallHealth={report.leftIris.overallHealth}
+          />
+          <UnwrappedIrisMap
+            zones={report.rightIris.zones}
+            artifacts={report.rightIris.artifacts}
+            side="right"
+            overallHealth={report.rightIris.overallHealth}
+          />
+        </motion.div>
+      )}
 
       {report.detailedAnalysis && (
         <motion.div

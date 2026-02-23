@@ -6,10 +6,11 @@ import IridologyOverlay from './IridologyOverlay'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { CustomOverlay } from '@/types'
+import { IRIS_MAX_DIMENSION } from '@/components/screens/ImageUploadScreen'
 
-// Size limit constants
-const MAX_RAW_CROP_SIZE_BYTES = 3072 * 1024 // 3 MB (will be compressed later)
-const MAX_RAW_CROP_SIZE_KB = 3072
+// Size limit constants – high resolution needed for iris analysis detail
+const MAX_RAW_CROP_SIZE_BYTES = 7 * 1024 * 1024 // 7 MB (will be compressed later)
+const MAX_RAW_CROP_SIZE_KB = 7168
 
 interface IrisCropEditorProps {
   imageDataUrl: string
@@ -308,7 +309,9 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
       console.log(`📊 [CROP] Transform:`, transform)
       
       const cropCanvas = document.createElement('canvas')
-      const cropSize = 800
+      // Use IRIS_MAX_DIMENSION: sufficient for iris detail (lacunae, crypts, radial lines)
+      // while keeping JPEG size manageable for LLM vision APIs
+      const cropSize = IRIS_MAX_DIMENSION
       cropCanvas.width = cropSize
       cropCanvas.height = cropSize
       
@@ -362,7 +365,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
           const sizeKB = Math.round(croppedDataUrl.length / 1024)
           console.log(`📊 [CROP] Размер на cropped изображение: ${sizeKB} KB`)
           
-          // Allow up to 3MB for raw cropped image (will be compressed later in handleCropSave)
+          // Allow up to 7MB for raw cropped image (will be compressed to ~5MB in handleCropSave)
           if (croppedDataUrl.length > MAX_RAW_CROP_SIZE_BYTES) {
             console.warn(`⚠️ [CROP] Изображението е твърде голямо след crop (${sizeKB} KB)`)
             toast.error(`Изображението е твърде голямо (${sizeKB} KB). Моля, опитайте с по-малък мащаб или зуум.`)

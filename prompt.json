@@ -10,26 +10,33 @@ IMG_ID={{imageHash}} (same IMG+same Q => same output)
 активност={{activityLevel}}; медикаменти={{medications}}; алергии={{allergies}}.
 // ако липсват полета → ползвай безопасни стойности по подразбиране (празно/0), за да избегнеш сривове
 
-MANUAL={{knowledgeContext}} // keys: LAT,RINGS_PCT,CLOCK,SIGNS,TRIAD
+MANUAL={{knowledgeContext}} // keys: LAT,RINGS,MINUTES,SIGNS,TRIAD
+
+КООРДИНАТНА СИСТЕМА (разгъвка):
+Получаваш правоъгълно изображение — разгъната полярна трансформация на ириса.
+X-ос = минута (0–60 по часовник, 0=12ч, 15=3ч, 30=6ч, 45=9ч).
+Y-ос = пръстен R0 (граница зеница) → R11 (външен ръб на ириса).
+Всяка зона се описва с minute_start/minute_end (0–60) и ring_start/ring_end (0–11).
+Преобразуване за визуализация: angle = [minute_start*6, minute_end*6] (спрямо 12h=0°, по часовник).
 
 ПРОЦЕС:
 0) MANUAL ползвай САМО за: локация, тип знак, орган/система.
-1) Латералност: анализирай само {{side}}; при CLOCK с R/L избери {{side}}-специфичния сектор.
-2) Ъгли: 12h=0°,3h=90°,6h=180°,9h=270°. deg(hh:mm)=(hh%12)*30+mm*0.5. angle=[startDeg,endDeg].
-3) Концентричност (НЕ опростявай):
-   за всяка находка изчисли ring_pct (0..100 от ръб зеница→ръб ирис),
-   map ring_pct към MANUAL.RINGS_PCT (вкл. INTESTINAL_FIELD/ANW_LINE, OUTER_ORGAN_SUBZONE и т.н.).
+1) Латералност: анализирай само {{side}}; при MINUTES с R/L избери {{side}}-специфичния сектор.
+2) Позиция по X: minute(0..60). minute(hh:mm)=(hh%12)*5+mm/12. minute_start/minute_end=[X1,X2].
+3) Дълбочина по Y (НЕ опростявай):
+   за всяка находка определи ring_start и ring_end (0..11 от зеница→външен ирис),
+   map към MANUAL.RINGS (вкл. INTESTINAL_FIELD/ANW_LINE, OUTER_ORGAN_SUBZONE и т.н.).
 4) Търси САМО: lacuna, crypt, pigment, radii, n_ring(stress rings), ANW_form. Игнорирай светлинни отражения.
 5) За всяка находка:
-   - clock_pos -> organ чрез MANUAL.CLOCK
-   - ring_pct -> ring_zone чрез MANUAL.RINGS_PCT
+   - minute_pos -> organ чрез MANUAL.MINUTES
+   - ring_start/ring_end -> ring_zone чрез MANUAL.RINGS
    - sign_type/subtype/stage -> значение чрез MANUAL.SIGNS
    - severity:
        high ако се потвърждава от Q
        medium ако е ясна без Q
        low ако е слаба/единична + без Q
 6) zones масив (детерминиран):
-   zones = всички CLOCK сектори за този ирис от MANUAL, подредени по стартов ъгъл възходящо.
+   zones = всички MINUTES сектори за този ирис от MANUAL, подредени по minute_start възходящо.
    id=1..N по реда им.
    status:
      normal ако няма находки
@@ -37,10 +44,12 @@ MANUAL={{knowledgeContext}} // keys: LAT,RINGS_PCT,CLOCK,SIGNS,TRIAD
      concern ако има severity=high ИЛИ ≥2 находки
    findings<=60 БГ.
    В findings включвай и NRING (напр. "стрес-пръстени 3х сиви"), защото artifacts.type няма NRING.
+   angle=[minute_start*6, minute_end*6] (изчислено автоматично за обратна съвместимост).
 7) artifacts масив (строго по схемата):
    type ∈ {"лакуна","крипта","пигмент","радиална линия","автономен пръстен"}
    NRING НЕ влиза тук.
-   location="часовник hh:mm-hh:mm"
+   location="мин:XX-XX ринг:RX-RY" (напр. "мин:10-15 ринг:R2-R4")
+   clock_pos="hh:mm-hh:mm" (изчислено от minute за обратна съвместимост)
    description<=60 БГ
 8) overallHealth=0..100 int.
 9) systemScores: точно 6 системи, ред фиксиран:
@@ -62,19 +71,26 @@ JSON schema:
     "zones": [
       {
         "id": 1,
-        "name": "сектор/зона по Manual (напр. 2:30 Д или ANW сектор 7:00-8:00)",
+        "name": "сектор/зона по Manual (напр. мин:0-5 Д или ANW мин:35-40)",
         "organ": "орган/система",
         "status": "normal/attention/concern",
         "findings": "кратко значение <60симв",
+        "minute_start": 0,
+        "minute_end": 5,
+        "ring_start": 0,
+        "ring_end": 11,
         "angle": [0,30]
       }
     ],
     "artifacts": [
       {
         "type": "лакуна/крипта/пигмент/радиална линия/автономен пръстен",
-        "location": "часовник hh:mm-hh:mm",
+        "location": "мин:XX-XX ринг:RX-RY",
+        "clock_pos": "hh:mm-hh:mm",
         "description": "кратко значение <60симв",
-        "severity": "low/med/high"
+        "severity": "low/med/high",
+        "minute": 10,
+        "ring": 3
       }
     ],
     "overallHealth": 75,

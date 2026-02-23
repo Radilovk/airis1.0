@@ -11,9 +11,12 @@ import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import type { IrisImage } from '@/types'
 
 // Compression and size limit constants
-const SECOND_PASS_THRESHOLD_BYTES = 1024 * 1024 // 1 MB
-const MAX_FINAL_SIZE_BYTES = 2048 * 1024 // 2 MB
-const MAX_FINAL_SIZE_KB = 2048
+// Iris images need ≥1600px width to preserve fine medical detail (lacunae, crypts, radial lines).
+// Shared with IrisCropEditor – keep in sync.
+export const IRIS_MAX_DIMENSION = 1600
+const SECOND_PASS_THRESHOLD_BYTES = 3 * 1024 * 1024 // 3 MB – only re-compress truly large files
+const MAX_FINAL_SIZE_BYTES = 5 * 1024 * 1024        // 5 MB – supports 1600px JPEG at q=0.92
+const MAX_FINAL_SIZE_KB = 5120
 
 interface ImageUploadScreenProps {
   onComplete: (left: IrisImage, right: IrisImage) => void
@@ -68,7 +71,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }, [])
 
-  const compressImage = async (dataUrl: string, maxWidth: number = 800, quality: number = 0.92): Promise<string> => {
+  const compressImage = async (dataUrl: string, maxWidth: number = IRIS_MAX_DIMENSION, quality: number = 0.92): Promise<string> => {
     const startTime = performance.now()
     return new Promise((resolve, reject) => {
       const img = new Image()
@@ -235,8 +238,8 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           fileType: file.type,
           side
         })
-        // First pass: High quality compression (0.92 = excellent quality without excessive size)
-        let compressedDataUrl = await compressImage(dataUrl, 800, 0.92)
+        // First pass: High quality at max IRIS_MAX_DIMENSION – preserves iris detail for AI analysis
+        let compressedDataUrl = await compressImage(dataUrl, IRIS_MAX_DIMENSION, 0.92)
         const afterFirstPassKB = Math.round(compressedDataUrl.length / 1024)
         uploadDiagnostics.log('COMPRESS_END_1ST_PASS', 'success', {
           compressedSizeKB: afterFirstPassKB,
@@ -251,7 +254,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           uploadDiagnostics.log('COMPRESS_START_2ND_PASS', 'start', {
             currentSizeKB: afterFirstPassKB
           })
-          compressedDataUrl = await compressImage(compressedDataUrl, 800, 0.88)
+          compressedDataUrl = await compressImage(compressedDataUrl, IRIS_MAX_DIMENSION, 0.88)
           const afterSecondPassKB = Math.round(compressedDataUrl.length / 1024)
           uploadDiagnostics.log('COMPRESS_END_2ND_PASS', 'success', {
             finalSizeKB: afterSecondPassKB,
@@ -266,7 +269,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         console.log(`📸 [UPLOAD] Total reduction: ${Math.round(((originalSizeKB - finalSizeKB) / originalSizeKB) * 100)}%`)
         console.log(`📸 [UPLOAD] Checking against limit: ${finalSizeKB} KB vs ${MAX_FINAL_SIZE_KB} KB max`)
         
-        // Allow up to 2MB after compression (reasonable for high quality 800x800 JPEG)
+        // Allow up to 5MB – supports 1600px JPEG at q=0.92 for high-detail iris images
         if (compressedDataUrl.length > MAX_FINAL_SIZE_BYTES) {
           uploadDiagnostics.log('COMPRESS_ERROR_TOO_LARGE', 'error', {
             finalSizeKB,
@@ -418,14 +421,14 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_START', 'start', {
         sizeBefore: Math.round(croppedDataUrl.length / 1024)
       })
-      // First pass: High quality (0.92 = excellent quality, good compression ratio)
-      let finalImage = await compressImage(croppedDataUrl, 800, 0.92)
+      // First pass: High quality at IRIS_MAX_DIMENSION – preserves iris detail for AI analysis
+      let finalImage = await compressImage(croppedDataUrl, IRIS_MAX_DIMENSION, 0.92)
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_SUCCESS', 'success', {
         sizeAfter: Math.round(finalImage.length / 1024)
       })
       console.log(`📊 [UPLOAD] Size after 1st pass: ${Math.round(finalImage.length / 1024)} KB`)
 
-      // Allow up to 2MB for final cropped image (reasonable for high quality 800x800 JPEG)
+      // Allow up to 5MB – supports 1600px JPEG at q=0.92 for high-detail iris images
       if (finalImage.length > MAX_FINAL_SIZE_BYTES) {
         uploadDiagnostics.log('CROP_COMPRESS_ERROR_TOO_LARGE', 'error', {
           finalSize: Math.round(finalImage.length / 1024),

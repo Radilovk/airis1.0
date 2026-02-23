@@ -6,6 +6,13 @@ from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
 
+# Output resolution for the unwrapped iris image.
+# Increasing these gives finer detail per ring/minute for the AI vision model.
+# UNWRAP_HEIGHT rows  = number of radial samples (R0–R11 → 12 rings, 50px each)
+# UNWRAP_WIDTH  cols  = number of angular samples (0–60 min → 60 minutes, 40px each)
+UNWRAP_HEIGHT = 600
+UNWRAP_WIDTH  = 2400
+
 # ==========================================
 # 1. PREPROCESSING
 # ==========================================
@@ -269,7 +276,7 @@ def segment_eyelids_ransac(img, cx, cy, ir,
 # 5. UNWRAP (VECTORIZED)
 # ==========================================
 def unwrap_iris_fast(img, px, py, pr, ir):
-    h_out, w_out = 300, 1200
+    h_out, w_out = UNWRAP_HEIGHT, UNWRAP_WIDTH
 
     theta = np.linspace(-np.pi/2, 1.5*np.pi, w_out).astype(np.float32)
     r_vals = np.linspace(pr, ir, h_out).astype(np.float32)
@@ -287,7 +294,7 @@ def unwrap_iris_fast(img, px, py, pr, ir):
 # ==========================================
 def draw_ai_grid_map_expanded(unwrapped, side="R"):
     if unwrapped is None:
-        return np.zeros((300, 1200, 3), np.uint8)
+        return np.zeros((UNWRAP_HEIGHT, UNWRAP_WIDTH, 3), np.uint8)
     unwrapped = unwrapped.astype(np.uint8)
 
     img_h, img_w = unwrapped.shape[:2]
@@ -391,8 +398,8 @@ def process():
 
             mapped = draw_ai_grid_map_expanded(unw, side=sc)
 
-            b_ovl = base64.b64encode(cv2.imencode('.jpg', ovl)[1]).decode()
-            b_map = base64.b64encode(cv2.imencode('.jpg', mapped)[1]).decode()
+            b_ovl = base64.b64encode(cv2.imencode('.jpg', ovl, [cv2.IMWRITE_JPEG_QUALITY, 95])[1]).decode()
+            b_map = base64.b64encode(cv2.imencode('.jpg', mapped, [cv2.IMWRITE_JPEG_QUALITY, 95])[1]).decode()
 
             results[sc] = {'found': True, 'overlay': b_ovl, 'mapped': b_map}
         else:
