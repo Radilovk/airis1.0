@@ -81,7 +81,7 @@ Return ONLY:
 
   step2a_structural_detector: `ROLE: iris_detector_struct_v9
 MODE: image_parse_only
-INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
+INPUT: {{imageFormat}}
 SIDE: {{side}}
 GEO: {{step1_json}}
 
@@ -127,7 +127,7 @@ FAILSAFE:
 
   step2b_pigment_rings_detector: `ROLE: iris_detector_pigment_rings_v9
 MODE: image_parse_only
-INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
+INPUT: {{imageFormat}}
 SIDE: {{side}}
 GEO: {{step1_json}}
 
@@ -573,6 +573,37 @@ async function executeSinglePromptAnalysis(
     ? 'правоъгълна разгъната карта (polar→rectangular) с нанесена координатна мрежа: X-ос = минута 0–60 (числа в горната лента), Y-ос = пръстен R0–R11 (надписи вляво), вертикални линии на всеки 5 мин., хоризонтални линии за всеки пръстен; чисто белите зони = маскирани клепачи/отблясъци – игнорирай ги'
     // Original circular photo: pupil at centre, 12 o'clock at top, clockwise
     : 'оригинална кръгла снимка на ириса (зеницата е в центъра, 12:00 е горе, по часовниковата стрелка); използвай стандартна кръгова координатна система'
+
+  // coordinateSystemDesc describes the image axes in detail; adapts to rectangular vs circular.
+  const coordinateSystemDesc = unwrappedDataUrl
+    ? `ПРАВОЪГЪЛНА КООРДИНАТНА КАРТА (unwrapped polar→rectangular map with printed grid):
+
+X-ос (хоризонтална) = МИНУТА, стойности 0 → 60
+  - Числата са изпечатани в ГОРНАТА ЛЕНТА на изображението: 0, 5, 10, 15, … 60
+  - Вертикални линии на решетката = на всеки 5 минути
+  - Ляв край  (min 0)  = 12:00 часова позиция = 0°
+  - 1/4 ширина (min 15) = 3:00 = 90°
+  - Средата    (min 30) = 6:00 = 180°
+  - 3/4 ширина (min 45) = 9:00 = 270°
+  - Десен край (min 60) = 12:00 = 360° (= min 0, цикличен)
+  - 1 зона = 5 минути = 30° (12 зони от min 0 до min 60)
+
+Y-ос (вертикална) = ПРЪСТЕН (RING), стойности R0 → R11
+  - Означен „R0", „R1", … „R11" ВЛЯВО на изображението
+  - Хоризонтални линии на решетката = между всеки пръстен
+  - Горен ред (R0)  = граница зеница (IPB – най-вътрешен пръстен)
+  - Долен ред (R11) = външен ръб на ириса (лимбус / SCU)`
+    : `ОРИГИНАЛНА КРЪГЛА СНИМКА НА ИРИСА:
+  - Зеницата е в центъра; 12:00 е ГОРЕ; посоката е по часовниковата стрелка
+  - X = минута (0–60): min 0 = 12:00, min 15 = 3:00, min 30 = 6:00, min 45 = 9:00
+  - Y = пръстен: R0 (граница зеница) → R11 (външен ръб / лимбус)
+  - Мислено раздели ириса на 12 радиални сектора (min 0–5, 5–10, … 55–60)`
+
+  // canvasIgnoreNote: rectangular-specific canvas labels to ignore; empty for circular images.
+  const canvasIgnoreNote = unwrappedDataUrl
+    ? `  - Надписите и рамката на канваса (горна лента с числа, лява лента R0-R11, долен надпис)
+  - Само ирисовата тъкан в решетката съдържа информация`
+    : ''
   
   const imageHash = generateSimpleHash(iris.dataUrl)
   const sideCode = side === 'left' ? 'L' : 'R'
@@ -588,6 +619,8 @@ async function executeSinglePromptAnalysis(
     side: sideCode,
     imageHash: imageHash,
     imageType: imageType,
+    coordinateSystemDesc: coordinateSystemDesc,
+    canvasIgnoreNote: canvasIgnoreNote,
     age: String(questionnaire.age),
     gender: genderName,
     bmi: bmi,
@@ -698,6 +731,10 @@ export async function executeV9Pipeline(
   const sideCode = side === 'left' ? 'L' : 'R'
   // Use the unwrapped (polar→rectangular) image for detection steps when available
   const detectionImageUrl = unwrappedDataUrl || iris.dataUrl
+  // imageFormat describes the visual format of the detection image for steps 2A/2B prompts
+  const imageFormat = unwrappedDataUrl
+    ? 'unwrapped_iris_image (polar→rectangular map with printed grid: X=minute 0-60 with numbers at top, Y=ring R0-R11 with labels on left; pure white zones = masked eyelids/glare)'
+    : "original_iris_image (circular photo; pupil at center, 12 o'clock at top, clockwise; use standard clock/ring coordinate system)"
   if (unwrappedDataUrl) {
     addLog('info', '[V9] Използване на разгъната карта (method1 backend) за структурен/пигментен анализ')
   }
@@ -733,6 +770,7 @@ export async function executeV9Pipeline(
     const step2aPrompt = interpolatePrompt(step2aPromptTemplate, {
       side: sideCode,
       imageHash,
+      imageFormat,
       step1_json: JSON.stringify(stepResults.step1)
     })
     
@@ -749,6 +787,7 @@ export async function executeV9Pipeline(
     const step2bPrompt = interpolatePrompt(step2bPromptTemplate, {
       side: sideCode,
       imageHash,
+      imageFormat,
       step1_json: JSON.stringify(stepResults.step1)
     })
     

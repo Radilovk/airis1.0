@@ -15,23 +15,7 @@ TASK: analyze {{side}} iris from coordinate map → return FINAL JSON
 ═══════════════════════════════════════════
 Получаваш: {{imageType}}
 
-ПРАВОЪГЪЛНА КООРДИНАТНА КАРТА (unwrapped polar→rectangular map with printed grid):
-
-X-ос (хоризонтална) = МИНУТА, стойности 0 → 60
-  - Числата са изпечатани в ГОРНАТА ЛЕНТА на изображението: 0, 5, 10, 15, … 60
-  - Вертикални линии на решетката = на всеки 5 минути
-  - Ляв край  (min 0)  = 12:00 часова позиция = 0°
-  - 1/4 ширина (min 15) = 3:00 = 90°
-  - Средата    (min 30) = 6:00 = 180°
-  - 3/4 ширина (min 45) = 9:00 = 270°
-  - Десен край (min 60) = 12:00 = 360° (= min 0, цикличен)
-  - 1 зона = 5 минути = 30° (12 зони от min 0 до min 60)
-
-Y-ос (вертикална) = ПРЪСТЕН (RING), стойности R0 → R11
-  - Означен „R0", „R1", … „R11" ВЛЯВО на изображението
-  - Хоризонтални линии на решетката = между всеки пръстен
-  - Горен ред (R0)  = граница зеница (IPB – най-вътрешен пръстен)
-  - Долен ред (R11) = външен ръб на ириса (лимбус / SCU)
+{{coordinateSystemDesc}}
 
 ЗОНИ ПО ПРЪСТЕНИ:
   R0      = IPB  (граница зеница)
@@ -47,8 +31,7 @@ Y-ос (вертикална) = ПРЪСТЕН (RING), стойности R0 →
 
 ИГНОРИРАЙ:
   - Чисто бели зони (R≈G≈B≈255) = маскирани клепачи или отблясъци
-  - Надписите и рамката на канвaса (горна лента с числа, лява лента R0-R11, долен надпис)
-  - Само ирисовата тъкан в решетката съдържа информация
+{{canvasIgnoreNote}}
 
 ═══════════════════════════════════════════
 ОРГАННИ ЗОНИ ПО МИНУТА (SIDE = {{side}})
@@ -255,7 +238,7 @@ FAILSAFE:
 // Step 2A: Structural Detector
 export const STEP2A_STRUCTURAL_DETECTOR_PROMPT = `ROLE: iris_detector_struct_v9
 MODE: image_parse_only
-INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
+INPUT: {{imageFormat}}
 SIDE: {{side}}
 GEO: {{step1_json}}
 
@@ -280,7 +263,6 @@ DETECT (STRUCTURAL):
 - structural_asymmetry: strong structural difference between sectors
 
 OUTPUT_JSON ONLY:
-{
   "imgId":"{{imageHash}}",
   "side":"{{side}}",
   "findings":[
@@ -302,7 +284,7 @@ FAILSAFE:
 // Step 2B: Pigment & Rings Detector
 export const STEP2B_PIGMENT_RINGS_DETECTOR_PROMPT = `ROLE: iris_detector_pigment_rings_v9
 MODE: image_parse_only
-INPUT: unwrapped_iris_image (polar→rectangular map; X=minute 0-60, Y=ring R0-R11)
+INPUT: {{imageFormat}}
 SIDE: {{side}}
 GEO: {{step1_json}}
 
