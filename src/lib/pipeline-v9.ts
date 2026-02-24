@@ -567,10 +567,12 @@ async function executeSinglePromptAnalysis(
   // imageType is injected into {{imageType}} in the prompt so the AI knows which format it receives.
   const imageToAnalyze = unwrappedDataUrl || iris.dataUrl
   const imageType = unwrappedDataUrl
-    // Unwrapped map: X = minute 0-60, Y = ring R0-R11
-    ? 'разгъната (polar→rectangular) карта (X=минута 0–60, Y=пръстен R0–R11) – чисто белите зони са маскирани клепачи/отблясъци'
+    // Annotated grid canvas from method1/app.py: rectangular polar→rectangular map with printed
+    // minute (X) and ring (Y) coordinate grid, minute numbers at top, R0-R11 labels on left,
+    // "RIGHT/LEFT EYE" + NASAL/TEMPORAL markers at bottom; pure-white zones = masked eyelids/glare.
+    ? 'правоъгълна разгъната карта (polar→rectangular) с нанесена координатна мрежа: X-ос = минута 0–60 (числа в горната лента), Y-ос = пръстен R0–R11 (надписи вляво), вертикални линии на всеки 5 мин., хоризонтални линии за всеки пръстен; чисто белите зони = маскирани клепачи/отблясъци – игнорирай ги'
     // Original circular photo: pupil at centre, 12 o'clock at top, clockwise
-    : 'оригинална кръгла снимка на ириса (зеницата е в центъра, 12:00 е горе, по часовниковата стрелка)'
+    : 'оригинална кръгла снимка на ириса (зеницата е в центъра, 12:00 е горе, по часовниковата стрелка); използвай стандартна кръгова координатна система'
   
   const imageHash = generateSimpleHash(iris.dataUrl)
   const sideCode = side === 'left' ? 'L' : 'R'

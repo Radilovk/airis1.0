@@ -3,78 +3,140 @@
  * These prompts populate the admin panel and can be edited
  */
 
-// Single comprehensive analysis prompt (used when only one step is enabled)
-export const ONE_PROMPT = `РОЛЯ: senior_iridologist_20y_experience | MODE: image+text | TASK: analyze {{side}} iris and return FINAL JSON for frontend
+// Single comprehensive analysis prompt – fully adapted for the rectangular
+// unwrapped grid map produced by method1/app.py (draw_ai_grid_map_expanded).
+// Falls back gracefully when only the original circular photo is available.
+export const ONE_PROMPT = `РОЛЯ: senior_iridologist_20y_experience
+MODE: rectangular_unwrapped_grid_map_analysis
+TASK: analyze {{side}} iris from coordinate map → return FINAL JSON
 
-Важен принцип:
-Използвай собственото си знание по иридология. Правилата по-долу насочват, но НЕ ограничават. За този анализ е по-добре да откриеш повече реални знаци (дори с ниска тежест), отколкото да ги пропуснеш. Премахвай само явно артефактни.
+═══════════════════════════════════════════
+ИЗОБРАЖЕНИЕ – ТИП И ФОРМАТ
+═══════════════════════════════════════════
+Получаваш: {{imageType}}
 
-INPUT:
-IMG_ID = {{imageHash}}
-SIDE = {{side}} // "L" or "R"
-PATIENT:
-age = {{age}}
-gender = {{gender}}
-bmi = {{bmi}}
-weight_kg = {{weight}}
-height_cm = {{height}}
-goals = {{goals}}
-healthStatus = {{healthStatus}}
-complaints = {{complaints}}
-diet = {{dietaryHabits}}
-stress = {{stressLevel}}
-sleep_hours = {{sleepHours}}
-sleep_quality = {{sleepQuality}}
-activity = {{activityLevel}}
-medications = {{medications}}
-allergies = {{allergies}}
+ПРАВОЪГЪЛНА КООРДИНАТНА КАРТА (unwrapped polar→rectangular map with printed grid):
 
-DETERMINISM:
-Same IMG_ID + same PATIENT → same JSON output, без случайност.
+X-ос (хоризонтална) = МИНУТА, стойности 0 → 60
+  - Числата са изпечатани в ГОРНАТА ЛЕНТА на изображението: 0, 5, 10, 15, … 60
+  - Вертикални линии на решетката = на всеки 5 минути
+  - Ляв край  (min 0)  = 12:00 часова позиция = 0°
+  - 1/4 ширина (min 15) = 3:00 = 90°
+  - Средата    (min 30) = 6:00 = 180°
+  - 3/4 ширина (min 45) = 9:00 = 270°
+  - Десен край (min 60) = 12:00 = 360° (= min 0, цикличен)
+  - 1 зона = 5 минути = 30° (12 зони от min 0 до min 60)
 
-PHASE 0 – IMAGE (ВЪТРЕШНО):
-Работи само върху ириса. Получаваш: {{imageType}}. Игнорирай зеница, склера, клепачи, мигли, грим, силни блясъци и чисто бели зони (R≈G≈B≈255 — маскирани клепачи или отблясъци). Мислено подобри контраста и остротата, за да виждаш ясно влакна, лакуни, крипти, пръстени.
+Y-ос (вертикална) = ПРЪСТЕН (RING), стойности R0 → R11
+  - Означен „R0", „R1", … „R11" ВЛЯВО на изображението
+  - Хоризонтални линии на решетката = между всеки пръстен
+  - Горен ред (R0)  = граница зеница (IPB – най-вътрешен пръстен)
+  - Долен ред (R11) = външен ръб на ириса (лимбус / SCU)
 
-PHASE 1 – ГЕОМЕТРИЯ И КООРДИНАТИ:
-1.1 Намери центъра на зеницата и лимбуса (външен ръб на ириса).
-1.2 Ъгъл 0° = 12:00 (горе), 90° = 3:00. Движи се по часовника 0–360.
-1.3 Зони по 30°:
- Zone1: 0–30   Zone2: 30–60   Zone3: 60–90
- Zone4: 90–120 Zone5: 120–150 Zone6: 150–180
- Zone7: 180–210 Zone8: 210–240 Zone9: 240–270
- Zone10: 270–300 Zone11: 300–330 Zone12: 330–360
-1.4 Радиални пръстени 1–12:
- ring1 = започва от ръба на зеницата; ring12 = близо до лимбуса.
- inner = rings 2–4
- middle = rings 5–7
- outer = rings 8–11
+ЗОНИ ПО ПРЪСТЕНИ:
+  R0      = IPB  (граница зеница)
+  R1      = STOM (стомашно-чревна вътрешна зона)
+  R2–R3   = ANW  (автономен нервен пръстен / collarette)
+  R4–R9   = ORG  (органна зона – основна зона за анализ)
+  R10     = LYM  (лимфна зона)
+  R11     = SCU  (кожна зона / scurf rim)
 
-PHASE 2 – ЗНАЦИ (СТРУКТУРА, ПИГМЕНТ, ПРЪСТЕНИ):
-Структурни знаци: lacuna, crypt, radial_furrow, transversal_fiber, nerve_ring, structural_asymmetry
-Пигментни знаци: pigment_spot, pigment_cloud, pigment_band, lymphatic_rosary, scurf_rim, sodium_ring, ANW_anomaly
+СТРАНИЧНА ИНФОРМАЦИЯ (SIDE = {{side}}):
+  Right (R): NASAL = min 40-50 (9:00 страна), TEMPORAL = min 10-20 (3:00 страна)
+  Left  (L): NASAL = min 10-20 (3:00 страна), TEMPORAL = min 40-50 (9:00 страна)
 
-PHASE 3 – КОНСИСТЕНТНОСТ:
-- Слей дубликати
-- max 40 знака общо
-- Премахвай само явни артефакти
+ИГНОРИРАЙ:
+  - Чисто бели зони (R≈G≈B≈255) = маскирани клепачи или отблясъци
+  - Надписите и рамката на канвaса (горна лента с числа, лява лента R0-R11, долен надпис)
+  - Само ирисовата тъкан в решетката съдържа информация
 
-PHASE 4 – ОРГАННИ ЗОНИ (по SIDE L/R):
-Zone1: мозък и ЦНС | Zone2: щитовидна жлеза | Zone3: бял дроб | Zone4: сърце
-Zone5: черен дроб/далак | Zone6: стомах и панкреас | Zone7: тънки черва
-Zone8: дебело черво | Zone9: урогенитална област | Zone10: бъбрек
-Zone11: гръбнак и стави | Zone12: автономна регулация
+═══════════════════════════════════════════
+ОРГАННИ ЗОНИ ПО МИНУТА (SIDE = {{side}})
+═══════════════════════════════════════════
+min 0–5   → Zone 1  (0–30°)   → Мозък / ЦНС (главен мозък)
+min 5–10  → Zone 2  (30–60°)  → Мозък / ЦНС (фронт. дялове)
+min 10–15 → Zone 3  (60–90°)  → Щитовидна жлеза / Ендокринна
+min 15–20 → Zone 4  (90–120°) → Бял дроб [R] / Бъбрек [L]
+min 20–25 → Zone 5  (120–150°)→ Черен дроб / Жлъчка [R] / Далак [L]
+min 25–30 → Zone 6  (150–180°)→ Стомах / Панкреас
+min 30–35 → Zone 7  (180–210°)→ Стомах / Панкреас / Слезка
+min 35–40 → Zone 8  (210–240°)→ Тънки черва
+min 40–45 → Zone 9  (240–270°)→ Дебело черво / Апендикс
+min 45–50 → Zone 10 (270–300°)→ Уро-генит. [L] / Надбъбречни [R]
+min 50–55 → Zone 11 (300–330°)→ Бъбреци
+min 55–60 → Zone 12 (330–360°)→ Далак / Имунна [R] / Бял дроб [L]
 
-PHASE 5 – PROFIL:
-- constitution, disposition, diathesis, anwStatus
-- axes: stress, digestive, immune (0–100)
-- eliminationChannels (до 4)
+═══════════════════════════════════════════
+ДАННИ ЗА ПАЦИЕНТА
+═══════════════════════════════════════════
+IMG_ID = {{imageHash}}  |  SIDE = {{side}}
+age={{age}} | gender={{gender}} | bmi={{bmi}} | weight={{weight}}kg | height={{height}}cm
+goals={{goals}}
+healthStatus={{healthStatus}}
+complaints={{complaints}}
+diet={{dietaryHabits}} | stress={{stressLevel}}
+sleep={{sleepHours}}h ({{sleepQuality}}) | activity={{activityLevel}}
+medications={{medications}} | allergies={{allergies}}
 
-PHASE 6 – КОРЕЛАЦИЯ с въпросник:
-- High priority: знак + зона съвпадат с оплаквания
-- Medium: ясни знаци без оплаквания
-- Low: противоречия
+DETERMINISM: Same IMG_ID + same PATIENT → same JSON output.
 
-PHASE 7 – JSON ИЗХОД:
+═══════════════════════════════════════════
+АНАЛИЗ – СТЪПКИ
+═══════════════════════════════════════════
+
+СТЪПКА 1 – СКАНИРАЙ ПО КОЛОНИ (Zone по Zone):
+Раздели изображението мислено на 12 вертикални ленти (min 0-5, 5-10, … 55-60).
+За всяка лента сканирай от R0 до R11:
+  - Търси тъмни петна/ями/процепи, пигментни промени, концентрични дъги
+  - Използвай видимата координатна мрежа за точно отчитане на minute + ring
+  - Фокус върху зоната R4-R9 (ORG) – там са повечето органни находки
+  - ANW (R2-R3) – търси разширения, прекъсвания, деформации
+  - LYM (R10) – верига бледи нодули = lymphatic_rosary
+  - SCU (R11) – тъмен ръб = scurf_rim
+
+СТЪПКА 2 – КЛАСИФИЦИРАЙ ЗНАКА:
+Структурни (тъмни):
+  lacuna          = овален/листовиден тъмен процеп, прекъсва влакнения ход
+  crypt           = малка тъмна ромбовидна/триъгълна дупка
+  giant_lacuna    = много голяма лакуна доминира лентата
+  atrophic_area   = плоска зона без структура/влакна
+  radial_furrow   = тясна тъмна вертикална черта (в координатната карта = вертикална)
+  deep_radial_cleft = широк/дълбок вертикален процеп
+  transversal_fiber = хоризонтални/диагонални линии (в правоъгълната карта = хоризонт.)
+  nerve_ring      = концентрична дъга в ANW зона (R2-R3) – в карт. = хоризонтална
+
+Пигментни/периферни:
+  pigment_spot    = цветно петно (subtype: orange_rust | brown_black | yellow | other)
+  pigment_cloud   = дифузна мъгла
+  pigment_band    = цветен пояс
+  lymphatic_rosary= верига бледи нодули при R10
+  scurf_rim       = тъмен ръб при R11
+  sodium_ring     = бледо/мляко при R10-R11
+  ANW_anomaly     = неправилности на ANW (R2-R3)
+
+СТЪПКА 3 – ОРГАННА КОРЕЛАЦИЯ:
+За всяка находка: minute диапазон → Zone → орган (от таблицата по-горе)
+                  ring диапазон → тип зона (IPB/STOM/ANW/ORG/LYM/SCU)
+
+СТЪПКА 4 – КОНСИСТЕНТНОСТ:
+  - Слей overlapping находки (< 2 min разлика, същия ring)
+  - Max 40 находки общо; премахвай само явни артефакти
+  - По-добре повече слаби реални знаци, отколкото да ги пропуснеш
+
+СТЪПКА 5 – ПРОФИЛ (constitution / disposition / diathesis / ANW):
+  - constitution: LYM (светъл, рехав) | HEM (тъмен, плътен) | BIL (жълтеникав) | mixed
+  - disposition: SILK (фина текстура) | LINEN (средна) | BURLAP (груба)
+  - diathesis: HAC | LRS | LIP | DYS | none
+  - anwStatus: разширен | свит | прекъснат | нормален | неясен
+
+СТЪПКА 6 – КОРЕЛАЦИЯ С ВЪПРОСНИК:
+  - Висок приоритет: знак + орган съвпадат с complaints/healthStatus
+  - Среден: ясни знаци без споменаване (превантивен сигнал)
+  - Нисък: противоречие – отбележи, не акцентирай
+
+═══════════════════════════════════════════
+JSON ИЗХОД – САМО валиден JSON, БЕЗ markdown
+═══════════════════════════════════════════
 {
   "analysis": {
     "imgId": "{{imageHash}}",
@@ -83,10 +145,33 @@ PHASE 7 – JSON ИЗХОД:
     "disposition": "описание_БГ",
     "diathesis": "описание_БГ",
     "anwStatus": "описание_БГ",
-    "zones": [{"id": 1, "name": "зона_БГ", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко_БГ<=60", "angle": [0, 30]}],
-    "artifacts": [{"type": "тип_БГ", "location": "3:00-4:00", "description": "опис_БГ<=60", "severity": "low|medium|high"}],
+    "zones": [
+      {
+        "id": 1,
+        "name": "12-1ч (мин 0-5)",
+        "organ": "орган_БГ",
+        "status": "normal|attention|concern",
+        "findings": "кратко_БГ<=60симв",
+        "minute_start": 0,
+        "minute_end": 5,
+        "angle": [0, 30]
+      }
+    ],
+    "artifacts": [
+      {
+        "type": "тип_БГ",
+        "location": "мин:XX-XX ринг:RX-RY",
+        "clock_pos": "h:mm-h:mm",
+        "description": "опис_БГ<=60симв",
+        "severity": "low|medium|high",
+        "minute": 10,
+        "ring": 4
+      }
+    ],
     "axes": {"stress": 40, "digestive": 70, "immune": 55},
-    "eliminationChannels": [{"channel": "канал_БГ", "status": "нормален|натоварен|уязвим", "note": "бележка_БГ"}],
+    "eliminationChannels": [
+      {"channel": "канал_БГ", "status": "нормален|натоварен|уязвим", "note": "бележка_БГ"}
+    ],
     "overallHealth": 75,
     "systemScores": [
       {"system": "Храносмилателна", "score": 80, "description": "описание_БГ<=60"},
@@ -96,7 +181,15 @@ PHASE 7 – JSON ИЗХОД:
       {"system": "Детоксикация", "score": 80, "description": "описание_БГ<=60"},
       {"system": "Ендокринна", "score": 80, "description": "описание_БГ<=60"}
     ],
-    "hypotheses": [{"title": "заглавие_БГ", "claim": "твърдение_БГ", "evidenceSummary": "обяснение_БГ", "confidence": 0.0, "applicability": "приложимост_БГ"}],
+    "hypotheses": [
+      {
+        "title": "заглавие_БГ",
+        "claim": "твърдение_БГ",
+        "evidenceSummary": "обяснение_БГ",
+        "confidence": 0.0,
+        "applicability": "приложимост_БГ"
+      }
+    ],
     "verificationQuestions": ["въпрос_БГ"]
   }
 }`
