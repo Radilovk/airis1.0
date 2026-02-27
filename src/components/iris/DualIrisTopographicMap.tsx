@@ -130,12 +130,14 @@ export default function DualIrisTopographicMap({
 
     return (
       <div className="relative flex-1 min-w-0">
-        <div className="relative aspect-square rounded-xl overflow-hidden shadow-lg">
-          <img
-            src={imageUrl}
-            alt={`${side === 'left' ? 'Ляв' : 'Десен'} ирис`}
-            className="absolute inset-0 w-full h-full object-cover rounded-xl"
-          />
+        <div className="relative aspect-square rounded-xl overflow-hidden shadow-lg bg-muted/20">
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt={`${side === 'left' ? 'Ляв' : 'Десен'} ирис`}
+              className="absolute inset-0 w-full h-full object-cover rounded-xl"
+            />
+          )}
           
           <svg
             className="absolute inset-0 w-full h-full pointer-events-auto"
