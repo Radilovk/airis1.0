@@ -696,7 +696,9 @@ export async function executeV9Pipeline(
   onProgress: (step: string, progress: number) => void,
   addLog: (level: 'info' | 'success' | 'error' | 'warning', message: string) => void,
   pipelineConfig?: PipelineConfig,
-  unwrappedDataUrl?: string
+  unwrappedDataUrl?: string,
+  structureDataUrl?: string,
+  pigmentDataUrl?: string
 ): Promise<IrisAnalysis> {
   // Check if single prompt mode is configured
   if (pipelineConfig && isSinglePromptMode(pipelineConfig)) {
@@ -729,16 +731,51 @@ export async function executeV9Pipeline(
   
   const imageHash = generateSimpleHash(iris.dataUrl)
   const sideCode = side === 'left' ? 'L' : 'R'
-  // Use the unwrapped (polar→rectangular) image for detection steps when available
+  // Use the unwrapped (polar→rectangular) image for detection steps when available.
+  // When multi-stream maps are provided, each step uses its dedicated layer:
+  //   step2a (structural) → structureDataUrl  (edge-preserving detail filter)
+  //   step2b (pigment)    → pigmentDataUrl    (chroma-isolation filter)
+  // Fallback chain: dedicated stream → base unwrapped → original circular photo.
+  const anyUnwrapped = unwrappedDataUrl || structureDataUrl || pigmentDataUrl
   const detectionImageUrl = unwrappedDataUrl || iris.dataUrl
-  // imageFormat describes the visual format of the detection image for steps 2A/2B prompts
-  const imageFormat = unwrappedDataUrl
+  const structureImageUrl = structureDataUrl || detectionImageUrl
+  const pigmentImageUrl   = pigmentDataUrl   || detectionImageUrl
+
+  // Base coordinate-system description shared by both detection steps.
+  const baseGridDesc = anyUnwrapped
     ? 'unwrapped_iris_image (polar→rectangular map with printed grid: X=minute 0-60 with numbers at top, Y=ring R0-R11 with labels on left; pure white zones = masked eyelids/glare)'
     : "original_iris_image (circular photo; pupil at center, 12 o'clock at top, clockwise; use standard clock/ring coordinate system)"
-  if (unwrappedDataUrl) {
+
+  // imageFormat2A – injected into Step 2A (structural detector).
+  // When the dedicated structure layer is available, inform the AI about the preprocessing so it
+  // can correctly interpret the altered appearance and focus on the right features.
+  const imageFormat2A = structureDataUrl
+    ? `${baseGridDesc} [STRUCTURE FILTER: edge-preserving detail enhancement applied – ` +
+      `crypts, lacunae, radial furrows and transversal fibers appear darker and more sharply defined; ` +
+      `colour channels are NOT amplified – report ONLY structural features; ` +
+      `do NOT report colour/pigment findings from this layer]`
+    : baseGridDesc
+
+  // imageFormat2B – injected into Step 2B (pigment & rings detector).
+  // When the dedicated pigment layer is available, inform the AI about the chroma amplification.
+  const imageFormat2B = pigmentDataUrl
+    ? `${baseGridDesc} [PIGMENT FILTER: chroma-isolation applied – A/B colour channels amplified ×1.8 ` +
+      `relative to neutral grey; pigment_spot (orange_rust/brown_black/yellow), pigment_cloud, ` +
+      `pigment_band, lymphatic_rosary, sodium_ring and scurf_rim appear more saturated and visible; ` +
+      `structural fiber texture may appear smoother – report ONLY colour/pigment/ring findings; ` +
+      `do NOT misinterpret structure-filter artefacts as pigment deposits]`
+    : baseGridDesc
+
+  if (structureDataUrl) {
+    addLog('info', '[V9] Структурен слой (edge-preserving detail) за Step 2A')
+  }
+  if (pigmentDataUrl) {
+    addLog('info', '[V9] Пигментен слой (chroma isolation) за Step 2B')
+  }
+  if (anyUnwrapped && !structureDataUrl && !pigmentDataUrl) {
     addLog('info', '[V9] Използване на разгъната карта (method1 backend) за структурен/пигментен анализ')
   }
-  
+
   const stepResults: Record<string, any> = {}
   
   try {
@@ -761,7 +798,7 @@ export async function executeV9Pipeline(
     }
     addLog('success', `[V9] Step 1 завършен - качество: ${stepResults.step1.quality?.score0_100 || 'N/A'}/100`)
     
-    // Step 2A: Structural Detector (uses unwrapped image when available)
+    // Step 2A: Structural Detector – receives the edge-preserving structure layer
     addLog('info', '[V9] Step 2A: Структурен анализ...')
     onProgress('Структурен анализ', 30)
     
@@ -770,15 +807,15 @@ export async function executeV9Pipeline(
     const step2aPrompt = interpolatePrompt(step2aPromptTemplate, {
       side: sideCode,
       imageHash,
-      imageFormat,
+      imageFormat: imageFormat2A,
       step1_json: JSON.stringify(stepResults.step1)
     })
     
-    const step2aResponse = await callLLM(step2aPrompt, true, 2, detectionImageUrl)
+    const step2aResponse = await callLLM(step2aPrompt, true, 2, structureImageUrl)
     stepResults.step2a = JSON.parse(step2aResponse)
     addLog('success', `[V9] Step 2A завършен - ${stepResults.step2a.findings?.length || 0} структурни находки`)
     
-    // Step 2B: Pigment & Rings Detector (uses unwrapped image when available)
+    // Step 2B: Pigment & Rings Detector – receives the chroma-isolation pigment layer
     addLog('info', '[V9] Step 2B: Пигментен анализ...')
     onProgress('Пигментен анализ', 50)
     
@@ -787,11 +824,11 @@ export async function executeV9Pipeline(
     const step2bPrompt = interpolatePrompt(step2bPromptTemplate, {
       side: sideCode,
       imageHash,
-      imageFormat,
+      imageFormat: imageFormat2B,
       step1_json: JSON.stringify(stepResults.step1)
     })
     
-    const step2bResponse = await callLLM(step2bPrompt, true, 2, detectionImageUrl)
+    const step2bResponse = await callLLM(step2bPrompt, true, 2, pigmentImageUrl)
     stepResults.step2b = JSON.parse(step2bResponse)
     addLog('success', `[V9] Step 2B завършен - ${stepResults.step2b.findings?.length || 0} пигментни находки`)
     addLog('info', `[V9] Конституция: ${stepResults.step2b.global?.constitution || 'unclear'}, Диспозиция: ${stepResults.step2b.global?.disposition || 'unclear'}`)

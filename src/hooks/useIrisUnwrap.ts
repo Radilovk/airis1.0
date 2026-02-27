@@ -1,8 +1,11 @@
 import { useState, useCallback } from 'react'
 
 export interface IrisUnwrapResult {
-  overlay: string   // base64 JPEG – original image with detected circles
-  mapped: string    // base64 JPEG – unwrapped iris with minute/ring grid
+  overlay: string    // base64 JPEG – original image with detected circles
+  mapped: string     // base64 JPEG – base-equalized map (backward-compatible alias for map_base)
+  map_base: string      // base64 JPEG – illumination-corrected map (general view)
+  map_structure: string // base64 JPEG – edge-preserving detail map (crypts, grooves, nerve rings)
+  map_pigment: string   // base64 JPEG – chroma-isolation map (toxic deposits, lymph stagnation)
   found: boolean
 }
 
@@ -77,15 +80,31 @@ export function useIrisUnwrap(): UseIrisUnwrapReturn {
         if (data.R) {
           setRightResult(
             data.R.found
-              ? { overlay: data.R.overlay, mapped: data.R.mapped, found: true }
-              : { overlay: '', mapped: '', found: false }
+              ? {
+                  overlay: data.R.overlay,
+                  // `mapped` is the backward-compat alias that always equals map_base.
+                  // Older backends only send `mapped`; newer ones send all three streams.
+                  mapped: data.R.map_base || data.R.mapped || '',
+                  map_base: data.R.map_base || data.R.mapped || '',
+                  map_structure: data.R.map_structure || data.R.map_base || data.R.mapped || '',
+                  map_pigment: data.R.map_pigment || data.R.map_base || data.R.mapped || '',
+                  found: true,
+                }
+              : { overlay: '', mapped: '', map_base: '', map_structure: '', map_pigment: '', found: false }
           )
         }
         if (data.L) {
           setLeftResult(
             data.L.found
-              ? { overlay: data.L.overlay, mapped: data.L.mapped, found: true }
-              : { overlay: '', mapped: '', found: false }
+              ? {
+                  overlay: data.L.overlay,
+                  mapped: data.L.map_base || data.L.mapped || '',
+                  map_base: data.L.map_base || data.L.mapped || '',
+                  map_structure: data.L.map_structure || data.L.map_base || data.L.mapped || '',
+                  map_pigment: data.L.map_pigment || data.L.map_base || data.L.mapped || '',
+                  found: true,
+                }
+              : { overlay: '', mapped: '', map_base: '', map_structure: '', map_pigment: '', found: false }
           )
         }
       } catch (err) {

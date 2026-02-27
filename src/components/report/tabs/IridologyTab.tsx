@@ -175,7 +175,8 @@ export default function IridologyTab({ report }: IridologyTabProps) {
 
       {/* Unwrapped coordinate-system maps (minute × ring) */}
       {(report.leftIris.zones?.some(z => z.minute_start !== undefined) ||
-        report.rightIris.zones?.some(z => z.minute_start !== undefined)) && (
+        report.rightIris.zones?.some(z => z.minute_start !== undefined) ||
+        report.leftIrisMaps || report.rightIrisMaps) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -186,18 +187,51 @@ export default function IridologyTab({ report }: IridologyTabProps) {
             <Eye size={20} weight="duotone" />
             Разгъвка – Координатна Система (минута × пръстен)
           </h3>
-          <UnwrappedIrisMap
-            zones={report.leftIris.zones}
-            artifacts={report.leftIris.artifacts}
-            side="left"
-            overallHealth={report.leftIris.overallHealth}
-          />
-          <UnwrappedIrisMap
-            zones={report.rightIris.zones}
-            artifacts={report.rightIris.artifacts}
-            side="right"
-            overallHealth={report.rightIris.overallHealth}
-          />
+
+          {/* Layer switcher – only shown when multi-stream maps are available */}
+          {(report.leftIrisMaps || report.rightIrisMaps) ? (
+            <Tabs defaultValue="base" className="w-full">
+              <TabsList className="mb-2">
+                <TabsTrigger value="base">Базов (осветление)</TabsTrigger>
+                <TabsTrigger value="structure">Структурен (крипти / влакна)</TabsTrigger>
+                <TabsTrigger value="pigment">Пигментен (токсини / цвят)</TabsTrigger>
+              </TabsList>
+
+              {(['base', 'structure', 'pigment'] as const).map((layer) => (
+                <TabsContent key={layer} value={layer} className="space-y-4">
+                  <UnwrappedIrisMap
+                    mappedImageBase64={report.leftIrisMaps?.[layer] || undefined}
+                    zones={report.leftIris.zones}
+                    artifacts={report.leftIris.artifacts}
+                    side="left"
+                    overallHealth={report.leftIris.overallHealth}
+                  />
+                  <UnwrappedIrisMap
+                    mappedImageBase64={report.rightIrisMaps?.[layer] || undefined}
+                    zones={report.rightIris.zones}
+                    artifacts={report.rightIris.artifacts}
+                    side="right"
+                    overallHealth={report.rightIris.overallHealth}
+                  />
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <>
+              <UnwrappedIrisMap
+                zones={report.leftIris.zones}
+                artifacts={report.leftIris.artifacts}
+                side="left"
+                overallHealth={report.leftIris.overallHealth}
+              />
+              <UnwrappedIrisMap
+                zones={report.rightIris.zones}
+                artifacts={report.rightIris.artifacts}
+                side="right"
+                overallHealth={report.rightIris.overallHealth}
+              />
+            </>
+          )}
         </motion.div>
       )}
 

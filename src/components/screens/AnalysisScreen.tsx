@@ -743,7 +743,11 @@ ${response}
         const callLLMWrapper = async (prompt: string, jsonMode: boolean, retries: number, imageDataUrl?: string) => {
           return callLLMWithRetry(prompt, jsonMode, retries, imageDataUrl)
         }
-        
+
+        // Helper: convert a non-empty base64 map string to a data URL; returns undefined otherwise
+        const toMapDataUrl = (b64: string | undefined): string | undefined =>
+          b64 ? `data:image/jpeg;base64,${b64}` : undefined
+
         setStatus('V9 Pipeline: Анализ на ляв ирис...')
         leftAnalysis = await executeV9Pipeline(
           leftIris,
@@ -756,9 +760,9 @@ ${response}
           },
           addLog,
           finalPipelineConfig,  // Pass pipeline config from admin panel
-          leftUnwrap?.found && leftUnwrap.mapped
-            ? `data:image/jpeg;base64,${leftUnwrap.mapped}`
-            : undefined
+          leftUnwrap?.found ? toMapDataUrl(leftUnwrap.map_base || leftUnwrap.mapped) : undefined,
+          leftUnwrap?.found ? toMapDataUrl(leftUnwrap.map_structure) : undefined,
+          leftUnwrap?.found ? toMapDataUrl(leftUnwrap.map_pigment) : undefined
         )
         addLog('success', 'V9 Pipeline: Ляв ирис анализиран успешно')
         
@@ -779,9 +783,9 @@ ${response}
           },
           addLog,
           finalPipelineConfig,  // Pass pipeline config from admin panel
-          rightUnwrap?.found && rightUnwrap.mapped
-            ? `data:image/jpeg;base64,${rightUnwrap.mapped}`
-            : undefined
+          rightUnwrap?.found ? toMapDataUrl(rightUnwrap.map_base || rightUnwrap.mapped) : undefined,
+          rightUnwrap?.found ? toMapDataUrl(rightUnwrap.map_structure) : undefined,
+          rightUnwrap?.found ? toMapDataUrl(rightUnwrap.map_pigment) : undefined
         )
         addLog('success', 'V9 Pipeline: Десен ирис анализиран успешно')
         
@@ -935,7 +939,22 @@ ${response}
           psychologicalRecommendations: psychRecs,
           specialRecommendations: specialRecs,
           recommendedTests: testRecs
-        }
+        },
+        // Attach multi-stream maps when the method1 backend was available
+        ...(leftUnwrap?.found && leftUnwrap.map_base ? {
+          leftIrisMaps: {
+            base:      leftUnwrap.map_base,
+            structure: leftUnwrap.map_structure,
+            pigment:   leftUnwrap.map_pigment,
+          }
+        } : {}),
+        ...(rightUnwrap?.found && rightUnwrap.map_base ? {
+          rightIrisMaps: {
+            base:      rightUnwrap.map_base,
+            structure: rightUnwrap.map_structure,
+            pigment:   rightUnwrap.map_pigment,
+          }
+        } : {}),
       }
       
       console.log('🎉 [АНАЛИЗ] Доклад завършен успешно!')
@@ -1017,8 +1036,8 @@ GitHub Spark API има ограничения за брой заявки в м�
       // and gives the AI a normalised, scale-independent view of the iris.
       const unwrapResult = side === 'left' ? leftUnwrap : rightUnwrap
       const imageForAnalysis =
-        unwrapResult?.found && unwrapResult.mapped
-          ? `data:image/jpeg;base64,${unwrapResult.mapped}`
+        unwrapResult?.found && (unwrapResult.map_base || unwrapResult.mapped)
+          ? `data:image/jpeg;base64,${unwrapResult.map_base || unwrapResult.mapped}`
           : iris.dataUrl
 
       const usingUnwrapped = imageForAnalysis !== iris.dataUrl

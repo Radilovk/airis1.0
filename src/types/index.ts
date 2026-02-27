@@ -136,6 +136,19 @@ export interface AnalysisReport {
     specialRecommendations: string[]
     recommendedTests: string[]
   }
+  // Multi-stream iris maps from the method1 backend (optional – only present when backend is available)
+  leftIrisMaps?: IrisStreamMaps
+  rightIrisMaps?: IrisStreamMaps
+}
+
+/** Three independent filtered views of the unwrapped iris image */
+export interface IrisStreamMaps {
+  /** Illumination-corrected base map – general overview */
+  base: string
+  /** Edge-preserving structure map – crypts, grooves, nerve rings */
+  structure: string
+  /** Chroma-isolation pigment map – toxic deposits, lymph stagnation */
+  pigment: string
 }
 
 export interface SupplementRecommendation {
