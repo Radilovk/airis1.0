@@ -6,6 +6,8 @@ import type { IrisZone, Artifact } from '@/types'
 interface UnwrappedIrisMapProps {
   /** base64 JPEG from method1 backend (mapped/unwrapped image). Optional. */
   mappedImageBase64?: string | null
+  /** Original iris photo data URL used as fallback background when mappedImageBase64 is absent. */
+  originalImageUrl?: string | null
   zones?: IrisZone[]
   artifacts?: Artifact[]
   side?: 'left' | 'right'
@@ -43,10 +45,13 @@ const ARTIFACT_COLOR: Record<string, string> = {
  * drawn as small circles.
  *
  * If a `mappedImageBase64` is supplied (from the method1 Python backend) it is
- * used as the background; otherwise a plain dark background is drawn.
+ * used as the background.  When only `originalImageUrl` is supplied (no backend
+ * map available) the original iris photo is shown as a fallback background so
+ * the user always sees the actual iris rather than a blank/dark placeholder.
  */
 export default function UnwrappedIrisMap({
   mappedImageBase64,
+  originalImageUrl,
   zones = [],
   artifacts = [],
   side = 'right',
@@ -76,6 +81,8 @@ export default function UnwrappedIrisMap({
   const nasalMinute  = side === 'right' ? 45 : 15
   const temporalMinute = side === 'right' ? 15 : 45
 
+  const svgBackground = (mappedImageBase64 || originalImageUrl) ? '#111' : 'hsl(var(--muted))'
+
   return (
     <Card className="overflow-hidden">
       <div className="p-4 bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-between">
@@ -100,7 +107,7 @@ export default function UnwrappedIrisMap({
           <svg
             viewBox={`0 0 ${W} ${H}`}
             className="w-full border border-border rounded"
-            style={{ minWidth: 320, background: '#111' }}
+            style={{ minWidth: 320, background: svgBackground }}
           >
             {/* Background image from method1 backend */}
             {mappedImageBase64 && (
@@ -111,6 +118,18 @@ export default function UnwrappedIrisMap({
                 width={IW}
                 height={IH}
                 preserveAspectRatio="none"
+              />
+            )}
+
+            {/* Fallback: show original iris photo when no backend image available */}
+            {!mappedImageBase64 && originalImageUrl && (
+              <image
+                href={originalImageUrl}
+                x={PAD_LEFT}
+                y={PAD_TOP}
+                width={IW}
+                height={IH}
+                preserveAspectRatio="xMidYMid slice"
               />
             )}
 
