@@ -143,8 +143,6 @@ export interface AnalysisReport {
 
 /** Three independent filtered views of the unwrapped iris image */
 export interface IrisStreamMaps {
-  /** Original iris photo with detected pupil/iris circles drawn on it */
-  overlay?: string
   /** Illumination-corrected base map – general overview */
   base: string
   /** Edge-preserving structure map – crypts, grooves, nerve rings */
