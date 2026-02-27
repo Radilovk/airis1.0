@@ -14,11 +14,11 @@ MANUAL={{knowledgeContext}} // keys: LAT,RINGS,MINUTES,SIGNS,TRIAD
 
 КООРДИНАТНА СИСТЕМА:
 Получаваш: {{imageType}}
-При правоъгълна разгъвка: X-ос = минута (0–60), Y-ос = пръстен R0 (зеница) → R11 (ръб на ириса).
-При кръгла снимка: minute=0–60 по часовник от 12ч, ring=R0–R11 от зеницата навън.
+{{coordinateSystemDesc}}
 Всяка зона: minute_start/minute_end (0–60) и ring_start/ring_end (0–11).
 angle = [minute_start*6, minute_end*6] (спрямо 12h=0°, по часовник).
 МАСКИРАНИ ЗОНИ: Чисто белите зони (R≈G≈B≈255) = маскирани клепачи или отблясъци — НЕ ги включвай в находки.
+{{canvasIgnoreNote}}
 
 ПРОЦЕС:
 0) MANUAL ползвай САМО за: локация, тип знак, орган/система.
