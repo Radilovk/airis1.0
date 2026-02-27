@@ -104,194 +104,200 @@ export default function UnwrappedIrisMap({
 
       <div className="p-4">
         <div className="w-full overflow-x-auto">
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="w-full border border-border rounded"
-            style={{ minWidth: 320, background: svgBackground }}
-          >
-            {/* Background image from method1 backend */}
-            {mappedImageBase64 && (
-              <image
-                href={`data:image/jpeg;base64,${mappedImageBase64}`}
-                x={PAD_LEFT}
-                y={PAD_TOP}
-                width={IW}
-                height={IH}
-                preserveAspectRatio="none"
-              />
-            )}
+          {/* When the method1 backend produced a grid map, show it directly as an <img>.
+              The backend's draw_ai_grid_map_expanded() already renders the minute/ring
+              grid, axis labels, NASAL/TEMPORAL markers and all three filter layers.
+              There is no need to recreate those in SVG – just display the image as-is. */}
+          {mappedImageBase64 ? (
+            <img
+              src={`data:image/jpeg;base64,${mappedImageBase64}`}
+              alt={`${sideLabel} – разгъната карта (метод1)`}
+              className="w-full border border-border rounded"
+              style={{ imageRendering: 'auto' }}
+            />
+          ) : (
+            /* Fallback SVG used only when no backend image is available.
+               Shows the original iris photo (if provided) with a coordinate
+               grid and any AI-reported zone / artifact overlays on top. */
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              className="w-full border border-border rounded"
+              style={{ minWidth: 320, background: originalImageUrl ? '#111' : 'hsl(var(--muted))' }}
+            >
+              {/* Fallback: original iris photo as background */}
+              {originalImageUrl && (
+                <image
+                  href={originalImageUrl}
+                  x={PAD_LEFT}
+                  y={PAD_TOP}
+                  width={IW}
+                  height={IH}
+                  preserveAspectRatio="xMidYMid slice"
+                />
+              )}
 
-            {/* Fallback: show original iris photo when no backend image available */}
-            {!mappedImageBase64 && originalImageUrl && (
-              <image
-                href={originalImageUrl}
-                x={PAD_LEFT}
-                y={PAD_TOP}
-                width={IW}
-                height={IH}
-                preserveAspectRatio="xMidYMid slice"
-              />
-            )}
-
-            {/* Grid lines – rings (horizontal) */}
-            {Array.from({ length: RINGS + 1 }).map((_, r) => (
-              <line
-                key={`ring-${r}`}
-                x1={PAD_LEFT}
-                y1={ry(r)}
-                x2={PAD_LEFT + IW}
-                y2={ry(r)}
-                stroke="rgba(255,255,255,0.15)"
-                strokeWidth={r === 0 || r === RINGS ? 1.5 : 0.5}
-              />
-            ))}
-
-            {/* Grid lines – minutes (vertical) every 5 min */}
-            {Array.from({ length: 13 }).map((_, i) => {
-              const m = i * 5
-              return (
+              {/* Grid lines – rings (horizontal) */}
+              {Array.from({ length: RINGS + 1 }).map((_, r) => (
                 <line
-                  key={`min-${m}`}
-                  x1={mx(m)}
-                  y1={PAD_TOP}
-                  x2={mx(m)}
-                  y2={PAD_TOP + IH}
+                  key={`ring-${r}`}
+                  x1={PAD_LEFT}
+                  y1={ry(r)}
+                  x2={PAD_LEFT + IW}
+                  y2={ry(r)}
                   stroke="rgba(255,255,255,0.15)"
-                  strokeWidth={m === 0 || m === 60 ? 1.5 : 0.5}
+                  strokeWidth={r === 0 || r === RINGS ? 1.5 : 0.5}
                 />
-              )
-            })}
+              ))}
 
-            {/* Zone highlights */}
-            {zones.map((z) => {
-              if (
-                z.minute_start === undefined ||
-                z.minute_end   === undefined ||
-                z.ring_start   === undefined ||
-                z.ring_end     === undefined
-              ) return null
-
-              const style = STATUS_STYLE[z.status] ?? STATUS_STYLE.normal
-              const x1 = mx(z.minute_start)
-              const y1 = ry(z.ring_start)
-              const x2 = mx(z.minute_end)
-              const y2 = ry(z.ring_end + 1)  // ring_end is inclusive; +1 converts to exclusive upper bound
-
-              return (
-                <g key={`zone-${z.id}`}>
-                  <rect
-                    x={x1}
-                    y={y1}
-                    width={Math.max(1, x2 - x1)}
-                    height={Math.max(1, y2 - y1)}
-                    fill={style.fill}
-                    stroke={style.stroke}
-                    strokeWidth={1}
-                    rx={2}
+              {/* Grid lines – minutes (vertical) every 5 min */}
+              {Array.from({ length: 13 }).map((_, i) => {
+                const m = i * 5
+                return (
+                  <line
+                    key={`min-${m}`}
+                    x1={mx(m)}
+                    y1={PAD_TOP}
+                    x2={mx(m)}
+                    y2={PAD_TOP + IH}
+                    stroke="rgba(255,255,255,0.15)"
+                    strokeWidth={m === 0 || m === 60 ? 1.5 : 0.5}
                   />
-                </g>
-              )
-            })}
+                )
+              })}
 
-            {/* Artifact markers */}
-            {artifacts.map((a, idx) => {
-              if (a.minute === undefined || a.ring === undefined) return null
-              const color = ARTIFACT_COLOR[a.type.toLowerCase()] ?? '#e2e8f0'
-              return (
-                <circle
-                  key={`art-${idx}`}
-                  cx={mx(a.minute)}
-                  cy={ry(a.ring + 0.5)}
-                  r={3}
-                  fill={color}
-                  stroke="rgba(0,0,0,0.5)"
-                  strokeWidth={0.5}
-                />
-              )
-            })}
+              {/* Zone highlights */}
+              {zones.map((z) => {
+                if (
+                  z.minute_start === undefined ||
+                  z.minute_end   === undefined ||
+                  z.ring_start   === undefined ||
+                  z.ring_end     === undefined
+                ) return null
 
-            {/* Ring labels (Y axis) */}
-            {Array.from({ length: RINGS }).map((_, r) => (
-              <text
-                key={`rl-${r}`}
-                x={PAD_LEFT - 2}
-                y={ry(r) + IH / RINGS / 2 + 3}
-                fontSize={6}
-                fill="rgba(255,255,255,0.6)"
-                textAnchor="end"
-              >
-                R{r}
-              </text>
-            ))}
+                const style = STATUS_STYLE[z.status] ?? STATUS_STYLE.normal
+                const x1 = mx(z.minute_start)
+                const y1 = ry(z.ring_start)
+                const x2 = mx(z.minute_end)
+                const y2 = ry(z.ring_end + 1)
 
-            {/* Minute labels (X axis) every 5 min */}
-            {Array.from({ length: 13 }).map((_, i) => {
-              const m = i * 5
-              return (
+                return (
+                  <g key={`zone-${z.id}`}>
+                    <rect
+                      x={x1}
+                      y={y1}
+                      width={Math.max(1, x2 - x1)}
+                      height={Math.max(1, y2 - y1)}
+                      fill={style.fill}
+                      stroke={style.stroke}
+                      strokeWidth={1}
+                      rx={2}
+                    />
+                  </g>
+                )
+              })}
+
+              {/* Artifact markers */}
+              {artifacts.map((a, idx) => {
+                if (a.minute === undefined || a.ring === undefined) return null
+                const color = ARTIFACT_COLOR[a.type.toLowerCase()] ?? '#e2e8f0'
+                return (
+                  <circle
+                    key={`art-${idx}`}
+                    cx={mx(a.minute)}
+                    cy={ry(a.ring + 0.5)}
+                    r={3}
+                    fill={color}
+                    stroke="rgba(0,0,0,0.5)"
+                    strokeWidth={0.5}
+                  />
+                )
+              })}
+
+              {/* Ring labels (Y axis) */}
+              {Array.from({ length: RINGS }).map((_, r) => (
                 <text
-                  key={`ml-${m}`}
-                  x={mx(m)}
-                  y={PAD_TOP + IH + 10}
+                  key={`rl-${r}`}
+                  x={PAD_LEFT - 2}
+                  y={ry(r) + IH / RINGS / 2 + 3}
                   fontSize={6}
                   fill="rgba(255,255,255,0.6)"
-                  textAnchor="middle"
+                  textAnchor="end"
                 >
-                  {m}
+                  R{r}
                 </text>
-              )
-            })}
+              ))}
 
-            {/* NASAL / TEMPORAL labels */}
-            <text
-              x={mx(nasalMinute)}
-              y={PAD_TOP + IH + 20}
-              fontSize={6}
-              fill="#f87171"
-              textAnchor="middle"
-              fontWeight="bold"
-            >
-              NASAL
-            </text>
-            <text
-              x={mx(temporalMinute)}
-              y={PAD_TOP + IH + 20}
-              fontSize={6}
-              fill="rgba(255,255,255,0.5)"
-              textAnchor="middle"
-            >
-              TEMPORAL
-            </text>
+              {/* Minute labels (X axis) every 5 min */}
+              {Array.from({ length: 13 }).map((_, i) => {
+                const m = i * 5
+                return (
+                  <text
+                    key={`ml-${m}`}
+                    x={mx(m)}
+                    y={PAD_TOP + IH + 10}
+                    fontSize={6}
+                    fill="rgba(255,255,255,0.6)"
+                    textAnchor="middle"
+                  >
+                    {m}
+                  </text>
+                )
+              })}
 
-            {/* Axis labels */}
-            <text x={PAD_LEFT + IW / 2} y={H - 2} fontSize={7} fill="rgba(255,255,255,0.4)" textAnchor="middle">
-              минута →
-            </text>
-          </svg>
+              {/* NASAL / TEMPORAL labels */}
+              <text
+                x={mx(nasalMinute)}
+                y={PAD_TOP + IH + 20}
+                fontSize={6}
+                fill="#f87171"
+                textAnchor="middle"
+                fontWeight="bold"
+              >
+                NASAL
+              </text>
+              <text
+                x={mx(temporalMinute)}
+                y={PAD_TOP + IH + 20}
+                fontSize={6}
+                fill="rgba(255,255,255,0.5)"
+                textAnchor="middle"
+              >
+                TEMPORAL
+              </text>
+
+              {/* Axis label */}
+              <text x={PAD_LEFT + IW / 2} y={H - 2} fontSize={7} fill="rgba(255,255,255,0.4)" textAnchor="middle">
+                минута →
+              </text>
+            </svg>
+          )}
         </div>
 
-        {/* Legend */}
-        <div className="mt-3 flex flex-wrap gap-3 text-xs">
-          {Object.entries(STATUS_STYLE).map(([status, s]) => (
-            <div key={status} className="flex items-center gap-1">
-              <span
-                className="inline-block w-3 h-3 rounded border"
-                style={{ background: s.fill, borderColor: s.stroke }}
-              />
-              <span className="text-muted-foreground capitalize">
-                {status === 'normal' ? 'Норма' : status === 'attention' ? 'Внимание' : 'Притеснение'}
-              </span>
-            </div>
-          ))}
-          {Object.entries(ARTIFACT_COLOR).slice(0, 3).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-1">
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ background: color }}
-              />
-              <span className="text-muted-foreground">{type}</span>
-            </div>
-          ))}
-        </div>
+        {/* Legend – only shown in SVG fallback mode (backend image has its own legend) */}
+        {!mappedImageBase64 && (
+          <div className="mt-3 flex flex-wrap gap-3 text-xs">
+            {Object.entries(STATUS_STYLE).map(([status, s]) => (
+              <div key={status} className="flex items-center gap-1">
+                <span
+                  className="inline-block w-3 h-3 rounded border"
+                  style={{ background: s.fill, borderColor: s.stroke }}
+                />
+                <span className="text-muted-foreground capitalize">
+                  {status === 'normal' ? 'Норма' : status === 'attention' ? 'Внимание' : 'Притеснение'}
+                </span>
+              </div>
+            ))}
+            {Object.entries(ARTIFACT_COLOR).slice(0, 3).map(([type, color]) => (
+              <div key={type} className="flex items-center gap-1">
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ background: color }}
+                />
+                <span className="text-muted-foreground">{type}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Card>
   )

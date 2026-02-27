@@ -943,6 +943,7 @@ ${response}
         // Attach multi-stream maps when the method1 backend was available
         ...(leftUnwrap?.found && leftUnwrap.map_base ? {
           leftIrisMaps: {
+            overlay:   leftUnwrap.overlay,
             base:      leftUnwrap.map_base,
             structure: leftUnwrap.map_structure,
             pigment:   leftUnwrap.map_pigment,
@@ -950,6 +951,7 @@ ${response}
         } : {}),
         ...(rightUnwrap?.found && rightUnwrap.map_base ? {
           rightIrisMaps: {
+            overlay:   rightUnwrap.overlay,
             base:      rightUnwrap.map_base,
             structure: rightUnwrap.map_structure,
             pigment:   rightUnwrap.map_pigment,
