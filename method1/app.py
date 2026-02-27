@@ -4,6 +4,41 @@ import numpy as np
 import base64
 from flask import Flask, request, jsonify, render_template
 
+# ==========================================
+# 0. MULTI-STREAM IRIS FILTERS
+# ==========================================
+def filter_base_equalized(unwrapped_bgr):
+    """Base layer: illumination correction only (CLAHE on L channel in LAB).
+    Cleans lighting/flash shadows without altering structure or colour."""
+    lab = cv2.cvtColor(unwrapped_bgr, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+    l_eq = clahe.apply(l)
+    return cv2.cvtColor(cv2.merge((l_eq, a, b)), cv2.COLOR_LAB2BGR)
+
+
+def filter_structure_detail(unwrapped_bgr):
+    """Structure layer: edge-preserving detail enhancement.
+    Highlights crypts, radial grooves and nerve rings without
+    creating haloes or destroying colour information."""
+    enhanced = cv2.detailEnhance(unwrapped_bgr, sigma_s=10, sigma_r=0.15)
+    gaussian = cv2.GaussianBlur(enhanced, (0, 0), 2.0)
+    structure = cv2.addWeighted(enhanced, 1.5, gaussian, -0.5, 0)
+    return structure
+
+
+def filter_pigment_isolation(unwrapped_bgr):
+    """Pigment layer: chroma isolation (A and B channels amplified in LAB).
+    Reveals toxic deposits, drug zones and lymphatic stagnation even in
+    very dark irides.  Brightness (L) is kept unchanged."""
+    lab = cv2.cvtColor(unwrapped_bgr, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    a_float = a.astype(np.float32) - 128
+    b_float = b.astype(np.float32) - 128
+    a_enhanced = np.clip((a_float * 1.8) + 128, 0, 255).astype(np.uint8)
+    b_enhanced = np.clip((b_float * 1.8) + 128, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(cv2.merge((l, a_enhanced, b_enhanced)), cv2.COLOR_LAB2BGR)
+
 app = Flask(__name__)
 
 # Output resolution for the unwrapped iris image.
@@ -396,12 +431,26 @@ def process():
             gray_m = cv2.cvtColor(unw_mask, cv2.COLOR_BGR2GRAY)
             unw[gray_m < 100] = (255, 255, 255)
 
-            mapped = draw_ai_grid_map_expanded(unw, side=sc)
+            # Generate three independent filtered streams
+            unw_base      = filter_base_equalized(unw)
+            unw_structure = filter_structure_detail(unw)
+            unw_pigment   = filter_pigment_isolation(unw)
 
-            b_ovl = base64.b64encode(cv2.imencode('.jpg', ovl, [cv2.IMWRITE_JPEG_QUALITY, 95])[1]).decode()
-            b_map = base64.b64encode(cv2.imencode('.jpg', mapped, [cv2.IMWRITE_JPEG_QUALITY, 95])[1]).decode()
+            def encode(img):
+                return base64.b64encode(cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 95])[1]).decode()
 
-            results[sc] = {'found': True, 'overlay': b_ovl, 'mapped': b_map}
+            b_ovl = encode(ovl)
+
+            results[sc] = {
+                'found': True,
+                'overlay': b_ovl,
+                # Multi-stream maps
+                'map_base':      encode(draw_ai_grid_map_expanded(unw_base,      side=sc)),
+                'map_structure': encode(draw_ai_grid_map_expanded(unw_structure, side=sc)),
+                'map_pigment':   encode(draw_ai_grid_map_expanded(unw_pigment,   side=sc)),
+                # Backward-compatible alias
+                'mapped': encode(draw_ai_grid_map_expanded(unw_base, side=sc)),
+            }
         else:
             results[sc] = {'found': False, 'error': 'Pupil not found'}
 
