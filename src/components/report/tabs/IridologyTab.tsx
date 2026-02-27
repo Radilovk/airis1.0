@@ -154,10 +154,6 @@ export default function IridologyTab({ report }: IridologyTabProps) {
         </Card>
       </motion.div>
       
-      {/* Overlay images produced by method1/app.py (detected pupil + iris circles drawn
-          on the original photo).  When available, show them instead of the SVG arc map
-          which tries to imitate the round iris but has no access to the actual pixel data.
-          Fall back to the SVG DualIrisTopographicMap only when the backend was not used. */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -166,41 +162,14 @@ export default function IridologyTab({ report }: IridologyTabProps) {
         <Card className="p-6">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-primary">
             <Eye size={20} weight="duotone" />
-            {report.leftIrisMaps?.overlay || report.rightIrisMaps?.overlay
-              ? 'Детекция на окръжности'
-              : 'Интерактивна Топографска Карта'}
+            Интерактивна Топографска Карта
           </h3>
-          {report.leftIrisMaps?.overlay || report.rightIrisMaps?.overlay ? (
-            <div className="flex flex-col lg:flex-row gap-4">
-              {report.leftIrisMaps?.overlay && (
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Ляв Ирис</p>
-                  <img
-                    src={`data:image/jpeg;base64,${report.leftIrisMaps.overlay}`}
-                    alt="Ляв ирис – overlay с разпознати окръжности"
-                    className="w-full rounded border border-border"
-                  />
-                </div>
-              )}
-              {report.rightIrisMaps?.overlay && (
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Десен Ирис</p>
-                  <img
-                    src={`data:image/jpeg;base64,${report.rightIrisMaps.overlay}`}
-                    alt="Десен ирис – overlay с разпознати окръжности"
-                    className="w-full rounded border border-border"
-                  />
-                </div>
-              )}
-            </div>
-          ) : (
-            <DualIrisTopographicMap
-              leftIris={report.leftIris}
-              rightIris={report.rightIris}
-              leftImageUrl={report.leftIrisImage.dataUrl}
-              rightImageUrl={report.rightIrisImage.dataUrl}
-            />
-          )}
+          <DualIrisTopographicMap
+            leftIris={report.leftIris}
+            rightIris={report.rightIris}
+            leftImageUrl={report.leftIrisImage.dataUrl}
+            rightImageUrl={report.rightIrisImage.dataUrl}
+          />
         </Card>
       </motion.div>
 
