@@ -313,13 +313,23 @@ def segment_eyelids_ransac(img, cx, cy, ir,
 def unwrap_iris_fast(img, px, py, pr, ir):
     h_out, w_out = UNWRAP_HEIGHT, UNWRAP_WIDTH
 
-    theta = np.linspace(-np.pi/2, 1.5*np.pi, w_out).astype(np.float32)
+    # theta goes from 0 → 2π (one full 360° revolution), endpoint=False so
+    # all w_out columns are unique and col 0 does NOT duplicate at col w_out-1.
+    # Mapping (clockwise from 12 o'clock):
+    #   column 0          → minute  0  = 12 o'clock (top)
+    #   column w_out // 4 → minute 15  =  3 o'clock (right)
+    #   column w_out // 2 → minute 30  =  6 o'clock (bottom)
+    #   column 3*w_out//4 → minute 45  =  9 o'clock (left)
+    # Using: map_x = px + r·sin(θ),  map_y = py − r·cos(θ)
+    # which is equivalent to rotating the standard polar convention by −π/2
+    # so that θ=0 points upward (12 o'clock) instead of rightward.
+    theta = np.linspace(0, 2 * np.pi, w_out, endpoint=False).astype(np.float32)
     r_vals = np.linspace(pr, ir, h_out).astype(np.float32)
 
     theta_grid, r_grid = np.meshgrid(theta, r_vals)
 
-    map_x = (px + r_grid * np.cos(theta_grid)).astype(np.float32)
-    map_y = (py + r_grid * np.sin(theta_grid)).astype(np.float32)
+    map_x = (px + r_grid * np.sin(theta_grid)).astype(np.float32)
+    map_y = (py - r_grid * np.cos(theta_grid)).astype(np.float32)
 
     unwrapped = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
     return unwrapped
