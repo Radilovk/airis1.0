@@ -353,8 +353,8 @@ def draw_ai_grid_map_expanded(unwrapped, side="R"):
         cv2.line(canvas, (x, pt), (x, pt+img_h), c_grid, 1)
         cv2.line(canvas, (x, pt-5), (x, pt), c_txt, 1)
         txt = f"{m}"
-        (tw, th), _ = cv2.getTextSize(txt, font, 0.4, 1)
-        cv2.putText(canvas, txt, (x - tw//2, pt - 10), font, 0.4, c_txt, 1)
+        (tw, th), _ = cv2.getTextSize(txt, font, 0.6, 1)
+        cv2.putText(canvas, txt, (x - tw//2, pt - 8), font, 0.6, c_txt, 1)
 
     # rings
     for r in range(12):

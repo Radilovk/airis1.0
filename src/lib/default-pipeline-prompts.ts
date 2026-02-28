@@ -242,6 +242,15 @@ INPUT: {{imageFormat}}
 SIDE: {{side}}
 GEO: {{step1_json}}
 
+COORDINATE_READING:
+- If INPUT contains "polar→rectangular" (unwrapped map):
+  X-axis = minute column (0-60); use the numbers printed at the TOP of the image.
+  Y-axis = ring row (R0 at top = pupil boundary … R11 at bottom = limbus); use labels on LEFT.
+  Locate each feature by the grid column (minute) and grid row (ring) it occupies.
+  Report minuteRange=[colStart,colEnd] and ringRange=[rowStart,rowEnd] from the visible gridlines.
+  In this layout: radial_furrow appears as a VERTICAL dark stripe; transversal_fiber as HORIZONTAL.
+- If INPUT is original circular photo: infer minute/ring from GEO calibration below.
+
 PREREQ:
 - If GEO.ok != true: return error JSON.
 
@@ -263,6 +272,7 @@ DETECT (STRUCTURAL):
 - structural_asymmetry: strong structural difference between sectors
 
 OUTPUT_JSON ONLY:
+{
   "imgId":"{{imageHash}}",
   "side":"{{side}}",
   "findings":[
@@ -287,6 +297,15 @@ MODE: image_parse_only
 INPUT: {{imageFormat}}
 SIDE: {{side}}
 GEO: {{step1_json}}
+
+COORDINATE_READING:
+- If INPUT contains "polar→rectangular" (unwrapped map):
+  X-axis = minute column (0-60); use the numbers printed at the TOP of the image.
+  Y-axis = ring row (R0 at top = pupil boundary … R11 at bottom = limbus); use labels on LEFT.
+  Locate each feature by the grid column (minute) and grid row (ring) it occupies.
+  Report minuteRange=[colStart,colEnd] and ringRange=[rowStart,rowEnd] from the visible gridlines.
+  In this layout: nerve_rings appear as HORIZONTAL bands; lymphatic_rosary as a row of pale dots near R10.
+- If INPUT is original circular photo: infer minute/ring from GEO calibration below.
 
 PREREQ:
 - If GEO.ok != true: return error JSON.

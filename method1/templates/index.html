@@ -15,20 +15,27 @@
         h2 { border-bottom: 2px solid #555; padding-bottom: 10px; color: #fff; }
         img { max-width: 100%; border: 1px solid #555; margin-top: 10px; display: none; }
         .label { font-weight: bold; color: #aaa; margin-top: 15px; display: block; }
+        .stream-tabs { display: flex; gap: 6px; margin-top: 12px; }
+        .stream-tab { padding: 5px 12px; background: #444; color: #bbb; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .stream-tab.active { background: #007bff; color: #fff; border-color: #007bff; }
+        .stream-tab:focus-visible { outline: 2px solid #80bdff; outline-offset: 2px; }
+        .stream-panel { display: none; }
+        .stream-panel.active { display: block; }
+        .stream-note { font-size: 11px; color: #888; margin-top: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Iridology AI Mapper</h1>
-        
+
         <div class="controls">
             <div class="file-group">
                 <label>ДЯСНО ОКО (Right):</label>
-                <input type="file" id="fileR">
+                <input type="file" id="fileR" accept="image/*">
             </div>
             <div class="file-group">
                 <label>ЛЯВО ОКО (Left):</label>
-                <input type="file" id="fileL">
+                <input type="file" id="fileL" accept="image/*">
             </div>
             <button class="btn" onclick="analyze()">АНАЛИЗИРАЙ</button>
         </div>
@@ -36,59 +43,137 @@
         <div id="status" style="margin-bottom: 10px; color: yellow;"></div>
 
         <div class="results-grid">
+            <!-- RIGHT EYE -->
             <div class="eye-column">
                 <h2>RIGHT EYE</h2>
-                <span class="label">Детекция:</span>
-                <img id="ovlR">
-                <span class="label">Карта (Външни координати):</span>
-                <img id="mapR">
+                <span class="label">Детекция (зеница + лимб):</span>
+                <img id="ovlR" alt="Right eye detection overlay">
+
+                <span class="label">Разгъната карта – изберете слой:</span>
+                <p class="stream-note">
+                    X ос (0–60 мин) = ъгъл по часовник от 12:00 · Y ос (R0–R11) = радиус от зеница навън
+                </p>
+                <div class="stream-tabs" role="tablist">
+                    <button class="stream-tab active" role="tab" aria-selected="true" aria-controls="panelR_base" id="tabR_base" onclick="switchTab('R','base',this)">Base</button>
+                    <button class="stream-tab" role="tab" aria-selected="false" aria-controls="panelR_structure" id="tabR_structure" onclick="switchTab('R','structure',this)">Structure</button>
+                    <button class="stream-tab" role="tab" aria-selected="false" aria-controls="panelR_pigment" id="tabR_pigment" onclick="switchTab('R','pigment',this)">Pigment</button>
+                </div>
+                <div id="panelR_base" class="stream-panel active" role="tabpanel" aria-labelledby="tabR_base">
+                    <img id="mapR_base" alt="Right eye base map">
+                    <p class="stream-note">Base – корекция на осветеността (CLAHE). Обща прегледност.</p>
+                </div>
+                <div id="panelR_structure" class="stream-panel" role="tabpanel" aria-labelledby="tabR_structure">
+                    <img id="mapR_structure" alt="Right eye structure map">
+                    <p class="stream-note">Structure – edge-preserving детайл. Крипти, бразди, нервни пръстени.</p>
+                </div>
+                <div id="panelR_pigment" class="stream-panel" role="tabpanel" aria-labelledby="tabR_pigment">
+                    <img id="mapR_pigment" alt="Right eye pigment map">
+                    <p class="stream-note">Pigment – хрома изолация (A/B ×1.8). Токсични депозити, лимфна стагнация.</p>
+                </div>
             </div>
+
+            <!-- LEFT EYE -->
             <div class="eye-column">
                 <h2>LEFT EYE</h2>
-                <span class="label">Детекция:</span>
-                <img id="ovlL">
-                <span class="label">Карта (Външни координати):</span>
-                <img id="mapL">
+                <span class="label">Детекция (зеница + лимб):</span>
+                <img id="ovlL" alt="Left eye detection overlay">
+
+                <span class="label">Разгъната карта – изберете слой:</span>
+                <p class="stream-note">
+                    X ос (0–60 мин) = ъгъл по часовник от 12:00 · Y ос (R0–R11) = радиус от зеница навън
+                </p>
+                <div class="stream-tabs" role="tablist">
+                    <button class="stream-tab active" role="tab" aria-selected="true" aria-controls="panelL_base" id="tabL_base" onclick="switchTab('L','base',this)">Base</button>
+                    <button class="stream-tab" role="tab" aria-selected="false" aria-controls="panelL_structure" id="tabL_structure" onclick="switchTab('L','structure',this)">Structure</button>
+                    <button class="stream-tab" role="tab" aria-selected="false" aria-controls="panelL_pigment" id="tabL_pigment" onclick="switchTab('L','pigment',this)">Pigment</button>
+                </div>
+                <div id="panelL_base" class="stream-panel active" role="tabpanel" aria-labelledby="tabL_base">
+                    <img id="mapL_base" alt="Left eye base map">
+                    <p class="stream-note">Base – корекция на осветеността (CLAHE). Обща прегледност.</p>
+                </div>
+                <div id="panelL_structure" class="stream-panel" role="tabpanel" aria-labelledby="tabL_structure">
+                    <img id="mapL_structure" alt="Left eye structure map">
+                    <p class="stream-note">Structure – edge-preserving детайл. Крипти, бразди, нервни пръстени.</p>
+                </div>
+                <div id="panelL_pigment" class="stream-panel" role="tabpanel" aria-labelledby="tabL_pigment">
+                    <img id="mapL_pigment" alt="Left eye pigment map">
+                    <p class="stream-note">Pigment – хрома изолация (A/B ×1.8). Токсични депозити, лимфна стагнация.</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Switch visible stream panel for a given eye side
+        function switchTab(side, stream, btn) {
+            ['base', 'structure', 'pigment'].forEach(s => {
+                const panel = document.getElementById('panel' + side + '_' + s);
+                if (panel) panel.classList.remove('active');
+                const tab = document.getElementById('tab' + side + '_' + s);
+                if (tab) { tab.classList.remove('active'); tab.setAttribute('aria-selected', 'false'); }
+            });
+            const activePanel = document.getElementById('panel' + side + '_' + stream);
+            if (activePanel) activePanel.classList.add('active');
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+        }
+
+        // Show result images for one eye side from the /process JSON response
+        function showEyeResults(side, d) {
+            if (!d || !d.found) return;
+
+            const prefix = 'data:image/jpeg;base64,';
+
+            // Detection overlay
+            const ovl = document.getElementById('ovl' + side);
+            if (ovl && d.overlay) {
+                ovl.src = prefix + d.overlay;
+                ovl.style.display = 'block';
+            }
+
+            // Multi-stream maps – prefer dedicated stream; fall back to map_base / mapped
+            const base      = d.map_base      || d.mapped || '';
+            const structure = d.map_structure || base;
+            const pigment   = d.map_pigment   || base;
+
+            const setMap = (id, b64) => {
+                const el = document.getElementById(id);
+                if (el && b64) {
+                    el.src = prefix + b64;
+                    el.style.display = 'block';
+                }
+            };
+
+            setMap('map' + side + '_base',      base);
+            setMap('map' + side + '_structure', structure);
+            setMap('map' + side + '_pigment',   pigment);
+        }
+
         async function analyze() {
             const fR = document.getElementById('fileR').files[0];
             const fL = document.getElementById('fileL').files[0];
-            
-            if(!fR && !fL) {
+
+            if (!fR && !fL) {
                 alert("Моля изберете поне една снимка!");
                 return;
             }
 
             const fd = new FormData();
-            if(fR) fd.append('image_right', fR);
-            if(fL) fd.append('image_left', fL);
+            if (fR) fd.append('image_right', fR);
+            if (fL) fd.append('image_left', fL);
 
             document.getElementById('status').innerText = "Обработка...";
-            
+
             try {
                 const res = await fetch('/process', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
-                
-                const show = (side, d) => {
-                    if(d && d.found) {
-                        const ovl = document.getElementById('ovl' + side);
-                        const map = document.getElementById('map' + side);
-                        ovl.src = 'data:image/jpeg;base64,' + d.overlay;
-                        map.src = 'data:image/jpeg;base64,' + d.mapped;
-                        ovl.style.display = 'block';
-                        map.style.display = 'block';
-                    }
-                };
 
-                show('R', data.R);
-                show('L', data.L);
-                
+                showEyeResults('R', data.R);
+                showEyeResults('L', data.L);
+
                 document.getElementById('status').innerText = "Готово.";
-            } catch(e) {
+            } catch (e) {
                 document.getElementById('status').innerText = "Грешка: " + e.message;
             }
         }

@@ -9,8 +9,13 @@ export interface IrisUnwrapResult {
   found: boolean
 }
 
+export interface IrisUnwrapResults {
+  left: IrisUnwrapResult | null
+  right: IrisUnwrapResult | null
+}
+
 export interface UseIrisUnwrapReturn {
-  unwrapImages: (leftDataUrl: string | null, rightDataUrl: string | null) => Promise<void>
+  unwrapImages: (leftDataUrl: string | null, rightDataUrl: string | null) => Promise<IrisUnwrapResults>
   leftResult: IrisUnwrapResult | null
   rightResult: IrisUnwrapResult | null
   isLoading: boolean
@@ -42,9 +47,10 @@ export function useIrisUnwrap(): UseIrisUnwrapReturn {
   const backendAvailable = BACKEND_URL.length > 0
 
   const unwrapImages = useCallback(
-    async (leftDataUrl: string | null, rightDataUrl: string | null) => {
-      if (!backendAvailable) return
-      if (!leftDataUrl && !rightDataUrl) return
+    async (leftDataUrl: string | null, rightDataUrl: string | null): Promise<IrisUnwrapResults> => {
+      const empty: IrisUnwrapResults = { left: null, right: null }
+      if (!backendAvailable) return empty
+      if (!leftDataUrl && !rightDataUrl) return empty
 
       setIsLoading(true)
       setError(null)
@@ -77,38 +83,42 @@ export function useIrisUnwrap(): UseIrisUnwrapReturn {
 
         const data = await response.json()
 
+        let rightRes: IrisUnwrapResult | null = null
+        let leftRes: IrisUnwrapResult | null = null
+
         if (data.R) {
-          setRightResult(
-            data.R.found
-              ? {
-                  overlay: data.R.overlay,
-                  // `mapped` is the backward-compat alias that always equals map_base.
-                  // Older backends only send `mapped`; newer ones send all three streams.
-                  mapped: data.R.map_base || data.R.mapped || '',
-                  map_base: data.R.map_base || data.R.mapped || '',
-                  map_structure: data.R.map_structure || data.R.map_base || data.R.mapped || '',
-                  map_pigment: data.R.map_pigment || data.R.map_base || data.R.mapped || '',
-                  found: true,
-                }
-              : { overlay: '', mapped: '', map_base: '', map_structure: '', map_pigment: '', found: false }
-          )
+          rightRes = data.R.found
+            ? {
+                overlay: data.R.overlay,
+                // `mapped` is the backward-compat alias that always equals map_base.
+                // Older backends only send `mapped`; newer ones send all three streams.
+                mapped: data.R.map_base || data.R.mapped || '',
+                map_base: data.R.map_base || data.R.mapped || '',
+                map_structure: data.R.map_structure || data.R.map_base || data.R.mapped || '',
+                map_pigment: data.R.map_pigment || data.R.map_base || data.R.mapped || '',
+                found: true,
+              }
+            : { overlay: '', mapped: '', map_base: '', map_structure: '', map_pigment: '', found: false }
+          setRightResult(rightRes)
         }
         if (data.L) {
-          setLeftResult(
-            data.L.found
-              ? {
-                  overlay: data.L.overlay,
-                  mapped: data.L.map_base || data.L.mapped || '',
-                  map_base: data.L.map_base || data.L.mapped || '',
-                  map_structure: data.L.map_structure || data.L.map_base || data.L.mapped || '',
-                  map_pigment: data.L.map_pigment || data.L.map_base || data.L.mapped || '',
-                  found: true,
-                }
-              : { overlay: '', mapped: '', map_base: '', map_structure: '', map_pigment: '', found: false }
-          )
+          leftRes = data.L.found
+            ? {
+                overlay: data.L.overlay,
+                mapped: data.L.map_base || data.L.mapped || '',
+                map_base: data.L.map_base || data.L.mapped || '',
+                map_structure: data.L.map_structure || data.L.map_base || data.L.mapped || '',
+                map_pigment: data.L.map_pigment || data.L.map_base || data.L.mapped || '',
+                found: true,
+              }
+            : { overlay: '', mapped: '', map_base: '', map_structure: '', map_pigment: '', found: false }
+          setLeftResult(leftRes)
         }
+
+        return { left: leftRes, right: rightRes }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
+        return { left: null, right: null }
       } finally {
         setIsLoading(false)
       }
