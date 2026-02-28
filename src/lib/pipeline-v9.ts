@@ -252,10 +252,10 @@ OUTPUT_JSON ONLY:
 {
   "analysis": {
     "zones": [
-      {"id": 1, "name": "12-1ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [0, 30]}
+      {"id": 1, "name": "12-1ч", "organ": "орган_БГ", "status": "normal|attention|concern", "findings": "кратко<=60", "angle": [0, 30], "minute_start": 0, "minute_end": 5}
     ],
     "artifacts": [
-      {"type": "тип_БГ", "location": "3:00-4:00", "description": "опис<=60", "severity": "low|medium|high"}
+      {"type": "тип_БГ", "location": "мин:XX-XX ринг:RX-RY", "description": "опис<=60", "severity": "low|medium|high", "minute": 5, "ring": 4}
     ],
     "overallHealth": 75,
     "systemScores": [
@@ -851,23 +851,89 @@ export async function executeV9Pipeline(
     addLog('success', `[V9] Step 2B завършен - ${stepResults.step2b.findings?.length || 0} пигментни находки`)
     addLog('info', `[V9] Конституция: ${stepResults.step2b.global?.constitution || 'unclear'}, Диспозиция: ${stepResults.step2b.global?.disposition || 'unclear'}`)
     
-    // Map findings to zones and artifacts
-    onProgress('Съставяне на резултати', 80)
-    
-    const zones = mapFindingsToZones(stepResults.step1, stepResults.step2a, stepResults.step2b, side)
-    const artifacts = convertToArtifacts(stepResults.step2a, stepResults.step2b)
-    const systemScores = calculateSystemScores(zones)
-    
-    // Calculate overall health score
-    const avgSystemScore = systemScores.reduce((sum: number, s: any) => sum + s.score, 0) / systemScores.length
-    const concernZones = zones.filter((z: any) => z.status === 'concern').length
-    const attentionZones = zones.filter((z: any) => z.status === 'attention').length
-    
-    let overallHealth = Math.round(avgSystemScore)
-    overallHealth -= concernZones * 5
-    overallHealth -= attentionZones * 2
-    overallHealth = Math.max(30, Math.min(100, overallHealth))
-    
+    // Step 5: Frontend Report – medical interpretation + questionnaire correlation
+    // This LLM call produces proper Bulgarian clinical zone findings, organ names,
+    // system scores, and correlates iris signs with the patient questionnaire.
+    addLog('info', '[V9] Step 5: Медицинска интерпретация и корелация с въпросника...')
+    onProgress('Медицинска интерпретация', 70)
+
+    const genderNameBG = questionnaire.gender === 'male' ? 'мъж' : questionnaire.gender === 'female' ? 'жена' : 'друго'
+    const questionnaireBMI = (questionnaire.weight / ((questionnaire.height / 100) ** 2)).toFixed(1)
+    const step5PromptTemplate = getStepPrompt('step5_frontend_report', pipelineConfig)
+    const step5Prompt = interpolatePrompt(step5PromptTemplate, {
+      side: sideCode,
+      imageHash,
+      step1_json: JSON.stringify(stepResults.step1),
+      step2a_json: JSON.stringify(stepResults.step2a),
+      step2b_json: JSON.stringify(stepResults.step2b),
+      questionnaire: JSON.stringify({
+        age: questionnaire.age,
+        gender: genderNameBG,
+        bmi: questionnaireBMI,
+        weight: questionnaire.weight,
+        height: questionnaire.height,
+        goals: questionnaire.goals,
+        healthStatus: questionnaire.healthStatus,
+        complaints: questionnaire.complaints,
+        dietaryHabits: questionnaire.dietaryHabits,
+        stressLevel: questionnaire.stressLevel,
+        sleepHours: questionnaire.sleepHours,
+        sleepQuality: questionnaire.sleepQuality,
+        activityLevel: questionnaire.activityLevel,
+        medications: questionnaire.medications,
+        allergies: questionnaire.allergies
+      })
+    })
+
+    let zones: any[]
+    let artifacts: any[]
+    let systemScores: any[]
+    let overallHealth: number
+
+    try {
+      const step5Response = await callLLM(step5Prompt, true, 2)
+      let step5Cleaned = step5Response.trim()
+      if (step5Cleaned.includes('```json')) {
+        step5Cleaned = step5Cleaned.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      } else if (step5Cleaned.includes('```')) {
+        step5Cleaned = step5Cleaned.replace(/```\s*/g, '').trim()
+      }
+      stepResults.step5 = JSON.parse(step5Cleaned)
+      addLog('success', `[V9] Step 5 завършен – медицинска интерпретация готова`)
+
+      const analysisData = stepResults.step5?.analysis ?? stepResults.step5
+      zones = Array.isArray(analysisData?.zones) && analysisData.zones.length > 0
+        ? analysisData.zones
+        : mapFindingsToZones(stepResults.step1, stepResults.step2a, stepResults.step2b, side)
+      artifacts = Array.isArray(analysisData?.artifacts)
+        ? analysisData.artifacts
+        : convertToArtifacts(stepResults.step2a, stepResults.step2b)
+      systemScores = Array.isArray(analysisData?.systemScores) && analysisData.systemScores.length > 0
+        ? analysisData.systemScores
+        : calculateSystemScores(zones)
+      overallHealth = typeof analysisData?.overallHealth === 'number'
+        ? Math.max(30, Math.min(100, analysisData.overallHealth))
+        : (() => {
+            if (systemScores.length === 0) return 70
+            const avg = systemScores.reduce((s: number, sc: any) => s + sc.score, 0) / systemScores.length
+            const nc = zones.filter((z: any) => z.status === 'concern').length
+            const na = zones.filter((z: any) => z.status === 'attention').length
+            return Math.max(30, Math.min(100, Math.round(avg) - nc * 5 - na * 2))
+          })()
+    } catch (step5Error) {
+      addLog('warning', `[V9] Step 5 не успя, резервен JS маппинг: ${step5Error instanceof Error ? step5Error.message : String(step5Error)}`)
+      zones = mapFindingsToZones(stepResults.step1, stepResults.step2a, stepResults.step2b, side)
+      artifacts = convertToArtifacts(stepResults.step2a, stepResults.step2b)
+      systemScores = calculateSystemScores(zones)
+      const avgSystemScore = systemScores.length > 0
+        ? systemScores.reduce((sum: number, s: any) => sum + s.score, 0) / systemScores.length
+        : 70
+      const concernZones = zones.filter((z: any) => z.status === 'concern').length
+      const attentionZones = zones.filter((z: any) => z.status === 'attention').length
+      overallHealth = Math.max(30, Math.min(100, Math.round(avgSystemScore) - concernZones * 5 - attentionZones * 2))
+    }
+
+    onProgress('Завършване', 90)
     addLog('success', `[V9] Pipeline завършен за ${side === 'left' ? 'ляв' : 'десен'} ирис`)
     addLog('info', `[V9] Резултат: ${zones.length} зони, ${artifacts.length} артефакти, здраве: ${overallHealth}/100`)
     

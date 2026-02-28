@@ -201,7 +201,6 @@ export default function IridologyTab({ report }: IridologyTabProps) {
                 <TabsContent key={layer} value={layer} className="space-y-4">
                   <UnwrappedIrisMap
                     mappedImageBase64={report.leftIrisMaps?.[layer] || undefined}
-                    originalImageUrl={report.leftIrisImage.dataUrl || undefined}
                     zones={report.leftIris.zones}
                     artifacts={report.leftIris.artifacts}
                     side="left"
@@ -209,7 +208,6 @@ export default function IridologyTab({ report }: IridologyTabProps) {
                   />
                   <UnwrappedIrisMap
                     mappedImageBase64={report.rightIrisMaps?.[layer] || undefined}
-                    originalImageUrl={report.rightIrisImage.dataUrl || undefined}
                     zones={report.rightIris.zones}
                     artifacts={report.rightIris.artifacts}
                     side="right"
@@ -221,14 +219,12 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           ) : (
             <>
               <UnwrappedIrisMap
-                originalImageUrl={report.leftIrisImage.dataUrl || undefined}
                 zones={report.leftIris.zones}
                 artifacts={report.leftIris.artifacts}
                 side="left"
                 overallHealth={report.leftIris.overallHealth}
               />
               <UnwrappedIrisMap
-                originalImageUrl={report.rightIrisImage.dataUrl || undefined}
                 zones={report.rightIris.zones}
                 artifacts={report.rightIris.artifacts}
                 side="right"
