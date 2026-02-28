@@ -272,6 +272,7 @@ DETECT (STRUCTURAL):
 - structural_asymmetry: strong structural difference between sectors
 
 OUTPUT_JSON ONLY:
+{
   "imgId":"{{imageHash}}",
   "side":"{{side}}",
   "findings":[
