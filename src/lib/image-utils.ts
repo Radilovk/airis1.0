@@ -2,6 +2,8 @@
  * Utility functions for image manipulation and composite creation
  */
 
+import { SECTORS_RIGHT } from './iris-map'
+
 // Maximum tokens for vision API calls
 export const MAX_VISION_TOKENS = 4096
 
@@ -140,20 +142,14 @@ function drawIridologyOverlay(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   
-  const labels = [
-    { hour: 12, text: '12h\nМозък', angle: -Math.PI / 2 },
-    { hour: 1, text: '1h\nХипофиза', angle: -Math.PI / 2 + angleStep * 1 },
-    { hour: 2, text: '2h\nЩ.жлеза', angle: -Math.PI / 2 + angleStep * 2 },
-    { hour: 3, text: '3h\nБелодр.', angle: -Math.PI / 2 + angleStep * 3 },
-    { hour: 4, text: '4h\nЧ.дроб', angle: -Math.PI / 2 + angleStep * 4 },
-    { hour: 5, text: '5h\nСтомах', angle: -Math.PI / 2 + angleStep * 5 },
-    { hour: 6, text: '6h\nПанкр.', angle: -Math.PI / 2 + angleStep * 6 },
-    { hour: 7, text: '7h\nБъбреци', angle: -Math.PI / 2 + angleStep * 7 },
-    { hour: 8, text: '8h\nНадбъбр.', angle: -Math.PI / 2 + angleStep * 8 },
-    { hour: 9, text: '9h\nСърце', angle: -Math.PI / 2 + angleStep * 9 },
-    { hour: 10, text: '10h\nДалак', angle: -Math.PI / 2 + angleStep * 10 },
-    { hour: 11, text: '11h\nЛимфа', angle: -Math.PI / 2 + angleStep * 11 }
-  ]
+  // Етикетите идват от единствената карта (`src/lib/iris-map.ts`) и са ОБЩИ
+  // (функционални), а не органни. Преди тук стоеше четвърти, различен списък
+  // от органи — той противоречеше и на промпта, и на отчета.
+  const labels = SECTORS_RIGHT.map((sec, i) => ({
+    hour: sec.id,
+    text: `${sec.clock}\n${sec.label.split(' ')[0]}`,
+    angle: -Math.PI / 2 + angleStep * i,
+  }))
   
   // Draw labels at outer edge
   const labelRadius = outerRadius + radius * 0.12

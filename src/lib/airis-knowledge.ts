@@ -1,19 +1,34 @@
+import { SECTORS_LEFT, SECTORS_RIGHT, systemLabel, type SectorDef, type SystemKey } from './iris-map'
+
+/**
+ * Картата НЕ се дублира тук. Тя се извежда от `src/lib/iris-map.ts`, който е
+ * единственият източник на истината. Преди в този файл стоеше собствен списък
+ * от 12 органа — еднакъв за двете очи и различен от този в промпта и в
+ * pipeline-а. Трите варианта се разминаваха и потребителят виждаше един,
+ * а моделът получаваше друг.
+ */
+function toKnowledgeZones(sectors: SectorDef[]) {
+  return sectors.map(sec => {
+    const dominant = (Object.entries(sec.systems) as Array<[SystemKey, number]>).sort(
+      (a, b) => b[1] - a[1]
+    )[0]
+    return {
+      angle: [sec.minuteStart * 6, sec.minuteEnd * 6] as [number, number],
+      hour: sec.clock.replace(' ч', ''),
+      organ: sec.label,
+      reference: sec.reference,
+      system: dominant ? systemLabel(dominant[0]) : '—',
+    }
+  })
+}
+
 export const AIRIS_KNOWLEDGE = {
   irisMap: {
-    zones: [
-      { angle: [0, 30], hour: "12-1", organ: "Мозък", system: "Нервна" },
-      { angle: [30, 60], hour: "1-2", organ: "Хипофиза", system: "Ендокринна" },
-      { angle: [60, 90], hour: "2-3", organ: "Щитовидна жлеза", system: "Ендокринна" },
-      { angle: [90, 120], hour: "3-4", organ: "Белодробна", system: "Респираторна" },
-      { angle: [120, 150], hour: "4-5", organ: "Черен дроб", system: "Храносмилателна" },
-      { angle: [150, 180], hour: "5-6", organ: "Стомах", system: "Храносмилателна" },
-      { angle: [180, 210], hour: "6-7", organ: "Панкреас", system: "Храносмилателна" },
-      { angle: [210, 240], hour: "7-8", organ: "Бъбреци", system: "Урогенитална" },
-      { angle: [240, 270], hour: "8-9", organ: "Надбъбречни жлези", system: "Ендокринна" },
-      { angle: [270, 300], hour: "9-10", organ: "Сърце", system: "Сърдечно-съдова" },
-      { angle: [300, 330], hour: "10-11", organ: "Далак", system: "Имунна" },
-      { angle: [330, 360], hour: "11-12", organ: "Лимфна система", system: "Имунна" }
-    ],
+    /** Общи етикети — идентични за двете очи (визуализацията ги ползва). */
+    zones: toKnowledgeZones(SECTORS_RIGHT),
+    /** Латерално специфични карти. */
+    zonesRight: toKnowledgeZones(SECTORS_RIGHT),
+    zonesLeft: toKnowledgeZones(SECTORS_LEFT),
     laterality: {
       left: "Лявата страна на тялото, емоционални аспекти",
       right: "Дясната страна на тялото, физически аспекти"

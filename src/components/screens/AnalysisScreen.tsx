@@ -11,9 +11,11 @@ import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
+import { runIrisPipeline, toIrisAnalysis } from '@/lib/iris-pipeline'
+import { FINDINGS } from '@/lib/iris-map'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
-import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig } from '@/types'
+import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -681,6 +683,182 @@ ${response}
     }
   }, [])
 
+  /**
+   * НОВИЯТ АНАЛИЗ — калибриран pipeline.
+   *
+   * Разликата с досегашния път е в реда на работа: първо кодът измерва
+   * геометрията и построява лентата с координатна мрежа, после моделът гледа
+   * тази лента (а не сурова кръгла снимка), после кодът валидира находките и
+   * смята оценките, и чак накрая моделът пише текста.
+   *
+   * Връща готовия отчет или null, ако предпоставките не са налице
+   * (липсваща геометрия), за да продължи наследеният път.
+   */
+  const runCalibratedAnalysis = async (requestDelay: number): Promise<AnalysisReport | null> => {
+    if (!leftIris.geometry || !rightIris.geometry) {
+      addLog(
+        'warning',
+        'Липсва калибрация на поне едно око — превключване към наследения анализ.'
+      )
+      return null
+    }
+
+    addLog('info', '🎯 Калибриран анализ: геометрията е измерена в браузъра.')
+    setStatus('Подготовка на калибрираните карти...')
+
+    const result = await runIrisPipeline({
+      leftIris,
+      rightIris,
+      questionnaire: questionnaireData,
+      callLLM: (prompt, jsonMode, retries, imageDataUrl) =>
+        callLLMWithRetry(prompt, jsonMode, retries, imageDataUrl),
+      addLog,
+      onProgress: (step, pct) => {
+        setStatus(step)
+        setProgress(Math.max(2, Math.min(98, pct)))
+      },
+      requestDelay,
+    })
+
+    const leftAnalysis = toIrisAnalysis(result.left, result.scoring, result.interpretation)
+    const rightAnalysis = toIrisAnalysis(result.right, result.scoring, result.interpretation)
+
+    const plan = result.interpretation?.plan
+    const supplements: SupplementRecommendation[] = (plan?.supplements ?? []).map(sup => ({
+      name: sup.name,
+      dosage: sup.dosage,
+      timing: sup.timing,
+      notes: sup.notes,
+    }))
+
+    // Препоръките се сглобяват от драйверите (детерминистични) + текста на модела.
+    const recommendations: Recommendation[] = []
+    for (const d of result.scoring.drivers) {
+      recommendations.push({
+        category: 'diet',
+        title: d.observation,
+        description: d.action,
+        priority: d.strength,
+      })
+    }
+    for (const sup of supplements) {
+      recommendations.push({
+        category: 'supplement',
+        title: sup.name,
+        description: `${sup.dosage} · ${sup.timing}${sup.notes ? ` — ${sup.notes}` : ''}`,
+        priority: 'medium',
+      })
+    }
+    for (const item of [
+      ...(plan?.lifestyle?.sleep ?? []),
+      ...(plan?.lifestyle?.stress ?? []),
+      ...(plan?.lifestyle?.activity ?? []),
+    ]) {
+      recommendations.push({
+        category: 'lifestyle',
+        title: 'Начин на живот',
+        description: item,
+        priority: 'medium',
+      })
+    }
+
+    const dayStructure = plan?.dayStructure
+    const generalRecommendations = [
+      ...(plan?.priorities ?? []),
+      ...(plan?.firstWeek ?? []).map(x => `Първа седмица: ${x}`),
+      ...(dayStructure
+        ? [
+            dayStructure.breakfast ? `Закуска: ${dayStructure.breakfast}` : '',
+            dayStructure.lunch ? `Обяд: ${dayStructure.lunch}` : '',
+            dayStructure.dinner ? `Вечеря: ${dayStructure.dinner}` : '',
+            dayStructure.notes ? `Ритъм: ${dayStructure.notes}` : '',
+          ].filter(Boolean)
+        : []),
+    ]
+
+    const detailedAnalysis =
+      result.interpretation?.summary ||
+      `Анализът е базиран основно на въпросника (качество на снимките ${Math.round(result.imageQuality)}/100).`
+
+    const calibrated: CalibratedAnalysisPayload = {
+      imageQuality: Math.round(result.imageQuality),
+      stripCoverage: result.stripCoverage,
+      irisWeight: result.scoring.irisWeight,
+      focus: result.scoring.focus,
+      systems: result.scoring.systems.map(sys => ({
+        key: sys.key,
+        label: sys.label,
+        score: sys.score,
+        priority: sys.priority,
+        description: sys.description,
+        reasons: sys.reasons,
+      })),
+      drivers: result.scoring.drivers.map(d => ({
+        id: d.id,
+        system: d.system,
+        strength: d.strength,
+        observation: d.observation,
+        action: d.action,
+        source: d.source,
+      })),
+      findings: [...result.left.findings, ...result.right.findings].map(f => ({
+        side: f.side,
+        type: f.type,
+        label: FINDINGS[f.type].label,
+        sector: f.sector,
+        ring: f.ring,
+        size: f.size,
+        confidence: f.confidence,
+        priorityZones: f.priorityZones,
+      })),
+      strips: {
+        left: {
+          base: result.preparation.left.strips.base.dataUrl,
+          structure: result.preparation.left.strips.structure.dataUrl,
+          pigment: result.preparation.left.strips.pigment.dataUrl,
+        },
+        right: {
+          base: result.preparation.right.strips.base.dataUrl,
+          structure: result.preparation.right.strips.structure.dataUrl,
+          pigment: result.preparation.right.strips.pigment.dataUrl,
+        },
+      },
+      constitution:
+        result.left.constitution !== 'unclear' ? result.left.constitution : result.right.constitution,
+    }
+
+    setProgress(100)
+    setStatus('Завършено!')
+    addLog('success', '🎉 Калибрираният анализ приключи.')
+
+    return {
+      id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      timestamp: new Date().toISOString(),
+      questionnaireData,
+      leftIris: leftAnalysis,
+      rightIris: rightAnalysis,
+      leftIrisImage: leftIris,
+      rightIrisImage: rightIris,
+      recommendations,
+      summary: detailedAnalysis,
+      briefSummary: result.interpretation?.briefSummary || detailedAnalysis.slice(0, 140),
+      detailedAnalysis,
+      motivationalSummary:
+        result.interpretation?.motivational ||
+        'Малките, последователни промени в менюто дават най-устойчив резултат.',
+      detailedPlan: {
+        generalRecommendations,
+        recommendedFoods: plan?.eatMore ?? [],
+        avoidFoods: plan?.eatLess ?? [],
+        supplements,
+        psychologicalRecommendations: plan?.lifestyle?.stress ?? [],
+        specialRecommendations: plan?.lifestyle?.activity ?? [],
+        recommendedTests: plan?.followUp ?? [],
+      },
+      calibrated,
+    }
+  }
+
   const performAnalysis = async () => {
     if (analysisRunning) {
       console.warn('⚠️ [АНАЛИЗ] performAnalysis вече работи, пропускане на дублирано извикване!')
@@ -734,6 +912,27 @@ ${response}
       console.log('🎯 [АНАЛИЗ] Pipeline v9:', usePipelineV9)
       console.log('📊 [АНАЛИЗ] Данни от въпросник:', questionnaireData)
       
+      // ── КАЛИБРИРАН PIPELINE (по подразбиране) ────────────────────────────
+      // Изпълнява се само когато и двете снимки са преминали калибриране —
+      // тогава координатната система е измерена, а не предполагаема.
+      const useCalibrated = finalConfig.useCalibratedPipeline ?? true
+      if (useCalibrated) {
+        try {
+          const calibratedReport = await runCalibratedAnalysis(requestDelay)
+          if (calibratedReport) {
+            setAnalysisRunning(false)
+            setTimeout(() => onComplete(calibratedReport), 800)
+            return
+          }
+        } catch (calibratedError) {
+          addLog(
+            'error',
+            `Калибрираният анализ се провали: ${calibratedError instanceof Error ? calibratedError.message : String(calibratedError)}`
+          )
+          addLog('info', 'Продължаване с наследения анализ...')
+        }
+      }
+
       const progressPerStep = 90 / requestCount
       let currentProgress = 5
       

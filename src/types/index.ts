@@ -66,6 +66,33 @@ export interface QuestionnaireConfig {
 export interface IrisImage {
   dataUrl: string
   side: 'left' | 'right'
+  /**
+   * Измерената геометрия на ириса (зеница + лимбус) в пиксели на `dataUrl`.
+   * Попълва се при качването (`iris-geometry.ts`) и може да бъде коригирана
+   * ръчно от потребителя в калибратора. Целият координатен апарат надолу по
+   * веригата стъпва върху нея.
+   */
+  geometry?: IrisGeometrySnapshot
+  /** Оценката на качеството, направена при качването. */
+  quality?: IrisQualitySnapshot
+}
+
+/** Сериализуемо копие на геометрията (виж `src/lib/iris-geometry.ts`). */
+export interface IrisGeometrySnapshot {
+  pupil: { cx: number; cy: number; r: number }
+  limbus: { cx: number; cy: number; r: number }
+  imageWidth: number
+  imageHeight: number
+  pupilConfidence: number
+  limbusConfidence: number
+  manual?: boolean
+}
+
+/** Сериализуемо копие на оценката за качество (виж `src/lib/iris-quality.ts`). */
+export interface IrisQualitySnapshot {
+  verdict: 'pass' | 'warn' | 'reject'
+  score: number
+  issueCodes: string[]
 }
 
 export interface IrisZone {
@@ -139,6 +166,56 @@ export interface AnalysisReport {
   // Multi-stream iris maps from the method1 backend (optional – only present when backend is available)
   leftIrisMaps?: IrisStreamMaps
   rightIrisMaps?: IrisStreamMaps
+  /**
+   * Детерминистичната част на анализа: измерените ленти, приетите находки,
+   * системните оценки и хранителните драйвери. Присъства при анализи,
+   * направени с калибрирания pipeline.
+   */
+  calibrated?: CalibratedAnalysisPayload
+}
+
+/** Резултатът от калибрирания анализ, запазен в отчета. */
+export interface CalibratedAnalysisPayload {
+  /** Средно качество на двете снимки, 0–100. */
+  imageQuality: number
+  /** Среден дял четима площ в лентите, 0–1. */
+  stripCoverage: number
+  /** Тежестта, с която ирисът е повлиял на оценките, 0–1. */
+  irisWeight: number
+  /** Приоритетен ред на системите (ключове). */
+  focus: string[]
+  systems: Array<{
+    key: string
+    label: string
+    score: number
+    priority: boolean
+    description: string
+    reasons: string[]
+  }>
+  drivers: Array<{
+    id: string
+    system: string
+    strength: 'high' | 'medium' | 'low'
+    observation: string
+    action: string
+    source: 'questionnaire' | 'iris' | 'both'
+  }>
+  findings: Array<{
+    side: 'left' | 'right'
+    type: string
+    label: string
+    sector: number
+    ring: number
+    size: string
+    confidence: number
+    priorityZones: string[]
+  }>
+  /** Разгънатите ленти по око и слой (data URL). */
+  strips?: {
+    left?: Partial<Record<'base' | 'structure' | 'pigment', string>>
+    right?: Partial<Record<'base' | 'structure' | 'pigment', string>>
+  }
+  constitution?: string
 }
 
 /** Three independent filtered views of the unwrapped iris image */
@@ -164,7 +241,17 @@ export interface AIModelConfig {
   apiKey: string
   useCustomKey: boolean
   requestDelay?: number
+  /** Брой заявки, използван само за оценка на прогреса. */
+  requestCount?: number
   enableDiagnostics?: boolean  // Enable AI diagnostic pre-check before analysis
+  /** Старият многоетапен v9 pipeline (наследен). */
+  usePipelineV9?: boolean
+  /**
+   * Новият анализ с калибрирана лента (`src/lib/iris-pipeline.ts`).
+   * По подразбиране включен — той е единственият, който измерва геометрията
+   * в браузъра и затова единственият с надеждна локализация.
+   */
+  useCalibratedPipeline?: boolean
 }
 
 // Pipeline preset for saving/loading configurations

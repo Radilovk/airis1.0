@@ -6,6 +6,7 @@
  */
 
 import type { QuestionnaireData, IrisImage, IrisAnalysis, AIModelConfig, PipelineConfig, PipelineStepConfig } from '@/types'
+import { sectorsFor } from './iris-map'
 
 // Step prompts - loaded from steps/ folder content
 // These are embedded at build time to avoid runtime file loading issues
@@ -368,16 +369,12 @@ function mapFindingsToZones(
   const zones: any[] = []
   
   // Create 12 zones based on v9 mapping
-  const zoneNames = [
-    '12-1ч', '1-2ч', '2-3ч', '3-4ч', '4-5ч', '5-6ч',
-    '6-7ч', '7-8ч', '8-9ч', '9-10ч', '10-11ч', '11-12ч'
-  ]
-  
-  const organsByZone = [
-    'Мозък/ЦНС', 'Хипофиза', 'Щитовидна жлеза', 'Бял дроб',
-    'Черен дроб', 'Стомах', 'Панкреас', 'Бъбреци',
-    'Надбъбречни', 'Сърце', 'Далак', 'Лимфна система'
-  ]
+  // Имената и етикетите идват от ЕДИНСТВЕНАТА карта (`src/lib/iris-map.ts`).
+  // Преди тук стоеше собствен, различен списък от 12 органа, еднакъв за двете
+  // очи — той противоречеше и на промпта, и на визуализацията.
+  const sectors = sectorsFor(side)
+  const zoneNames = sectors.map(sec => sec.clock)
+  const organsByZone = sectors.map(sec => sec.label)
   
   for (let i = 0; i < 12; i++) {
     const startAngle = i * 30
