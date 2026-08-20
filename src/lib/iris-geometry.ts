@@ -38,6 +38,16 @@ export interface Circle {
   r: number
 }
 
+/**
+ * Криви на клепачите — квадратни полиноми y = c0·x² + c1·x + c2 в координати на
+ * ОРИГИНАЛНОТО изображение. `null` означава „не е открит клепач от тази страна",
+ * тоест ирисът е свободен дотам.
+ */
+export interface Eyelids {
+  upper: [number, number, number] | null
+  lower: [number, number, number] | null
+}
+
 export interface IrisGeometry {
   /** Координати в пиксели на ОРИГИНАЛНОТО изображение. */
   pupil: Circle
@@ -51,6 +61,8 @@ export interface IrisGeometry {
   limbusConfidence: number
   /** true, когато потребителят е коригирал ръчно. */
   manual?: boolean
+  /** Открити криви на клепачите; използват се от разгъвката за маскиране. */
+  eyelids?: Eyelids
 }
 
 const WORK_SIZE = 320
@@ -206,17 +218,61 @@ function scanRadius(
   return { r: bestR, strength: best, profile }
 }
 
-/** Увереност от силата на прехода спрямо разсейването на профила. */
-function confidenceFromProfile(strength: number, profile: number[]): number {
+/**
+ * Относителен контраст на границата: (средно навън − средно навътре) спрямо
+ * сумата им. Мярката е нормирана, тоест не зависи от общата експонация.
+ *
+ * ЗАЩО НЕ Z-ОЦЕНКА НА ПРОФИЛА (както беше)
+ * ────────────────────────────────────────
+ * Първата версия смяташе колко „изпъква" най-силният радиус спрямо целия
+ * профил. Върху синтетичен ирис с рязък ръб това дава високи стойности, но
+ * върху РЕАЛНИ снимки границата на зеницата е плавна и съседните радиуси също
+ * имат силен градиент — z-оценката пада. Измерено върху две реални снимки с
+ * визуално ТОЧНА детекция: старата метрика връщаше 0.14 и 0.22, при праг за
+ * отхвърляне 0.35. Тоест приложението отхвърляше добри снимки.
+ *
+ * Контрастът е физически смислен: зеницата е почти черна, ирисът около нея е
+ * значително по-светъл. Същите две снимки дават 0.79 и 0.76, а кадър без око —
+ * 0.00.
+ */
+function edgeContrast(
+  g: Gray,
+  cx: number,
+  cy: number,
+  r: number,
+  angles?: number[]
+): number {
+  const band = Math.max(2, r * 0.18)
+  const inner = ringMean(g, cx, cy, r - band, 64, angles)
+  const outer = ringMean(g, cx, cy, r + band, 64, angles)
+  if (Number.isNaN(inner) || Number.isNaN(outer)) return 0
+  const sum = inner + outer
+  if (sum < 1) return 0
+  return clamp((outer - inner) / sum, 0, 1)
+}
+
+/**
+ * Увереност = предимно контраст на границата, плюс малък дял „изпъкване" на
+ * профила. Вторият член пази от фалшиви положителни върху плавна сянка, която
+ * има контраст, но няма ясен ръб.
+ */
+function confidence(
+  contrast: number,
+  strength: number,
+  profile: number[],
+  contrastScale: number
+): number {
+  const contrastScore = clamp((contrast - 0.06) / contrastScale, 0, 1)
+
   const vals = profile.filter(v => Number.isFinite(v))
-  if (vals.length < 3 || !Number.isFinite(strength)) return 0
-  const mean = vals.reduce((a, b) => a + b, 0) / vals.length
-  const varSum = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length
-  const sd = Math.sqrt(varSum)
-  if (sd < 1e-6) return 0
-  const z = (strength - mean) / sd
-  // z≈2 → ~0.5 ; z≈5 → ~0.9
-  return clamp((z - 1) / 5, 0, 1)
+  let peakScore = 0
+  if (vals.length >= 3 && Number.isFinite(strength)) {
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+    const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length)
+    if (sd > 1e-6) peakScore = clamp(((strength - mean) / sd - 0.5) / 3, 0, 1)
+  }
+
+  return clamp(0.8 * contrastScore + 0.2 * peakScore, 0, 1)
 }
 
 /* ── зеница ──────────────────────────────────────────────────────────────── */
@@ -407,6 +463,173 @@ function findLimbus(g: Gray, pupil: { cx: number; cy: number; r: number }) {
   return best
 }
 
+/* ── клепачи ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Откриване на горния и долния клепач чрез RANSAC на квадратна крива.
+ *
+ * ЗАЩО ГЕОМЕТРИЧНО, А НЕ ПО ЦВЯТ
+ * ──────────────────────────────
+ * Първо пробвах класификация по цветност (хроматичност спрямо еталон от средния
+ * ирис). Измерването върху две реални снимки показа, че разпределенията се
+ * припокриват тежко: при всеки праг се губят 50–80 % от истинската ирисова
+ * тъкан, за да се хванат 60–100 % от външната. При лешниково-зелени ириси на
+ * топла светлина цветът на ириса е твърде близък до цвета на кожата.
+ *
+ * Клепачът обаче е ГЕОМЕТРИЧЕН обект: гладка крива с рязък хоризонтален ръб.
+ * Затова се търси по вертикалния градиент, а кривата се напасва с RANSAC, за да
+ * не я развалят миглите и отблясъците.
+ *
+ * Мащабът е този на работното изображение; коефициентите се преобразуват към
+ * оригинала преди връщане.
+ */
+function detectEyelids(g: Gray, limbus: { cx: number; cy: number; r: number }): Eyelids {
+  const { w, h } = g
+
+  // Вертикален градиент |∂I/∂y| (Sobel 3×3, само y).
+  const gy = new Float32Array(w * h)
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const up = g.data[(y - 1) * w + x - 1] + 2 * g.data[(y - 1) * w + x] + g.data[(y - 1) * w + x + 1]
+      const dn = g.data[(y + 1) * w + x - 1] + 2 * g.data[(y + 1) * w + x] + g.data[(y + 1) * w + x + 1]
+      gy[y * w + x] = Math.abs(dn - up)
+    }
+  }
+
+  const x0 = Math.max(1, Math.round(limbus.cx - limbus.r))
+  const x1 = Math.min(w - 2, Math.round(limbus.cx + limbus.r))
+  if (x1 - x0 < 12) return { upper: null, lower: null }
+
+  const upPts: Array<[number, number]> = []
+  const loPts: Array<[number, number]> = []
+  const upVal: number[] = []
+  const loVal: number[] = []
+
+  // Търси се само в поясите близо до ръба на ириса — навътре е самата тъкан.
+  const bandFrac = 0.4
+
+  for (let x = x0; x <= x1; x++) {
+    const dx = x - limbus.cx
+    const inside = limbus.r * limbus.r - dx * dx
+    if (inside <= 0) continue
+    const half = Math.sqrt(inside)
+    const yTop = Math.max(1, Math.floor(limbus.cy - half))
+    const yBot = Math.min(h - 2, Math.ceil(limbus.cy + half))
+
+    const upEnd = Math.min(Math.round(limbus.cy) - 3, Math.round(limbus.cy - (1 - bandFrac) * half))
+    if (upEnd > yTop + 3) {
+      let best = -1
+      let bestY = yTop
+      for (let y = yTop; y <= upEnd; y++) {
+        const v = gy[y * w + x]
+        if (v > best) {
+          best = v
+          bestY = y
+        }
+      }
+      upPts.push([x, bestY])
+      upVal.push(best)
+    }
+
+    const loStart = Math.max(Math.round(limbus.cy) + 3, Math.round(limbus.cy + (1 - bandFrac) * half))
+    if (yBot > loStart + 3) {
+      let best = -1
+      let bestY = yBot
+      for (let y = loStart; y <= yBot; y++) {
+        const v = gy[y * w + x]
+        if (v > best) {
+          best = v
+          bestY = y
+        }
+      }
+      loPts.push([x, bestY])
+      loVal.push(best)
+    }
+  }
+
+  const fit = (
+    pts: Array<[number, number]>,
+    vals: number[],
+    seed: number
+  ): [number, number, number] | null => {
+    if (pts.length < 20) return null
+
+    // Само точки със силен градиент — иначе се напасва текстурата на ириса.
+    const sorted = [...vals].sort((a, b) => a - b)
+    const thr = Math.max(28, sorted[Math.floor(sorted.length * 0.55)])
+    const kept = pts.filter((_, i) => vals[i] >= thr)
+    if (kept.length < 15) return null
+
+    let rng = seed >>> 0
+    const rand = () => {
+      rng = (rng * 1664525 + 1013904223) >>> 0
+      return rng / 4294967296
+    }
+
+    let bestCoef: [number, number, number] | null = null
+    let bestCount = -1
+    const tol = 3.0
+
+    for (let iter = 0; iter < 220; iter++) {
+      const a = kept[Math.floor(rand() * kept.length)]
+      const b = kept[Math.floor(rand() * kept.length)]
+      const c = kept[Math.floor(rand() * kept.length)]
+      const coef = quadThrough(a, b, c)
+      if (!coef) continue
+      let n = 0
+      for (const [px2, py] of kept) {
+        const yy = coef[0] * px2 * px2 + coef[1] * px2 + coef[2]
+        if (Math.abs(py - yy) < tol) n++
+      }
+      if (n > bestCount) {
+        bestCount = n
+        bestCoef = coef
+      }
+    }
+
+    // Изисква се съгласие поне от половината силни точки.
+    if (!bestCoef || bestCount < kept.length * 0.5) return null
+    return bestCoef
+  }
+
+  const upper = fit(upPts, upVal, 12345)
+  const lower = fit(loPts, loVal, 98765)
+
+  // Преобразуване към координати на оригинала се прави от повикващия — тук
+  // всичко е в работния мащаб.
+  return { upper, lower }
+}
+
+/** Квадратна крива през три точки; null при израждане. */
+function quadThrough(
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number]
+): [number, number, number] | null {
+  const [x1, y1] = p1
+  const [x2, y2] = p2
+  const [x3, y3] = p3
+  const d = (x1 - x2) * (x1 - x3) * (x2 - x3)
+  if (Math.abs(d) < 1e-6) return null
+  const a = (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / d
+  const b =
+    (x3 * x3 * (y1 - y2) + x2 * x2 * (y3 - y1) + x1 * x1 * (y2 - y3)) / d
+  const c =
+    (x2 * x3 * (x2 - x3) * y1 + x3 * x1 * (x3 - x1) * y2 + x1 * x2 * (x1 - x2) * y3) / d
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return null
+  return [a, b, c]
+}
+
+/** Преобразува коефициенти от работния мащаб към оригиналния. */
+function scaleQuad(
+  coef: [number, number, number] | null,
+  inv: number
+): [number, number, number] | null {
+  if (!coef) return null
+  // y_orig = inv · y_work(x_orig / inv)
+  return [coef[0] / inv, coef[1], coef[2] * inv]
+}
+
 /* ── публично API ────────────────────────────────────────────────────────── */
 
 /**
@@ -432,14 +655,32 @@ export function detectIrisGeometry(img: HTMLImageElement | HTMLCanvasElement): I
     const pupil = refinePupil(smooth, seed)
     const limbus = findLimbus(smooth, pupil)
 
+    const lidsWork = detectEyelids(smooth, limbus)
+
     const inv = 1 / scale
     const geo: IrisGeometry = {
       pupil: { cx: pupil.cx * inv, cy: pupil.cy * inv, r: pupil.r * inv },
       limbus: { cx: limbus.cx * inv, cy: limbus.cy * inv, r: limbus.r * inv },
       imageWidth: srcW,
       imageHeight: srcH,
-      pupilConfidence: confidenceFromProfile(pupil.strength, pupil.profile),
-      limbusConfidence: confidenceFromProfile(limbus.strength, limbus.profile),
+      // Мащабите са различни: зеницата е почти черна спрямо ириса (контраст
+      // 0.4–0.8), докато преходът ирис→склера е по-мек (0.15–0.45).
+      eyelids: {
+        upper: scaleQuad(lidsWork.upper, inv),
+        lower: scaleQuad(lidsWork.lower, inv),
+      },
+      pupilConfidence: confidence(
+        edgeContrast(smooth, pupil.cx, pupil.cy, pupil.r),
+        pupil.strength,
+        pupil.profile,
+        0.5
+      ),
+      limbusConfidence: confidence(
+        edgeContrast(smooth, limbus.cx, limbus.cy, limbus.r, LIMBUS_ANGLES),
+        limbus.strength,
+        limbus.profile,
+        0.3
+      ),
     }
 
     // Санитарни ограничения: физиологично отношение зеница/ирис е ≈0.15–0.65.

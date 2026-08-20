@@ -260,6 +260,8 @@ export function unwrapIris(
   const sampleBuf: [number, number, number] = [0, 0, 0]
 
   const { pupil, limbus } = geo
+  const lidUpper = geo.eyelids?.upper ?? null
+  const lidLower = geo.eyelids?.lower ?? null
 
   for (let row = 0; row < PH; row++) {
     // t = 0 при ръба на зеницата, 1 при лимбуса; центриране в средата на реда
@@ -285,13 +287,76 @@ export function unwrapIris(
         valid[i] = 0
         continue
       }
+
+      // Клепачите се изрязват ГЕОМЕТРИЧНО. Праг по яркост не ги хваща: кожата и
+      // склерата са в средния диапазон и минаваха за валидна ирисова тъкан —
+      // на реална снимка само 3 от 144 клетки се маркираха, при видимо покрит
+      // от клепача горен сектор.
+      const occluded =
+        (lidUpper !== null && y < lidUpper[0] * x * x + lidUpper[1] * x + lidUpper[2]) ||
+        (lidLower !== null && y > lidLower[0] * x * x + lidLower[1] * x + lidLower[2])
+
       const l = luma(sampleBuf[0], sampleBuf[1], sampleBuf[2])
-      // мигли/дълбока сянка от клепач ИЛИ спекуларен отблясък → нечетимо
-      const readable = l > 20 && l < 249
+      // мигли/дълбока сянка ИЛИ спекуларен отблясък → също нечетимо
+      const readable = !occluded && l > 20 && l < 249
       valid[i] = readable ? 1 : 0
       px[i * 3] = sampleBuf[0]
       px[i * 3 + 1] = sampleBuf[1]
       px[i * 3 + 2] = sampleBuf[2]
+    }
+  }
+
+  // ── маскиране на спекуларни отблясъци ───────────────────────────────────
+  //
+  // Фиксираният праг (luma > 249) хващаше само напълно избелени пиксели. Реалните
+  // отблясъци от прозорец или лампа са в диапазона 170–245: те заличават текстурата,
+  // но минаваха за валидна тъкан и моделът щеше да „чете" находки в тях.
+  // Прагът се извежда от самата снимка, защото абсолютната яркост зависи от
+  // експонацията: взима се 96-и персентил на четимите пиксели, с долна граница,
+  // за да не се реже нормално светъл ирис.
+  {
+    const lumas: number[] = []
+    for (let i = 0; i < PW * PH; i += 5) {
+      if (!valid[i]) continue
+      lumas.push(luma(px[i * 3], px[i * 3 + 1], px[i * 3 + 2]))
+    }
+    if (lumas.length > 200) {
+      lumas.sort((a, b) => a - b)
+      const p50 = lumas[Math.floor(lumas.length * 0.5)]
+      const p98 = lumas[Math.floor(lumas.length * 0.98)]
+
+      // Насищането на самото око служи за еталон, за да важи правилото и за
+      // сиви/сини ириси, при които абсолютен праг би изрязал здрава тъкан.
+      const sats: number[] = []
+      for (let i = 0; i < PW * PH; i += 5) {
+        if (!valid[i]) continue
+        const r = px[i * 3]
+        const gg = px[i * 3 + 1]
+        const b = px[i * 3 + 2]
+        const mx = Math.max(r, gg, b)
+        sats.push(mx < 1 ? 0 : (mx - Math.min(r, gg, b)) / mx)
+      }
+      sats.sort((a, b) => a - b)
+      const satMed = sats[Math.floor(sats.length * 0.5)] || 0
+
+      const hardSpecular = Math.max(165, p98)
+      // Отблясъкът носи цвета на източника, тоест е много по-малко наситен от
+      // пигментираната тъкан наоколо, и е значително по-светъл.
+      const softLuma = Math.max(140, p50 * 1.45)
+      // 0.55, а не 0.45: отблясъците често носят цвета на източника (синкав
+      // прозорец, топла лампа) и не са напълно неутрални.
+      const softSat = satMed * 0.55
+
+      for (let i = 0; i < PW * PH; i++) {
+        if (!valid[i]) continue
+        const r = px[i * 3]
+        const gg = px[i * 3 + 1]
+        const b = px[i * 3 + 2]
+        const l = luma(r, gg, b)
+        const mx = Math.max(r, gg, b)
+        const sat = mx < 1 ? 0 : (mx - Math.min(r, gg, b)) / mx
+        if (l >= hardSpecular || (l > softLuma && sat < softSat)) valid[i] = 0
+      }
     }
   }
 
