@@ -26,6 +26,7 @@ export type QualityIssueCode =
   | 'limbus_not_found'
   | 'blurry'
   | 'glare'
+  | 'reflection'
   | 'too_dark'
   | 'too_bright'
   | 'iris_too_small'
@@ -49,6 +50,14 @@ export interface QualityMetrics {
   sharpness: number
   /** Дял на пресветените пиксели, 0..1. */
   glare: number
+  /**
+   * Дял от ирисовата площ, покрит от огледално отражение, 0..1.
+   *
+   * Различава се от `glare`: `glare` брои само напълно избелени пиксели, докато
+   * тук се хваща и отражение със среден интензитет — например огледален образ на
+   * дървета и небе, който напълно заличава текстурата, без да е бял.
+   */
+  reflection: number
   /** Средна яркост 0..1. */
   brightness: number
   /** Дял на диска на ириса, попадащ в кадъра, 0..1. */
@@ -180,6 +189,46 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
   const expectedPupilShare = irisArea > 0 ? pupilArea / irisArea : 0
   const occlusion = Math.max(0, darkCount / irisPixels - expectedPupilShare)
 
+  // ── покритие от отражение ────────────────────────────────────────────────
+  // Мери се в ирисовия пръстен. Отражението носи цвета на източника, тоест е
+  // значително по-малко наситено от пигментираната тъкан, и е по-светло от нея.
+  // Праговете са относителни, за да важат и за сиви/сини ириси.
+  let reflection = 0
+  {
+    const rIn0 = geometry.pupil.r * s.scale * 1.1
+    const rOut0 = g.r * 0.97
+    const lum: number[] = []
+    const sat: number[] = []
+    const idx: number[] = []
+    for (let y = 0; y < s.h; y++) {
+      for (let x = 0; x < s.w; x++) {
+        const d2 = (x - g.cx) ** 2 + (y - g.cy) ** 2
+        if (d2 < rIn0 * rIn0 || d2 > rOut0 * rOut0) continue
+        const i = y * s.w + x
+        const p = i * 4
+        const mx = Math.max(s.rgba[p], s.rgba[p + 1], s.rgba[p + 2])
+        const mn = Math.min(s.rgba[p], s.rgba[p + 1], s.rgba[p + 2])
+        lum.push(s.gray[i])
+        sat.push(mx < 1 ? 0 : (mx - mn) / mx)
+        idx.push(i)
+      }
+    }
+    if (lum.length > 300) {
+      const ls = [...lum].sort((a, b) => a - b)
+      const ss = [...sat].sort((a, b) => a - b)
+      const lMed = ls[Math.floor(ls.length * 0.5)]
+      const sMed = ss[Math.floor(ss.length * 0.5)]
+      const lHard = Math.max(165, ls[Math.floor(ls.length * 0.98)])
+      const lSoft = Math.max(140, lMed * 1.45)
+      const sSoft = sMed * 0.55
+      let hit = 0
+      for (let k = 0; k < lum.length; k++) {
+        if (lum[k] >= lHard || (lum[k] > lSoft && sat[k] < sSoft)) hit++
+      }
+      reflection = hit / lum.length
+    }
+  }
+
   // Фокус: мери се САМО върху пръстена на ириса (не върху фона/склерата)
   const rIn = geometry.pupil.r * s.scale * 1.15
   const rOut = g.r * 0.95
@@ -198,6 +247,7 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
   const metrics: QualityMetrics = {
     sharpness,
     glare,
+    reflection,
     brightness,
     frameCoverage,
     irisFill,
@@ -235,12 +285,20 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
     })
   }
 
-  if (ratio > 0.62) {
+  // Отношението зеница/ирис е най-надеждният признак, че АВТОМАТИКАТА се е
+  // объркала. Измерено: три годни снимки дават 0.19–0.24, а снимка, при която
+  // огледално отражение на дървесна корона беше сбъркано със зеница — 0.56.
+  //
+  // Това нарочно е ПРЕДУПРЕЖДЕНИЕ, а не отхвърляне: при слаба светлина зеницата
+  // наистина се разширява до 0.5–0.6. Затова вниманието се насочва към
+  // калибратора, където потребителят вижда кръговете и може да ги поправи —
+  // точно за това съществува тази стъпка.
+  if (ratio > 0.5) {
     issues.push({
       code: 'pupil_low_contrast',
       level: 'warning',
-      message: 'Зеницата е силно разширена и покрива голяма част от ириса.',
-      fix: 'Снимайте на по-светло — зеницата ще се свие и ще се вижда повече ирисова тъкан.',
+      message: 'Зеницата изглежда необичайно голяма спрямо ириса.',
+      fix: 'Проверете сините и жълтите кръгове по-горе. Ако не съвпадат с окото, нагласете ги с влачене — иначе всички находки ще се локализират погрешно.',
     })
   }
 
@@ -273,6 +331,26 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
       level: 'warning',
       message: 'Има отблясъци върху ириса.',
       fix: 'Леко завъртане на главата спрямо източника на светлина ги премахва.',
+    })
+  }
+
+  // Огледално отражение върху ириса. Това е отделно правило от `glare`, защото
+  // отражение на прозорец, дървета или небе заличава текстурата, без да е бяло:
+  // измерено върху реална снимка с отразена корона на дърво — 60 % от ирисовата
+  // площ, а старите правила не отчитаха нищо.
+  if (reflection > 0.34) {
+    issues.push({
+      code: 'reflection',
+      level: 'error',
+      message: 'Огледално отражение покрива голяма част от ириса.',
+      fix: 'Застанете с гръб към прозореца или влезте на сянка. Отражението на небе, дървета или лампа скрива тъканта и анализът няма какво да разчете.',
+    })
+  } else if (reflection > 0.18) {
+    issues.push({
+      code: 'reflection',
+      level: 'warning',
+      message: 'Част от ириса е закрита от отражение.',
+      fix: 'Леко завъртане на главата спрямо светлината намалява отражението.',
     })
   }
 
@@ -372,8 +450,9 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
             0.14 * geometry.limbusConfidence +
             0.12 * Math.min(1, irisFill / 0.6) +
             0.1 * frameCoverage +
-            0.07 * (1 - Math.min(1, glare / 0.12)) +
-            0.05 * (1 - Math.min(1, occlusion / 0.35))
+            0.05 * (1 - Math.min(1, glare / 0.12)) +
+            0.04 * (1 - Math.min(1, occlusion / 0.35)) +
+            0.03 * (1 - Math.min(1, reflection / 0.4))
         )
       )
   )
