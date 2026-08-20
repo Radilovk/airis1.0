@@ -46,7 +46,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     apiKey: '',
     useCustomKey: false,
     requestDelay: DEFAULT_REQUEST_DELAY_MS,
-    enableDiagnostics: true
+    enableDiagnostics: true,
+    useCalibratedPipeline: true
   })
   
   const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
@@ -55,6 +56,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || DEFAULT_REQUEST_DELAY_MS)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
+  const [useCalibratedPipeline, setUseCalibratedPipeline] = useState(
+    aiConfig?.useCalibratedPipeline ?? true
+  )
 
   // Log successful admin panel access
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 60000)
       setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
+      setUseCalibratedPipeline(aiConfig.useCalibratedPipeline ?? true)
     }
   }, [aiConfig])
 
@@ -139,7 +144,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         apiKey: actualUseCustomKey ? apiKey : '',
         useCustomKey: actualUseCustomKey,
         requestDelay,
-        enableDiagnostics
+        enableDiagnostics,
+        useCalibratedPipeline,
+        // Запазваме наследения флаг както е бил — този екран пренаписва целия
+        // обект, така че всяко неспоменато поле иначе се губи.
+        usePipelineV9: aiConfig?.usePipelineV9 ?? true
       }
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
@@ -385,6 +394,25 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     </AlertDescription>
                   </Alert>
                   
+                  <div className="flex items-center justify-between space-x-2 pt-2">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="calibrated-pipeline" className="text-base">
+                        Калибриран анализ (препоръчано)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Геометрията на ириса се измерва в браузъра, снимката се разгъва в
+                        лента с координатна мрежа и оценките се смятат детерминистично.
+                        Изключването връща наследения v9 pipeline, при който моделът
+                        получава оригиналната кръгла снимка без опорни точки.
+                      </p>
+                    </div>
+                    <Switch
+                      id="calibrated-pipeline"
+                      checked={useCalibratedPipeline}
+                      onCheckedChange={setUseCalibratedPipeline}
+                    />
+                  </div>
+
                   <div className="flex items-center justify-between space-x-2 pt-2">
                     <div className="space-y-0.5">
                       <Label htmlFor="enable-diagnostics" className="text-base">

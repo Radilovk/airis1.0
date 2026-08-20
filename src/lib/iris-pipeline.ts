@@ -39,7 +39,13 @@ import {
   type NormalizedFinding,
   type ScoringResult,
 } from './iris-scoring'
-import { CONSTITUTIONS, sectorsFor, type Constitution, type Side } from './iris-map'
+import {
+  CONSTITUTIONS,
+  MAX_FINDINGS_PER_EYE,
+  sectorsFor,
+  type Constitution,
+  type Side,
+} from './iris-map'
 
 export type LogLevel = 'info' | 'success' | 'error' | 'warning'
 export type AddLog = (level: LogLevel, message: string) => void
@@ -54,7 +60,11 @@ export type CallLLM = (
 export interface EyePreparation {
   side: Side
   geometry: IrisGeometry
-  quality: QualityReport
+  /** 0–100. Идва от калибратора, ако снимката е минала през него. */
+  qualityScore: number
+  qualityVerdict: 'pass' | 'warn' | 'reject'
+  /** Дали геометрията е потвърдена/коригирана ръчно от потребителя. */
+  manualGeometry: boolean
   strips: Record<StripLayer, UnwrapResult>
 }
 
@@ -93,6 +103,8 @@ export interface InterpretationOutput {
     lifestyle?: { sleep?: string[]; stress?: string[]; activity?: string[] }
     firstWeek?: string[]
     followUp?: string[]
+    /** Имена на рутинни изследвания за обсъждане с лекар — без интерпретация. */
+    suggestedChecks?: string[]
   }
 }
 
@@ -128,30 +140,53 @@ export async function prepareEye(
   side: Side,
   addLog: AddLog
 ): Promise<EyePreparation> {
-  addLog('info', `[Подготовка ${side === 'left' ? 'ляв' : 'десен'}] Измерване на геометрията...`)
-  const quality = await analyseIrisQualityFromDataUrl(iris.dataUrl)
-  const geometry = iris.geometry ?? quality.geometry
+  const name = side === 'left' ? 'ляв' : 'десен'
 
-  addLog(
-    quality.verdict === 'reject' ? 'warning' : 'info',
-    `[Подготовка ${side === 'left' ? 'ляв' : 'десен'}] Качество ${quality.score}/100 — ` +
-      `зеница ${Math.round(quality.geometry.pupilConfidence * 100)} %, ` +
-      `лимбус ${Math.round(quality.geometry.limbusConfidence * 100)} %`
-  )
+  // Ако снимката е минала през калибратора, геометрията и оценката вече са
+  // измерени и потвърдени от потребителя. Повторното им смятане тук е и излишно
+  // (пълната детекция е ~1–2 s на око), и вредно: изхвърляше ръчната корекция
+  // и заместваше потвърдената оценка с нова, автоматична.
+  let geometry: IrisGeometry
+  let qualityScore: number
+  let qualityVerdict: 'pass' | 'warn' | 'reject'
+  const manualGeometry = iris.geometry?.manual === true
 
-  addLog('info', `[Подготовка ${side === 'left' ? 'ляв' : 'десен'}] Пречертаване на лентата...`)
+  if (iris.geometry && iris.quality) {
+    geometry = iris.geometry
+    qualityScore = iris.quality.score
+    qualityVerdict = iris.quality.verdict
+    addLog(
+      'info',
+      `[Подготовка ${name}] Използвам калибрацията от екрана за качване` +
+        `${manualGeometry ? ' (коригирана ръчно)' : ''} — качество ${qualityScore}/100`
+    )
+  } else {
+    addLog('info', `[Подготовка ${name}] Няма запазена калибрация — измервам геометрията...`)
+    const quality: QualityReport = await analyseIrisQualityFromDataUrl(iris.dataUrl)
+    geometry = iris.geometry ?? quality.geometry
+    qualityScore = quality.score
+    qualityVerdict = quality.verdict
+    addLog(
+      quality.verdict === 'reject' ? 'warning' : 'info',
+      `[Подготовка ${name}] Качество ${quality.score}/100 — ` +
+        `зеница ${Math.round(geometry.pupilConfidence * 100)} %, ` +
+        `лимбус ${Math.round(geometry.limbusConfidence * 100)} %`
+    )
+  }
+
+  addLog('info', `[Подготовка ${name}] Пречертаване на лентата...`)
   const strips = await unwrapAllFromDataUrl(iris.dataUrl, geometry, side)
 
   const coverage = Math.round(strips.base.coverage * 100)
   addLog(
     coverage < 60 ? 'warning' : 'success',
-    `[Подготовка ${side === 'left' ? 'ляв' : 'десен'}] Лентата е готова — ${coverage} % четима площ` +
+    `[Подготовка ${name}] Лентата е готова — ${coverage} % четима площ` +
       (strips.base.unreadableCells.length
         ? `, ${strips.base.unreadableCells.length} нечетими клетки`
         : '')
   )
 
-  return { side, geometry, quality, strips }
+  return { side, geometry, qualityScore, qualityVerdict, manualGeometry, strips }
 }
 
 /* ── стъпка 2: детекция (LLM) ────────────────────────────────────────────── */
@@ -182,7 +217,7 @@ export async function detectEye(
       side: prep.side,
       layer,
       unreadableCells: strip.unreadableCells,
-      qualityScore: prep.quality.score,
+      qualityScore: prep.qualityScore,
     })
 
     try {
@@ -231,12 +266,31 @@ export async function detectEye(
 
   // де-дублиране между слоевете
   const seen = new Set<string>()
-  const findings = collected.filter(f => {
+  const deduped = collected.filter(f => {
     const k = `${f.type}:${f.sector}:${f.ring}`
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
+
+  // Твърд таван. Промптът иска максимум 14 находки, но това е молба, не гаранция —
+  // модел, който върне 40, иначе би размил сигнала и би обърнал всяка система в
+  // „проблемна". Задържаме най-тежките.
+  const findings = deduped
+    .slice()
+    .sort((a, b) => b.load - a.load)
+    .slice(0, MAX_FINDINGS_PER_EYE)
+
+  if (deduped.length > findings.length) {
+    addLog(
+      'warning',
+      `[Детекция ${sideName}] ${deduped.length} находки надхвърлят тавана — задържани най-тежките ${MAX_FINDINGS_PER_EYE}`
+    )
+  }
+
+  if (passesOk === 0) {
+    addLog('error', `[Детекция ${sideName}] Нито един пас не успя — окото няма ирисов принос.`)
+  }
 
   return { side: prep.side, findings, constitution, passesOk, rejectedCount: rejected }
 }
@@ -269,13 +323,23 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     prepareEye(rightIris, 'right', addLog),
   ])
 
-  const imageQuality = (leftPrep.quality.score + rightPrep.quality.score) / 2
+  const imageQuality = (leftPrep.qualityScore + rightPrep.qualityScore) / 2
   const stripCoverage = (leftPrep.strips.base.coverage + rightPrep.strips.base.coverage) / 2
 
   addLog(
     'info',
     `Средно качество ${Math.round(imageQuality)}/100, средно покритие ${Math.round(stripCoverage * 100)} %`
   )
+
+  for (const prep of [leftPrep, rightPrep]) {
+    if (prep.qualityVerdict === 'reject') {
+      addLog(
+        'warning',
+        `[${prep.side === 'left' ? 'Ляв' : 'Десен'}] Снимката е под прага за качество — ` +
+          'ирисовият принос ще бъде силно свит, планът стъпва на въпросника.'
+      )
+    }
+  }
 
   // ── 2. детекция ─────────────────────────────────────────────────────────
   onProgress('Анализ на ляв ирис', 15)
@@ -286,6 +350,10 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
   const right = await detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay)
 
   const allFindings = [...left.findings, ...right.findings]
+  const passTotal = left.passesOk + right.passesOk
+  if (passTotal < 6) {
+    addLog('warning', `Успели LLM паса: ${passTotal} от 6 — част от данните липсват.`)
+  }
   addLog(
     'success',
     `Общо ${allFindings.length} приети находки` +

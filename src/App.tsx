@@ -347,10 +347,18 @@ function App() {
       setAnalysisReport(report)
       
       console.log('📋 [APP] Създаване на "лека" версия на репорт за история (БЕЗ изображения)...')
+      // Изхвърляме ВСИЧКИ тежки изображения, не само двете снимки.
+      // Разгънатите ленти (2 очи × 3 слоя) тежат няколко мегабайта и биха
+      // запушили хранилището след един-два анализа — а те се възстановяват
+      // изцяло от снимката и геометрията, тоест нямат нужда да се пазят.
+      const { strips: _discardedStrips, ...calibratedWithoutStrips } = report.calibrated ?? {}
       const lightReport: AnalysisReport = {
         ...report,
         leftIrisImage: { dataUrl: '', side: 'left' },
-        rightIrisImage: { dataUrl: '', side: 'right' }
+        rightIrisImage: { dataUrl: '', side: 'right' },
+        ...(report.calibrated
+          ? { calibrated: calibratedWithoutStrips as AnalysisReport['calibrated'] }
+          : {})
       }
       
       console.log(`📊 [APP] Размер на "лек" репорт: ${JSON.stringify(lightReport).length} символа`)

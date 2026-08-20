@@ -57,12 +57,18 @@ export interface UnwrapOptions {
   plotHeight?: number
   /** JPEG качество на изхода. */
   quality?: number
+  /**
+   * Да се произведе ли и лентата БЕЗ мрежа (`rawDataUrl`).
+   * По подразбиране НЕ: това е още едно пълно JPEG кодиране на слой, а суровата
+   * лента не се използва никъде в приложението.
+   */
+  includeRaw?: boolean
 }
 
 export interface UnwrapResult {
   /** Готовата лента с мрежа, като data URL (JPEG). */
   dataUrl: string
-  /** Разгънатата тъкан без мрежа — за визуализация в UI. */
+  /** Разгънатата тъкан без мрежа. Празен низ, освен ако `includeRaw` е зададено. */
   rawDataUrl: string
   /** readability[ring][sector] ∈ 0..1 — колко от клетката е четима. */
   readability: number[][]
@@ -341,7 +347,7 @@ export function unwrapIris(
     imgData.data[i * 4 + 3] = 255
   }
   rawCtx.putImageData(imgData, 0, 0)
-  const rawDataUrl = rawCanvas.toDataURL('image/jpeg', quality)
+  const rawDataUrl = options.includeRaw ? rawCanvas.toDataURL('image/jpeg', quality) : ''
 
   const dataUrl = drawCalibrationGrid(rawCanvas, side, layer, readability, quality)
 
@@ -620,6 +626,56 @@ export function unwrapAllFromDataUrl(
       }
     }
     img.onerror = () => reject(new Error('Изображението не може да бъде заредено'))
+    img.src = dataUrl
+  })
+}
+
+/* ── смаляване за съхранение ──────────────────────────────────────────────── */
+
+/**
+ * Смалява готова лента до размер, подходящ за ЗАПИС в отчета.
+ *
+ * Пълната лента е ≈1670×980 px и тежи ~780 KB като data URL. Шест такива
+ * (2 очи × 3 слоя) правят ~4.7 MB на отчет. Отчетите се пазят в историята, а
+ * localStorage/IndexedDB имат няколко мегабайта общо — два анализа стигат да
+ * запушат хранилището.
+ *
+ * За показване в отчета е достатъчна ширина ~1000 px: етикетите остават четими,
+ * а размерът пада около пет пъти. Пълната резолюция се използва само за
+ * заявката към модела и живее единствено в паметта.
+ */
+export function shrinkStripForStorage(
+  dataUrl: string,
+  maxWidth = 1000,
+  quality = 0.72
+): Promise<string> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width
+        const h = img.naturalHeight || img.height
+        if (w <= maxWidth) {
+          resolve(dataUrl)
+          return
+        }
+        const scale = maxWidth / w
+        const c = document.createElement('canvas')
+        c.width = Math.round(w * scale)
+        c.height = Math.round(h * scale)
+        const ctx = c.getContext('2d')!
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+        // Бял фон: рамката на лентата е бяла, а JPEG няма прозрачност.
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        resolve(c.toDataURL('image/jpeg', quality))
+      } catch {
+        resolve(dataUrl)
+      }
+    }
+    img.onerror = () => resolve(dataUrl)
     img.src = dataUrl
   })
 }

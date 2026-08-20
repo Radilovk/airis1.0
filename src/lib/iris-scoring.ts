@@ -74,11 +74,16 @@ export interface SystemResult {
 
 export type DriverStrength = 'high' | 'medium' | 'low'
 
+/** В коя секция на плана попада действието. */
+export type DriverCategory = 'diet' | 'supplement' | 'lifestyle'
+
 /** Проследима причина за препоръка. */
 export interface NutritionDriver {
   id: string
   system: SystemKey
   strength: DriverStrength
+  /** Категория за отчета — не всичко е „хранене". */
+  category: DriverCategory
   /** Какво наблюдаваме. */
   observation: string
   /** Какво следва да се направи в храненето. */
@@ -458,6 +463,8 @@ export function computeScores(input: ScoringInput): ScoringResult {
 interface DriverRule {
   id: string
   system: SystemKey
+  /** Категория за отчета. По подразбиране 'diet'. */
+  category?: DriverCategory
   /** Праг на оценката, под който правилото се задейства. */
   belowScore: number
   observation: string
@@ -537,6 +544,7 @@ const DRIVER_RULES: DriverRule[] = [
   // ── ендокринна ──
   {
     id: 'circadian_anchor',
+    category: 'lifestyle',
     system: 'endocrine',
     belowScore: 76,
     observation: 'Хормоналният ритъм е разместен от съня и стреса.',
@@ -588,6 +596,7 @@ const DRIVER_RULES: DriverRule[] = [
   },
   {
     id: 'lymph_move',
+    category: 'lifestyle',
     system: 'immune',
     belowScore: 68,
     observation: 'Лимфата се движи само с мускулна помпа.',
@@ -656,6 +665,7 @@ function buildDrivers(
     drivers.push({
       id: rule.id,
       system: rule.system,
+      category: rule.category ?? 'diet',
       strength: strengthFor(sys.score, rule.belowScore),
       observation: rule.observation,
       action: rule.action,

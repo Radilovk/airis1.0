@@ -13,6 +13,7 @@ import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
 import { runIrisPipeline, toIrisAnalysis } from '@/lib/iris-pipeline'
 import { FINDINGS } from '@/lib/iris-map'
+import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
@@ -735,7 +736,9 @@ ${response}
     const recommendations: Recommendation[] = []
     for (const d of result.scoring.drivers) {
       recommendations.push({
-        category: 'diet',
+        // Категорията идва от самото правило — режимните драйвери (ритъм на съня,
+        // движение за лимфата) не са хранителни препоръки.
+        category: d.category,
         title: d.observation,
         description: d.action,
         priority: d.strength,
@@ -765,7 +768,6 @@ ${response}
     const dayStructure = plan?.dayStructure
     const generalRecommendations = [
       ...(plan?.priorities ?? []),
-      ...(plan?.firstWeek ?? []).map(x => `Първа седмица: ${x}`),
       ...(dayStructure
         ? [
             dayStructure.breakfast ? `Закуска: ${dayStructure.breakfast}` : '',
@@ -774,11 +776,34 @@ ${response}
             dayStructure.notes ? `Ритъм: ${dayStructure.notes}` : '',
           ].filter(Boolean)
         : []),
+      ...(plan?.lifestyle?.activity ?? []).map(x => `Движение: ${x}`),
     ]
 
     const detailedAnalysis =
       result.interpretation?.summary ||
       `Анализът е базиран основно на въпросника (качество на снимките ${Math.round(result.imageQuality)}/100).`
+
+    const [
+      leftBase, leftStructure, leftPigment,
+      rightBase, rightStructure, rightPigment,
+    ] = await Promise.all([
+      shrinkStripForStorage(result.preparation.left.strips.base.dataUrl),
+      shrinkStripForStorage(result.preparation.left.strips.structure.dataUrl),
+      shrinkStripForStorage(result.preparation.left.strips.pigment.dataUrl),
+      shrinkStripForStorage(result.preparation.right.strips.base.dataUrl),
+      shrinkStripForStorage(result.preparation.right.strips.structure.dataUrl),
+      shrinkStripForStorage(result.preparation.right.strips.pigment.dataUrl),
+    ])
+    const shrunk = {
+      leftBase, leftStructure, leftPigment,
+      rightBase, rightStructure, rightPigment,
+    }
+    addLog(
+      'info',
+      `Лентите са смалени за отчета: ${Math.round(
+        Object.values(shrunk).reduce((a, b) => a + b.length, 0) / 1024
+      )} KB общо`
+    )
 
     const calibrated: CalibratedAnalysisPayload = {
       imageQuality: Math.round(result.imageQuality),
@@ -811,16 +836,19 @@ ${response}
         confidence: f.confidence,
         priorityZones: f.priorityZones,
       })),
+      // Смалени копия: пълните ленти (≈780 KB всяка) се ползват САМО за
+      // заявките към модела и остават в паметта. В отчета влизат намалени
+      // версии, иначе шестте ленти правят ~4.7 MB на отчет.
       strips: {
         left: {
-          base: result.preparation.left.strips.base.dataUrl,
-          structure: result.preparation.left.strips.structure.dataUrl,
-          pigment: result.preparation.left.strips.pigment.dataUrl,
+          base: shrunk.leftBase,
+          structure: shrunk.leftStructure,
+          pigment: shrunk.leftPigment,
         },
         right: {
-          base: result.preparation.right.strips.base.dataUrl,
-          structure: result.preparation.right.strips.structure.dataUrl,
-          pigment: result.preparation.right.strips.pigment.dataUrl,
+          base: shrunk.rightBase,
+          structure: shrunk.rightStructure,
+          pigment: shrunk.rightPigment,
         },
       },
       constitution:
@@ -852,8 +880,16 @@ ${response}
         avoidFoods: plan?.eatLess ?? [],
         supplements,
         psychologicalRecommendations: plan?.lifestyle?.stress ?? [],
-        specialRecommendations: plan?.lifestyle?.activity ?? [],
-        recommendedTests: plan?.followUp ?? [],
+        // „Специални (индивидуални) препоръки" = конкретните стъпки за първата
+        // седмица. Преди тук влизаше движението, което е режим, не индивидуална
+        // препоръка.
+        specialRecommendations: [
+          ...(plan?.firstWeek ?? []).map(x => `Първа седмица: ${x}`),
+          ...(plan?.followUp ?? []).map(x => `За проследяване: ${x}`),
+        ],
+        // Секцията е озаглавена „Препоръчителни Конкретни Изследвания“, затова тук
+        // влизат имена на изследвания, а не бележки за проследяване (както беше).
+        recommendedTests: plan?.suggestedChecks ?? [],
       },
       calibrated,
     }
