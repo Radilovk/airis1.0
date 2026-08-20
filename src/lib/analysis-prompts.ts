@@ -38,6 +38,7 @@ import {
   systemsToPromptBlock,
   type NormalizedFinding,
 } from './iris-scoring'
+import { safetyToPromptBlock } from './safety-profile'
 import type { QuestionnaireData } from '@/types'
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -261,6 +262,41 @@ export function buildInterpretationPrompt(ctx: InterpretationContext): string {
         ? 'Качеството на снимките е средно — говори за ирисовите наблюдения предпазливо, като „сигнал за наблюдение".'
         : 'Качеството на снимките е ниско — ирисовите наблюдения се споменават най-много веднъж и само общо. Планът стъпва на въпросника.'
 
+  const safetyBlock = safetyToPromptBlock(scoring.safety, scoring.notices)
+  const p = scoring.safety
+
+  // Твърдите забрани се повтарят най-отгоре, защото това е единственото място,
+  // където моделът може да навреди директно.
+  const hardRules: string[] = []
+  if (p.pregnancy || p.breastfeeding || p.minor || p.underweight || p.eatingDisorder) {
+    hardRules.push(
+      'НЕ давай калорийни цели, режими за отслабване, гладуване или „детокс". ' +
+        'Планът е ПОДДЪРЖАЩ — достатъчност, не ограничение.'
+    )
+  }
+  if (p.autoimmuneThyroid) {
+    hardRules.push('НЕ препоръчвай йод, водорасли или йодирана сол на воля.')
+  }
+  if (p.kidneyDisease) {
+    hardRules.push('НЕ препоръчвай повишен белтък, повече калий или увеличен прием на течности.')
+  }
+  if (p.hypertension) {
+    hardRules.push('НЕ препоръчвай свободен прием на сол; посоката е намаляване.')
+  }
+  if (p.glucoseLoweringMeds) {
+    hardRules.push('НЕ препоръчвай пропускане на хранене или дълги паузи между храненията.')
+  }
+  if (p.bowelInflammation) {
+    hardRules.push('НЕ препоръчвай рязко увеличаване на фибри, сурови зеленчуци или ферментирали храни на воля.')
+  }
+  if (p.vegan) {
+    hardRules.push('НЕ предлагай животински продукти. Витамин B12 е задължителна добавка.')
+  } else if (p.vegetarian) {
+    hardRules.push('НЕ предлагай месо и риба.')
+  }
+  if (p.glutenFree) hardRules.push('НЕ предлагай пшеница, ръж, ечемик или обикновен овес.')
+  if (p.lactoseIntolerant) hardRules.push('НЕ предлагай млечни продукти с лактоза.')
+
   return `Ти си консултант по хранене. Пишеш на български, ясно и практично,
 към конкретен човек, на „ти".
 
@@ -272,6 +308,13 @@ export function buildInterpretationPrompt(ctx: InterpretationContext): string {
   и винаги с уговорка да се съгласуват с лекар.
 • Ако въпросникът съдържа тежко състояние или медикаменти, планът е щадящ и
   изрично препраща към лекуващия лекар.
+
+═══ ФИЗИОЛОГИЧНИ ОГРАДИ ЗА ТОЗИ ЧОВЕК (най-висок приоритет) ═══
+Тези правила са изчислени от въпросника и НЕ подлежат на предоговаряне.
+Ако драйвер по-долу им противоречи, ОГРАДАТА печели.
+${hardRules.length ? hardRules.map(r => `‼ ${r}`).join('\n') : '‼ Няма установени специални ограничения.'}
+
+${safetyBlock}
 
 ${confidenceNote}
 

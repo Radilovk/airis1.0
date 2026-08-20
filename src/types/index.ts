@@ -216,6 +216,12 @@ export interface CalibratedAnalysisPayload {
     right?: Partial<Record<'base' | 'structure' | 'pigment', string>>
   }
   constitution?: string
+  /**
+   * Видими физиологични огради (бременност, бъбречно състояние, автоимунен
+   * тиреоидит и т.н.). Показват се в отчета и обясняват защо определени
+   * съвети липсват или изглеждат различно.
+   */
+  notices?: Array<{ level: 'critical' | 'caution'; title: string; body: string }>
 }
 
 /** Three independent filtered views of the unwrapped iris image */

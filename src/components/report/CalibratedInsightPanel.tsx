@@ -9,6 +9,7 @@ import {
   ListChecks,
   MapPin,
   Scales,
+  ShieldWarning,
   Target,
 } from '@phosphor-icons/react'
 import type { CalibratedAnalysisPayload } from '@/types'
@@ -103,6 +104,62 @@ export default function CalibratedInsightPanel({ data }: Props) {
           </p>
         </div>
       </Card>
+
+      {/* ── Физиологични огради ───────────────────────────────────────────── */}
+      {data.notices && data.notices.length > 0 && (
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldWarning size={20} weight="duotone" className="text-amber-600" />
+            <h3 className="text-lg font-semibold">Важно за твоя случай</h3>
+          </div>
+          <div className="space-y-2">
+            {data.notices.map((n, i) => (
+              <motion.div
+                key={n.title}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <Card
+                  className={`p-4 ${
+                    n.level === 'critical'
+                      ? 'border-rose-300 bg-rose-50/70'
+                      : 'border-amber-300 bg-amber-50/70'
+                  }`}
+                >
+                  <div className="flex gap-3">
+                    <div
+                      className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
+                        n.level === 'critical' ? 'bg-rose-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-semibold ${
+                          n.level === 'critical' ? 'text-rose-900' : 'text-amber-900'
+                        }`}
+                      >
+                        {n.title}
+                      </p>
+                      <p
+                        className={`mt-1 text-xs leading-relaxed ${
+                          n.level === 'critical' ? 'text-rose-800' : 'text-amber-800'
+                        }`}
+                      >
+                        {n.body}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            Планът по-долу вече е съобразен с горното — някои общи препоръки са
+            заменени или пропуснати нарочно.
+          </p>
+        </div>
+      )}
 
       {/* ── Приоритетни системи ───────────────────────────────────────────── */}
       <div>

@@ -798,6 +798,19 @@ ${response}
       leftBase, leftStructure, leftPigment,
       rightBase, rightStructure, rightPigment,
     }
+    if (result.scoring.notices.length > 0) {
+      addLog(
+        'warning',
+        `Активни физиологични огради: ${result.scoring.notices.map(n => n.title).join(', ')}`
+      )
+    }
+    if (result.scoring.suppressed.length > 0) {
+      addLog(
+        'info',
+        `Пропуснати препоръки заради противопоказание: ${result.scoring.suppressed.join(', ')}`
+      )
+    }
+
     addLog(
       'info',
       `Лентите са смалени за отчета: ${Math.round(
@@ -853,6 +866,7 @@ ${response}
       },
       constitution:
         result.left.constitution !== 'unclear' ? result.left.constitution : result.right.constitution,
+      notices: result.scoring.notices,
     }
 
     setProgress(100)
