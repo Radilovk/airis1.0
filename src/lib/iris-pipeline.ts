@@ -246,6 +246,7 @@ export async function detectEye(
       side: prep.side,
       layer,
       unreadableCells: strip.unreadableCells,
+      partialCells: strip.partialCells,
       qualityScore: prep.qualityScore,
       flash: prep.flash,
     })
@@ -254,7 +255,10 @@ export async function detectEye(
       const response = await callLLM(prompt, true, 2, strip.dataUrl)
       const parsed = parseJsonResponse(response) as Record<string, unknown>
       const rawList = Array.isArray(parsed.findings) ? parsed.findings : []
-      const normalized = normalizeFindings(rawList, prep.side)
+      const normalized = normalizeFindings(rawList, prep.side, {
+        readability: strip.readability,
+        partialCells: strip.partialCells,
+      })
       rejected += rawList.length - normalized.length
       collected.push(...normalized)
       passesOk++

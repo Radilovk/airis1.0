@@ -74,6 +74,12 @@ export interface UnwrapResult {
   readability: number[][]
   /** Списък на клетките, които са под прага на четимост. */
   unreadableCells: Array<{ sector: number; ring: number }>
+  /**
+   * Клетки, четими като цяло, но с частично маскирана площ (отблясък, ръб на
+   * клепач). Находка в такава клетка е с по-малка тежест: част от текстурата
+   * липсва и е лесно да се сбърка ореолът на светкавицата с пигмент.
+   */
+  partialCells: Array<{ sector: number; ring: number; readable: number }>
   /** Общ дял четима площ 0..1. */
   coverage: number
   side: Side
@@ -83,6 +89,9 @@ export interface UnwrapResult {
 const SECTORS = 12
 const RINGS = 12
 const UNREADABLE_THRESHOLD = 0.55 // клетка под 55 % четими пиксели се маркира
+// Между двата прага клетката е използваема, но не е чиста: докладва се на модела
+// като „частична" и находките в нея се претеглят надолу.
+const PARTIAL_THRESHOLD = 0.9
 
 /* ── семплиране ───────────────────────────────────────────────────────────── */
 
@@ -394,17 +403,40 @@ export function unwrapIris(
     }
   }
 
+  // Ореолът на отблясъка не спира на границата на клетката. Клетка с 95 %
+  // четимост до силно маскирана съседка е по-светла и по-жълта именно заради
+  // разсейката — точно така се роди фалшивото „ярък жълто-оранжев пигмент".
+  // Затова съседството се брои: то е измеримо, а не предположение.
+  const HALO_NEIGHBOUR = 0.85
+  const bleeding = (ring: number, sec: number) => {
+    if (readability[ring][sec] >= 1) return false
+    const n: Array<[number, number]> = [
+      [ring - 1, sec],
+      [ring + 1, sec],
+      [ring, (sec + SECTORS - 1) % SECTORS], // лентата е разгъната кръгово:
+      [ring, (sec + 1) % SECTORS], // S12 и S1 са съседни в окото
+    ]
+    return n.some(([r, c]) => r >= 0 && r < RINGS && readability[r][c] < HALO_NEIGHBOUR)
+  }
+
   const unreadableCells: Array<{ sector: number; ring: number }> = []
+  const partialCells: Array<{ sector: number; ring: number; readable: number }> = []
   let readableCells = 0
   for (let ring = 0; ring < RINGS; ring++) {
     for (let sec = 0; sec < SECTORS; sec++) {
-      if (readability[ring][sec] < UNREADABLE_THRESHOLD) {
+      const r = readability[ring][sec]
+      if (r < UNREADABLE_THRESHOLD) {
         unreadableCells.push({ sector: sec + 1, ring })
       } else {
         readableCells++
+        if (r < PARTIAL_THRESHOLD || bleeding(ring, sec)) {
+          partialCells.push({ sector: sec + 1, ring, readable: Math.round(r * 100) / 100 })
+        }
       }
     }
   }
+  const isPartial = Array.from({ length: RINGS }, () => new Array(SECTORS).fill(false))
+  for (const c of partialCells) isPartial[c.ring][c.sector - 1] = true
   const coverage = readableCells / (RINGS * SECTORS)
 
   // ── растеризация ─────────────────────────────────────────────────────────
@@ -414,17 +446,23 @@ export function unwrapIris(
   const rawCtx = rawCanvas.getContext('2d')!
   const imgData = rawCtx.createImageData(PW, PH)
   for (let i = 0; i < PW * PH; i++) {
-    imgData.data[i * 4] = px[i * 3]
-    imgData.data[i * 4 + 1] = px[i * 3 + 1]
-    imgData.data[i * 4 + 2] = px[i * 3 + 2]
+    // Маскираните пиксели се ЗАЛИЧАВАТ, а не само се изключват от статистиката.
+    // Дотук отблясъкът на светкавицата се махаше от изчисленията, но се
+    // рисуваше в лентата с оригиналната си стойност — и моделът го четеше като
+    // „ярък жълто-оранжев пигмент". Плоското сиво няма нито влакна, нито цвят,
+    // затова не може да бъде объркано с тъкан в никой от двата слоя.
+    const dead = !valid[i]
+    imgData.data[i * 4] = dead ? 122 : px[i * 3]
+    imgData.data[i * 4 + 1] = dead ? 122 : px[i * 3 + 1]
+    imgData.data[i * 4 + 2] = dead ? 128 : px[i * 3 + 2]
     imgData.data[i * 4 + 3] = 255
   }
   rawCtx.putImageData(imgData, 0, 0)
   const rawDataUrl = options.includeRaw ? rawCanvas.toDataURL('image/jpeg', quality) : ''
 
-  const dataUrl = drawCalibrationGrid(rawCanvas, side, layer, readability, quality)
+  const dataUrl = drawCalibrationGrid(rawCanvas, side, layer, readability, isPartial, quality)
 
-  return { dataUrl, rawDataUrl, readability, unreadableCells, coverage, side, layer }
+  return { dataUrl, rawDataUrl, readability, unreadableCells, partialCells, coverage, side, layer }
 }
 
 /* ── мрежата ──────────────────────────────────────────────────────────────── */
@@ -452,6 +490,7 @@ function drawCalibrationGrid(
   side: Side,
   layer: StripLayer,
   readability: number[][],
+  isPartial: boolean[][],
   quality: number
 ): string {
   const PW = plot.width
@@ -506,6 +545,30 @@ function drawCalibrationGrid(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText('N/A', x + cellW / 2, y + cellH / 2)
+    }
+  }
+  ctx.restore()
+
+  // 2б. Частично маскираните клетки — рядка защриховка без запълване, за да се
+  // вижда тъканта, но да е ясно, че клетката не е чиста.
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(PAD_LEFT, PAD_TOP, PW, PH)
+  ctx.clip()
+  ctx.strokeStyle = 'rgba(255,190,90,0.55)'
+  ctx.lineWidth = 2
+  for (let ring = 0; ring < RINGS; ring++) {
+    for (let s = 0; s < SECTORS; s++) {
+      if (readability[ring][s] < UNREADABLE_THRESHOLD || !isPartial[ring][s]) continue
+      const x = xOf(s)
+      const y = yOf(ring)
+      for (let k = -cellH; k < cellW; k += 26) {
+        ctx.beginPath()
+        ctx.moveTo(x + k, y + cellH)
+        ctx.lineTo(x + k + cellH, y)
+        ctx.stroke()
+      }
+      ctx.strokeRect(x + 1, y + 1, cellW - 2, cellH - 2)
     }
   }
   ctx.restore()

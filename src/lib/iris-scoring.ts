@@ -136,7 +136,23 @@ function asSize(v: unknown): FindingSize {
  * Отхвърля: непознат тип, сектор/пръстен извън обхват, находка в пръстен,
  * в който този тип няма физически смисъл, и увереност под 0.35.
  */
-export function normalizeFindings(raw: unknown, side: Side): NormalizedFinding[] {
+/**
+ * Четимостта на клетките от разгъването. Подава се, за да не тежи еднакво
+ * находка в чиста клетка и находка в клетка, на която една пета от площта е
+ * заличен отблясък.
+ */
+export interface CellReadability {
+  readability: number[][]
+  partialCells: Array<{ sector: number; ring: number }>
+}
+
+export function normalizeFindings(
+  raw: unknown,
+  side: Side,
+  cells?: CellReadability
+): NormalizedFinding[] {
+  const partialKeys = new Set((cells?.partialCells ?? []).map(c => `${c.sector}:${c.ring}`))
+
   const list = Array.isArray(raw) ? raw : []
   const out: NormalizedFinding[] = []
 
@@ -178,7 +194,19 @@ export function normalizeFindings(raw: unknown, side: Side): NormalizedFinding[]
     const zones = priorityZonesFor(side, centreMinute, ring)
 
     const boost = zones.length > 0 ? PRIORITY_ZONE_BOOST : 1
-    const load = def.weight * SIZE_WEIGHT[size] * confidence * boost
+
+    // Клетка с частично маскирана площ носи по-малко доказателство. Под 55 %
+    // четимост находката се отхвърля изцяло: там е било защриховано „N/A",
+    // тоест моделът е докладвал върху маска.
+    const readable = cells?.readability?.[ring]?.[sector - 1]
+    if (readable !== undefined && readable < 0.55) continue
+    // Собствената четимост на клетката, а под нея — фиксирано намаление, ако
+    // клетката е в обхвата на съседен отблясък (ореолът бледнее през ръба).
+    const readableFactor =
+      (readable === undefined ? 1 : Math.min(1, readable / 0.9)) *
+      (partialKeys.has(`${sector}:${ring}`) ? 0.6 : 1)
+
+    const load = def.weight * SIZE_WEIGHT[size] * confidence * boost * readableFactor
 
     out.push({
       side,

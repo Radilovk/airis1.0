@@ -100,8 +100,14 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         }
         break
       case 'gemini':
-        if (!key.startsWith('AIza')) {
-          return { valid: false, message: 'Google Gemini API ключът трябва да започва с "AIza"' }
+        // Google издава ДВА формата: по-старите ключове от AI Studio започват с
+        // „AIza", по-новите — с „AQ.". Проверката приемаше само първия и
+        // отхвърляше напълно валидни ключове от втория вид.
+        if (!key.startsWith('AIza') && !key.startsWith('AQ.')) {
+          return {
+            valid: false,
+            message: 'Google Gemini API ключът трябва да започва с „AIza" или „AQ."',
+          }
         }
         if (key.length < 30) {
           return { valid: false, message: 'Google Gemini API ключът е твърде кратък' }
