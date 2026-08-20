@@ -65,6 +65,8 @@ export interface EyePreparation {
   qualityVerdict: 'pass' | 'warn' | 'reject'
   /** Дали геометрията е потвърдена/коригирана ръчно от потребителя. */
   manualGeometry: boolean
+  /** Изведено от снимката, не предположено: има ли отблясък от светкавица. */
+  flash: boolean
   strips: Record<StripLayer, UnwrapResult>
 }
 
@@ -207,7 +209,13 @@ export async function prepareEye(
         : '')
   )
 
-  return { side, geometry, qualityScore, qualityVerdict, manualGeometry, strips }
+  // Прагът е КАЛИБРИРАН по измерване, не избран на око: върху пет реални снимки
+  // четирите при околна светлина дават 0.0 %, а тази със светкавица — 1.7 %.
+  // 0.5 % лежи в средата на празнината.
+  const flash = recomputed.metrics.pupilSpecular > 0.005
+  if (flash) addLog('info', `[Подготовка ${name}] Разпозната светкавица — четенето е нагласено за нея`)
+
+  return { side, geometry, qualityScore, qualityVerdict, manualGeometry, flash, strips }
 }
 
 /* ── стъпка 2: детекция (LLM) ────────────────────────────────────────────── */
@@ -239,6 +247,7 @@ export async function detectEye(
       layer,
       unreadableCells: strip.unreadableCells,
       qualityScore: prep.qualityScore,
+      flash: prep.flash,
     })
 
     try {

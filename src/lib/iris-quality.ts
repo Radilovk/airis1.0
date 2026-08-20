@@ -72,6 +72,14 @@ export interface QualityMetrics {
   saturation: number
   /** Резолюция по по-малката страна, px. */
   minDimension: number
+  /**
+   * Дял от площта на ЗЕНИЦАТА, зает от спекуларен отблясък.
+   *
+   * Това е сигнатурата на светкавицата: компактно, почти бяло петно в средата на
+   * зеницата. При околна светлина отблясъкът е разсеян и попада другаде.
+   * Използва се, за да се каже на модела при какви условия е снимано.
+   */
+  pupilSpecular: number
 }
 
 export interface QualityReport {
@@ -256,6 +264,25 @@ export function analyseIrisQuality(
   // Нормиране: <40 = размазано, >400 = много рязко
   const sharpness = Math.max(0, Math.min(1, (lapVar - 25) / 375))
 
+  // Отблясък В зеницата — сигнатура на светкавица.
+  let pupilSpecular = 0
+  {
+    const pr = geometry.pupil.r * s.scale
+    const pcx = geometry.pupil.cx * s.scale
+    const pcy = geometry.pupil.cy * s.scale
+    let hit = 0
+    let tot = 0
+    for (let y = Math.max(0, Math.floor(pcy - pr)); y < Math.min(s.h, pcy + pr); y++) {
+      for (let x = Math.max(0, Math.floor(pcx - pr)); x < Math.min(s.w, pcx + pr); x++) {
+        if ((x - pcx) ** 2 + (y - pcy) ** 2 > pr * pr) continue
+        tot++
+        const p = (y * s.w + x) * 4
+        if (s.rgba[p] > 225 && s.rgba[p + 1] > 225 && s.rgba[p + 2] > 225) hit++
+      }
+    }
+    pupilSpecular = tot > 20 ? hit / tot : 0
+  }
+
   const frameCoverage = irisFrameCoverage(geometry)
   const irisFill = minDimension > 0 ? (geometry.limbus.r * 2) / minDimension : 0
   const ratio = pupilRatio(geometry)
@@ -271,6 +298,7 @@ export function analyseIrisQuality(
     occlusion,
     saturation,
     minDimension,
+    pupilSpecular,
   }
 
   // ── правила ───────────────────────────────────────────────────────────────

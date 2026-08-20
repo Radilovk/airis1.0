@@ -136,42 +136,47 @@ export interface SectorDef {
 /**
  * Етикетите на 12-те визуални зони са ОБЩИ — функционални, а не органни.
  * Това е изрично изискване: 12-те зони остават видими, но не назовават орган,
- * за да не се създава впечатление за медицинска диагноза.
+ * за да не се създава впечатление за медицинска диагноза. Органните съответствия
+ * стоят само в полето `reference`, взети дословно от `manual.json`.
  *
- * Списъците са РАЗЛИЧНИ за двете очи, защото картите са огледални. Първата
- * версия ползваше един общ списък по индекс — тогава етикетът на ляво S4 казваше
- * „Дишане и гръден кош", докато теглата на същия сектор бяха 100 % кръвообращение.
- * Етикет, който противоречи на изчислението под него, е по-лош от липсващ.
+ * ВСИЧКО ПО-ДОЛУ Е ИЗВЕДЕНО ОТ `manual.json` → `CLOCK`.
+ *
+ * Първата версия на този файл беше построена от обща иридологична литература,
+ * без да бъде сверена със собствения справочник на проекта. Разминаванията бяха
+ * груби: черният дроб стоеше на 5–6 ч вместо на 4–5 ч, бъбрекът на 7–8 вместо
+ * на 6:00, панкреасът (дясно) на 8–9 вместо главата му на 8:00, а сърцето в
+ * ляво око беше на 3–4 ч, докато справочникът го слага на 8:00–8:30 — разлика
+ * от пет часа. Тоест находка, разчетена вярно от модела, се приписваше на
+ * грешна система.
  */
 const ZONE_LABELS_RIGHT = [
-  'Глава и нервна регулация',      // S1  12–1
-  'Хормонален контрол',            // S2  1–2
-  'Обмяна и щитовидна ос',         // S3  2–3
-  'Дишане и гръден кош',           // S4  3–4
-  'Горно храносмилане',            // S5  4–5
-  'Чернодробно-жлъчна ос',         // S6  5–6
-  'Долно храносмилане',            // S7  6–7
-  'Отделяне и водно-солев баланс', // S8  7–8
-  'Стресова ос и надбъбречни',     // S9  8–9
-  'Кръвообращение',                // S10 9–10
-  'Лимфа и имунен фон',            // S11 10–11
-  'Възстановяване и сън',          // S12 11–12
+  'Хормонален център и синуси',   // S1  12–1  хипофиза/епифиза, нос/синуси
+  'Сетивна кора и очна област',   // S2  1–2   сензорен кортекс, око/орбита
+  'Щитовидна ос и гърло',         // S3  2–3   уста/сливици, щитовидна
+  'Дишане и гръден кош',          // S4  3–4   бронхи/горен бял дроб, ребра
+  'Чернодробно-жлъчна ос',        // S5  4–5   долен бял дроб, ЧЕРЕН ДРОБ/ЖЛЪЧКА
+  'Пикочни пътища',               // S6  5–6   пикочен мехур
+  'Бъбречно-надбъбречна ос',      // S7  6–7   БЪБРЕК+НАДБЪБРЕЧНИ, репродуктивни
+  'Илеоцекална област',           // S8  7–8   крайници, апендикс/сляпо черво
+  'Кръвно-захарна ос',            // S9  8–9   ПАНКРЕАС ГЛАВА, диафрагма
+  'Гръб и опорен апарат',         // S10 9–10  гръб/торакален, ухо
+  'Шия и малък мозък',            // S11 10–11 шия/тил/малък мозък
+  'Двигателна кора',              // S12 11–12 моторен кортекс
 ]
 
-/** Огледален ред: ляво Sk съответства функционално на дясно S(14−k), k≥2. */
 const ZONE_LABELS_LEFT = [
-  'Глава и нервна регулация',      // S1  12–1
-  'Възстановяване и сън',          // S2  1–2
-  'Лимфа и имунен фон',            // S3  2–3
-  'Кръвообращение',                // S4  3–4
-  'Стресова ос и надбъбречни',     // S5  4–5
-  'Отделяне и водно-солев баланс', // S6  5–6
-  'Долно храносмилане',            // S7  6–7
-  'Кръвно-захарна регулация',      // S8  7–8
-  'Горно храносмилане',            // S9  8–9
-  'Дишане и гръден кош',           // S10 9–10
-  'Обмяна и щитовидна ос',         // S11 10–11
-  'Хормонален контрол',            // S12 11–12
+  'Хормонален център и синуси',   // S1  12–1  хипофиза/епифиза
+  'Двигателна кора и шия',        // S2  1–2   моторен кортекс, шия/тил/малък мозък
+  'Ухо и мастоид',                // S3  2–3   ухо/мастоид
+  'Гръб и коремна стена',         // S4  3–4   гръб/торакален, коремна стена
+  'Долно дебело черво',           // S5  4–5   сигма/ректум
+  'Пикочни пътища и таз',         // S6  5–6   крайници/ингвинална, пикочен мехур
+  'Бъбречно-надбъбречна ос',      // S7  6–7   БЪБРЕК+НАДБЪБРЕЧНИ, репродуктивни
+  'Кръвно-захарна и лимфна ос',   // S8  7–8   ДАЛАК, ПАНКРЕАС тяло/опашка
+  'Сърдечна област',              // S9  8–9   СЪРЦЕ
+  'Щитовидна ос и дишане',        // S10 9–10  бронхи/горен бял дроб, щитовидна
+  'Уста и очна област',           // S11 10–11 уста/език/сливици, око/орбита
+  'Сетивна кора и синуси',        // S12 11–12 сензорен кортекс, нос/синуси
 ]
 
 function makeSector(labels: string[]) {
@@ -198,43 +203,40 @@ function makeSector(labels: string[]) {
 const sectorR = makeSector(ZONE_LABELS_RIGHT)
 const sectorL = makeSector(ZONE_LABELS_LEFT)
 
-/**
- * ДЕСЕН ИРИС. Черният дроб и жлъчката се проектират в дясното око
- * (сектори 6–7, приблизително 5:00–7:00), апендиксът и илеоцекалната област — 6–7 ч.
- */
+/** ДЯСНО ОКО — точно по `manual.json` → `CLOCK`, записите с „(R)" и общите. */
 export const SECTORS_RIGHT: SectorDef[] = [
-  sectorR(1, { nervous: 1.0, endocrine: 0.2 }, 'мозъчна кора, нервна регулация'),
-  sectorR(2, { endocrine: 0.9, nervous: 0.3 }, 'хипофизно-хипоталамична ос'),
-  sectorR(3, { endocrine: 1.0, metabolic: 0.7 }, 'щитовидна жлеза, базален обмен'),
-  sectorR(4, { immune: 0.5, circulatory: 0.4 }, 'бял дроб, бронхи (дясно)'),
-  sectorR(5, { digestive: 1.0, metabolic: 0.5 }, 'стомах, дуоденум'),
-  sectorR(6, { detox: 1.0, digestive: 0.6, metabolic: 0.5 }, 'черен дроб, жлъчка (дясно)'),
-  sectorR(7, { digestive: 1.0, immune: 0.4 }, 'тънко и дебело черво, илеоцекална област'),
-  sectorR(8, { detox: 0.8, metabolic: 0.3 }, 'бъбрек, пикочни пътища (дясно)'),
-  sectorR(9, { endocrine: 1.0, metabolic: 0.6, nervous: 0.5 }, 'надбъбречна жлеза (дясно)'),
-  sectorR(10, { circulatory: 0.9 }, 'съдов тонус, периферно кръвообращение'),
-  sectorR(11, { immune: 1.0, detox: 0.4 }, 'лимфен дренаж (дясно)'),
-  sectorR(12, { nervous: 0.8, endocrine: 0.4 }, 'епифиза, сън и възстановяване'),
+  sectorR(1, { endocrine: 0.9, nervous: 0.6, immune: 0.3 }, 'хипофиза/епифиза/психика; нос/синуси/челюст'),
+  sectorR(2, { nervous: 1.0 }, 'сензорен кортекс; око/орбита'),
+  sectorR(3, { endocrine: 1.0, metabolic: 0.7, immune: 0.4, digestive: 0.3 }, 'уста/език/сливици; щитовидна/шийни прешлени'),
+  sectorR(4, { immune: 0.5, circulatory: 0.3 }, 'рамо/ръка/бронхи/горен бял дроб; гръден кош/ребра/млечна жлеза'),
+  sectorR(5, { detox: 1.0, digestive: 0.6, metabolic: 0.5 }, 'долен бял дроб/плевра; черен дроб/жлъчка'),
+  sectorR(6, { detox: 0.8 }, 'пикочен мехур'),
+  sectorR(7, { detox: 0.9, endocrine: 0.9, metabolic: 0.4 }, 'бъбрек+надбъбречни; репродуктивни органи'),
+  sectorR(8, { digestive: 0.9, immune: 0.5 }, 'крайници/ингвинална област; апендикс/сляпо черво'),
+  sectorR(9, { metabolic: 1.0, digestive: 0.9 }, 'панкреас глава; диафрагма/коремна стена'),
+  sectorR(10, { nervous: 0.4 }, 'гръб/торакален отдел; ухо/мастоид'),
+  sectorR(11, { nervous: 0.7 }, 'шия/тил/малък мозък'),
+  sectorR(12, { nervous: 0.9 }, 'моторен кортекс'),
 ]
 
 /**
- * ЛЯВ ИРИС. Сърцето, далакът и панкреасът се проектират в лявото око.
- * Секторите са огледални по функция, но не по номер — номерацията остава
- * часовникова, за да съвпада с визуализацията.
+ * ЛЯВО ОКО — също по `manual.json`. НЕ е огледален индекс на дясното:
+ * сърцето, далакът и панкреасното тяло съществуват само тук, а черният дроб —
+ * само в дясното око.
  */
 export const SECTORS_LEFT: SectorDef[] = [
-  sectorL(1, { nervous: 1.0, endocrine: 0.2 }, 'мозъчна кора, нервна регулация'),
-  sectorL(2, { nervous: 0.8, endocrine: 0.4 }, 'епифиза, сън и възстановяване'),
-  sectorL(3, { immune: 1.0, detox: 0.4 }, 'лимфен дренаж (ляво), далак'),
-  sectorL(4, { circulatory: 1.0 }, 'сърце, съдов тонус'),
-  sectorL(5, { endocrine: 1.0, metabolic: 0.6, nervous: 0.5 }, 'надбъбречна жлеза (ляво)'),
-  sectorL(6, { detox: 0.8, metabolic: 0.3 }, 'бъбрек, пикочни пътища (ляво)'),
-  sectorL(7, { digestive: 1.0, immune: 0.4 }, 'дебело черво, сигма'),
-  sectorL(8, { digestive: 1.0, metabolic: 1.0 }, 'панкреас, кръвно-захарна регулация'),
-  sectorL(9, { digestive: 1.0, metabolic: 0.5 }, 'стомах, кардия'),
-  sectorL(10, { immune: 0.5, circulatory: 0.4 }, 'бял дроб, бронхи (ляво)'),
-  sectorL(11, { endocrine: 1.0, metabolic: 0.7 }, 'щитовидна жлеза, базален обмен'),
-  sectorL(12, { endocrine: 0.9, nervous: 0.3 }, 'хипофизно-хипоталамична ос'),
+  sectorL(1, { endocrine: 0.9, nervous: 0.6, immune: 0.3 }, 'хипофиза/епифиза/психика'),
+  sectorL(2, { nervous: 1.0 }, 'моторен кортекс; шия/тил/малък мозък'),
+  sectorL(3, { nervous: 0.3 }, 'ухо/мастоид'),
+  sectorL(4, { nervous: 0.4, digestive: 0.3 }, 'гръб/торакален отдел; коремна стена'),
+  sectorL(5, { digestive: 1.0 }, 'сигма/ректум'),
+  sectorL(6, { detox: 0.7 }, 'крайници/ингвинална област; пикочен мехур'),
+  sectorL(7, { detox: 0.9, endocrine: 0.9, metabolic: 0.4 }, 'бъбрек+надбъбречни; репродуктивни органи'),
+  sectorL(8, { metabolic: 1.0, digestive: 0.8, immune: 0.7 }, 'далак; панкреас тяло/опашка'),
+  sectorL(9, { circulatory: 1.0 }, 'сърце'),
+  sectorL(10, { endocrine: 1.0, metabolic: 0.7, immune: 0.4 }, 'рамо/ръка/бронхи/горен бял дроб; щитовидна'),
+  sectorL(11, { immune: 0.4, digestive: 0.3 }, 'уста/език/сливици; око/орбита'),
+  sectorL(12, { nervous: 0.8, immune: 0.3 }, 'сензорен кортекс; нос/синуси/челюст'),
 ]
 
 export function sectorsFor(side: Side): SectorDef[] {
@@ -268,20 +270,26 @@ export type RingBandKey = 'IPB' | 'STOM' | 'ANW' | 'ORG' | 'LYM' | 'SCU'
 
 export interface RingBandDef {
   key: RingBandKey
-  /** Пръстени [от, до] включително. */
+  /** Пръстени [от, до] включително, при 12 равни пръстена. */
   rings: [number, number]
+  /**
+   * Оригиналният диапазон в ПРОЦЕНТИ от разстоянието зеница→лимбус, както е
+   * зададен в `manual.json` (`RINGS_PCT`). Пръстените по-горе са изведени от
+   * него по центъра на всеки пръстен — това е източникът, не обратното.
+   */
+  pct: [number, number]
   label: string
   /** Какво тежи, когато находка попадне тук. */
   systems: Partial<Record<SystemKey, number>>
 }
 
 export const RING_BANDS: RingBandDef[] = [
-  { key: 'IPB', rings: [0, 0], label: 'Ръб на зеницата', systems: { nervous: 0.6 } },
-  { key: 'STOM', rings: [1, 1], label: 'Стомашен пръстен', systems: { digestive: 1.0 } },
-  { key: 'ANW', rings: [2, 3], label: 'Автономен нервен пръстен', systems: { digestive: 0.9, nervous: 0.8 } },
-  { key: 'ORG', rings: [4, 9], label: 'Органна зона', systems: {} },
-  { key: 'LYM', rings: [10, 10], label: 'Лимфен пояс', systems: { immune: 1.0, detox: 0.5 } },
-  { key: 'SCU', rings: [11, 11], label: 'Кожен пояс / лимбус', systems: { detox: 0.8, circulatory: 0.6 } },
+  { key: 'IPB', rings: [0, 0], pct: [0, 12], label: 'Зеничен ръб (IPB)', systems: { nervous: 0.7, endocrine: 0.4 } },
+  { key: 'STOM', rings: [1, 2], pct: [12, 22], label: 'Стомашен пръстен', systems: { digestive: 1.0 } },
+  { key: 'ANW', rings: [3, 4], pct: [22, 38], label: 'Чревно поле / коларета', systems: { digestive: 1.0, nervous: 0.7 } },
+  { key: 'ORG', rings: [5, 8], pct: [38, 75], label: 'Органна зона', systems: {} },
+  { key: 'LYM', rings: [9, 10], pct: [75, 92], label: 'Лимфа и периферия', systems: { immune: 1.0, detox: 0.5 } },
+  { key: 'SCU', rings: [11, 11], pct: [92, 100], label: 'Кожа / елиминация', systems: { detox: 0.9, circulatory: 0.5 } },
 ]
 
 export function ringBand(ring: number): RingBandDef {
@@ -305,7 +313,9 @@ export type FindingType =
   | 'fiber_loosening'
   | 'collarette_irregularity'
   // пигментни / пръстеновидни
-  | 'pigment_spot'
+  | 'pigment_orange'
+  | 'pigment_brown'
+  | 'pigment_yellow'
   | 'pigment_diffuse'
   | 'nerve_rings'
   | 'lymphatic_rosary'
@@ -389,13 +399,34 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
     systems: { digestive: 1.0, nervous: 0.7 },
     validRings: [1, 4],
   },
-  pigment_spot: {
-    type: 'pigment_spot',
-    label: 'Пигментно петно',
-    appearanceUnwrapped: 'ясно очертано жълто/оранжево/кафяво петно върху влакната',
-    meaning: 'метаболитно-детоксикационно натоварване',
+  // manual.json → SIGNS.PIGMENT разделя пигмента на три, с РАЗЛИЧНО значение.
+  // Единният „pigment_spot" губеше точно тази информация.
+  pigment_orange: {
+    type: 'pigment_orange',
+    label: 'Оранжево-ръждив пигмент',
+    appearanceUnwrapped: 'ясно очертано оранжево или ръждиво петно върху влакната',
+    // „панкреас+черен дроб; гликемичен риск НЕЗАВИСИМО ОТ ЛОКАЦИЯ"
+    meaning: 'кръвно-захарна натовареност — тежи навсякъде, не само в панкреасната зона',
+    weight: 0.9,
+    systems: { metabolic: 1.0, detox: 0.5 },
+    validRings: [1, 11],
+  },
+  pigment_brown: {
+    type: 'pigment_brown',
+    label: 'Кафяво-черен пигмент',
+    appearanceUnwrapped: 'тъмнокафяво до почти черно петно с ясен ръб',
+    meaning: 'чернодробно натоварване',
     weight: 0.8,
-    systems: { detox: 0.9, metabolic: 0.5 },
+    systems: { detox: 1.0, digestive: 0.4 },
+    validRings: [1, 11],
+  },
+  pigment_yellow: {
+    type: 'pigment_yellow',
+    label: 'Жълт пигмент',
+    appearanceUnwrapped: 'жълтеникаво петно или воал върху влакната',
+    meaning: 'бъбречно натоварване',
+    weight: 0.7,
+    systems: { detox: 1.0 },
     validRings: [1, 11],
   },
   pigment_diffuse: {
@@ -487,74 +518,62 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     key: 'gastro_intestinal',
     label: 'Стомашно-чревна ос',
     description:
-      'Вътрешните пръстени около зеницата и автономният нервен пръстен — най-пряката връзка с храносмилането.',
+      'Стомашният пръстен и чревното поле с коларетата — най-пряката връзка с храносмилането.',
     system: 'digestive',
-    minutes: {
-      // цялата обиколка в R1–R3 се чете като храносмилателен пояс
-      right: [[0, 60]],
-      left: [[0, 60]],
-    },
-    rings: [1, 3],
-    keyFindings: ['collarette_irregularity', 'radial_furrow', 'lacuna', 'crypt', 'pigment_spot'],
+    // manual.json: STOMACH_RING 12–22 % (R1–R2) + INTESTINAL_FIELD/ANW 22–38 % (R3–R4)
+    minutes: { right: [[0, 60]], left: [[0, 60]] },
+    rings: [1, 4],
+    keyFindings: ['collarette_irregularity', 'radial_furrow', 'lacuna', 'crypt', 'pigment_orange'],
   },
   {
     key: 'pancreatic_metabolic',
-    label: 'Инсулинова / кръвно-захарна зона',
-    description: 'Панкреас и горно храносмилане — как тялото управлява захарите и енергията.',
+    label: 'Панкреасна / кръвно-захарна зона',
+    description: 'Панкреас — как тялото управлява захарите и енергията.',
+    // manual.json: панкреас ГЛАВА 8:00 (R) → S9;  панкреас ТЯЛО/ОПАШКА 7–8 (L) → S8
     system: 'metabolic',
-    minutes: {
-      right: [[20, 30]],
-      left: [[35, 50]],
-    },
-    rings: [3, 8],
-    keyFindings: ['lacuna', 'crypt', 'pigment_spot', 'pigment_diffuse', 'fiber_loosening'],
+    minutes: { right: [[40, 45]], left: [[35, 40]] },
+    rings: [3, 9],
+    keyFindings: ['lacuna', 'crypt', 'pigment_orange', 'pigment_diffuse', 'fiber_loosening'],
   },
   {
     key: 'hepatobiliary',
     label: 'Чернодробно-жлъчна зона',
     description: 'Обработка на мазнини, детоксикация, поносимост към тежка храна.',
+    // manual.json: черен дроб/жлъчка 4–5 (R) → S5. В ляво око няма чернодробна проекция.
     system: 'detox',
-    minutes: {
-      right: [[25, 35]],
-      left: [[25, 32]],
-    },
+    minutes: { right: [[20, 25]], left: [] },
     rings: [3, 9],
-    keyFindings: ['pigment_spot', 'pigment_diffuse', 'lacuna', 'fiber_loosening'],
+    keyFindings: ['pigment_brown', 'pigment_diffuse', 'lacuna', 'fiber_loosening'],
   },
   {
     key: 'thyroid_axis',
     label: 'Щитовидна ос',
     description: 'Базален обмен и енергийно ниво.',
+    // manual.json: щитовидна 2:30 (R) → S3;  9:30 (L) → S10
     system: 'endocrine',
-    minutes: {
-      right: [[10, 15]],
-      left: [[50, 55]],
-    },
-    rings: [3, 8],
-    keyFindings: ['lacuna', 'fiber_loosening', 'pigment_spot', 'nerve_rings'],
+    minutes: { right: [[10, 15]], left: [[45, 50]] },
+    rings: [3, 9],
+    keyFindings: ['lacuna', 'fiber_loosening', 'pigment_orange', 'nerve_rings'],
   },
   {
     key: 'adrenal_stress',
-    label: 'Надбъбречно-стресова ос',
-    description: 'Стресова реакция, апетитни колебания, сутрешна енергия.',
+    label: 'Бъбречно-надбъбречна ос',
+    description: 'Стресова реакция, апетитни колебания, водно-солев баланс.',
+    // manual.json: бъбрек+надбъбречни 6:00, ЕДНАКВО за двете очи → S7
     system: 'endocrine',
-    minutes: {
-      right: [[40, 45]],
-      left: [[20, 25]],
-    },
-    rings: [3, 8],
-    keyFindings: ['nerve_rings', 'radial_furrow', 'lacuna', 'crypt'],
+    minutes: { right: [[30, 35]], left: [[30, 35]] },
+    rings: [3, 9],
+    keyFindings: ['nerve_rings', 'radial_furrow', 'lacuna', 'crypt', 'pigment_yellow'],
   },
   {
     key: 'lipid_rim',
     label: 'Липидно-минерален ръб',
-    description: 'Периферният пояс — липиден и минерален обмен.',
+    description: 'Периферният пояс — липиден обмен и елиминиране през кожата.',
+    // manual.json: OUTER_ORGAN_SUBZONE 75–92 % (R9–R10) + SCURF_RIM 92–100 % (R11);
+    // диатеза LIP = „липемен пръстен по ръба".
     system: 'metabolic',
-    minutes: {
-      right: [[0, 60]],
-      left: [[0, 60]],
-    },
-    rings: [10, 11],
+    minutes: { right: [[0, 60]], left: [[0, 60]] },
+    rings: [9, 11],
     keyFindings: ['sodium_ring', 'scurf_rim', 'lymphatic_rosary'],
   },
 ]
@@ -568,6 +587,8 @@ export function priorityZonesFor(side: Side, minute: number, ring: number): Prio
   const r = Math.max(0, Math.min(11, Math.round(ring)))
   return PRIORITY_ZONES.filter(z => {
     if (r < z.rings[0] || r > z.rings[1]) return false
+    // Празен списък = зоната няма проекция в това око (напр. черният дроб е
+    // само в дясното).
     return z.minutes[side].some(([a, b]) => (a <= b ? m >= a && m < b : m >= a || m < b))
   })
 }
