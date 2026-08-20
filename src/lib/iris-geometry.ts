@@ -35,7 +35,13 @@
 export interface Circle {
   cx: number
   cy: number
+  /** Хоризонтален радиус (и единственият, ако окото гледа право в камерата). */
   r: number
+  /**
+   * Вертикален радиус на лимбуса — присъства само когато е измерим.
+   * Измерено върху снимка със светкавица: rx=366, ry=354.
+   */
+  ry?: number
 }
 
 /**
@@ -143,26 +149,6 @@ function blur(g: Gray, passes = 2): Gray {
     dst = t2
   }
   return { data: src, w, h }
-}
-
-/** Интегрално изображение (summed-area table) с размер (w+1)×(h+1). */
-function integral(values: Float32Array, w: number, h: number): Float64Array {
-  const sat = new Float64Array((w + 1) * (h + 1))
-  for (let y = 0; y < h; y++) {
-    let rowSum = 0
-    for (let x = 0; x < w; x++) {
-      rowSum += values[y * w + x]
-      sat[(y + 1) * (w + 1) + (x + 1)] = sat[y * (w + 1) + (x + 1)] + rowSum
-    }
-  }
-  return sat
-}
-
-function satSum(sat: Float64Array, w: number, x0: number, y0: number, x1: number, y1: number) {
-  const W = w + 1
-  return (
-    sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0]
-  )
 }
 
 /**
@@ -365,123 +351,161 @@ function refineLimbus(g: Gray, seed: { cx: number; cy: number; r: number }) {
   return best
 }
 
+/** Ъгли за вертикално измерване: ±22° около 12:00 и 6:00. */
+const VERTICAL_ANGLES: number[] = (() => {
+  const a: number[] = []
+  for (let deg = -22; deg <= 22; deg += 4) {
+    a.push(-Math.PI / 2 + (deg * Math.PI) / 180)
+    a.push(Math.PI / 2 + (deg * Math.PI) / 180)
+  }
+  return a
+})()
+
+/**
+ * Опит за измерване на ВЕРТИКАЛНИЯ радиус на лимбуса.
+ *
+ * Ирисът се проектира като ЕЛИПСА, щом погледът е дори леко встрани от камерата,
+ * а кръговият модел тогава вкарва склера в най-външните пръстени. Маскирането на
+ * клепачи не помага, защото това е видима склера, а не клепач.
+ *
+ * Отгоре и отдолу обаче често има клепач, затова резултатът се приема само при
+ * строги условия: радиусът да е в [0.75, 1.06]·rx и извън ръба да е толкова
+ * светло, колкото извън хоризонталния ръб — тоест да е СКЛЕРА, а не кожа.
+ * Иначе се връща `undefined` и моделът остава кръгов: по-добре леко голям кръг,
+ * отколкото прекалено малък, който отрязва истинска тъкан.
+ */
+function measureVerticalRadius(
+  g: Gray,
+  cx: number,
+  cy: number,
+  rx: number
+): number | undefined {
+  const res = scanRadius(g, cx, cy, rx * 0.72, rx * 1.1, 1, 1, VERTICAL_ANGLES)
+  if (!Number.isFinite(res.strength) || res.strength <= 0) return undefined
+
+  const ry = res.r
+  if (ry < rx * 0.75 || ry > rx * 1.06) return undefined
+
+  const outsideV = ringMean(g, cx, cy, ry * 1.08, 32, VERTICAL_ANGLES)
+  const outsideH = ringMean(g, cx, cy, rx * 1.08, 32, LIMBUS_ANGLES)
+  if (Number.isNaN(outsideV) || Number.isNaN(outsideH)) return undefined
+  if (outsideV < outsideH * 0.85) return undefined
+
+  return ry
+}
+
 /* ── зеница (в границите на лимбуса) ─────────────────────────────────────── */
 
 /**
- * „Pupilness" карта: спекуларните отблясъци се приравняват към нула. Те винаги
- * падат ВЪТРЕ в зеницата и иначе я разкъсват на две.
+ * Заменя спекуларните пиксели със средното на най-близките неспекуларни съседи
+ * по същия ред. Така отблясъкът не създава нито фалшив тъмен, нито фалшив светъл
+ * преход — просто изчезва.
+ *
+ * Предишната версия го ЗАНУЛЯВАШЕ, тоест го броеше за абсолютно черно, което е
+ * по-лошо от самия проблем: зануленото петно ставаше най-тъмната област в кадъра.
  */
-function pupilnessMap(g: Gray, rgb: Uint8ClampedArray): Float32Array {
-  const out = new Float32Array(g.w * g.h)
-  for (let i = 0, p = 0; i < out.length; i++, p += 4) {
-    const isSpecular = rgb[p] > 232 && rgb[p + 1] > 232 && rgb[p + 2] > 232
-    out[i] = isSpecular ? 0 : g.data[i]
+function despeckle(g: Gray, rgb: Uint8ClampedArray): Gray {
+  const { w, h } = g
+  const out = new Float32Array(g.data)
+  const isSpec = (i: number) => {
+    const p = i * 4
+    return rgb[p] > 232 && rgb[p + 1] > 232 && rgb[p + 2] > 232
   }
-  return out
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x
+      if (!isSpec(i)) continue
+      let l = x - 1
+      while (l >= 0 && isSpec(y * w + l)) l--
+      let r = x + 1
+      while (r < w && isSpec(y * w + r)) r++
+      const a = l >= 0 ? g.data[y * w + l] : NaN
+      const b = r < w ? g.data[y * w + r] : NaN
+      if (Number.isNaN(a) && Number.isNaN(b)) continue
+      out[i] = Number.isNaN(a) ? b : Number.isNaN(b) ? a : (a + b) / 2
+    }
+  }
+  return { data: out, w, h }
 }
-
-/** Средна стойност в квадрат със страна `side`, центриран в (cx, cy). */
-function boxMean(sat: Float64Array, w: number, h: number, cx: number, cy: number, side: number) {
-  const half = side / 2
-  const x0 = Math.max(0, Math.round(cx - half))
-  const y0 = Math.max(0, Math.round(cy - half))
-  const x1 = Math.min(w, Math.round(cx + half))
-  const y1 = Math.min(h, Math.round(cy + half))
-  const area = (x1 - x0) * (y1 - y0)
-  if (area <= 0) return NaN
-  return satSum(sat, w, x0, y0, x1, y1) / area
-}
-
-const ABSOLUTE_DARKNESS_WEIGHT = 0.6
 
 /**
- * Груба локализация на зеницата, ОГРАНИЧЕНА до вътрешността на лимбуса.
+ * Локализация на зеницата ВЪТРЕ в вече намерения лимбус.
  *
- * Оценката е `среден пръстен − среден диск − 0.6·среден диск`. И двата члена са
- * необходими: само контраст → преходът ирис→склера е също толкова силен, колкото
- * зеница→ирис; само тъмнина → печели всяко тъмно петно, включително мигли.
+ * ЗАЩО НЕ ТЪРСЕНЕ НА „НАЙ-ТЪМНИЯ КОМПАКТЕН ДИСК" (както беше)
+ * ────────────────────────────────────────────────────────────
+ * Върху снимка СЪС СВЕТКАВИЦА това се счупи. Измереният радиален профил показва
+ * ярко ядро от отблясъка (яркост 189 в центъра), спад до 44 при радиус ≈80 px и
+ * изкачване до плато ≈105 при ≈130 px — тоест ръбът на зеницата е при ≈100 px.
+ * Детекторът върна 45: попадна върху спадащата част на ореола около отблясъка.
+ * По-лошо, прецизирането се ограничаваше до 0.6–1.6× от този погрешен резултат,
+ * така че истинската граница оставаше ИЗВЪН обхвата и не можеше да бъде намерена.
  *
- * Ограниченията върху центъра и радиуса са това, което спасява тъмните ириси:
- * петно от отражение извън физиологичния диапазон вече не може да спечели.
+ * Сега, след като лимбусът е известен и надежден, се прилага директно радиалният
+ * оператор (Daugman) в физиологично ограничен диапазон 0.08–0.62 от радиуса на
+ * лимбуса. В този диапазон най-силният преход „тъмно → светло" Е ръбът на
+ * зеницата: лимбусът е извън обхвата, а отблясъкът дава преход с ОБРАТЕН знак и
+ * затова изобщо не се конкурира.
  */
-function coarsePupil(
+function findPupil(
   g: Gray,
   rgb: Uint8ClampedArray,
   limbus: { cx: number; cy: number; r: number }
-): { cx: number; cy: number; r: number } {
-  const { w, h } = g
-  const values = pupilnessMap(g, rgb)
-  const sat = integral(values, w, h)
-
-  const rMin = Math.max(3, Math.round(limbus.r * 0.13))
-  // 0.55, а не 0.62: физиологичното отношение при осветено око рядко надхвърля
-  // 0.5, а по-широкият диапазон позволяваше на голямо тъмно отражение да мине
-  // за зеница.
-  const rMax = Math.max(rMin + 2, Math.round(limbus.r * 0.55))
-  const centreSpan = limbus.r * 0.32
-
-  let best = { cx: limbus.cx, cy: limbus.cy, r: limbus.r * 0.25, score: -Infinity }
-
-  for (let r = rMin; r <= rMax; r += 2) {
-    const innerSide = r * 1.4
-    const midSide = r * 2.2
-    const outerSide = r * 3.2
-    const step = Math.max(2, Math.round(r / 3))
-
-    for (let cy = limbus.cy - centreSpan; cy <= limbus.cy + centreSpan; cy += step) {
-      for (let cx = limbus.cx - centreSpan; cx <= limbus.cx + centreSpan; cx += step) {
-        if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue
-        const disc = boxMean(sat, w, h, cx, cy, innerSide)
-        const midAll = boxMean(sat, w, h, cx, cy, midSide)
-        const outerAll = boxMean(sat, w, h, cx, cy, outerSide)
-        if (Number.isNaN(disc) || Number.isNaN(midAll) || Number.isNaN(outerAll)) continue
-
-        const aOuter = outerSide * outerSide
-        const aMid = midSide * midSide
-        const ring = (outerAll * aOuter - midAll * aMid) / Math.max(1, aOuter - aMid)
-
-        const score = ring - disc - ABSOLUTE_DARKNESS_WEIGHT * disc
-        if (score > best.score) best = { cx, cy, r, score }
-      }
-    }
-  }
-  return { cx: best.cx, cy: best.cy, r: best.r }
-}
-
-/**
- * Прецизиране на зеницата. От профила на радиалния градиент се взима НЕ
- * глобалният максимум, а най-малкият радиус, при който преходът достига 65 % от
- * максимума: лимбусът също е силен преход „тъмно→светло" и иначе печели той.
- */
-function refinePupil(
-  g: Gray,
-  seed: { cx: number; cy: number; r: number },
-  limbusR: number
 ) {
-  const rLo = Math.max(3, Math.min(seed.r * 0.6, limbusR * 0.6))
-  const rHi = Math.min(seed.r * 1.6, limbusR * 0.68)
-  if (rHi <= rLo + 1) {
-    return { cx: seed.cx, cy: seed.cy, r: seed.r, strength: 0, profile: [] as number[] }
+  const clean = despeckle(g, rgb)
+
+  const rLo = Math.max(3, limbus.r * 0.08)
+  const rHi = limbus.r * 0.62
+  const span = limbus.r * 0.28
+
+  let best = {
+    cx: limbus.cx,
+    cy: limbus.cy,
+    r: limbus.r * 0.25,
+    strength: -Infinity,
+    profile: [] as number[],
   }
 
-  let best = { cx: seed.cx, cy: seed.cy, r: seed.r, strength: -Infinity, profile: [] as number[] }
-
-  const span = Math.max(2, Math.round(seed.r * 0.45))
-  for (let dy = -span; dy <= span; dy += 2) {
-    for (let dx = -span; dx <= span; dx += 2) {
-      const res = scanRadius(g, seed.cx + dx, seed.cy + dy, rLo, rHi, 1, 1)
+  const step = Math.max(2, Math.round(limbus.r * 0.05))
+  for (let dy = -span; dy <= span; dy += step) {
+    for (let dx = -span; dx <= span; dx += step) {
+      const res = scanRadius(clean, limbus.cx + dx, limbus.cy + dy, rLo, rHi, 1, 1)
       if (res.strength > best.strength) {
-        best = { cx: seed.cx + dx, cy: seed.cy + dy, r: res.r, strength: res.strength, profile: res.profile }
+        best = {
+          cx: limbus.cx + dx,
+          cy: limbus.cy + dy,
+          r: res.r,
+          strength: res.strength,
+          profile: res.profile,
+        }
       }
     }
   }
 
-  if (best.profile.length > 2 && Number.isFinite(best.strength)) {
-    const threshold = best.strength * 0.65
-    for (let i = 0; i < best.profile.length; i++) {
-      if (best.profile[i] >= threshold) { best.r = rLo + i; break }
+  // Фино дотягане на центъра около най-добрия кандидат.
+  const coarse = { ...best }
+  for (let dy = -step; dy <= step; dy++) {
+    for (let dx = -step; dx <= step; dx++) {
+      const res = scanRadius(
+        clean,
+        coarse.cx + dx,
+        coarse.cy + dy,
+        Math.max(rLo, coarse.r * 0.7),
+        Math.min(rHi, coarse.r * 1.4),
+        1,
+        1
+      )
+      if (res.strength > best.strength) {
+        best = {
+          cx: coarse.cx + dx,
+          cy: coarse.cy + dy,
+          r: res.r,
+          strength: res.strength,
+          profile: res.profile,
+        }
+      }
     }
   }
+
   return best
 }
 
@@ -676,15 +700,20 @@ export function detectIrisGeometry(img: HTMLImageElement | HTMLCanvasElement): I
     // Редът е: лимбус → зеница вътре в него. Виж коментара при `coarseLimbus`.
     const limbusSeed = coarseLimbus(smooth)
     const limbus = refineLimbus(smooth, limbusSeed)
-    const pupilSeed = coarsePupil(smooth, rgb, limbus)
-    const pupil = refinePupil(smooth, pupilSeed, limbus.r)
+    const pupil = findPupil(smooth, rgb, limbus)
+    const limbusRy = measureVerticalRadius(smooth, limbus.cx, limbus.cy, limbus.r)
 
     const lidsWork = detectEyelids(smooth, limbus)
 
     const inv = 1 / scale
     const geo: IrisGeometry = {
       pupil: { cx: pupil.cx * inv, cy: pupil.cy * inv, r: pupil.r * inv },
-      limbus: { cx: limbus.cx * inv, cy: limbus.cy * inv, r: limbus.r * inv },
+      limbus: {
+        cx: limbus.cx * inv,
+        cy: limbus.cy * inv,
+        r: limbus.r * inv,
+        ...(limbusRy !== undefined ? { ry: limbusRy * inv } : {}),
+      },
       imageWidth: srcW,
       imageHeight: srcH,
       // Мащабите са различни: зеницата е почти черна спрямо ириса (контраст

@@ -80,7 +80,7 @@ export interface IrisImage {
 /** Сериализуемо копие на геометрията (виж `src/lib/iris-geometry.ts`). */
 export interface IrisGeometrySnapshot {
   pupil: { cx: number; cy: number; r: number }
-  limbus: { cx: number; cy: number; r: number }
+  limbus: { cx: number; cy: number; r: number; ry?: number }
   imageWidth: number
   imageHeight: number
   pupilConfidence: number

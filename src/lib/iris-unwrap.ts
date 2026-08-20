@@ -260,6 +260,7 @@ export function unwrapIris(
   const sampleBuf: [number, number, number] = [0, 0, 0]
 
   const { pupil, limbus } = geo
+  const limbusRy = geo.limbus.ry
   const lidUpper = geo.eyelids?.upper ?? null
   const lidLower = geo.eyelids?.lower ?? null
 
@@ -274,7 +275,14 @@ export function unwrapIris(
       const cos = Math.cos(theta)
       // радиусът на зеницата и на лимбуса по този лъч, спрямо съответния център
       const rIn = pupil.r
-      const rOut = limbus.r
+      // Елиптичен лимбус: радиусът зависи от ъгъла. При поглед встрани ирисът се
+      // проектира като елипса и единичен радиус вкарва склера в най-външните
+      // пръстени.
+      const rOut =
+        limbusRy === undefined
+          ? limbus.r
+          : (limbus.r * limbusRy) /
+            Math.sqrt((limbusRy * sin) ** 2 + (limbus.r * cos) ** 2 || 1)
       const r = rIn + (rOut - rIn) * t
       const x = cx + r * sin
       const y = cy - r * cos
