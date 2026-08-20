@@ -177,6 +177,27 @@ export async function prepareEye(
   addLog('info', `[Подготовка ${name}] Пречертаване на лентата...`)
   const strips = await unwrapAllFromDataUrl(iris.dataUrl, geometry, side)
 
+  // Оценката се преизчислява СЛЕД лентата: покритието ѝ е единственото число,
+  // което описва какво реално вижда моделът. Без него оценяваме снимката, а не
+  // анализа.
+  const recomputed = await analyseIrisQualityFromDataUrl(iris.dataUrl, {
+    stripCoverage: strips.base.coverage,
+  })
+  if (!(iris.geometry && iris.quality)) {
+    qualityScore = recomputed.score
+    qualityVerdict = recomputed.verdict
+  } else if (Math.abs(recomputed.score - qualityScore) > 12) {
+    // Калибраторът е дал своя оценка; ако разминаването е голямо, вярваме на
+    // тази, която включва покритието.
+    addLog(
+      'info',
+      `[Подготовка ${name}] Оценката е коригирана с покритието на лентата: ` +
+        `${qualityScore} → ${recomputed.score}`
+    )
+    qualityScore = recomputed.score
+    qualityVerdict = recomputed.verdict
+  }
+
   const coverage = Math.round(strips.base.coverage * 100)
   addLog(
     coverage < 60 ? 'warning' : 'success',

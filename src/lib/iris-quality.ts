@@ -136,7 +136,23 @@ function laplacianVariance(s: Sampled, mask?: (x: number, y: number) => boolean)
   return sumSq / n - mean * mean
 }
 
-export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
+export interface QualityOptions {
+  /**
+   * Дял четима площ в РАЗГЪНАТАТА лента (0..1), ако вече е построена.
+   *
+   * Това е единственото число, което описва какво реално получава моделът.
+   * Без него оценката мери снимката, а не лентата — и подредбата излиза
+   * обърната. Измерено върху пет реални снимки: кадър с оценка 67 (наказан за
+   * резкост, защото източникът е 809 px) даде НАЙ-ЧИСТАТА лента — 99 % покритие
+   * и 2 нечетими клетки от 144, докато кадър с оценка 85 даде 81 % и 28 клетки.
+   */
+  stripCoverage?: number
+}
+
+export function analyseIrisQuality(
+  img: HTMLImageElement,
+  options: QualityOptions = {}
+): QualityReport {
   const s = sample(img)
   const geometry = detectIrisGeometry(img)
 
@@ -258,6 +274,7 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
   }
 
   // ── правила ───────────────────────────────────────────────────────────────
+  const strip = options.stripCoverage
   const issues: QualityIssue[] = []
 
   if (geometry.pupilConfidence < 0.18 || geometry.pupil.r <= 0) {
@@ -447,27 +464,52 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
     })
   }
 
+  // Покритието на лентата е крайният арбитър: то казва каква част от ирисовата
+  // карта изобщо стига до модела.
+  if (strip !== undefined) {
+    if (strip < 0.55) {
+      issues.push({
+        code: 'occluded',
+        level: 'error',
+        message: `Само ${Math.round(strip * 100)} % от ирисовата карта е четима.`,
+        fix: 'Отворете окото по-широко и се обърнете така, че светлината да не пада директно в него. Останалото е закрито от клепач, мигли или отблясък.',
+      })
+    } else if (strip < 0.75) {
+      issues.push({
+        code: 'occluded',
+        level: 'warning',
+        message: `${Math.round((1 - strip) * 100)} % от ирисовата карта е закрита.`,
+        fix: 'По-широко отворено око би дало по-пълен анализ.',
+      })
+    }
+  }
+
   // ── обобщение ─────────────────────────────────────────────────────────────
   const hasError = issues.some(i => i.level === 'error')
   const warnCount = issues.filter(i => i.level === 'warning').length
 
-  const score = Math.round(
-    100 *
-      Math.max(
-        0,
-        Math.min(
-          1,
-          0.3 * sharpness +
-            0.22 * geometry.pupilConfidence +
-            0.14 * geometry.limbusConfidence +
-            0.12 * Math.min(1, irisFill / 0.6) +
-            0.1 * frameCoverage +
-            0.05 * (1 - Math.min(1, glare / 0.12)) +
-            0.04 * (1 - Math.min(1, occlusion / 0.35)) +
-            0.03 * (1 - Math.min(1, reflection / 0.4))
-        )
-      )
-  )
+  // Когато лентата е построена, покритието ѝ носи най-голямата тежест: то е
+  // буквално делът от ирисовата карта, който моделът може да прочете.
+  // Останалите метрики описват снимката, тоест причината, а не резултата.
+  const raw =
+    strip === undefined
+      ? 0.3 * sharpness +
+        0.22 * geometry.pupilConfidence +
+        0.14 * geometry.limbusConfidence +
+        0.12 * Math.min(1, irisFill / 0.6) +
+        0.1 * frameCoverage +
+        0.05 * (1 - Math.min(1, glare / 0.12)) +
+        0.04 * (1 - Math.min(1, occlusion / 0.35)) +
+        0.03 * (1 - Math.min(1, reflection / 0.4))
+      : 0.34 * Math.max(0, Math.min(1, strip)) +
+        0.2 * sharpness +
+        0.2 * geometry.pupilConfidence +
+        0.1 * geometry.limbusConfidence +
+        0.08 * Math.min(1, irisFill / 0.6) +
+        0.05 * (1 - Math.min(1, glare / 0.12)) +
+        0.03 * (1 - Math.min(1, reflection / 0.4))
+
+  const score = Math.round(100 * Math.max(0, Math.min(1, raw)))
 
   const verdict: QualityVerdict = hasError ? 'reject' : warnCount > 0 ? 'warn' : 'pass'
 
@@ -481,12 +523,15 @@ export function analyseIrisQuality(img: HTMLImageElement): QualityReport {
 }
 
 /** Удобна обвивка за data URL. */
-export function analyseIrisQualityFromDataUrl(dataUrl: string): Promise<QualityReport> {
+export function analyseIrisQualityFromDataUrl(
+  dataUrl: string,
+  options: QualityOptions = {}
+): Promise<QualityReport> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
       try {
-        resolve(analyseIrisQuality(img))
+        resolve(analyseIrisQuality(img, options))
       } catch (e) {
         reject(e)
       }

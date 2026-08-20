@@ -61,6 +61,8 @@ export default function IrisCalibrator({
   const [drag, setDrag] = useState<Handle>(null)
   const [strip, setStrip] = useState<string | null>(null)
   const [showStrip, setShowStrip] = useState(false)
+  /** Дял четима площ в лентата — това е, което моделът реално получава. */
+  const [coverage, setCoverage] = useState<number | null>(null)
   // Естествените размери се държат в state, а не се четат от ref-а: промяна на
   // ref не предизвиква повторно изчисление и наслагването изоставаше с един кадър.
   const [natural, setNatural] = useState({ w: 0, h: 0 })
@@ -136,8 +138,17 @@ export default function IrisCalibrator({
           quality: 0.82,
         })
         setStrip(res.dataUrl)
+        setCoverage(res.coverage)
+        // Оценката се преизчислява с покритието: то описва лентата, която
+        // моделът вижда, а не снимката, която потребителят е направил.
+        try {
+          setReport(analyseIrisQuality(img, { stripCoverage: res.coverage }))
+        } catch {
+          /* оставяме предишната оценка */
+        }
       } catch {
         setStrip(null)
+        setCoverage(null)
       }
     },
     [side]
@@ -591,7 +602,10 @@ export default function IrisCalibrator({
                   {[
                     { label: 'Резкост', value: report.metrics.sharpness },
                     { label: 'Зеница', value: touched ? 1 : report.geometry.pupilConfidence },
-                    { label: 'Обхват', value: report.metrics.frameCoverage },
+                    {
+                      label: 'Четима карта',
+                      value: coverage ?? report.metrics.frameCoverage,
+                    },
                     { label: 'Без блясък', value: 1 - Math.min(1, report.metrics.glare / 0.12) },
                   ].map(m => (
                     <div key={m.label} className="rounded-xl bg-white/[0.04] p-2">
