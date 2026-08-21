@@ -173,7 +173,18 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   }
 
   const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
-  const geminiModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash-thinking-exp', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
+  const geminiModels = [
+  // Псевдонимите с „-latest" не остаряват: Google ги пренасочва към текущия
+  // модел. Изброените преди това пет (gemini-1.5-*, gemini-2.0-flash-exp)
+  // вече не съществуват — проверено срещу API-то; всеки анализ с тях връщаше 404.
+  'gemini-flash-latest',
+  'gemini-pro-latest',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemini-3-flash-preview',
+]
 
   return (
     <div className="min-h-screen bg-background">
