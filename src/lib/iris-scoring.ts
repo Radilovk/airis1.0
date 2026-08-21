@@ -21,7 +21,7 @@
 
 import {
   FINDINGS,
-  PRIORITY_ZONE_BOOST,
+  zoneBoost,
   SYSTEMS,
   isFindingType,
   minuteToSector,
@@ -56,6 +56,11 @@ export interface NormalizedFinding {
   priorityZones: string[]
   /** Изчисленото натоварване, което тази находка внася. */
   load: number
+  /**
+   * Има ли съответстваща находка в ДРУГОТО око — същият пръстенен пояс и обща
+   * водеща система. Двустранната находка е по-силно доказателство.
+   */
+  bilateral?: boolean
 }
 
 export interface SystemResult {
@@ -127,6 +132,36 @@ export interface ScoringResult {
 
 const SIZE_WEIGHT: Record<FindingSize, number> = { xs: 0.4, s: 0.65, m: 1.0, l: 1.4 }
 
+/**
+ * Средното тегло на 15-те типа находки. Служи за център на свиването.
+ */
+const MEAN_FINDING_WEIGHT = 0.68
+
+/**
+ * КОЛКО ДА ВЯРВАМЕ НА ТИПА НА НАХОДКАТА.
+ *
+ * Измерено при проверка с реален модел: една и съща снимка, един и същ модел,
+ * два независими паса. МЯСТОТО се повтаря, ТИПЪТ — не. В сектор S10 пас 1
+ * върна „радиална бразда R6", пас 2 — „лакуна R5" и „неравен автономен
+ * пръстен R3". Регионът е един, името — три различни.
+ *
+ * Затова типът не бива да носи пълната разлика в тежестта: 0.5 срещу 0.9 е
+ * почти двойно, а разликата е между два етикета, които моделът разменя. Тежестта
+ * се свива към средното, така че редът се запазва, но грешният етикет не
+ * променя силата на извода наполовина.
+ */
+const TYPE_WEIGHT_TRUST = 0.6
+function typeWeight(w: number): number {
+  return MEAN_FINDING_WEIGHT + (w - MEAN_FINDING_WEIGHT) * TYPE_WEIGHT_TRUST
+}
+
+/**
+ * Тежест на ТИПА при определяне на ПОСОКАТА (към коя система сочи находката).
+ * Секторът и поясът са координати — те са стабилни. Типът е етикет и не е.
+ * Затова той участва в посоката, но не се конкурира с местоположението.
+ */
+const TYPE_DIRECTION_WEIGHT = 0.45
+
 function asSize(v: unknown): FindingSize {
   return v === 'xs' || v === 's' || v === 'm' || v === 'l' ? v : 'm'
 }
@@ -193,7 +228,7 @@ export function normalizeFindings(
     const centreMinute = (sector - 1) * 5 + 2.5
     const zones = priorityZonesFor(side, centreMinute, ring)
 
-    const boost = zones.length > 0 ? PRIORITY_ZONE_BOOST : 1
+    const boost = zoneBoost(zones)
 
     // Клетка с частично маскирана площ носи по-малко доказателство. Под 55 %
     // четимост находката се отхвърля изцяло: там е било защриховано „N/A",
@@ -206,7 +241,7 @@ export function normalizeFindings(
       (readable === undefined ? 1 : Math.min(1, readable / 0.9)) *
       (partialKeys.has(`${sector}:${ring}`) ? 0.6 : 1)
 
-    const load = def.weight * SIZE_WEIGHT[size] * confidence * boost * readableFactor
+    const load = typeWeight(def.weight) * SIZE_WEIGHT[size] * confidence * boost * readableFactor
 
     out.push({
       side,
@@ -263,7 +298,8 @@ export function irisLoadBySystem(findings: NormalizedFinding[]): Record<SystemKe
     const weights = emptyLoad()
     for (const [k, v] of Object.entries(sectorDef.systems)) weights[k as SystemKey] += v
     for (const [k, v] of Object.entries(band.systems)) weights[k as SystemKey] += v * 0.7
-    for (const [k, v] of Object.entries(def.systems)) weights[k as SystemKey] += v
+    for (const [k, v] of Object.entries(def.systems))
+      weights[k as SystemKey] += v * TYPE_DIRECTION_WEIGHT
 
     const total = Object.values(weights).reduce((a, b) => a + b, 0)
     if (total <= 0) continue
@@ -275,6 +311,50 @@ export function irisLoadBySystem(findings: NormalizedFinding[]): Record<SystemKe
   }
 
   return load
+}
+
+/**
+ * ДВУСТРАННО ПОТВЪРЖДЕНИЕ.
+ *
+ * Досега находка от едното око тежеше колкото находка, потвърдена и от двете.
+ * Физиологично е обратното: системен процес се проявява двустранно, а
+ * единичното петно в едно око по-често е локална особеност или артефакт.
+ *
+ * „Двустранна" НЕ значи „същият сектор". Картата не е огледална — черният дроб
+ * е само в дясното око, сърцето и далакът само в лявото. Затова съвпадението се
+ * търси по СМИСЪЛ: същият пръстенен пояс плюс обща водеща система.
+ */
+const BILATERAL_BOOST = 1.25
+
+function dominantSystems(f: NormalizedFinding): SystemKey[] {
+  const sectorDef = sectorsFor(f.side)[f.sector - 1]
+  const band = ringBand(f.ring)
+  const w = emptyLoad()
+  for (const [k, v] of Object.entries(sectorDef.systems)) w[k as SystemKey] += v
+  for (const [k, v] of Object.entries(band.systems)) w[k as SystemKey] += v * 0.7
+  const max = Math.max(...Object.values(w))
+  if (max <= 0) return []
+  return (Object.keys(w) as SystemKey[]).filter(k => w[k] >= max * 0.6)
+}
+
+export function applyBilateralCorroboration(findings: NormalizedFinding[]): NormalizedFinding[] {
+  const left = findings.filter(f => f.side === 'left')
+  const right = findings.filter(f => f.side === 'right')
+  if (left.length === 0 || right.length === 0) return findings
+
+  const meta = new Map<NormalizedFinding, { band: string; systems: SystemKey[] }>()
+  for (const f of findings) meta.set(f, { band: ringBand(f.ring).key, systems: dominantSystems(f) })
+
+  return findings.map(f => {
+    const mine = meta.get(f)!
+    const others = f.side === 'left' ? right : left
+    const corroborated = others.some(o => {
+      const theirs = meta.get(o)!
+      return theirs.band === mine.band && theirs.systems.some(k => mine.systems.includes(k))
+    })
+    if (!corroborated) return f
+    return { ...f, bilateral: true, load: f.load * BILATERAL_BOOST }
+  })
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -458,9 +538,10 @@ function saturate(load: number, scale = 3.2): number {
 }
 
 export function computeScores(input: ScoringInput): ScoringResult {
-  const { findings, questionnaire, imageQuality, stripCoverage } = input
+  const { findings: rawFindings, questionnaire, imageQuality, stripCoverage } = input
 
   const qSignals = questionnaireSignals(questionnaire)
+  const findings = applyBilateralCorroboration(rawFindings)
   const rawIrisLoad = irisLoadBySystem(findings)
 
   // Колко доверие заслужава ирисът при това качество на входа.
@@ -496,7 +577,8 @@ export function computeScores(input: ScoringInput): ScoringResult {
 
     for (const f of relevant) {
       reasons.push(
-        `${FINDINGS[f.type].label} — ${f.side === 'left' ? 'ляв' : 'десен'} ирис, сектор ${f.sector}, R${f.ring}`
+        `${FINDINGS[f.type].label} — ${f.side === 'left' ? 'ляв' : 'десен'} ирис, сектор ${f.sector}, R${f.ring}` +
+          (f.bilateral ? ' (потвърдена и в другото око)' : '')
       )
     }
 
@@ -586,6 +668,16 @@ interface DriverRule {
    * по-щадящо темпо и т.н.). Първият съвпаднал вариант печели.
    */
   variants?: Array<{ when: (p: SafetyProfile) => boolean; action: string; observation?: string }>
+  /**
+   * Фиксирана сила — за правилата по профил, при които силата не идва от
+   * системната оценка, а от самото състояние.
+   */
+  fixedStrength?: DriverStrength
+  /**
+   * Съветът засяга безопасност (лекарствено взаимодействие, забрана по
+   * диагноза). Излиза пръв в плана и не се отрязва от лимита.
+   */
+  critical?: boolean
 }
 
 const DRIVER_RULES: DriverRule[] = [
@@ -985,6 +1077,280 @@ const FOUNDATION_RULES: DriverRule[] = [
 ]
 
 /**
+ * ПРАВИЛА ПО ПРОФИЛ.
+ *
+ * Задействат се САМО когато `alsoWhen` разпознае състоянието — независимо от
+ * системната оценка. Ирисова находка не ги предизвиква и не ги отменя: човек,
+ * който пие варфарин, се нуждае от съвета за витамин K дори при перфектни
+ * оценки по всички системи.
+ *
+ * Отделени са от `FOUNDATION_RULES`, защото базовите се излъчват безусловно.
+ * Сложени там, тези правила щяха да раздават съвет за антикоагуланти на всеки
+ * потребител.
+ */
+const PROFILE_RULES: DriverRule[] = [
+  /* ── ЖИТЕЙСКИ ЕТАПИ ─────────────────────────────────────────────────────
+   * Правилата дотук третираха всички възрастни еднакво. Възрастта, менопаузата
+   * и спортното натоварване променят нуждите достатъчно, че общият съвет да
+   * стане грешен — най-видимо при 65+, където „по-малко белтък" е точно
+   * обратното на препоръчаното.
+   * ────────────────────────────────────────────────────────────────────── */
+  {
+    id: 'senior_protein',
+    fixedStrength: 'high',
+    system: 'metabolic',
+    category: 'diet',
+    alsoWhen: p => p.senior,
+    // При бъбречно заболяване белтъкът се определя от нефролог, не оттук.
+    unsafeWhen: p => p.kidneyDisease,
+    belowScore: 101,
+    observation:
+      'След 65 г. мускулната маса намалява дори при непроменено тегло, а усвояването ' +
+      'на белтъка става по-малко ефективно.',
+    action:
+      'Осигури 1.0–1.2 г белтък на кг телесно тегло дневно — това е ПО-ВИСОКО от общата ' +
+      'норма за възрастни, не по-ниско. Разпредели го по 25–30 г на хранене, защото ' +
+      'еднократна голяма доза не се усвоява по-добре. Комбинирай с движение срещу ' +
+      'съпротивление; храната без стимул за мускула не спира загубата.',
+    variants: [
+      {
+        when: p => p.vegan || p.vegetarian,
+        action:
+          'Осигури 1.0–1.2 г растителен белтък на кг дневно, по 25–30 г на хранене: ' +
+          'варива, тофу, темпе, киноа, ядкови масла. Растителните източници се усвояват ' +
+          'по-бавно, затова разпределението през деня има още по-голямо значение. ' +
+          'Комбинирай с движение срещу съпротивление.',
+      },
+    ],
+  },
+  {
+    id: 'menopause_bone',
+    fixedStrength: 'medium',
+    system: 'endocrine',
+    category: 'diet',
+    alsoWhen: p => p.menopause || p.osteoporosis,
+    belowScore: 101,
+    observation:
+      'След менопаузата спадът на естрогена намалява задържането на калций и ускорява ' +
+      'загубата на костна маса.',
+    action:
+      'Цели около 1200 мг калций дневно ОТ ХРАНАТА: млечни продукти, сардини с костите, ' +
+      'тахан, бадеми, броколи, обогатени растителни напитки. Витамин D 800 IU дневно ' +
+      'подпомага усвояването — стойността му се проверява с кръвно изследване, преди да ' +
+      'се приема добавка. Достатъчният белтък и натоварването с тежести пазят костта ' +
+      'толкова, колкото и калцият.',
+    variants: [
+      {
+        when: p => p.lactoseIntolerant || p.vegan,
+        action:
+          'Цели около 1200 мг калций дневно без млечни продукти: обогатени растителни ' +
+          'напитки (провери етикета — не всички са обогатени), тахан, бадеми, тофу със ' +
+          'калциев сулфат, броколи, зеле. Витамин D 800 IU дневно; при веган режим ' +
+          'провери източника да е D3 от лишеи или D2.',
+      },
+    ],
+  },
+  {
+    id: 'athlete_fuel',
+    fixedStrength: 'medium',
+    system: 'metabolic',
+    category: 'diet',
+    alsoWhen: p => p.athlete,
+    unsafeWhen: p => p.kidneyDisease || p.eatingDisorder,
+    belowScore: 101,
+    observation: 'Редовното интензивно натоварване вдига нуждите над общите норми.',
+    action:
+      'Белтък 1.4–2.0 г на кг дневно, разпределен по 25–40 г на хранене, с порция в рамките ' +
+      'на 2 часа след тренировка. Въглехидратите се съобразяват с натоварването — ' +
+      'ограничаването им в дните с тежка тренировка вреди на възстановяването. ' +
+      'Течности и електролити според изпотяването, не по график.',
+  },
+  {
+    id: 'pcos_insulin',
+    fixedStrength: 'medium',
+    system: 'endocrine',
+    category: 'diet',
+    alsoWhen: p => p.pcos,
+    unsafeWhen: p => p.eatingDisorder || p.pregnancy,
+    belowScore: 101,
+    observation:
+      'При поликистозни яйчници инсулиновата чувствителност е водещият фактор, върху ' +
+      'който храненето може да влияе.',
+    action:
+      'Понижи гликемичния товар: цели зърна вместо бели брашна, белтък и мазнина към ' +
+      'всяко хранене с въглехидрати, без подсладени напитки. Редовното движение ' +
+      'подобрява инсулиновата чувствителност независимо от промяната в теглото — ' +
+      'то не е добавка към диетата, а равностойна част.',
+  },
+
+  /* ── ЛЕКАРСТВЕНИ ВЗАИМОДЕЙСТВИЯ С ХРАНАТА ──────────────────────────────
+   * Тези правила не се задействат от ирисова находка и нямат праг: те зависят
+   * само от приеманите лекарства. Пропускането им е по-опасно от всяка грешна
+   * находка, защото съветът „яж повече зелени зеленчуци" при варфарин може да
+   * извади INR извън терапевтичния диапазон.
+   * ────────────────────────────────────────────────────────────────────── */
+  {
+    id: 'warfarin_vitamin_k',
+    critical: true,
+    fixedStrength: 'high',
+    system: 'circulatory',
+    category: 'lifestyle',
+    alsoWhen: p => p.warfarin,
+    belowScore: 101,
+    observation:
+      'Витамин K от храната влияе пряко върху действието на антикоагуланта, а дозата му ' +
+      'е нагласена спрямо обичайното ти меню.',
+    action:
+      'НЕ спирай зелените листни зеленчуци — приемай ги в ПОСТОЯННО количество. ' +
+      'Ако сега ядеш салата 4 пъти седмично, продължавай със същата честота. ' +
+      'Опасното е рязката промяна в двете посоки: и внезапното увеличаване, и ' +
+      'изрязването. Планирана промяна в менюто се съобщава на лекаря, който следи INR.',
+  },
+  {
+    id: 'levothyroxine_timing',
+    critical: true,
+    fixedStrength: 'high',
+    system: 'endocrine',
+    category: 'lifestyle',
+    alsoWhen: p => p.levothyroxine,
+    belowScore: 101,
+    observation: 'Калцият и желязото свързват левотироксина в червата и намаляват усвояването му.',
+    action:
+      'Взимай таблетката сутрин на празен стомах, 30–60 минути преди първата храна или ' +
+      'напитка. Отдели калция и желязото — от добавка или от млечни продукти — на поне ' +
+      '4 часа от нея. Кафето и храните с много фибри също пречат, затова закуската идва ' +
+      'след интервала, не заедно с таблетката.',
+  },
+  {
+    id: 'b12_depleting_meds',
+    critical: true,
+    fixedStrength: 'medium',
+    system: 'nervous',
+    category: 'lifestyle',
+    alsoWhen: p => p.metformin || p.ppi,
+    belowScore: 101,
+    observation:
+      'Продължителният прием на метформин или на лекарство за киселини е свързан с ' +
+      'понижени нива на витамин B12, а комбинацията от двете — с по-висок риск от всяко ' +
+      'поотделно.',
+    action:
+      'Поискай изследване на витамин B12 при следващия преглед, вместо да започваш ' +
+      'добавка наслуки. Ниският B12 се проявява като умора, изтръпване или трудна ' +
+      'концентрация и се бърка с други неща. Решението за добавка и дозата ѝ са на лекаря.',
+  },
+
+  /* ── СЪСТОЯНИЯ, КОИТО ПРЕНАПИСВАТ МЕНЮТО ───────────────────────────── */
+  {
+    id: 'gout_purines',
+    fixedStrength: 'medium',
+    system: 'metabolic',
+    category: 'diet',
+    alsoWhen: p => p.gout,
+    belowScore: 101,
+    observation: 'Пикочната киселина се повишава от конкретна група храни и напитки.',
+    action:
+      'Извади вътрешностите, аншоата и сардината, бирата (включително безалкохолната) и ' +
+      'подсладените с фруктоза напитки. Растителните пурини от варива и зеленчуци НЕ ' +
+      'носят същия риск и не се ограничават. Течностите — поне 2 л дневно, ако няма ' +
+      'бъбречно или сърдечно ограничение — помагат за извеждането.',
+    variants: [
+      {
+        when: p => p.kidneyDisease,
+        action:
+          'Извади вътрешностите, аншоата и сардината, бирата и подсладените с фруктоза ' +
+          'напитки. Количеството течности при бъбречно заболяване се определя от ' +
+          'нефролога — не увеличавай приема по своя преценка.',
+      },
+    ],
+  },
+  {
+    id: 'ibs_structured_elimination',
+    fixedStrength: 'medium',
+    system: 'digestive',
+    category: 'diet',
+    alsoWhen: p => p.ibs,
+    belowScore: 101,
+    observation:
+      'При раздразнено черво част от въглехидратите ферментират в дебелото черво и ' +
+      'предизвикват подуване и болка.',
+    action:
+      'Ако пробваш нискоферментационен (FODMAP) режим, той е ВРЕМЕНЕН: 2–6 седмици ' +
+      'строга фаза, след което храните се връщат група по група, за да се види коя точно ' +
+      'е проблемна. Постоянното изрязване обеднява чревната флора и не е целта. ' +
+      'Фазата на връщане отнема 6–8 седмици и върви най-добре с диетолог. ' +
+      'Дневник на храна и симптоми струва повече от всеки общ списък.',
+  },
+  {
+    id: 'celiac_strict',
+    critical: true,
+    fixedStrength: 'high',
+    system: 'digestive',
+    category: 'diet',
+    alsoWhen: p => p.celiac,
+    belowScore: 101,
+    observation: 'При цьолиакия глутенът уврежда чревната лигавица дори без симптоми.',
+    action:
+      'Глутенът отпада напълно и пожизнено — пшеница, ръж, ечемик и всичко произведено ' +
+      'от тях. Внимавай за кръстосано замърсяване: общ тостер, общо олио за пържене, ' +
+      'насипни продукти, овес без сертификат. Тъй като безглутеновите заместители често ' +
+      'са по-бедни на фибри и желязо, дръж в менюто елда, киноа, ориз, варива и ядки.',
+  },
+  {
+    id: 'iron_absorption',
+    fixedStrength: 'medium',
+    system: 'circulatory',
+    category: 'diet',
+    alsoWhen: p => p.anemia,
+    belowScore: 101,
+    observation: 'Усвояването на желязо зависи силно от това с какво е поднесено.',
+    action:
+      'Комбинирай източниците на желязо с витамин C (чушка, магданоз, цитрус) в същото ' +
+      'хранене — усвояването се увеличава многократно. Чаят, кафето и калцият в същото ' +
+      'хранене го намаляват, затова ги отдели с поне час. Добавка с желязо се приема само ' +
+      'при потвърден дефицит: излишъкът е също толкова проблем, колкото и недостигът.',
+    variants: [
+      {
+        when: p => p.vegan || p.vegetarian,
+        action:
+          'Растителното желязо се усвоява по-трудно, затова комбинацията с витамин C е ' +
+          'задължителна, а не по избор: варива или тъмнозелени зеленчуци заедно с чушка, ' +
+          'магданоз или цитрус. Накисването и покълването на варивата намаляват фитатите, ' +
+          'които пречат на усвояването. Чай и кафе — най-малко час след хранене.',
+      },
+    ],
+  },
+  {
+    id: 'vegan_completeness',
+    critical: true,
+    fixedStrength: 'high',
+    system: 'nervous',
+    category: 'supplement',
+    alsoWhen: p => p.vegan,
+    belowScore: 101,
+    observation:
+      'Веган режимът е пълноценен, но три хранителни вещества не се набавят надеждно ' +
+      'от растения.',
+    action:
+      'Витамин B12 — задължителна добавка, без изключение: 25–100 µg дневно или 2000 µg ' +
+      'веднъж седмично. Йод — йодирана сол в готвенето или добавка около 150 µg дневно. ' +
+      'Омега-3 DHA/EPA — от водораслово масло, защото ленът и орехите дават ALA, която ' +
+      'тялото превръща слабо. Желязото, цинкът и калцият се следят с изследване, преди ' +
+      'да се добавят.',
+    variants: [
+      {
+        when: p => p.autoimmuneThyroid,
+        action:
+          'Витамин B12 — задължителна добавка, без изключение: 25–100 µg дневно или ' +
+          '2000 µg веднъж седмично. Омега-3 DHA/EPA — от водораслово масло. ' +
+          'ЙОДЪТ при автоимунен тиреоидит се приема САМО по лекарска преценка — ' +
+          'излишъкът може да влоши състоянието, затова тук не се препоръчва добавка. ' +
+          'Желязото, цинкът и калцият се следят с изследване.',
+      },
+    ],
+  },
+]
+
+/**
  * Прилага профила за безопасност върху едно правило.
  * Връща `null`, ако правилото е противопоказано.
  */
@@ -1054,6 +1420,13 @@ function buildDrivers(
     emit(rule, forced && sys.score >= rule.belowScore ? 'medium' : strengthFor(sys.score, rule.belowScore))
   }
 
+  // Правилата по профил: задействат се от състоянието, не от оценката.
+  for (const rule of PROFILE_RULES) {
+    if (rule.alsoWhen?.(safety) !== true) continue
+    if (drivers.some(d => d.id === rule.id)) continue
+    emit(rule, rule.fixedStrength ?? 'medium')
+  }
+
   // Базовите правила се добавят винаги — планът никога не е празен.
   for (const rule of FOUNDATION_RULES) {
     if (drivers.some(d => d.id === rule.id)) continue
@@ -1065,7 +1438,16 @@ function buildDrivers(
   const order: Record<DriverStrength, number> = { high: 0, medium: 1, low: 2 }
   const priority = new Set(SYSTEMS.filter(s => s.priority).map(s => s.key))
   const isFoundation = (id: string) => FOUNDATION_RULES.some(r => r.id === id)
+  // Безопасността се сортира първа и не зависи от приоритетните системи:
+  // взаимодействието на варфарина с витамин K е по-важно от всяка находка,
+  // а системата му (кръвообращение) не е сред приоритетните.
+  const criticalIds = new Set(
+    [...DRIVER_RULES, ...PROFILE_RULES, ...FOUNDATION_RULES].filter(r => r.critical).map(r => r.id)
+  )
   drivers.sort((a, b) => {
+    const ca = criticalIds.has(a.id) ? 0 : 1
+    const cb = criticalIds.has(b.id) ? 0 : 1
+    if (ca !== cb) return ca - cb
     const fa = isFoundation(a.id) ? 1 : 0
     const fb = isFoundation(b.id) ? 1 : 0
     if (fa !== fb) return fa - fb
@@ -1075,7 +1457,12 @@ function buildDrivers(
     return order[a.strength] - order[b.strength]
   })
 
-  return { drivers: drivers.slice(0, 14), suppressed }
+  // Лимитът пази плана четим, но никога не изяжда съвет за безопасност.
+  const critical = drivers.filter(d => criticalIds.has(d.id))
+  const rest = drivers.filter(d => !criticalIds.has(d.id))
+  const limited = [...critical, ...rest.slice(0, Math.max(6, 16 - critical.length))]
+
+  return { drivers: limited, suppressed }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

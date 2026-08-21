@@ -511,6 +511,12 @@ export interface PriorityZone {
   rings: [number, number]
   /** Кои типове находки се броят с повишено тегло тук. */
   keyFindings: FindingType[]
+  /**
+   * `focal` — зоната е проекция на конкретен орган в няколко минути.
+   * `circumferential` — зоната е цял пръстенен пояс през всички сектори.
+   * Разликата има значение: поясната зона е базовият случай, не отличие.
+   */
+  spread: 'focal' | 'circumferential'
 }
 
 export const PRIORITY_ZONES: PriorityZone[] = [
@@ -524,6 +530,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     minutes: { right: [[0, 60]], left: [[0, 60]] },
     rings: [1, 4],
     keyFindings: ['collarette_irregularity', 'radial_furrow', 'lacuna', 'crypt', 'pigment_orange'],
+    spread: 'circumferential',
   },
   {
     key: 'pancreatic_metabolic',
@@ -534,6 +541,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     minutes: { right: [[40, 45]], left: [[35, 40]] },
     rings: [3, 9],
     keyFindings: ['lacuna', 'crypt', 'pigment_orange', 'pigment_diffuse', 'fiber_loosening'],
+    spread: 'focal',
   },
   {
     key: 'hepatobiliary',
@@ -544,6 +552,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     minutes: { right: [[20, 25]], left: [] },
     rings: [3, 9],
     keyFindings: ['pigment_brown', 'pigment_diffuse', 'lacuna', 'fiber_loosening'],
+    spread: 'focal',
   },
   {
     key: 'thyroid_axis',
@@ -554,6 +563,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     minutes: { right: [[10, 15]], left: [[45, 50]] },
     rings: [3, 9],
     keyFindings: ['lacuna', 'fiber_loosening', 'pigment_orange', 'nerve_rings'],
+    spread: 'focal',
   },
   {
     key: 'adrenal_stress',
@@ -564,6 +574,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     minutes: { right: [[30, 35]], left: [[30, 35]] },
     rings: [3, 9],
     keyFindings: ['nerve_rings', 'radial_furrow', 'lacuna', 'crypt', 'pigment_yellow'],
+    spread: 'focal',
   },
   {
     key: 'lipid_rim',
@@ -575,11 +586,34 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     minutes: { right: [[0, 60]], left: [[0, 60]] },
     rings: [9, 11],
     keyFindings: ['sodium_ring', 'scurf_rim', 'lymphatic_rosary'],
+    spread: 'circumferential',
   },
 ]
 
-/** Множител за находки, попадащи в приоритетна зона. */
+/**
+ * Множител за находки в приоритетна зона — СТЕПЕНУВАН.
+ *
+ * Плоският множител 1.4 не разграничаваше: `gastro_intestinal` покрива всички
+ * 12 сектора на пръстени 1–4, тоест над една трета от картата. При проверка с
+ * реален модел 8 от 11 находки получиха един и същ boost — това не е
+ * приоритет, а базов случай. Поясната зона казва „находката е в
+ * храносмилателния пояс"; фокусната казва „находката е върху панкреаса".
+ * Второто е информация, първото — почти константа.
+ */
 export const PRIORITY_ZONE_BOOST = 1.4
+export const CIRCUMFERENTIAL_ZONE_BOOST = 1.12
+/** Таван, за да не се натрупват множителите при застъпване на зони. */
+export const MAX_ZONE_BOOST = 1.5
+
+/** Изчислява крайния множител за списък от зони, в които попада находка. */
+export function zoneBoost(zones: PriorityZone[]): number {
+  if (zones.length === 0) return 1
+  const focal = zones.some(z => z.spread === 'focal')
+  const base = focal ? PRIORITY_ZONE_BOOST : CIRCUMFERENTIAL_ZONE_BOOST
+  // Всяка допълнителна фокусна зона добавя малко, но никога над тавана.
+  const extra = Math.max(0, zones.filter(z => z.spread === 'focal').length - 1) * 0.08
+  return Math.min(MAX_ZONE_BOOST, base + extra)
+}
 
 /** Връща приоритетните зони, в които попада дадена находка. */
 export function priorityZonesFor(side: Side, minute: number, ring: number): PriorityZone[] {

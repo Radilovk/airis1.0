@@ -289,6 +289,51 @@ const LIMBUS_ANGLES: number[] = (() => {
   return a
 })()
 
+/**
+ * Същите ъгли, но разделени на ДВЕ СТРАНИ — темпорална и назална.
+ *
+ * Разделянето не е козметично. Оценката „среден външен пръстен минус среден
+ * вътрешен" се лъже систематично: зеницата (яркост ≈ 10) е много по-тъмна от
+ * ириса (≈ 130), затова търсенето печели, като измести кръга настрани, докато
+ * ЕДНАТА страна на вътрешния пръстен попадне в зеницата, а ОТСРЕЩНАТА страна на
+ * външния — в склерата. Аритметиката при истина cx=600, r_ирис=430, r_зеница=130:
+ *
+ *   истинският кръг   cx=600 r=430 → 102
+ *   изместеният кръг  cx=750 r=278 → 111   ← печели
+ *
+ * Резултатът беше радиус 0.63–0.77 от истинския при всеки размер, с изместен
+ * център. Затова двете страни се оценяват поотделно и печели ПО-СЛАБАТА:
+ * изместеният кръг е добър от едната страна и лош от другата, истинският —
+ * добър и от двете. Няма нова константа за донастройване.
+ */
+const LIMBUS_ANGLE_GROUPS: number[][] = (() => {
+  // Четири групи вместо две: горна и долна половина на всяка от двете дъги.
+  // Изместена окръжност може да съвпадне по две групи, но не по четири.
+  const g: number[][] = [[], [], [], []]
+  for (let deg = -35; deg <= 35; deg += 5) {
+    const rad = (deg * Math.PI) / 180
+    g[deg < 0 ? 0 : 1].push(rad)
+    g[deg < 0 ? 2 : 3].push(Math.PI + rad)
+  }
+  return g
+})()
+
+/**
+ * Колко се наказва разсейката между групите. Концентричната с лимбуса
+ * окръжност дава ЕДНАКЪВ преход във всички посоки; изместената дава силен в
+ * едни и слаб в други. Наказанието превръща тази симетрия в част от критерия,
+ * вместо да се разчита само на най-слабата група.
+ */
+const ASYMMETRY_PENALTY = 0.6
+
+/** Силата на прехода ирис→склера от едната страна на кандидат-окръжността. */
+function limbusHalfScore(g: Gray, cx: number, cy: number, r: number, angles: number[]): number {
+  const inner = ringMean(g, cx, cy, r * 0.82, 32, angles)
+  const outer = ringMean(g, cx, cy, r * 1.18, 32, angles)
+  if (Number.isNaN(inner) || Number.isNaN(outer)) return NaN
+  return outer - inner
+}
+
 /* ── лимбус (търси се ПРЪВ) ──────────────────────────────────────────────── */
 
 /**
@@ -317,10 +362,19 @@ function coarseLimbus(g: Gray): { cx: number; cy: number; r: number } {
     // Пръстените се вземат само по хоризонталата, където клепачите не пречат.
     for (let cy = Math.round(h * 0.3); cy <= Math.round(h * 0.7); cy += 4) {
       for (let cx = Math.round(w * 0.3); cx <= Math.round(w * 0.7); cx += 4) {
-        const inner = ringMean(g, cx, cy, r * 0.82, 32, LIMBUS_ANGLES)
-        const outer = ringMean(g, cx, cy, r * 1.18, 32, LIMBUS_ANGLES)
-        if (Number.isNaN(inner) || Number.isNaN(outer)) continue
-        const score = outer - inner
+        let lo = Infinity
+        let hi = -Infinity
+        let bad = false
+        for (const group of LIMBUS_ANGLE_GROUPS) {
+          const v = limbusHalfScore(g, cx, cy, r, group)
+          if (Number.isNaN(v)) { bad = true; break }
+          if (v < lo) lo = v
+          if (v > hi) hi = v
+        }
+        if (bad) continue
+        // ПО-СЛАБАТА група решава, а разсейката между групите се наказва.
+        // Виж коментара при `LIMBUS_ANGLE_GROUPS`.
+        const score = lo - ASYMMETRY_PENALTY * (hi - lo)
         if (score > best.score) best = { cx, cy, r, score }
       }
     }

@@ -277,9 +277,19 @@ export async function detectEye(
     }
   }
 
-  await runDetection('structure', 20)
-  if (delayBetweenCalls > 0) await sleep(delayBetweenCalls)
-  await runDetection('pigment', 45)
+  // Двата слоя са независими: различна лента, различен промпт, различен речник
+  // от типове. Последователното им изпълнение удвояваше времето до доклада без
+  // да променя нищо в резултата.
+  //
+  // При включено ограничение на честотата (`requestDelay`) редът се запазва —
+  // паралелизмът щеше да заобиколи именно това ограничение.
+  if (delayBetweenCalls > 0) {
+    await runDetection('structure', 20)
+    await sleep(delayBetweenCalls)
+    await runDetection('pigment', 45)
+  } else {
+    await Promise.all([runDetection('structure', 20), runDetection('pigment', 45)])
+  }
 
   // Конституция — кратък пас върху базовия слой.
   let constitution: Constitution = 'unclear'
@@ -376,12 +386,22 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
   }
 
   // ── 2. детекция ─────────────────────────────────────────────────────────
-  onProgress('Анализ на ляв ирис', 15)
-  const left = await detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay)
-  if (delay > 0) await sleep(delay)
-
-  onProgress('Анализ на десен ирис', 40)
-  const right = await detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay)
+  // Двете очи също са независими помежду си.
+  let left: EyeDetection
+  let right: EyeDetection
+  if (delay > 0) {
+    onProgress('Анализ на ляв ирис', 15)
+    left = await detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay)
+    await sleep(delay)
+    onProgress('Анализ на десен ирис', 40)
+    right = await detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay)
+  } else {
+    onProgress('Анализ на двата ириса', 15)
+    ;[left, right] = await Promise.all([
+      detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay),
+      detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay),
+    ])
+  }
 
   const allFindings = [...left.findings, ...right.findings]
   const passTotal = left.passesOk + right.passesOk
