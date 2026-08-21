@@ -23,7 +23,7 @@ import {
   FINDINGS,
   zoneBoost,
   SYSTEMS,
-  isFindingType,
+  resolveFindingType,
   minuteToSector,
   priorityZonesFor,
   ringBand,
@@ -205,8 +205,9 @@ export function normalizeFindings(
     if (!item || typeof item !== 'object') continue
     const o = item as Record<string, unknown>
 
-    const type = o.type
-    if (!isFindingType(type)) continue
+    // Приемат се и старите, по-фини имена — превеждат се към класа.
+    const type = resolveFindingType(o.type)
+    if (!type) continue
     const def = FINDINGS[type]
 
     // адресът е клетка: sector 1..12 + ring 0..11.

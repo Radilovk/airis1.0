@@ -304,14 +304,31 @@ export function ringBand(ring: number): RingBandDef {
  * начин находките да бъдат обработени детерминистично надолу по веригата.
  * ───────────────────────────────────────────────────────────────────────────*/
 
+/**
+ * СТРУКТУРНИЯТ РЕЧНИК Е КОЛАПСИРАН — по измерване, не по вкус.
+ *
+ * Два независими прочита на една и съща тъкан (§10 в МЕТОДИКА_2) показаха:
+ *
+ *   пигментен слой:  2 от 2 потвърдени находки със СЪЩИЯ тип
+ *   структурен слой: 0 от 3 потвърдени находки със същия тип
+ *
+ * Тоест моделът именува пигмента безгрешно, а структурата — никога еднакво.
+ * Разминаванията бяха `radial_furrow`↔`crypt`, `fiber_loosening`↔`radial_furrow`,
+ * `collarette_irregularity`↔`lacuna` — все „тъмно нещо във влакната".
+ * Седемте структурни типа са по-фино деление, отколкото снимка позволява да се
+ * различи.
+ *
+ * След колапса до три класа същият тест дава 2 от 3 със същия тип.
+ *
+ * Загубата е малка: смисълът на находката идва от СЕКТОРА и ПОЯСА (картата), а
+ * не от името ѝ — теглата на слетите типове бяха 0.7–0.8, почти еднакви.
+ */
 export type FindingType =
-  // структурни
-  | 'lacuna'
-  | 'crypt'
-  | 'radial_furrow'
+  // структурни — три класа, разграничими по ЕДИН признак: има ли ръб
+  | 'fiber_defect'
+  | 'fiber_thinning'
+  | 'collarette_deform'
   | 'transversal_fiber'
-  | 'fiber_loosening'
-  | 'collarette_irregularity'
   // пигментни / пръстеновидни
   | 'pigment_orange'
   | 'pigment_brown'
@@ -345,62 +362,47 @@ export interface FindingDef {
 }
 
 export const FINDINGS: Record<FindingType, FindingDef> = {
-  lacuna: {
-    type: 'lacuna',
-    label: 'Лакуна',
-    appearanceUnwrapped: 'затворен тъмен овал/лист, който прекъсва хода на влакната',
-    meaning: 'локално по-рехава тъкан; зона за поддръжка',
-    weight: 0.8,
+  fiber_defect: {
+    type: 'fiber_defect',
+    label: 'Дефект във влакната',
+    appearanceUnwrapped:
+      'тъмна зона с РАЗЛИЧИМ РЪБ, в която влакната липсват или са прекъснати; ' +
+      'формата няма значение — овална, ромбовидна или вертикална ивица са едно и също',
+    meaning: 'локално по-рехава или прекъсната тъкан; зона за поддръжка',
+    weight: 0.75,
     systems: {},
     validRings: [1, 11],
   },
-  crypt: {
-    type: 'crypt',
-    label: 'Крипта',
-    appearanceUnwrapped: 'малка дълбока тъмна ромбовидна дупка',
-    meaning: 'по-дълбок структурен дефицит в сектора',
-    weight: 0.7,
+  fiber_thinning: {
+    type: 'fiber_thinning',
+    label: 'Разреждане на влакната',
+    appearanceUnwrapped:
+      'по-редки, размити или бледи влакна БЕЗ ясен ръб — преходът е плавен',
+    meaning: 'по-нисък тъканен тонус в зоната',
+    weight: 0.5,
     systems: {},
-    validRings: [1, 9],
-  },
-  radial_furrow: {
-    type: 'radial_furrow',
-    label: 'Радиална бразда',
-    appearanceUnwrapped: 'ВЕРТИКАЛНА тъмна ивица (в разгъвката радиалното е вертикално)',
-    meaning: 'нервно-стресов и чревно-транзитен маркер',
-    weight: 0.6,
-    systems: { nervous: 0.8, digestive: 0.5 },
     validRings: [2, 11],
+  },
+  collarette_deform: {
+    type: 'collarette_deform',
+    label: 'Деформиран автономен пръстен',
+    appearanceUnwrapped:
+      'границата около R2–R3 е вълнообразна, накъсана, изтеглена или неравномерно ' +
+      'отдалечена от зеницата; определя се по МЯСТО, не по форма',
+    meaning: 'неравномерен тонус на храносмилателния тракт',
+    weight: 0.9,
+    systems: { digestive: 1 },
+    validRings: [1, 4],
   },
   transversal_fiber: {
     type: 'transversal_fiber',
     label: 'Напречно влакно',
-    appearanceUnwrapped: 'ХОРИЗОНТАЛНА линия, пресичаща няколко минути',
-    meaning: 'локално напрежение в тъканта',
+    appearanceUnwrapped: 'ХОРИЗОНТАЛНА линия, пресичаща няколко сектора',
+    meaning: 'преминала през зоната реакция',
     weight: 0.5,
     systems: {},
     validRings: [2, 11],
   },
-  fiber_loosening: {
-    type: 'fiber_loosening',
-    label: 'Разреждане на влакната',
-    appearanceUnwrapped: 'участък с по-размита, по-рядка текстура без ясни линии',
-    meaning: 'по-нисък тъканен тонус в сектора',
-    weight: 0.5,
-    systems: {},
-    validRings: [2, 11],
-  },
-  collarette_irregularity: {
-    type: 'collarette_irregularity',
-    label: 'Неравен автономен пръстен',
-    appearanceUnwrapped: 'вълнообразна/накъсана граница около редове R2–R3',
-    meaning: 'храносмилателен и вегетативен дисбаланс',
-    weight: 0.9,
-    systems: { digestive: 1.0, nervous: 0.7 },
-    validRings: [1, 4],
-  },
-  // manual.json → SIGNS.PIGMENT разделя пигмента на три, с РАЗЛИЧНО значение.
-  // Единният „pigment_spot" губеше точно тази информация.
   pigment_orange: {
     type: 'pigment_orange',
     label: 'Оранжево-ръждив пигмент',
@@ -488,6 +490,28 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
 
 export const FINDING_TYPES = Object.keys(FINDINGS) as FindingType[]
 
+/**
+ * Старите, по-фини структурни имена. Приемат се и се превеждат към класа —
+ * заради вече записана история и заради модел, който по инерция върне старото
+ * име. Нищо не се губи: смисълът идва от сектора и пояса.
+ */
+const FINDING_ALIASES: Record<string, FindingType> = {
+  lacuna: 'fiber_defect',
+  crypt: 'fiber_defect',
+  radial_furrow: 'fiber_defect',
+  giant_lacuna: 'fiber_defect',
+  fiber_loosening: 'fiber_thinning',
+  collarette_irregularity: 'collarette_deform',
+  collarette_defect_lesion: 'collarette_deform',
+}
+
+/** Превежда произволна стойност към валиден тип находка, или null. */
+export function resolveFindingType(v: unknown): FindingType | null {
+  if (typeof v !== 'string') return null
+  if ((FINDING_TYPES as string[]).includes(v)) return v as FindingType
+  return FINDING_ALIASES[v] ?? null
+}
+
 export function isFindingType(v: unknown): v is FindingType {
   return typeof v === 'string' && v in FINDINGS
 }
@@ -529,7 +553,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     // manual.json: STOMACH_RING 12–22 % (R1–R2) + INTESTINAL_FIELD/ANW 22–38 % (R3–R4)
     minutes: { right: [[0, 60]], left: [[0, 60]] },
     rings: [1, 4],
-    keyFindings: ['collarette_irregularity', 'radial_furrow', 'lacuna', 'crypt', 'pigment_orange'],
+    keyFindings: ['collarette_deform', 'fiber_defect', 'pigment_orange'],
     spread: 'circumferential',
   },
   {
@@ -540,7 +564,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     system: 'metabolic',
     minutes: { right: [[40, 45]], left: [[35, 40]] },
     rings: [3, 9],
-    keyFindings: ['lacuna', 'crypt', 'pigment_orange', 'pigment_diffuse', 'fiber_loosening'],
+    keyFindings: ['fiber_defect', 'pigment_orange', 'pigment_diffuse', 'fiber_thinning'],
     spread: 'focal',
   },
   {
@@ -551,7 +575,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     system: 'detox',
     minutes: { right: [[20, 25]], left: [] },
     rings: [3, 9],
-    keyFindings: ['pigment_brown', 'pigment_diffuse', 'lacuna', 'fiber_loosening'],
+    keyFindings: ['pigment_brown', 'pigment_diffuse', 'fiber_defect', 'fiber_thinning'],
     spread: 'focal',
   },
   {
@@ -562,7 +586,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     system: 'endocrine',
     minutes: { right: [[10, 15]], left: [[45, 50]] },
     rings: [3, 9],
-    keyFindings: ['lacuna', 'fiber_loosening', 'pigment_orange', 'nerve_rings'],
+    keyFindings: ['fiber_defect', 'fiber_thinning', 'pigment_orange', 'nerve_rings'],
     spread: 'focal',
   },
   {
@@ -573,7 +597,7 @@ export const PRIORITY_ZONES: PriorityZone[] = [
     system: 'endocrine',
     minutes: { right: [[30, 35]], left: [[30, 35]] },
     rings: [3, 9],
-    keyFindings: ['nerve_rings', 'radial_furrow', 'lacuna', 'crypt', 'pigment_yellow'],
+    keyFindings: ['nerve_rings', 'fiber_defect', 'pigment_yellow'],
     spread: 'focal',
   },
   {
