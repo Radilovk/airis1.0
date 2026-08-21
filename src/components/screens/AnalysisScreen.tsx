@@ -822,6 +822,8 @@ ${response}
       imageQuality: Math.round(result.imageQuality),
       stripCoverage: result.stripCoverage,
       irisWeight: result.scoring.irisWeight,
+      agreement: result.agreement,
+      confirmedCount: result.confirmedCount,
       focus: result.scoring.focus,
       systems: result.scoring.systems.map(sys => ({
         key: sys.key,
@@ -848,6 +850,8 @@ ${response}
         size: f.size,
         confidence: f.confidence,
         priorityZones: f.priorityZones,
+        confirmations: f.confirmations,
+        bilateral: f.bilateral,
       })),
       // Смалени копия: пълните ленти (≈780 KB всяка) се ползват САМО за
       // заявките към модела и остават в паметта. В отчета влизат намалени

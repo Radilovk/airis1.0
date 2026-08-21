@@ -63,6 +63,14 @@ export interface UnwrapOptions {
    * лента не се използва никъде в приложението.
    */
   includeRaw?: boolean
+  /**
+   * На колко сектора да се измести ШЕВЪТ на разгъването (0–11).
+   *
+   * Кръгът се среже някъде, за да стане правоъгълник, и това „някъде" е
+   * произволно. Изместването прави физически ИДЕНТИЧНА, но визуално различна
+   * лента: колона 1 вече е друг физически сектор. Виж `iris-pipeline.ts`.
+   */
+  rotationSectors?: number
 }
 
 export interface UnwrapResult {
@@ -84,6 +92,8 @@ export interface UnwrapResult {
   coverage: number
   side: Side
   layer: StripLayer
+  /** Изместването на шева, с което е направена лентата (0–11 сектора). */
+  rotationSectors: number
 }
 
 const SECTORS = 12
@@ -258,6 +268,8 @@ export function unwrapIris(
   options: UnwrapOptions = {}
 ): UnwrapResult {
   const layer = options.layer ?? 'base'
+  const rotationSectors = ((Math.round(options.rotationSectors ?? 0) % SECTORS) + SECTORS) % SECTORS
+  const rotationTurns = rotationSectors / SECTORS
   const PW = options.plotWidth ?? 1440
   const PH = options.plotHeight ?? 720
   const quality = options.quality ?? 0.93
@@ -279,7 +291,9 @@ export function unwrapIris(
     const cx = pupil.cx + (limbus.cx - pupil.cx) * t
     const cy = pupil.cy + (limbus.cy - pupil.cy) * t
     for (let col = 0; col < PW; col++) {
-      const theta = ((col + 0.5) / PW) * Math.PI * 2 // 0 = 12:00, расте по часовника
+      // 0 = 12:00, расте по часовника. `rotationTurns` мести шева: колона 0 вече
+      // сочи към физически сектор `rotationSectors + 1`.
+      const theta = ((col + 0.5) / PW + rotationTurns) * Math.PI * 2
       const sin = Math.sin(theta)
       const cos = Math.cos(theta)
       // радиусът на зеницата и на лимбуса по този лъч, спрямо съответния център
@@ -462,7 +476,46 @@ export function unwrapIris(
 
   const dataUrl = drawCalibrationGrid(rawCanvas, side, layer, readability, isPartial, quality)
 
-  return { dataUrl, rawDataUrl, readability, unreadableCells, partialCells, coverage, side, layer }
+  return {
+    dataUrl,
+    rawDataUrl,
+    readability,
+    unreadableCells,
+    partialCells,
+    coverage,
+    side,
+    layer,
+    rotationSectors,
+  }
+}
+
+/**
+ * Превръща сектор, докладван върху ЛЕНТАТА, във физически сектор на ириса.
+ *
+ * Лентата винаги е надписана S1…S12, независимо къде е срязан кръгът — точно
+ * затова моделът не може да познае, че две ленти са едно и също око. Връщането
+ * към физическите координати става тук и само тук.
+ */
+export function stripSectorToPhysical(stripSector: number, rotationSectors: number): number {
+  const k = ((Math.round(rotationSectors) % SECTORS) + SECTORS) % SECTORS
+  return (((Math.round(stripSector) - 1 + k) % SECTORS) + SECTORS) % SECTORS + 1
+}
+
+/** Обратното: физически сектор → коя колона на лентата го показва. */
+export function physicalSectorToStrip(physicalSector: number, rotationSectors: number): number {
+  const k = ((Math.round(rotationSectors) % SECTORS) + SECTORS) % SECTORS
+  return (((Math.round(physicalSector) - 1 - k) % SECTORS) + SECTORS) % SECTORS + 1
+}
+
+/**
+ * Пренарежда матрицата на четимостта от координати на ЛЕНТАТА във физически.
+ * Нужно е, защото находките се връщат към физически сектори, а претеглянето по
+ * четимост трябва да е в същата рамка.
+ */
+export function readabilityToPhysical(readability: number[][], rotationSectors: number): number[][] {
+  return readability.map(row =>
+    row.map((_, physIdx) => row[physicalSectorToStrip(physIdx + 1, rotationSectors) - 1])
+  )
 }
 
 /* ── мрежата ──────────────────────────────────────────────────────────────── */
@@ -736,6 +789,57 @@ export function unwrapFromDataUrl(
     img.onload = () => {
       try {
         resolve(unwrapIris(img, geo, side, options))
+      } catch (e) {
+        reject(e)
+      }
+    }
+    img.onerror = () => reject(new Error('Изображението не може да бъде заредено'))
+    img.src = dataUrl
+  })
+}
+
+/**
+ * ИЗМЕСТВАНЕ НА ШЕВА — на колко сектора се мести срезът за втория прочит.
+ *
+ * 6 е половин оборот. При шев на 12:00 клетка в сектор 1 лежи до ръба на
+ * лентата; при шев на 6:00 същата клетка е колона 7, тоест в средата. Така
+ * всяка клетка е далеч от шев поне в единия от двата прочита.
+ */
+export const SEAM_ROTATION = 6
+
+export interface AnalysisViews {
+  /** Базовият слой, шев на 12:00 — за конституцията и за показване. */
+  base: UnwrapResult
+  /** Двата детекторски слоя, по един прочит за всеки шев. */
+  readings: Array<{
+    rotationSectors: number
+    structure: UnwrapResult
+    pigment: UnwrapResult
+  }>
+}
+
+/**
+ * Подготвя всичко, което детекцията ползва: базовия слой плюс ДВА независими
+ * прочита на детекторските слоеве, срязани на различно място.
+ */
+export function unwrapAnalysisFromDataUrl(
+  dataUrl: string,
+  geo: IrisGeometry,
+  side: Side,
+  options: Omit<UnwrapOptions, 'layer' | 'rotationSectors'> = {}
+): Promise<AnalysisViews> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        resolve({
+          base: unwrapIris(img, geo, side, { ...options, layer: 'base' }),
+          readings: [0, SEAM_ROTATION].map(rotationSectors => ({
+            rotationSectors,
+            structure: unwrapIris(img, geo, side, { ...options, layer: 'structure', rotationSectors }),
+            pigment: unwrapIris(img, geo, side, { ...options, layer: 'pigment', rotationSectors }),
+          })),
+        })
       } catch (e) {
         reject(e)
       }

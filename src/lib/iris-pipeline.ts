@@ -27,7 +27,14 @@
 import type { IrisImage, QuestionnaireData } from '@/types'
 import type { IrisGeometry } from './iris-geometry'
 import { analyseIrisQualityFromDataUrl, type QualityReport } from './iris-quality'
-import { unwrapAllFromDataUrl, type StripLayer, type UnwrapResult } from './iris-unwrap'
+import {
+  readabilityToPhysical,
+  stripSectorToPhysical,
+  unwrapAnalysisFromDataUrl,
+  type AnalysisViews,
+  type StripLayer,
+  type UnwrapResult,
+} from './iris-unwrap'
 import {
   buildConstitutionPrompt,
   buildDetectionPrompt,
@@ -35,6 +42,7 @@ import {
 } from './analysis-prompts'
 import {
   computeScores,
+  mergeSeamReadings,
   normalizeFindings,
   type NormalizedFinding,
   type ScoringResult,
@@ -68,15 +76,24 @@ export interface EyePreparation {
   /** Изведено от снимката, не предположено: има ли отблясък от светкавица. */
   flash: boolean
   strips: Record<StripLayer, UnwrapResult>
+  /** Двата независими прочита с различен шев. Виж `mergeSeamReadings`. */
+  readings: AnalysisViews['readings']
 }
 
 export interface EyeDetection {
   side: Side
   findings: NormalizedFinding[]
   constitution: Constitution
-  /** Колко LLM паса са успели (0–3). */
+  /** Колко LLM паса са успели (0–5: 2 слоя × 2 шева + конституция). */
   passesOk: number
   rejectedCount: number
+  /**
+   * Измерена повторяемост: какъв дял от находките са се появили и в двата
+   * прочита с различен шев. Това е увереност, която е ИЗМЕРЕНА, за разлика от
+   * числото `confidence`, което моделът обявява сам.
+   */
+  agreement: number
+  confirmedCount: number
 }
 
 export interface IrisPipelineResult {
@@ -88,6 +105,9 @@ export interface IrisPipelineResult {
   interpretation: InterpretationOutput | null
   imageQuality: number
   stripCoverage: number
+  /** Средна повторяемост на двата прочита с различен шев, 0–1. */
+  agreement: number
+  confirmedCount: number
 }
 
 export interface InterpretationOutput {
@@ -177,7 +197,14 @@ export async function prepareEye(
   }
 
   addLog('info', `[Подготовка ${name}] Пречертаване на лентата...`)
-  const strips = await unwrapAllFromDataUrl(iris.dataUrl, geometry, side)
+  const views = await unwrapAnalysisFromDataUrl(iris.dataUrl, geometry, side)
+  // `strips` остава с шев на 12:00 — за конституцията, за показване и за
+  // историята. Детекцията ползва `views.readings`.
+  const strips: Record<StripLayer, UnwrapResult> = {
+    base: views.base,
+    structure: views.readings[0].structure,
+    pigment: views.readings[0].pigment,
+  }
 
   // Оценката се преизчислява СЛЕД лентата: покритието ѝ е единственото число,
   // което описва какво реално вижда моделът. Без него оценяваме снимката, а не
@@ -215,7 +242,16 @@ export async function prepareEye(
   const flash = recomputed.metrics.pupilSpecular > 0.005
   if (flash) addLog('info', `[Подготовка ${name}] Разпозната светкавица — четенето е нагласено за нея`)
 
-  return { side, geometry, qualityScore, qualityVerdict, manualGeometry, flash, strips }
+  return {
+    side,
+    geometry,
+    qualityScore,
+    qualityVerdict,
+    manualGeometry,
+    flash,
+    strips,
+    readings: views.readings,
+  }
 }
 
 /* ── стъпка 2: детекция (LLM) ────────────────────────────────────────────── */
@@ -232,15 +268,25 @@ export async function detectEye(
   delayBetweenCalls: number
 ): Promise<EyeDetection> {
   const sideName = prep.side === 'left' ? 'ляв' : 'десен'
-  const collected: NormalizedFinding[] = []
   let rejected = 0
   let passesOk = 0
 
-  const runDetection = async (layer: Exclude<StripLayer, 'base'>, progress: number) => {
-    const strip = prep.strips[layer]
+  // Резултатите се държат ПО ПРОЧИТ (по индекс на шева), защото сливането е
+  // именно между тях. Смесването им тук би заличило информацията, заради която
+  // се прави вторият прочит.
+  const perReading: NormalizedFinding[][] = prep.readings.map(() => [])
+
+  const runDetection = async (
+    layer: Exclude<StripLayer, 'base'>,
+    readingIdx: number,
+    progress: number
+  ) => {
+    const view = prep.readings[readingIdx]
+    const strip = view[layer]
     const label = layer === 'structure' ? 'структурен' : 'пигментен'
-    onProgress(`Детекция (${sideName}, ${label})`, progress)
-    addLog('info', `[Детекция ${sideName}] ${label} слой...`)
+    const seam = view.rotationSectors === 0 ? '12:00' : `${(view.rotationSectors % 12) || 12}:00`
+    onProgress(`Детекция (${sideName}, ${label}, шев ${seam})`, progress)
+    addLog('info', `[Детекция ${sideName}] ${label} слой, шев на ${seam}...`)
 
     const prompt = buildDetectionPrompt({
       side: prep.side,
@@ -255,16 +301,30 @@ export async function detectEye(
       const response = await callLLM(prompt, true, 2, strip.dataUrl)
       const parsed = parseJsonResponse(response) as Record<string, unknown>
       const rawList = Array.isArray(parsed.findings) ? parsed.findings : []
-      const normalized = normalizeFindings(rawList, prep.side, {
-        readability: strip.readability,
-        partialCells: strip.partialCells,
+
+      // Секторите се връщат към ФИЗИЧЕСКИ преди нормализирането: приоритетните
+      // зони и картата на органите работят с физически координати, не с колони.
+      const physical = rawList.map(item => {
+        if (!item || typeof item !== 'object') return item
+        const o = item as Record<string, unknown>
+        const sec = Number(o.sector)
+        if (!Number.isFinite(sec)) return item
+        return { ...o, sector: stripSectorToPhysical(sec, view.rotationSectors) }
+      })
+
+      const normalized = normalizeFindings(physical, prep.side, {
+        readability: readabilityToPhysical(strip.readability, view.rotationSectors),
+        partialCells: strip.partialCells.map(c => ({
+          sector: stripSectorToPhysical(c.sector, view.rotationSectors),
+          ring: c.ring,
+        })),
       })
       rejected += rawList.length - normalized.length
-      collected.push(...normalized)
+      perReading[readingIdx].push(...normalized)
       passesOk++
       addLog(
         'success',
-        `[Детекция ${sideName}] ${label} слой: ${normalized.length} приети` +
+        `[Детекция ${sideName}] ${label}, шев ${seam}: ${normalized.length} приети` +
           (rawList.length > normalized.length
             ? `, ${rawList.length - normalized.length} отхвърлени като невалидни`
             : '')
@@ -272,24 +332,37 @@ export async function detectEye(
     } catch (e) {
       addLog(
         'warning',
-        `[Детекция ${sideName}] ${label} слой се провали: ${e instanceof Error ? e.message : String(e)}`
+        `[Детекция ${sideName}] ${label}, шев ${seam} се провали: ` +
+          `${e instanceof Error ? e.message : String(e)}`
       )
     }
   }
 
-  // Двата слоя са независими: различна лента, различен промпт, различен речник
-  // от типове. Последователното им изпълнение удвояваше времето до доклада без
-  // да променя нищо в резултата.
-  //
-  // При включено ограничение на честотата (`requestDelay`) редът се запазва —
-  // паралелизмът щеше да заобиколи именно това ограничение.
+  // Четири независими паса: два слоя × два шева. Всички са независими помежду
+  // си — при липса на ограничение на честотата вървят наведнъж.
+  const jobs: Array<[Exclude<StripLayer, 'base'>, number, number]> = []
+  prep.readings.forEach((_, idx) => {
+    jobs.push(['structure', idx, 15 + idx * 10])
+    jobs.push(['pigment', idx, 35 + idx * 10])
+  })
+
   if (delayBetweenCalls > 0) {
-    await runDetection('structure', 20)
-    await sleep(delayBetweenCalls)
-    await runDetection('pigment', 45)
+    for (const [layer, idx, progress] of jobs) {
+      await runDetection(layer, idx, progress)
+      await sleep(delayBetweenCalls)
+    }
   } else {
-    await Promise.all([runDetection('structure', 20), runDetection('pigment', 45)])
+    await Promise.all(jobs.map(([layer, idx, progress]) => runDetection(layer, idx, progress)))
   }
+
+  // Сливане на двата прочита. Тук се ражда измерената повторяемост.
+  const merged = mergeSeamReadings(perReading[0] ?? [], perReading[1] ?? [])
+  const collected = merged.findings
+  addLog(
+    merged.agreement >= 0.5 ? 'success' : 'warning',
+    `[Детекция ${sideName}] Два прочита с различен шев: ${merged.confirmed} от ` +
+      `${merged.total} находки съвпадат (${Math.round(merged.agreement * 100)} % повторяемост)`
+  )
 
   // Конституция — кратък пас върху базовия слой.
   let constitution: Constitution = 'unclear'
@@ -308,14 +381,18 @@ export async function detectEye(
     void e
   }
 
-  // де-дублиране между слоевете
+  // Де-дублиране между слоевете. Подредбата е по тежест ПРЕДИ филтъра, за да
+  // оцелее потвърдената находка, ако някога съвпадне по адрес с непотвърдена.
   const seen = new Set<string>()
-  const deduped = collected.filter(f => {
-    const k = `${f.type}:${f.sector}:${f.ring}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  })
+  const deduped = collected
+    .slice()
+    .sort((a, b) => (b.confirmations ?? 1) - (a.confirmations ?? 1) || b.load - a.load)
+    .filter(f => {
+      const k = `${f.type}:${f.sector}:${f.ring}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
 
   // Твърд таван. Промптът иска максимум 14 находки, но това е молба, не гаранция —
   // модел, който върне 40, иначе би размил сигнала и би обърнал всяка система в
@@ -336,7 +413,15 @@ export async function detectEye(
     addLog('error', `[Детекция ${sideName}] Нито един пас не успя — окото няма ирисов принос.`)
   }
 
-  return { side: prep.side, findings, constitution, passesOk, rejectedCount: rejected }
+  return {
+    side: prep.side,
+    findings,
+    constitution,
+    passesOk,
+    rejectedCount: rejected,
+    agreement: merged.agreement,
+    confirmedCount: findings.filter(f => f.confirmations === 2).length,
+  }
 }
 
 function sleep(ms: number) {
@@ -405,9 +490,15 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
 
   const allFindings = [...left.findings, ...right.findings]
   const passTotal = left.passesOk + right.passesOk
-  if (passTotal < 6) {
-    addLog('warning', `Успели LLM паса: ${passTotal} от 6 — част от данните липсват.`)
+  if (passTotal < 10) {
+    addLog('warning', `Успели LLM паса: ${passTotal} от 10 — част от данните липсват.`)
   }
+  const agreement = (left.agreement + right.agreement) / 2
+  addLog(
+    agreement >= 0.5 ? 'success' : 'warning',
+    `Повторяемост на разчитането: ${Math.round(agreement * 100)} % ` +
+      `(${left.confirmedCount + right.confirmedCount} потвърдени находки от два независими прочита)`
+  )
   addLog(
     'success',
     `Общо ${allFindings.length} приети находки` +
@@ -423,6 +514,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     questionnaire,
     imageQuality: imageQuality / 100,
     stripCoverage,
+    agreement,
   })
   addLog(
     'success',
@@ -468,6 +560,8 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     interpretation,
     imageQuality,
     stripCoverage,
+    agreement,
+    confirmedCount: left.confirmedCount + right.confirmedCount,
   }
 }
 

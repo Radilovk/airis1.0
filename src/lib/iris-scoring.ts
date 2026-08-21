@@ -61,6 +61,11 @@ export interface NormalizedFinding {
    * водеща система. Двустранната находка е по-силно доказателство.
    */
   bilateral?: boolean
+  /**
+   * В колко от независимите прочита се е появила находката (1 или 2).
+   * Виж `mergeSeamReadings`.
+   */
+  confirmations?: number
 }
 
 export interface SystemResult {
@@ -99,6 +104,11 @@ export interface NutritionDriver {
 }
 
 export interface ScoringInput {
+  /**
+   * Измерена повторяемост между двата прочита с различен шев, 0–1.
+   * Ако липсва, се приема 1 (поведението отпреди двойния прочит).
+   */
+  agreement?: number
   findings: NormalizedFinding[]
   questionnaire: QuestionnaireData
   /** 0..1 — среднопретеглено качество на двете снимки. */
@@ -358,6 +368,108 @@ export function applyBilateralCorroboration(findings: NormalizedFinding[]): Norm
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 2б. ДВА ПРОЧИТА С РАЗЛИЧЕН ШЕВ
+ *
+ * Разгъването на кръг в правоъгълник изисква да се избере КЪДЕ да се среже.
+ * Този избор е произволен — и точно затова може да се използва като уред.
+ *
+ * Една и съща тъкан се разгъва два пъти, срязана на 12:00 и на 6:00. Двете
+ * ленти са надписани еднакво (S1…S12), затова моделът няма как да познае, че
+ * са едно и също око: етикетите се местят заедно с тъканта. Всеки прочит е
+ * независим. После координатите се връщат към физически сектори и се гледа
+ * какво СЪВПАДА.
+ *
+ * Какво дава това:
+ *   • Увереността става ИЗМЕРЕНА, а не самообявена. Числото `confidence`, което
+ *     моделът връща, не е калибрирано; съвпадението при точна симетрия е
+ *     измерване.
+ *   • Шевът е изкуствена прекъснатост — S12 и S1 са физически съседни, но в
+ *     лентата са на двата ръба. При двата среза всяка клетка е далеч от шев
+ *     поне веднъж.
+ *   • Позиционното отклонение на модела (кои части от кадъра гледа по-внимателно)
+ *     пада върху различна физическа тъкан в двата прочита.
+ *   • Измислена находка не се появява два пъти на един и същи физически адрес.
+ *
+ * Съответствието се търси по МЯСТО, не по име на находката: измерено е, че
+ * между два паса мястото се повтаря, а типът се разменя (§8.5 в МЕТОДИКА_2).
+ * Затова се изисква същият пръстенен пояс и сектор в рамките на ±1.
+ * ───────────────────────────────────────────────────────────────────────────*/
+
+/** Тежест на находка, видяна само в единия прочит. */
+const UNCONFIRMED_WEIGHT = 0.55
+
+function sectorDistance(a: number, b: number): number {
+  const d = Math.abs(a - b) % 12
+  return Math.min(d, 12 - d)
+}
+
+export interface SeamMergeResult {
+  findings: NormalizedFinding[]
+  /** Колко от находките са потвърдени и в двата прочита. */
+  confirmed: number
+  /** Общо различни находки след сливането. */
+  total: number
+  /** `confirmed / total` — измерена повторяемост на разчитането. */
+  agreement: number
+}
+
+/**
+ * Слива двата прочита. И двата списъка трябва вече да са във ФИЗИЧЕСКИ
+ * координати (виж `stripSectorToPhysical`).
+ */
+export function mergeSeamReadings(
+  a: NormalizedFinding[],
+  b: NormalizedFinding[]
+): SeamMergeResult {
+  const usedB = new Set<number>()
+  const out: NormalizedFinding[] = []
+  let confirmed = 0
+
+  for (const fa of a) {
+    let matchIdx = -1
+    let bestDist = Infinity
+    for (let i = 0; i < b.length; i++) {
+      if (usedB.has(i)) continue
+      const fb = b[i]
+      if (ringBand(fb.ring).key !== ringBand(fa.ring).key) continue
+      const d = sectorDistance(fa.sector, fb.sector)
+      if (d > 1) continue
+      if (d < bestDist) { bestDist = d; matchIdx = i }
+    }
+
+    if (matchIdx < 0) {
+      out.push({ ...fa, confirmations: 1, load: fa.load * UNCONFIRMED_WEIGHT })
+      continue
+    }
+
+    usedB.add(matchIdx)
+    confirmed++
+    const fb = b[matchIdx]
+    // Печели прочитът с по-висока увереност; при равенство — първият.
+    const winner = fb.confidence > fa.confidence ? fb : fa
+    out.push({
+      ...winner,
+      confirmations: 2,
+      // Тежестта е средната от двата прочита: единият може да е видял находката
+      // като по-голяма от другия, и няма причина да вярваме повече на който и да е.
+      load: (fa.load + fb.load) / 2,
+    })
+  }
+
+  for (let i = 0; i < b.length; i++) {
+    if (usedB.has(i)) continue
+    out.push({ ...b[i], confirmations: 1, load: b[i].load * UNCONFIRMED_WEIGHT })
+  }
+
+  return {
+    findings: out,
+    confirmed,
+    total: out.length,
+    agreement: out.length ? confirmed / out.length : 0,
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
  * 3. БАЗА ОТ ВЪПРОСНИКА
  *
  * Всяка система получава базово натоварване 0..1 от самоотчета. Това е
@@ -547,7 +659,19 @@ export function computeScores(input: ScoringInput): ScoringResult {
   // Колко доверие заслужава ирисът при това качество на входа.
   const quality = Math.max(0, Math.min(1, imageQuality))
   const coverage = Math.max(0, Math.min(1, stripCoverage))
-  const irisWeight = IRIS_MAX_INFLUENCE * quality * (0.35 + 0.65 * coverage)
+  // ДОВЕРИЕТО КЪМ ИРИСА СЕ ИЗВЕЖДА ОТ ИЗМЕРВАНЕ, НЕ ОТ ДОПУСКАНЕ.
+  //
+  // Дотук тежестта зависеше от качеството на снимката и от четимата площ —
+  // тоест от това колко ДОБРЕ СЕ ВИЖДА тъканта. Липсваше третото: колко
+  // ПОВТОРЯЕМО се разчита. Двата прочита с различен шев дават точно това число.
+  //
+  // Измерено върху реална снимка със светкавица: 5 потвърдени от 15 находки,
+  // тоест 33 %. При такава повторяемост да се държи пълната тежест би било
+  // неоснователно. Мащабирането е ограничено отдолу на 0.45, защото дори
+  // еднократен прочит не е нула, и достига 1 при пълно съвпадение.
+  const agreement = Math.max(0, Math.min(1, input.agreement ?? 1))
+  const irisWeight =
+    IRIS_MAX_INFLUENCE * quality * (0.35 + 0.65 * coverage) * (0.45 + 0.55 * agreement)
 
   const loadBySystem = emptyLoad()
   const systems: SystemResult[] = []
@@ -578,7 +702,8 @@ export function computeScores(input: ScoringInput): ScoringResult {
     for (const f of relevant) {
       reasons.push(
         `${FINDINGS[f.type].label} — ${f.side === 'left' ? 'ляв' : 'десен'} ирис, сектор ${f.sector}, R${f.ring}` +
-          (f.bilateral ? ' (потвърдена и в другото око)' : '')
+          (f.bilateral ? ', потвърдена и в другото око' : '') +
+          (f.confirmations === 2 ? ' ✓ два независими прочита' : '')
       )
     }
 

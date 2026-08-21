@@ -78,7 +78,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
             <h3 className="text-base font-semibold">Как е получен този резултат</h3>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Metric
               label="Качество на снимките"
               value={`${data.imageQuality}/100`}
@@ -89,6 +89,13 @@ export default function CalibratedInsightPanel({ data }: Props) {
               value={`${Math.round(data.stripCoverage * 100)}%`}
               hint="Останалото е закрито от клепач или отблясък"
             />
+            {typeof data.agreement === 'number' && (
+              <Metric
+                label="Повторяемост"
+                value={`${Math.round(data.agreement * 100)}%`}
+                hint="Съвпадение между два независими прочита на едно и също око"
+              />
+            )}
             <Metric
               label="Тежест на ириса"
               value={`${Math.round(data.irisWeight * 100)}%`}
@@ -97,7 +104,20 @@ export default function CalibratedInsightPanel({ data }: Props) {
             />
           </div>
 
-          <p className="mt-4 text-xs leading-relaxed text-slate-400">
+          {typeof data.agreement === 'number' && (
+            <p className="mt-4 rounded-lg border border-sky-500/20 bg-sky-500/5 px-3.5 py-3 text-xs leading-relaxed text-slate-300">
+              <span className="font-medium text-sky-300">Как се проверява сам анализът.</span>{' '}
+              Всяко око се разчита <strong>два пъти</strong>. Кръглият ирис се разгъва в
+              правоъгълник, а мястото на среза е произволно — затова вторият прочит среща
+              кръга на друго място. Двете изображения са една и съща тъкан, но изглеждат
+              различно и се подават поотделно. Находка, която се появи и в двата прочита на
+              едно и също физическо място, е потвърдена
+              {typeof data.confirmedCount === 'number' ? ` — тук такива са ${data.confirmedCount}` : ''}.
+              Останалите тежат по-малко.
+            </p>
+          )}
+
+          <p className="mt-3 text-xs leading-relaxed text-slate-400">
             Ирисовият анализ е помощен инструмент. Основата на препоръките е
             въпросникът; находките от снимката само променят акцентите, и то
             толкова, колкото качеството на снимката позволява.
