@@ -71,6 +71,15 @@ export interface UnwrapOptions {
    * лента: колона 1 вече е друг физически сектор. Виж `iris-pipeline.ts`.
    */
   rotationSectors?: number
+  /**
+   * УВЕЛИЧЕН ПРОЧИТ. Разгъва само пръстените [от, до] (включително) върху цялото
+   * платно, вместо и дванайсетте.
+   *
+   * Това НЕ е увеличаване на готовата лента — семплирането пак върви от
+   * оригиналната снимка, само че четири пръстена заемат мястото на дванайсет.
+   * Клетката получава три пъти повече РЕАЛНИ пиксели, а не интерполирани.
+   */
+  ringRange?: [number, number]
 }
 
 export interface UnwrapResult {
@@ -94,6 +103,8 @@ export interface UnwrapResult {
   layer: StripLayer
   /** Изместването на шева, с което е направена лентата (0–11 сектора). */
   rotationSectors: number
+  /** Кои пръстени показва лентата (включително двата края). */
+  ringRange: [number, number]
 }
 
 const SECTORS = 12
@@ -270,6 +281,9 @@ export function unwrapIris(
   const layer = options.layer ?? 'base'
   const rotationSectors = ((Math.round(options.rotationSectors ?? 0) % SECTORS) + SECTORS) % SECTORS
   const rotationTurns = rotationSectors / SECTORS
+  const ring0 = Math.max(0, Math.min(RINGS - 1, Math.round(options.ringRange?.[0] ?? 0)))
+  const ring1 = Math.max(ring0, Math.min(RINGS - 1, Math.round(options.ringRange?.[1] ?? RINGS - 1)))
+  const ringCount = ring1 - ring0 + 1
   const PW = options.plotWidth ?? 1440
   const PH = options.plotHeight ?? 720
   const quality = options.quality ?? 0.93
@@ -286,8 +300,9 @@ export function unwrapIris(
   const lidLower = geo.eyelids?.lower ?? null
 
   for (let row = 0; row < PH; row++) {
-    // t = 0 при ръба на зеницата, 1 при лимбуса; центриране в средата на реда
-    const t = (row + 0.5) / PH
+    // t = 0 при ръба на зеницата, 1 при лимбуса. При увеличен прочит редовете
+    // покриват само пръстените [ring0, ring1], затова t се свива до техния дял.
+    const t = (ring0 + ((row + 0.5) / PH) * ringCount) / RINGS
     const cx = pupil.cx + (limbus.cx - pupil.cx) * t
     const cy = pupil.cy + (limbus.cy - pupil.cy) * t
     for (let col = 0; col < PW; col++) {
@@ -396,15 +411,18 @@ export function unwrapIris(
   else applyBase(px, PW, PH, valid)
 
   // ── readability по клетки ────────────────────────────────────────────────
-  const readability: number[][] = Array.from({ length: RINGS }, () => new Array(SECTORS).fill(0))
+  // Матрицата е винаги 12×12 и индексирана по АБСОЛЮТЕН пръстен, за да не се
+  // променя нищо надолу по веригата. Пръстените извън обхвата се пълнят с 1
+  // („няма данни", тоест не наказвай), защото тази лента просто не ги показва.
+  const readability: number[][] = Array.from({ length: RINGS }, () => new Array(SECTORS).fill(1))
   const cellW = PW / SECTORS
-  const cellH = PH / RINGS
-  for (let ring = 0; ring < RINGS; ring++) {
+  const cellH = PH / ringCount
+  for (let ring = ring0; ring <= ring1; ring++) {
     for (let sec = 0; sec < SECTORS; sec++) {
       let ok = 0
       let total = 0
-      const y0 = Math.floor(ring * cellH)
-      const y1 = Math.floor((ring + 1) * cellH)
+      const y0 = Math.floor((ring - ring0) * cellH)
+      const y1 = Math.floor((ring - ring0 + 1) * cellH)
       const x0 = Math.floor(sec * cellW)
       const x1 = Math.floor((sec + 1) * cellW)
       for (let y = y0; y < y1; y += 3) {
@@ -430,13 +448,13 @@ export function unwrapIris(
       [ring, (sec + SECTORS - 1) % SECTORS], // лентата е разгъната кръгово:
       [ring, (sec + 1) % SECTORS], // S12 и S1 са съседни в окото
     ]
-    return n.some(([r, c]) => r >= 0 && r < RINGS && readability[r][c] < HALO_NEIGHBOUR)
+    return n.some(([r, c]) => r >= ring0 && r <= ring1 && readability[r][c] < HALO_NEIGHBOUR)
   }
 
   const unreadableCells: Array<{ sector: number; ring: number }> = []
   const partialCells: Array<{ sector: number; ring: number; readable: number }> = []
   let readableCells = 0
-  for (let ring = 0; ring < RINGS; ring++) {
+  for (let ring = ring0; ring <= ring1; ring++) {
     for (let sec = 0; sec < SECTORS; sec++) {
       const r = readability[ring][sec]
       if (r < UNREADABLE_THRESHOLD) {
@@ -451,7 +469,7 @@ export function unwrapIris(
   }
   const isPartial = Array.from({ length: RINGS }, () => new Array(SECTORS).fill(false))
   for (const c of partialCells) isPartial[c.ring][c.sector - 1] = true
-  const coverage = readableCells / (RINGS * SECTORS)
+  const coverage = readableCells / (ringCount * SECTORS)
 
   // ── растеризация ─────────────────────────────────────────────────────────
   const rawCanvas = document.createElement('canvas')
@@ -474,7 +492,9 @@ export function unwrapIris(
   rawCtx.putImageData(imgData, 0, 0)
   const rawDataUrl = options.includeRaw ? rawCanvas.toDataURL('image/jpeg', quality) : ''
 
-  const dataUrl = drawCalibrationGrid(rawCanvas, side, layer, readability, isPartial, quality)
+  const dataUrl = drawCalibrationGrid(
+    rawCanvas, side, layer, readability, isPartial, quality, [ring0, ring1]
+  )
 
   return {
     dataUrl,
@@ -486,6 +506,7 @@ export function unwrapIris(
     side,
     layer,
     rotationSectors,
+    ringRange: [ring0, ring1],
   }
 }
 
@@ -544,8 +565,12 @@ function drawCalibrationGrid(
   layer: StripLayer,
   readability: number[][],
   isPartial: boolean[][],
-  quality: number
+  quality: number,
+  ringRange: [number, number]
 ): string {
+  const [ring0, ring1] = ringRange
+  const ringCount = ring1 - ring0 + 1
+  const zoomed = ringCount < RINGS
   const PW = plot.width
   const PH = plot.height
   const W = PW + PAD_LEFT + PAD_RIGHT
@@ -561,9 +586,10 @@ function drawCalibrationGrid(
   ctx.drawImage(plot, PAD_LEFT, PAD_TOP)
 
   const cellW = PW / SECTORS
-  const cellH = PH / RINGS
+  const cellH = PH / ringCount
   const xOf = (sec: number) => PAD_LEFT + sec * cellW
-  const yOf = (ring: number) => PAD_TOP + ring * cellH
+  // Пръстенът се задава в АБСОЛЮТНИ номера; тук се превежда към ред на платното.
+  const yOf = (ring: number) => PAD_TOP + (ring - ring0) * cellH
 
   // 1. ЗЕБРА по колони — визуална сегментация без броене
   ctx.save()
@@ -578,7 +604,7 @@ function drawCalibrationGrid(
   ctx.beginPath()
   ctx.rect(PAD_LEFT, PAD_TOP, PW, PH)
   ctx.clip()
-  for (let ring = 0; ring < RINGS; ring++) {
+  for (let ring = ring0; ring <= ring1; ring++) {
     for (let s = 0; s < SECTORS; s++) {
       if (readability[ring][s] >= UNREADABLE_THRESHOLD) continue
       const x = xOf(s)
@@ -610,7 +636,7 @@ function drawCalibrationGrid(
   ctx.clip()
   ctx.strokeStyle = 'rgba(255,190,90,0.55)'
   ctx.lineWidth = 2
-  for (let ring = 0; ring < RINGS; ring++) {
+  for (let ring = ring0; ring <= ring1; ring++) {
     for (let s = 0; s < SECTORS; s++) {
       if (readability[ring][s] < UNREADABLE_THRESHOLD || !isPartial[ring][s]) continue
       const x = xOf(s)
@@ -629,7 +655,7 @@ function drawCalibrationGrid(
   // 3. Пръстенни линии — тънки
   ctx.strokeStyle = 'rgba(255,255,255,0.42)'
   ctx.lineWidth = 1
-  for (let r = 1; r < RINGS; r++) {
+  for (let r = ring0 + 1; r <= ring1; r++) {
     ctx.beginPath()
     ctx.moveTo(PAD_LEFT, yOf(r))
     ctx.lineTo(PAD_LEFT + PW, yOf(r))
@@ -690,7 +716,7 @@ function drawCalibrationGrid(
 
   // 7. Ляво и дясно — ПРЪСТЕНИ (също два пъти)
   const drawRingLabel = (x: number, wBand: number, align: 'left' | 'right') => {
-    for (let r = 0; r < RINGS; r++) {
+    for (let r = ring0; r <= ring1; r++) {
       const y = yOf(r)
       ctx.fillStyle = r % 2 === 0 ? '#eef2ff' : '#e0e7ff'
       ctx.fillRect(x, y, wBand, cellH)
@@ -712,8 +738,9 @@ function drawCalibrationGrid(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   for (const band of RING_BANDS) {
-    const y0 = yOf(band.rings[0])
-    const y1 = yOf(band.rings[1] + 1)
+    if (band.rings[1] < ring0 || band.rings[0] > ring1) continue
+    const y0 = yOf(Math.max(band.rings[0], ring0))
+    const y1 = yOf(Math.min(band.rings[1], ring1) + 1)
     ctx.strokeStyle = '#1e1b4b'
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -726,7 +753,8 @@ function drawCalibrationGrid(
     ctx.fillStyle = '#1e1b4b'
     // Едноредовите пояси имат само 60 px височина — шрифтът се свива, за да не
     // прелее върху съседния пояс.
-    const singleRow = band.rings[0] === band.rings[1]
+    const singleRow =
+      Math.min(band.rings[1], ring1) === Math.max(band.rings[0], ring0)
     ctx.font = `bold ${singleRow ? 15 : 20}px "Arial", sans-serif`
     ctx.fillText(band.key, 0, 0)
     ctx.restore()
@@ -741,12 +769,22 @@ function drawCalibrationGrid(
   ctx.fillText(eyeLabel, 10, 22)
   ctx.font = '18px "Arial", sans-serif'
   ctx.fillStyle = '#475569'
-  ctx.fillText(LAYER_LABEL[layer], 10, 48)
+  ctx.fillText(
+    LAYER_LABEL[layer] + (zoomed ? `  ·  УВЕЛИЧЕНО: само R${ring0}–R${ring1}` : ''),
+    10,
+    48
+  )
 
   ctx.textAlign = 'right'
   ctx.font = '17px "Arial", sans-serif'
   ctx.fillStyle = '#475569'
-  ctx.fillText('R0 = ръб на зеницата  ·  R11 = лимбус', W - 10, 22)
+  ctx.fillText(
+    zoomed
+      ? `ПОКАЗАНИ СА САМО R${ring0}–R${ring1} от 12 · R0 = ръб на зеницата, R11 = лимбус`
+      : 'R0 = ръб на зеницата  ·  R11 = лимбус',
+    W - 10,
+    22
+  )
   ctx.fillText('S1 = 12–1 ч  ·  по часовниковата стрелка', W - 10, 46)
 
   // 10. NASAL / TEMPORAL маркери на долния ръб
