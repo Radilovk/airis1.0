@@ -142,7 +142,7 @@ export default function IrisCalibrator({
         // Оценката се преизчислява с покритието: то описва лентата, която
         // моделът вижда, а не снимката, която потребителят е направил.
         try {
-          setReport(analyseIrisQuality(img, { stripCoverage: res.coverage }))
+          setReport(analyseIrisQuality(img, { stripCoverage: res.coverage, manualGeometry: g.manual }))
         } catch {
           /* оставяме предишната оценка */
         }
