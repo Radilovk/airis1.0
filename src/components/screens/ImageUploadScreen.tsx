@@ -21,7 +21,12 @@ const MAX_FINAL_SIZE_BYTES = 5 * 1024 * 1024        // 5 MB – supports 1600px 
 const MAX_FINAL_SIZE_KB = 5120
 
 interface ImageUploadScreenProps {
-  onComplete: (left: IrisImage, right: IrisImage) => void
+  /**
+   * Връща `false`, ако родителят е отказал прехода — тогава екранът връща
+   * бутона в работно състояние. Без това отказ в родителя оставяше „Запазване…"
+   * завинаги: `catch` тук не се задейства, защото няма изключение.
+   */
+  onComplete: (left: IrisImage, right: IrisImage) => void | boolean | Promise<void | boolean>
   initialLeft?: IrisImage | null
   initialRight?: IrisImage | null
   isReanalysis?: boolean
@@ -739,8 +744,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       })
       errorLogger.info('UPLOAD_NEXT', 'Calling onComplete() with validated images...')
       
-      onComplete(leftImage, rightImage)
-      
+      const accepted = await onComplete(leftImage, rightImage)
+      if (accepted === false) {
+        uploadDiagnostics.log('HANDLE_NEXT_ON_COMPLETE_REJECTED', 'error')
+        setIsSaving(false)
+        return
+      }
+
       uploadDiagnostics.log('HANDLE_NEXT_ON_COMPLETE_CALLED', 'success')
       errorLogger.info('UPLOAD_NEXT', 'onComplete() called successfully')
     } catch (error) {

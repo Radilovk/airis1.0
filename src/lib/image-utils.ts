@@ -182,3 +182,57 @@ function drawIridologyOverlay(
   ctx.lineTo(centerX, centerY + crosshairSize)
   ctx.stroke()
 }
+
+/** Максимален размер на data URL за едно око. */
+export const MAX_EYE_IMAGE_BYTES = 400 * 1024
+
+/**
+ * Смалява data URL, докато се побере в лимита.
+ *
+ * Първо пробва по-ниско качество на JPEG, после намалява и размерите. Връща
+ * най-доброто постигнато — извикващият проверява дали е достатъчно.
+ *
+ * Съществува, защото приложението отхвърляше собствения си изход: кроп
+ * редакторът дава 1600 px при качество 0.92, което за нормална снимка е
+ * 400–500 KB, а прагът беше точно 400 KB.
+ */
+export function shrinkDataUrlToLimit(dataUrl: string, maxBytes: number): Promise<string> {
+  return new Promise(resolve => {
+    if (dataUrl.length <= maxBytes) { resolve(dataUrl); return }
+    const img = new Image()
+    img.onload = () => {
+      let best = dataUrl
+      // Първо само качество — размерите носят детайла, който анализът ползва.
+      for (const q of [0.86, 0.78, 0.7, 0.62]) {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        const ctx = c.getContext('2d')
+        if (!ctx) break
+        ctx.imageSmoothingQuality = 'high'
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0)
+        best = c.toDataURL('image/jpeg', q)
+        if (best.length <= maxBytes) { resolve(best); return }
+      }
+      // Едва след това се жертва резолюция.
+      for (const scale of [0.85, 0.72, 0.6, 0.5]) {
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.naturalWidth * scale)
+        c.height = Math.round(img.naturalHeight * scale)
+        const ctx = c.getContext('2d')
+        if (!ctx) break
+        ctx.imageSmoothingQuality = 'high'
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        best = c.toDataURL('image/jpeg', 0.8)
+        if (best.length <= maxBytes) { resolve(best); return }
+      }
+      resolve(best)
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
