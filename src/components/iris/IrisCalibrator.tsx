@@ -273,8 +273,8 @@ export default function IrisCalibrator({
 
   const blockingErrors = useMemo(() => {
     if (!report) return []
-    // Ръчно нагласените кръгове + високо покритие на лентата = доверие в геометрията.
-    if (touched && (coverage ?? 0) >= 0.75) return []
+    // Ръчната калибрация е финалното решение на потребителя.
+    if (touched) return []
     return report.issues.filter(i => {
       if (i.level !== 'error') return false
       if (touched && GEOMETRY_CODES.has(i.code)) return false

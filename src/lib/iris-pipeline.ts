@@ -256,6 +256,17 @@ export async function prepareEye(
   if (!(iris.geometry && iris.quality)) {
     qualityScore = recomputed.score
     qualityVerdict = recomputed.verdict
+  } else if (manualGeometry) {
+    // Потребителят е потвърдил в калибратора — не отменяме с второ автоматично преброяване.
+    if (recomputed.verdict !== 'reject' && Math.abs(recomputed.score - qualityScore) > 12) {
+      addLog(
+        'info',
+        `[Подготовка ${name}] Оценката е коригирана с покритието на лентата: ` +
+          `${qualityScore} → ${recomputed.score}`
+      )
+      qualityScore = recomputed.score
+      qualityVerdict = recomputed.verdict
+    }
   } else if (Math.abs(recomputed.score - qualityScore) > 12) {
     // Калибраторът е дал своя оценка; ако разминаването е голямо, вярваме на
     // тази, която включва покритието.
@@ -504,13 +515,15 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
   )
 
   for (const prep of [leftPrep, rightPrep]) {
-    if (prep.qualityVerdict === 'reject') {
-      const label = prep.side === 'left' ? 'Ляв' : 'Десен'
-      throw new IrisQualityRejectedError(
-        `${label} ирис: снимката не отговаря на условията за анализ ` +
-          `(${prep.qualityScore}/100). Направете нова снимка и калибрирайте отново.`
-      )
-    }
+    if (prep.qualityVerdict !== 'reject') continue
+    const src = prep.side === 'left' ? leftIris : rightIris
+    // Ръчно потвърдена калибрация с pass/warn не се отменя при повторна автоматична проверка.
+    if (src.geometry?.manual && src.quality?.verdict !== 'reject') continue
+    const label = prep.side === 'left' ? 'Ляв' : 'Десен'
+    throw new IrisQualityRejectedError(
+      `${label} ирис: снимката не отговаря на условията за анализ ` +
+        `(${prep.qualityScore}/100). Направете нова снимка и калибрирайте отново.`
+    )
   }
 
   // ── 2. детекция ─────────────────────────────────────────────────────────

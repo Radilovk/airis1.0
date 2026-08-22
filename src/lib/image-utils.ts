@@ -7,6 +7,17 @@ import { SECTORS_RIGHT } from './iris-map'
 // Maximum tokens for vision API calls
 export const MAX_VISION_TOKENS = 4096
 
+/** Мащаб и отместване за object-contain в квадратен контейнер (калибратор, отчет). */
+export function fitImageInSquare(imageW: number, imageH: number, viewSize: number) {
+  const scale = viewSize / Math.max(imageW, imageH, 1)
+  return {
+    scale,
+    offsetX: (viewSize - imageW * scale) / 2,
+    offsetY: (viewSize - imageH * scale) / 2,
+    viewSize,
+  }
+}
+
 /**
  * Creates a composite image by overlaying the iridology map on top of an iris image
  * @param irisImageDataUrl - Base64 data URL of the iris image
