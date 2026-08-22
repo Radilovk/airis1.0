@@ -162,6 +162,8 @@ export interface QualityOptions {
   stripCoverage?: number
   /** Ръчно потвърдена геометрия — не предупреждаваме за автоматичния лимбус. */
   manualGeometry?: boolean
+  /** Ако е зададена (напр. от калибратора), не се преизчислява автоматично. */
+  geometry?: IrisGeometry
 }
 
 export function analyseIrisQuality(
@@ -169,7 +171,7 @@ export function analyseIrisQuality(
   options: QualityOptions = {}
 ): QualityReport {
   const s = sample(img)
-  const geometry = detectIrisGeometry(img)
+  const geometry = options.geometry ?? detectIrisGeometry(img)
 
   const srcW = img.naturalWidth || img.width
   const srcH = img.naturalHeight || img.height
