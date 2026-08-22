@@ -2,6 +2,8 @@
  * Utility functions for image manipulation and composite creation
  */
 
+import { SECTORS_RIGHT } from './iris-map'
+
 // Maximum tokens for vision API calls
 export const MAX_VISION_TOKENS = 4096
 
@@ -140,20 +142,14 @@ function drawIridologyOverlay(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   
-  const labels = [
-    { hour: 12, text: '12h\nМозък', angle: -Math.PI / 2 },
-    { hour: 1, text: '1h\nХипофиза', angle: -Math.PI / 2 + angleStep * 1 },
-    { hour: 2, text: '2h\nЩ.жлеза', angle: -Math.PI / 2 + angleStep * 2 },
-    { hour: 3, text: '3h\nБелодр.', angle: -Math.PI / 2 + angleStep * 3 },
-    { hour: 4, text: '4h\nЧ.дроб', angle: -Math.PI / 2 + angleStep * 4 },
-    { hour: 5, text: '5h\nСтомах', angle: -Math.PI / 2 + angleStep * 5 },
-    { hour: 6, text: '6h\nПанкр.', angle: -Math.PI / 2 + angleStep * 6 },
-    { hour: 7, text: '7h\nБъбреци', angle: -Math.PI / 2 + angleStep * 7 },
-    { hour: 8, text: '8h\nНадбъбр.', angle: -Math.PI / 2 + angleStep * 8 },
-    { hour: 9, text: '9h\nСърце', angle: -Math.PI / 2 + angleStep * 9 },
-    { hour: 10, text: '10h\nДалак', angle: -Math.PI / 2 + angleStep * 10 },
-    { hour: 11, text: '11h\nЛимфа', angle: -Math.PI / 2 + angleStep * 11 }
-  ]
+  // Етикетите идват от единствената карта (`src/lib/iris-map.ts`) и са ОБЩИ
+  // (функционални), а не органни. Преди тук стоеше четвърти, различен списък
+  // от органи — той противоречеше и на промпта, и на отчета.
+  const labels = SECTORS_RIGHT.map((sec, i) => ({
+    hour: sec.id,
+    text: `${sec.clock}\n${sec.label.split(' ')[0]}`,
+    angle: -Math.PI / 2 + angleStep * i,
+  }))
   
   // Draw labels at outer edge
   const labelRadius = outerRadius + radius * 0.12
@@ -185,4 +181,58 @@ function drawIridologyOverlay(
   ctx.moveTo(centerX, centerY - crosshairSize)
   ctx.lineTo(centerX, centerY + crosshairSize)
   ctx.stroke()
+}
+
+/** Максимален размер на data URL за едно око. */
+export const MAX_EYE_IMAGE_BYTES = 400 * 1024
+
+/**
+ * Смалява data URL, докато се побере в лимита.
+ *
+ * Първо пробва по-ниско качество на JPEG, после намалява и размерите. Връща
+ * най-доброто постигнато — извикващият проверява дали е достатъчно.
+ *
+ * Съществува, защото приложението отхвърляше собствения си изход: кроп
+ * редакторът дава 1600 px при качество 0.92, което за нормална снимка е
+ * 400–500 KB, а прагът беше точно 400 KB.
+ */
+export function shrinkDataUrlToLimit(dataUrl: string, maxBytes: number): Promise<string> {
+  return new Promise(resolve => {
+    if (dataUrl.length <= maxBytes) { resolve(dataUrl); return }
+    const img = new Image()
+    img.onload = () => {
+      let best = dataUrl
+      // Първо само качество — размерите носят детайла, който анализът ползва.
+      for (const q of [0.86, 0.78, 0.7, 0.62]) {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        const ctx = c.getContext('2d')
+        if (!ctx) break
+        ctx.imageSmoothingQuality = 'high'
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0)
+        best = c.toDataURL('image/jpeg', q)
+        if (best.length <= maxBytes) { resolve(best); return }
+      }
+      // Едва след това се жертва резолюция.
+      for (const scale of [0.85, 0.72, 0.6, 0.5]) {
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.naturalWidth * scale)
+        c.height = Math.round(img.naturalHeight * scale)
+        const ctx = c.getContext('2d')
+        if (!ctx) break
+        ctx.imageSmoothingQuality = 'high'
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        best = c.toDataURL('image/jpeg', 0.8)
+        if (best.length <= maxBytes) { resolve(best); return }
+      }
+      resolve(best)
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
 }

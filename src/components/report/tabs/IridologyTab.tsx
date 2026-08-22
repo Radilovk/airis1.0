@@ -14,6 +14,7 @@ import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
 import UnwrappedIrisMap from '@/components/iris/UnwrappedIrisMap'
+import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
 import {
   Collapsible,
   CollapsibleContent,
@@ -75,6 +76,18 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           </h2>
         </Card>
       </motion.div>
+
+      {/* Новият калибриран анализ. Показва се само когато отчетът е направен с
+          него — старите отчети продължават да се визуализират по стария начин. */}
+      {report.calibrated && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.04 }}
+        >
+          <CalibratedInsightPanel data={report.calibrated} />
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

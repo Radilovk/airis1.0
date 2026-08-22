@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { CustomOverlay } from '@/types'
 import { IRIS_MAX_DIMENSION } from '@/components/screens/ImageUploadScreen'
+import { detectIrisGeometry } from '@/lib/iris-geometry'
 
 // Size limit constants – high resolution needed for iris analysis detail
 const MAX_RAW_CROP_SIZE_BYTES = 7 * 1024 * 1024 // 7 MB (will be compressed later)
@@ -43,6 +44,9 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 400, height: 400 })
+  // `onload` се изпълнява извън рендера и не вижда актуалния state.
+  const canvasSizeRef = useRef(canvasSize)
+  canvasSizeRef.current = canvasSize
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   
@@ -95,10 +99,45 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     let mounted = true
     
     img.onload = () => {
-      if (mounted) {
-        imageRef.current = img
-        setImageLoaded(true)
+      if (!mounted) return
+      imageRef.current = img
+
+      // АВТОМАТИЧНО НАПАСВАНЕ.
+      //
+      // Досега началният мащаб беше фиксиран на 1 — снимка от 3000 px се
+      // рисуваше 1:1 в платно от 400 px и потребителят виждаше само фрагмент
+      // от окото, силно увеличен, който трябваше сам да намери и подравни.
+      //
+      // Геометрията вече се засича другаде в приложението; тук се използва
+      // същата функция, за да ЛЕГНЕ ирисът в шаблона още при отваряне. Така
+      // стъпката става потвърждение вместо ръчна работа. При неуспешна
+      // детекция се пада до просто побиране на кадъра.
+      try {
+        const geo = detectIrisGeometry(img)
+        const canvasW = canvasSizeRef.current.width
+        // Ирисът да заема ~62 % от платното — толкова е шаблонният кръг.
+        const target = canvasW * 0.62
+        const ok = geo.limbusConfidence > 0.25 && geo.limbus.r > 8
+        if (ok) {
+          const scale = Math.max(0.15, Math.min(5, target / (geo.limbus.r * 2)))
+          setTransform({
+            scale,
+            // центърът на лимбуса се измества в центъра на платното
+            x: (img.width / 2 - geo.limbus.cx) * scale,
+            y: (img.height / 2 - geo.limbus.cy) * scale,
+            rotation: 0,
+          })
+        } else {
+          const fit = Math.min(canvasW / img.width, canvasW / img.height)
+          setTransform({ scale: Math.max(0.15, fit), x: 0, y: 0, rotation: 0 })
+        }
+      } catch {
+        const canvasW = canvasSizeRef.current.width
+        const fit = Math.min(canvasW / img.width, canvasW / img.height)
+        setTransform({ scale: Math.max(0.15, fit), x: 0, y: 0, rotation: 0 })
       }
+
+      setImageLoaded(true)
     }
     
     img.onerror = (error) => {
@@ -216,7 +255,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
         const scaleDelta = distance / lastTouchDistance
         setTransform(prev => ({
           ...prev,
-          scale: Math.max(0.5, Math.min(5, prev.scale * scaleDelta))
+          scale: Math.max(0.1, Math.min(5, prev.scale * scaleDelta))
         }))
         setLastTouchDistance(distance)
       }
@@ -257,7 +296,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
     const scaleDelta = e.deltaY > 0 ? 0.9 : 1.1
     setTransform(prev => ({
       ...prev,
-      scale: Math.max(0.5, Math.min(5, prev.scale * scaleDelta))
+      scale: Math.max(0.1, Math.min(5, prev.scale * scaleDelta))
     }))
   }
   
@@ -272,7 +311,7 @@ export default function IrisCropEditor({ imageDataUrl, side, onSave, onCancel }:
   const handleZoomOut = () => {
     setTransform(prev => ({
       ...prev,
-      scale: Math.max(0.5, prev.scale / 1.2)
+      scale: Math.max(0.1, prev.scale / 1.2)
     }))
   }
   

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster } from '@/components/ui/sonner'
+import { shrinkDataUrlToLimit, MAX_EYE_IMAGE_BYTES } from '@/lib/image-utils'
 import { toast } from 'sonner'
 import WelcomeScreen from '@/components/screens/WelcomeScreen'
 import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
@@ -117,7 +118,9 @@ function App() {
     setTimeout(() => setCurrentScreen('upload'), 50)
   }
 
-  const handleImagesComplete = async (left: IrisImage, right: IrisImage) => {
+  const handleImagesComplete = async (leftIn: IrisImage, rightIn: IrisImage) => {
+    let left = leftIn
+    let right = rightIn
     uploadDiagnostics.log('APP_HANDLE_IMAGES_COMPLETE_START', 'start', {
       leftExists: !!left,
       rightExists: !!right,
@@ -154,7 +157,8 @@ function App() {
       })
       console.error('❌ [APP] CRITICAL ERROR: left or right is null/undefined!')
       toast.error('Критична грешка: Липсват изображенията')
-      return
+      // `false` връща бутона в работно състояние — иначе остава „Запазване…".
+      return false
     }
     
     if (!left.dataUrl || !right.dataUrl) {
@@ -174,7 +178,8 @@ function App() {
       console.error('❌ [APP] left.dataUrl:', left?.dataUrl ? 'exists' : 'MISSING')
       console.error('❌ [APP] right.dataUrl:', right?.dataUrl ? 'exists' : 'MISSING')
       toast.error('Критична грешка: Невалидни данни на изображенията')
-      return
+      // `false` връща бутона в работно състояние — иначе остава „Запазване…".
+      return false
     }
     
     uploadDiagnostics.log('APP_IMAGES_COMPLETE_VALIDATION_SUCCESS', 'success', {
@@ -235,28 +240,44 @@ function App() {
       console.log(`📊 [APP] Left image: ${Math.round(left.dataUrl.length / 1024)} KB`)
       console.log(`📊 [APP] Right image: ${Math.round(right.dataUrl.length / 1024)} KB`)
 
-      if (left.dataUrl.length > 400 * 1024) {
-        uploadDiagnostics.log('APP_ERROR_LEFT_TOO_LARGE', 'error', {
-          size: Math.round(left.dataUrl.length / 1024)
+      // РАЗМЕРЪТ СЕ ОПРАВЯ, А НЕ СЕ ОТХВЪРЛЯ.
+      //
+      // Прагът от 400 KB отхвърляше СОБСТВЕНИЯ изход на приложението: кроп
+      // редакторът дава 1600 px JPEG с качество 0.92, който за нормално
+      // експонирана снимка тежи 400–500 KB. При тест от край до край лявата
+      // снимка излезе 423 KB — 6 % над прага — и потокът умираше мълчаливо:
+      // родителят се връщаше без изключение, `catch` в екрана не се задействаше
+      // и бутонът оставаше на „Запазване…" завинаги.
+      //
+      // Сега снимката се ПРЕСВИВА до лимита. Отказ има само ако и това не
+      // помогне, което би значело нещо патологично.
+      const fitted = await Promise.all(
+        [left, right].map(async (img, i) => {
+          if (img.dataUrl.length <= MAX_EYE_IMAGE_BYTES) return img
+          const before = Math.round(img.dataUrl.length / 1024)
+          const shrunk = await shrinkDataUrlToLimit(img.dataUrl, MAX_EYE_IMAGE_BYTES)
+          uploadDiagnostics.log('APP_IMAGE_REFITTED', 'info', {
+            side: i === 0 ? 'left' : 'right',
+            beforeKB: before,
+            afterKB: Math.round(shrunk.length / 1024)
+          })
+          return { ...img, dataUrl: shrunk }
         })
-        errorLogger.warning('APP_IMAGES_COMPLETE', 'Left image is too large', {
-          size: Math.round(left.dataUrl.length / 1024)
-        })
-        toast.error('Лявото изображение е твърде голямо (>400KB). Моля, опитайте с по-малка снимка.')
-        screenTransitionLockRef.current = false
-        return
-      }
+      )
+      left = fitted[0]
+      right = fitted[1]
 
-      if (right.dataUrl.length > 400 * 1024) {
-        uploadDiagnostics.log('APP_ERROR_RIGHT_TOO_LARGE', 'error', {
-          size: Math.round(right.dataUrl.length / 1024)
+      const stillTooBig = [left, right].find(img => img.dataUrl.length > MAX_EYE_IMAGE_BYTES)
+      if (stillTooBig) {
+        uploadDiagnostics.log('APP_ERROR_IMAGE_TOO_LARGE', 'error', {
+          size: Math.round(stillTooBig.dataUrl.length / 1024)
         })
-        errorLogger.warning('APP_IMAGES_COMPLETE', 'Right image is too large', {
-          size: Math.round(right.dataUrl.length / 1024)
+        errorLogger.warning('APP_IMAGES_COMPLETE', 'Image still too large after refit', {
+          size: Math.round(stillTooBig.dataUrl.length / 1024)
         })
-        toast.error('Дясното изображение е твърде голямо (>400KB). Моля, опитайте с по-малка снимка.')
+        toast.error('Снимката не може да бъде смалена достатъчно. Опитайте с друга снимка.')
         screenTransitionLockRef.current = false
-        return
+        return false
       }
 
       const storageUsage = await estimateStorageUsage()
@@ -270,7 +291,7 @@ function App() {
         errorLogger.error('APP_IMAGES_COMPLETE', 'Storage is almost full', undefined, { usage: usagePercent })
         toast.error('Няма достатъчно място в паметта. Моля, изчистете стари анализи от историята.')
         screenTransitionLockRef.current = false
-        return
+        return false
       }
 
       uploadDiagnostics.log('APP_VALIDATION_COMPLETE', 'success')
@@ -347,10 +368,18 @@ function App() {
       setAnalysisReport(report)
       
       console.log('📋 [APP] Създаване на "лека" версия на репорт за история (БЕЗ изображения)...')
+      // Изхвърляме ВСИЧКИ тежки изображения, не само двете снимки.
+      // Разгънатите ленти (2 очи × 3 слоя) тежат няколко мегабайта и биха
+      // запушили хранилището след един-два анализа — а те се възстановяват
+      // изцяло от снимката и геометрията, тоест нямат нужда да се пазят.
+      const { strips: _discardedStrips, ...calibratedWithoutStrips } = report.calibrated ?? {}
       const lightReport: AnalysisReport = {
         ...report,
         leftIrisImage: { dataUrl: '', side: 'left' },
-        rightIrisImage: { dataUrl: '', side: 'right' }
+        rightIrisImage: { dataUrl: '', side: 'right' },
+        ...(report.calibrated
+          ? { calibrated: calibratedWithoutStrips as AnalysisReport['calibrated'] }
+          : {})
       }
       
       console.log(`📊 [APP] Размер на "лек" репорт: ${JSON.stringify(lightReport).length} символа`)

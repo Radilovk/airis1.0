@@ -46,7 +46,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     apiKey: '',
     useCustomKey: false,
     requestDelay: DEFAULT_REQUEST_DELAY_MS,
-    enableDiagnostics: true
+    enableDiagnostics: true,
+    useCalibratedPipeline: true
   })
   
   const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
@@ -55,6 +56,9 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || DEFAULT_REQUEST_DELAY_MS)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
+  const [useCalibratedPipeline, setUseCalibratedPipeline] = useState(
+    aiConfig?.useCalibratedPipeline ?? true
+  )
 
   // Log successful admin panel access
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setUseCustomKey(aiConfig.useCustomKey)
       setRequestDelay(aiConfig.requestDelay || 60000)
       setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
+      setUseCalibratedPipeline(aiConfig.useCalibratedPipeline ?? true)
     }
   }, [aiConfig])
 
@@ -95,8 +100,14 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         }
         break
       case 'gemini':
-        if (!key.startsWith('AIza')) {
-          return { valid: false, message: 'Google Gemini API ключът трябва да започва с "AIza"' }
+        // Google издава ДВА формата: по-старите ключове от AI Studio започват с
+        // „AIza", по-новите — с „AQ.". Проверката приемаше само първия и
+        // отхвърляше напълно валидни ключове от втория вид.
+        if (!key.startsWith('AIza') && !key.startsWith('AQ.')) {
+          return {
+            valid: false,
+            message: 'Google Gemini API ключът трябва да започва с „AIza" или „AQ."',
+          }
         }
         if (key.length < 30) {
           return { valid: false, message: 'Google Gemini API ключът е твърде кратък' }
@@ -139,7 +150,11 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
         apiKey: actualUseCustomKey ? apiKey : '',
         useCustomKey: actualUseCustomKey,
         requestDelay,
-        enableDiagnostics
+        enableDiagnostics,
+        useCalibratedPipeline,
+        // Запазваме наследения флаг както е бил — този екран пренаписва целия
+        // обект, така че всяко неспоменато поле иначе се губи.
+        usePipelineV9: aiConfig?.usePipelineV9 ?? true
       }
       
       console.log('💾 [ADMIN] Запазване на конфигурация:', config)
@@ -158,7 +173,18 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   }
 
   const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
-  const geminiModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash-thinking-exp', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
+  const geminiModels = [
+  // Псевдонимите с „-latest" не остаряват: Google ги пренасочва към текущия
+  // модел. Изброените преди това пет (gemini-1.5-*, gemini-2.0-flash-exp)
+  // вече не съществуват — проверено срещу API-то; всеки анализ с тях връщаше 404.
+  'gemini-flash-latest',
+  'gemini-pro-latest',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemini-3-flash-preview',
+]
 
   return (
     <div className="min-h-screen bg-background">
@@ -385,6 +411,25 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     </AlertDescription>
                   </Alert>
                   
+                  <div className="flex items-center justify-between space-x-2 pt-2">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="calibrated-pipeline" className="text-base">
+                        Калибриран анализ (препоръчано)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Геометрията на ириса се измерва в браузъра, снимката се разгъва в
+                        лента с координатна мрежа и оценките се смятат детерминистично.
+                        Изключването връща наследения v9 pipeline, при който моделът
+                        получава оригиналната кръгла снимка без опорни точки.
+                      </p>
+                    </div>
+                    <Switch
+                      id="calibrated-pipeline"
+                      checked={useCalibratedPipeline}
+                      onCheckedChange={setUseCalibratedPipeline}
+                    />
+                  </div>
+
                   <div className="flex items-center justify-between space-x-2 pt-2">
                     <div className="space-y-0.5">
                       <Label htmlFor="enable-diagnostics" className="text-base">

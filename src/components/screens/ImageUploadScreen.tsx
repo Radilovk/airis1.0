@@ -2,13 +2,15 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Camera, Upload, CheckCircle, ArrowRight, X, Crop } from '@phosphor-icons/react'
+import { Camera, Upload, CheckCircle, ArrowRight, X, Crop, Crosshair } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import IrisCropEditor from '@/components/iris/IrisCropEditor'
+import IrisCalibrator from '@/components/iris/IrisCalibrator'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
-import type { IrisImage } from '@/types'
+import type { QualityReport } from '@/lib/iris-quality'
+import type { IrisGeometrySnapshot, IrisImage } from '@/types'
 
 // Compression and size limit constants
 // Iris images need ≥1600px width to preserve fine medical detail (lacunae, crypts, radial lines).
@@ -19,7 +21,12 @@ const MAX_FINAL_SIZE_BYTES = 5 * 1024 * 1024        // 5 MB – supports 1600px 
 const MAX_FINAL_SIZE_KB = 5120
 
 interface ImageUploadScreenProps {
-  onComplete: (left: IrisImage, right: IrisImage) => void
+  /**
+   * Връща `false`, ако родителят е отказал прехода — тогава екранът връща
+   * бутона в работно състояние. Без това отказ в родителя оставяше „Запазване…"
+   * завинаги: `catch` тук не се задейства, защото няма изключение.
+   */
+  onComplete: (left: IrisImage, right: IrisImage) => void | boolean | Promise<void | boolean>
   initialLeft?: IrisImage | null
   initialRight?: IrisImage | null
   isReanalysis?: boolean
@@ -30,7 +37,37 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   const rightImageRef = useRef<IrisImage | null>(initialRight)
   const [imagesVersion, setImagesVersion] = useState(0)
   const [editingSide, setEditingSide] = useState<'left' | 'right' | null>(null)
+  /**
+   * ОПАШКА ЗА ВТОРАТА СНИМКА.
+   *
+   * `handleFileSelect` правеше `setEditingSide(side)` безусловно. Ако
+   * потребителят избере втората снимка, докато модалът на първата е още
+   * отворен, второто извикване ПРЕЗАПИСВАШЕ първото и първото око се губеше
+   * тихо — без съобщение и без следа. Открито при пълен тест в браузъра.
+   *
+   * Сега втората изчаква тук и се отваря сама, щом първата приключи.
+   */
+  const pendingCropRef = useRef<{ side: 'left' | 'right'; dataUrl: string } | null>(null)
+  // `handleFileSelect` е async и не вижда актуалния state, затова огледални ref-ове.
+  const editingSideRef = useRef<'left' | 'right' | null>(null)
+  const calibratingRef = useRef<unknown>(null)
   const [tempImageData, setTempImageData] = useState<string | null>(null)
+  // Стъпката „калибриране" се показва веднага след изрязването: там се измерва
+  // геометрията и се решава дали снимката изобщо става за анализ.
+  const [calibrating, setCalibrating] = useState<{ side: 'left' | 'right'; dataUrl: string } | null>(null)
+
+  editingSideRef.current = editingSide
+  calibratingRef.current = calibrating
+
+  // Източва опашката, щом и двата модала са затворени.
+  useEffect(() => {
+    if (editingSide || calibrating) return
+    const next = pendingCropRef.current
+    if (!next) return
+    pendingCropRef.current = null
+    setTempImageData(next.dataUrl)
+    setEditingSide(next.side)
+  }, [editingSide, calibrating])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const isMountedRef = useRef(true)
@@ -298,6 +335,16 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           imageSizeKB: Math.round(compressedDataUrl.length / 1024)
         })
         console.log(`✅ [UPLOAD] Изображението е готово за crop редактиране`)
+        if (editingSideRef.current || calibratingRef.current) {
+          // Другото око е в процес — това изчаква реда си, вместо да го изтрие.
+          pendingCropRef.current = { side, dataUrl: compressedDataUrl }
+          uploadDiagnostics.log('CROP_QUEUED', 'info', { side })
+          toast.info(
+            `${side === 'left' ? 'Лявата' : 'Дясната'} снимка е приета — ще се отвори веднага след другата.`
+          )
+          setIsProcessing(false)
+          return
+        }
         setTempImageData(compressedDataUrl)
         setEditingSide(side)
         setIsProcessing(false)
@@ -539,8 +586,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       
       setIsProcessing(false)
       console.log(`✅ [UPLOAD] ${savedSide === 'left' ? 'Left' : 'Right'} iris saved successfully`)
-      
-      toast.success(`${savedSide === 'left' ? 'Ляв' : 'Десен'} ирис запазен успешно`)
+
+      // Веднага след изрязването минаваме през калибрирането. Дотогава снимката
+      // е записана, но НЯМА геометрия — а без геометрия анализът не тръгва.
+      setCalibrating({ side: savedSide, dataUrl: image.dataUrl })
     } catch (error) {
       uploadDiagnostics.log('CROP_SAVE_ERROR', 'error', {
         editingSide,
@@ -707,6 +756,20 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         throw error
       }
       
+      if (!leftImage.geometry || !rightImage.geometry) {
+        const missing = !leftImage.geometry ? 'left' : 'right'
+        uploadDiagnostics.log('HANDLE_NEXT_MISSING_GEOMETRY', 'warning', { missing })
+        setIsSaving(false)
+        toast.error(
+          `${missing === 'left' ? 'Левият' : 'Десният'} ирис не е калибриран. Отворете калибрирането, за да се постави координатната система.`
+        )
+        setCalibrating({
+          side: missing as 'left' | 'right',
+          dataUrl: missing === 'left' ? leftImage.dataUrl : rightImage.dataUrl,
+        })
+        return
+      }
+
       uploadDiagnostics.log('HANDLE_NEXT_VALIDATION_SUCCESS', 'success')
       errorLogger.info('UPLOAD_NEXT', 'Validation successful - all checks passed!')
       
@@ -718,8 +781,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       })
       errorLogger.info('UPLOAD_NEXT', 'Calling onComplete() with validated images...')
       
-      onComplete(leftImage, rightImage)
-      
+      const accepted = await onComplete(leftImage, rightImage)
+      if (accepted === false) {
+        uploadDiagnostics.log('HANDLE_NEXT_ON_COMPLETE_REJECTED', 'error')
+        setIsSaving(false)
+        return
+      }
+
       uploadDiagnostics.log('HANDLE_NEXT_ON_COMPLETE_CALLED', 'success')
       errorLogger.info('UPLOAD_NEXT', 'onComplete() called successfully')
     } catch (error) {
@@ -739,6 +807,55 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       toast.error(`Грешка при преминаване към анализ: ${error instanceof Error ? error.message : 'Неизвестна грешка'}`)
       setIsSaving(false)
     }
+  }
+
+  /** Потвърдена калибрация → геометрията се закача за снимката. */
+  const handleCalibrationConfirm = (geometry: IrisGeometrySnapshot, quality: QualityReport) => {
+    if (!calibrating) return
+    const target = calibrating.side === 'left' ? leftImageRef : rightImageRef
+    if (target.current) {
+      target.current = {
+        ...target.current,
+        geometry,
+        quality: {
+          verdict: quality.verdict,
+          score: quality.score,
+          issueCodes: quality.issues.map(i => i.code),
+        },
+      }
+    }
+    setCalibrating(null)
+    setImagesVersion(v => v + 1)
+    toast.success(
+      `${calibrating.side === 'left' ? 'Ляв' : 'Десен'} ирис калибриран · качество ${quality.score}/100`
+    )
+  }
+
+  /** „Друга снимка" → изчистваме текущата и връщаме потребителя към избора. */
+  const handleCalibrationRetake = () => {
+    if (!calibrating) return
+    const side = calibrating.side
+    if (side === 'left') leftImageRef.current = null
+    else rightImageRef.current = null
+    setCalibrating(null)
+    setImagesVersion(v => v + 1)
+    setTimeout(() => {
+      const input = side === 'left' ? leftInputRef.current : rightInputRef.current
+      input?.click()
+    }, 120)
+  }
+
+  /** Затваряне без потвърждение — снимката остава, но без геометрия. */
+  const handleCalibrationCancel = () => {
+    setCalibrating(null)
+    toast.info('Калибрирането е отложено. Анализът изисква калибрирана снимка.')
+  }
+
+  /** Повторно отваряне на калибратора за вече качена снимка. */
+  const openCalibrator = (side: 'left' | 'right') => {
+    const image = side === 'left' ? leftImageRef.current : rightImageRef.current
+    if (!image) return
+    setCalibrating({ side, dataUrl: image.dataUrl })
   }
 
   const removeImage = (side: 'left' | 'right') => {
@@ -787,11 +904,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           <Card className="p-6 mb-6 bg-secondary/30">
             <h3 className="font-semibold mb-3">📋 Инструкции за качествени снимки:</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• Осигурете добро осветление - естествена светлина е най-добра</li>
-              <li>• Заснемете отблизо, за да се вижда ириса ясно</li>
-              <li>• Уверете се, че снимката е фокусирана и не е замъглена</li>
-              <li>• Избягвайте отражения и сенки</li>
-              <li>• След качване, позиционирайте ириса в редактора</li>
+              <li>• <strong>Снимайте със светкавица</strong> на ръка, на рязко, с отворено око</li>
+              <li>• <strong>Зеницата трябва да се вижда ясно</strong> — тя е нулевата точка на координатната система</li>
+              <li>• Заснемете отблизо — ирисът да заема поне една трета от кадъра</li>
+              <li>• Докоснете екрана за фокус върху ириса преди снимката</li>
+              <li>• Отворете окото широко — клепачът не трябва да закрива ириса</li>
+              <li>• Избягвайте огледални отражения (прозорец, лампа) върху ириса</li>
+              <li>• След качване следва <strong>калибриране</strong>: нагласете кръговете и потвърдете само ако снимката минава проверката</li>
             </ul>
           </Card>
 
@@ -873,6 +992,11 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                     </div>
                   </div>
                 )}
+
+                <CalibrationStatus
+                  image={leftImageRef.current}
+                  onOpen={() => openCalibrator('left')}
+                />
               </Card>
             </motion.div>
 
@@ -944,6 +1068,11 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                     </div>
                   </div>
                 )}
+
+                <CalibrationStatus
+                  image={rightImageRef.current}
+                  onOpen={() => openCalibrator('right')}
+                />
               </Card>
             </motion.div>
           </div>
@@ -975,6 +1104,57 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           onCancel={handleCropCancel}
         />
       )}
+
+      {calibrating && (
+        <IrisCalibrator
+          key={`${calibrating.side}-${calibrating.dataUrl.length}`}
+          imageDataUrl={calibrating.dataUrl}
+          side={calibrating.side}
+          onConfirm={handleCalibrationConfirm}
+          onRetake={handleCalibrationRetake}
+          onCancel={handleCalibrationCancel}
+        />
+      )}
     </>
+  )
+}
+
+/**
+ * Малка лента под всяка снимка: показва дали ирисът е калибриран и с какво
+ * качество, и дава бърз достъп обратно до калибратора.
+ */
+function CalibrationStatus({
+  image,
+  onOpen,
+}: {
+  image: IrisImage | null
+  onOpen: () => void
+}) {
+  if (!image) return null
+
+  const q = image.quality
+  const calibrated = !!image.geometry
+  const tone = !calibrated
+    ? 'border-amber-300 bg-amber-50 text-amber-900'
+    : q && q.score >= 70
+      ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+      : q && q.score >= 45
+        ? 'border-amber-300 bg-amber-50 text-amber-900'
+        : 'border-rose-300 bg-rose-50 text-rose-900'
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`mt-3 flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors hover:brightness-[0.97] ${tone}`}
+    >
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <Crosshair size={16} weight="bold" />
+        {calibrated ? 'Калибриран' : 'Изисква калибриране'}
+      </span>
+      <span className="text-xs font-semibold tabular-nums">
+        {calibrated && q ? `${q.score}/100` : 'отвори →'}
+      </span>
+    </button>
   )
 }

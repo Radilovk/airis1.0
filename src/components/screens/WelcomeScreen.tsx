@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug } from '@phosphor-icons/react'
+import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug, Key } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
-import type { QuestionnaireData } from '@/types'
+import type { AIModelConfig, QuestionnaireData } from '@/types'
 
 interface WelcomeScreenProps {
   onStart: () => void
@@ -16,6 +16,12 @@ interface WelcomeScreenProps {
 
 export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart, onAbout, onDiagnostics }: WelcomeScreenProps) {
   const [questionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
+
+  // Проверката за API ключ беше чак в AnalysisScreen — потребителят изминаваше
+  // 21 въпроса, две снимки и две калибрации и чак тогава научаваше, че нищо
+  // няма да се случи. Тук е на входа, преди инвестицията на време.
+  const [aiConfig] = useKVWithFallback<AIModelConfig | null>('ai-model-config', null)
+  const hasApiKey = !!aiConfig?.apiKey && aiConfig.apiKey.trim().length > 0
   const features = [
     {
       icon: Eye,
@@ -88,6 +94,37 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
           transition={{ duration: 0.5, delay: 0.5 }}
           className="text-center space-y-4"
         >
+          {!hasApiKey && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-auto mb-4 max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-4 text-left"
+            >
+              <div className="flex gap-3">
+                <Key size={20} weight="duotone" className="mt-0.5 shrink-0 text-amber-700" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-900">
+                    Липсва API ключ — анализът няма да може да стартира
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-amber-800">
+                    Анализът използва външен AI модел и изисква ваш собствен ключ.
+                    Добавете го в настройките сега, за да не стигнете до края на
+                    въпросника напразно.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onAdmin}
+                    className="mt-3 gap-2 border-amber-400 bg-white text-amber-900 hover:bg-amber-100"
+                  >
+                    <Gear size={16} />
+                    Добави ключ в настройките
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button
               size="lg"

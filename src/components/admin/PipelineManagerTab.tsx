@@ -40,7 +40,18 @@ import type { GitHubAdminConfig, PipelineConfig, PipelineStepConfig, PipelinePre
 import { getGitHubApiService, initializeGitHubApiService, DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 
 const OPENAI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
-const GEMINI_MODELS = ['gemini-2.0-flash-exp', 'gemini-2.0-flash-thinking-exp', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
+const GEMINI_MODELS = [
+  // Псевдонимите с „-latest" не остаряват: Google ги пренасочва към текущия
+  // модел. Изброените преди това пет (gemini-1.5-*, gemini-2.0-flash-exp)
+  // вече не съществуват — проверено срещу API-то; всеки анализ с тях връщаше 404.
+  'gemini-flash-latest',
+  'gemini-pro-latest',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemini-3-flash-preview',
+]
 
 export default function PipelineManagerTab() {
   // GitHub Config state
