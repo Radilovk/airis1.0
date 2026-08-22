@@ -126,7 +126,11 @@ export default function AnalysisScreen({
     apiKey: string,
     jsonMode: boolean = true,
     imageDataUrl?: string,
-    modelStrategy?: AIModelStrategy | null
+    // Функцията чете САМО тези три полета, затова типът е частичен. Пълният
+    // `AIModelStrategy` изискваше и manualWeight/promptWeight/…, каквито
+    // резервната стойност по-долу няма — оттам идваше единствената TypeScript
+    // грешка в жив код.
+    modelStrategy?: Partial<AIModelStrategy> | null
   ): Promise<string> => {
     // Get model settings from strategy or use defaults
     const temperature = modelStrategy?.temperature ?? 0.7

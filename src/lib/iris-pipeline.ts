@@ -55,6 +55,36 @@ import {
   type Side,
 } from './iris-map'
 
+/**
+ * ОГРАНИЧИТЕЛ НА ЕДНОВРЕМЕННИТЕ ЗАЯВКИ.
+ *
+ * След като детекциите станаха паралелни и всяко око се чете с два шева, в
+ * полет тръгваха 8 заявки наведнъж — 2 слоя × 2 шева × 2 очи — всяка с
+ * изображение от порядъка на 500 KB. Това е ~4 MB едновременен upload и при
+ * тест от край до край всичките се върнаха с `Failed to fetch` /
+ * `ERR_CONNECTION_RESET`, тоест анализът приключи с 0 находки.
+ *
+ * Ограничението е на ниво МОДУЛ, а не на ниво цикъл, за да важи независимо от
+ * това как извикващият е решил да паралелизира. Две едновременни заявки пазят
+ * почти цялото ускорение, без да задавят връзката.
+ */
+const MAX_CONCURRENT_LLM = 2
+let inFlight = 0
+const waiting: Array<() => void> = []
+
+async function withLlmSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (inFlight >= MAX_CONCURRENT_LLM) {
+    await new Promise<void>(resolve => waiting.push(resolve))
+  }
+  inFlight++
+  try {
+    return await fn()
+  } finally {
+    inFlight--
+    waiting.shift()?.()
+  }
+}
+
 export type LogLevel = 'info' | 'success' | 'error' | 'warning'
 export type AddLog = (level: LogLevel, message: string) => void
 export type OnProgress = (step: string, progress: number) => void
@@ -298,7 +328,7 @@ export async function detectEye(
     })
 
     try {
-      const response = await callLLM(prompt, true, 2, strip.dataUrl)
+      const response = await withLlmSlot(() => callLLM(prompt, true, 2, strip.dataUrl))
       const parsed = parseJsonResponse(response) as Record<string, unknown>
       const rawList = Array.isArray(parsed.findings) ? parsed.findings : []
 
@@ -369,7 +399,9 @@ export async function detectEye(
   try {
     if (delayBetweenCalls > 0) await sleep(delayBetweenCalls)
     onProgress(`Конституция (${sideName})`, 65)
-    const response = await callLLM(buildConstitutionPrompt(prep.side), true, 1, prep.strips.base.dataUrl)
+    const response = await withLlmSlot(() =>
+      callLLM(buildConstitutionPrompt(prep.side), true, 1, prep.strips.base.dataUrl)
+    )
     const parsed = parseJsonResponse(response) as Record<string, unknown>
     if (isConstitution(parsed.constitution)) {
       constitution = parsed.constitution
@@ -543,7 +575,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       constitution,
       imageQuality,
     })
-    const response = await callLLM(prompt, true, 2)
+    const response = await withLlmSlot(() => callLLM(prompt, true, 2))
     interpretation = parseJsonResponse(response) as InterpretationOutput
     addLog('success', 'Планът е готов')
   } catch (e) {

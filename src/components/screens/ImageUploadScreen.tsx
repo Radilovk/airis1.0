@@ -37,10 +37,37 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   const rightImageRef = useRef<IrisImage | null>(initialRight)
   const [imagesVersion, setImagesVersion] = useState(0)
   const [editingSide, setEditingSide] = useState<'left' | 'right' | null>(null)
+  /**
+   * ОПАШКА ЗА ВТОРАТА СНИМКА.
+   *
+   * `handleFileSelect` правеше `setEditingSide(side)` безусловно. Ако
+   * потребителят избере втората снимка, докато модалът на първата е още
+   * отворен, второто извикване ПРЕЗАПИСВАШЕ първото и първото око се губеше
+   * тихо — без съобщение и без следа. Открито при пълен тест в браузъра.
+   *
+   * Сега втората изчаква тук и се отваря сама, щом първата приключи.
+   */
+  const pendingCropRef = useRef<{ side: 'left' | 'right'; dataUrl: string } | null>(null)
+  // `handleFileSelect` е async и не вижда актуалния state, затова огледални ref-ове.
+  const editingSideRef = useRef<'left' | 'right' | null>(null)
+  const calibratingRef = useRef<unknown>(null)
   const [tempImageData, setTempImageData] = useState<string | null>(null)
   // Стъпката „калибриране" се показва веднага след изрязването: там се измерва
   // геометрията и се решава дали снимката изобщо става за анализ.
   const [calibrating, setCalibrating] = useState<{ side: 'left' | 'right'; dataUrl: string } | null>(null)
+
+  editingSideRef.current = editingSide
+  calibratingRef.current = calibrating
+
+  // Източва опашката, щом и двата модала са затворени.
+  useEffect(() => {
+    if (editingSide || calibrating) return
+    const next = pendingCropRef.current
+    if (!next) return
+    pendingCropRef.current = null
+    setTempImageData(next.dataUrl)
+    setEditingSide(next.side)
+  }, [editingSide, calibrating])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const isMountedRef = useRef(true)
@@ -308,6 +335,16 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           imageSizeKB: Math.round(compressedDataUrl.length / 1024)
         })
         console.log(`✅ [UPLOAD] Изображението е готово за crop редактиране`)
+        if (editingSideRef.current || calibratingRef.current) {
+          // Другото око е в процес — това изчаква реда си, вместо да го изтрие.
+          pendingCropRef.current = { side, dataUrl: compressedDataUrl }
+          uploadDiagnostics.log('CROP_QUEUED', 'info', { side })
+          toast.info(
+            `${side === 'left' ? 'Лявата' : 'Дясната'} снимка е приета — ще се отвори веднага след другата.`
+          )
+          setIsProcessing(false)
+          return
+        }
         setTempImageData(compressedDataUrl)
         setEditingSide(side)
         setIsProcessing(false)
