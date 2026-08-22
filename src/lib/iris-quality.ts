@@ -160,6 +160,10 @@ export interface QualityOptions {
    * и 2 нечетими клетки от 144, докато кадър с оценка 85 даде 81 % и 28 клетки.
    */
   stripCoverage?: number
+  /** Ръчно потвърдена геометрия — не предупреждаваме за автоматичния лимбус. */
+  manualGeometry?: boolean
+  /** Ако е зададена (напр. от калибратора), не се преизчислява автоматично. */
+  geometry?: IrisGeometry
 }
 
 export function analyseIrisQuality(
@@ -167,7 +171,7 @@ export function analyseIrisQuality(
   options: QualityOptions = {}
 ): QualityReport {
   const s = sample(img)
-  const geometry = detectIrisGeometry(img)
+  const geometry = options.geometry ?? detectIrisGeometry(img)
 
   const srcW = img.naturalWidth || img.width
   const srcH = img.naturalHeight || img.height
@@ -339,7 +343,7 @@ export function analyseIrisQuality(
     })
   }
 
-  if (geometry.limbusConfidence < 0.15) {
+  if (!options.manualGeometry && geometry.limbusConfidence < 0.15) {
     issues.push({
       code: 'limbus_not_found',
       level: 'warning',
@@ -365,14 +369,19 @@ export function analyseIrisQuality(
     })
   }
 
-  if (sharpness < 0.14) {
+  // Лапласианът мери ръбове в суровия кадър; ирисовите влакна са нискоконтрастни
+  // и при светкавица + downscale до 360 px систематично дават ниска стойност.
+  // Покритието на лентата описва какво реално получава моделът — при ≥75 % не
+  // блокираме за „размазана“ (виж МЕТОДИКА_2 §7.8, eye5: 99 % лента, false blur).
+  const stripOk = strip !== undefined && strip >= 0.75
+  if (!stripOk && sharpness < 0.14) {
     issues.push({
       code: 'blurry',
       level: 'error',
       message: 'Снимката е размазана — влакната на ириса не се различават.',
       fix: 'Задръжте телефона неподвижно, докоснете екрана за фокус върху ириса и снимайте отново.',
     })
-  } else if (sharpness < 0.28) {
+  } else if (!stripOk && sharpness < 0.28) {
     issues.push({
       code: 'blurry',
       level: 'warning',

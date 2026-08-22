@@ -71,6 +71,16 @@ export interface IrisGeometry {
   eyelids?: Eyelids
 }
 
+/** Зеницата и лимбусът споделят център — иначе мрежата в калибратора изглежда изместена. */
+export function concentricGeometry(geo: IrisGeometry): IrisGeometry {
+  const { cx, cy } = geo.limbus
+  return {
+    ...geo,
+    pupil: { ...geo.pupil, cx, cy },
+    limbus: { ...geo.limbus, cx, cy },
+  }
+}
+
 const WORK_SIZE = 320
 
 interface Gray {
@@ -798,7 +808,7 @@ export function detectIrisGeometry(img: HTMLImageElement | HTMLCanvasElement): I
       if (ratio > 0.72) geo.limbus.r = geo.pupil.r / 0.4
       if (ratio < 0.1) geo.pupil.r = geo.limbus.r * 0.22
     }
-    return geo
+    return concentricGeometry(geo)
   } catch {
     return fallback()
   }

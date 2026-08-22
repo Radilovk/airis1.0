@@ -13,7 +13,7 @@ import {
   XCircle,
 } from '@phosphor-icons/react'
 import { analyseIrisQuality, type QualityReport } from '@/lib/iris-quality'
-import { detectIrisGeometry, type IrisGeometry } from '@/lib/iris-geometry'
+import { detectIrisGeometry, concentricGeometry, type IrisGeometry } from '@/lib/iris-geometry'
 import { unwrapIris } from '@/lib/iris-unwrap'
 import type { IrisGeometrySnapshot } from '@/types'
 
@@ -86,10 +86,10 @@ export default function IrisCalibrator({
         try {
           const q = analyseIrisQuality(img)
           setReport(q)
-          setGeo(q.geometry)
+          setGeo(concentricGeometry(q.geometry))
         } catch {
           const g = detectIrisGeometry(img)
-          setGeo(g)
+          setGeo(concentricGeometry(g))
         } finally {
           if (alive) setAnalysing(false)
         }
@@ -142,7 +142,7 @@ export default function IrisCalibrator({
         // Оценката се преизчислява с покритието: то описва лентата, която
         // моделът вижда, а не снимката, която потребителят е направил.
         try {
-          setReport(analyseIrisQuality(img, { stripCoverage: res.coverage }))
+          setReport(analyseIrisQuality(img, { stripCoverage: res.coverage, manualGeometry: g.manual, geometry: g }))
         } catch {
           /* оставяме предишната оценка */
         }
@@ -188,12 +188,25 @@ export default function IrisCalibrator({
     setTouched(true)
     setGeo(prev => {
       if (!prev) return prev
+      const cx = prev.limbus.cx
+      const cy = prev.limbus.cy
       if (drag === 'pupil') {
         const nr = Math.max(4, Math.min(prev.limbus.r * 0.7, r))
-        return { ...prev, pupil: { ...prev.pupil, r: nr }, manual: true, pupilConfidence: 1 }
+        return concentricGeometry({
+          ...prev,
+          pupil: { cx, cy, r: nr },
+          limbus: { ...prev.limbus, cx, cy },
+          manual: true,
+          pupilConfidence: 1,
+        })
       }
       const nr = Math.max(prev.pupil.r * 1.5, r)
-      return { ...prev, limbus: { ...prev.limbus, r: nr }, manual: true, limbusConfidence: 1 }
+      return concentricGeometry({
+        ...prev,
+        limbus: { ...prev.limbus, cx, cy, r: nr },
+        manual: true,
+        limbusConfidence: 1,
+      })
     })
   }
 
@@ -207,8 +220,8 @@ export default function IrisCalibrator({
     if (drag || !geo) return
     const p = pointFromEvent(e.clientX, e.clientY)
     if (!p) return
-    const d = Math.hypot(p.x - geo.pupil.cx, p.y - geo.pupil.cy)
-    if (d > geo.pupil.r * 0.75) return
+    const dLimbus = Math.hypot(p.x - geo.limbus.cx, p.y - geo.limbus.cy)
+    if (dLimbus > geo.limbus.r * 1.02) return
     e.preventDefault()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     setDrag(null)
@@ -224,12 +237,12 @@ export default function IrisCalibrator({
       setTouched(true)
       setGeo(prev =>
         prev
-          ? {
+          ? concentricGeometry({
               ...prev,
               pupil: { ...prev.pupil, cx: startPupil.cx + dx, cy: startPupil.cy + dy },
               limbus: { ...prev.limbus, cx: startLimbus.cx + dx, cy: startLimbus.cy + dy },
               manual: true,
-            }
+            })
           : prev
       )
     }
@@ -250,7 +263,7 @@ export default function IrisCalibrator({
     if (!img) return
     const q = analyseIrisQuality(img)
     setReport(q)
-    setGeo(q.geometry)
+    setGeo(concentricGeometry(q.geometry))
     setTouched(false)
     rebuildStrip(q.geometry)
   }
@@ -260,12 +273,14 @@ export default function IrisCalibrator({
 
   const blockingErrors = useMemo(() => {
     if (!report) return []
+    // Ръчно нагласените кръгове + високо покритие на лентата = доверие в геометрията.
+    if (touched && (coverage ?? 0) >= 0.75) return []
     return report.issues.filter(i => {
       if (i.level !== 'error') return false
       if (touched && GEOMETRY_CODES.has(i.code)) return false
       return true
     })
-  }, [report, touched])
+  }, [report, touched, coverage])
 
   const warnings = useMemo(
     () => (report?.issues ?? []).filter(i => i.level === 'warning'),
@@ -402,17 +417,12 @@ export default function IrisCalibrator({
                   </defs>
 
                   {(() => {
-                    const p = toView(geo.pupil.cx, geo.pupil.cy)
-                    const l = toView(geo.limbus.cx, geo.limbus.cy)
+                    const c = toView(geo.limbus.cx, geo.limbus.cy)
                     const pr = geo.pupil.r * scale
                     const lr = geo.limbus.r * scale
                     const rings = Array.from({ length: 11 }, (_, i) => {
                       const t = (i + 1) / 12
-                      return {
-                        cx: p.x + (l.x - p.x) * t,
-                        cy: p.y + (l.y - p.y) * t,
-                        r: pr + (lr - pr) * t,
-                      }
+                      return { cx: c.x, cy: c.y, r: pr + (lr - pr) * t }
                     })
                     return (
                       <>
@@ -437,10 +447,10 @@ export default function IrisCalibrator({
                           return (
                             <line
                               key={`s${i}`}
-                              x1={p.x + pr * sin}
-                              y1={p.y - pr * cos}
-                              x2={l.x + lr * sin}
-                              y2={l.y - lr * cos}
+                              x1={c.x + pr * sin}
+                              y1={c.y - pr * cos}
+                              x2={c.x + lr * sin}
+                              y2={c.y - lr * cos}
                               stroke="rgba(125,211,252,0.28)"
                               strokeWidth={1}
                             />
@@ -449,8 +459,8 @@ export default function IrisCalibrator({
 
                         {/* лимбус */}
                         <circle
-                          cx={l.x}
-                          cy={l.y}
+                          cx={c.x}
+                          cy={c.y}
                           r={lr}
                           fill="none"
                           stroke="#fbbf24"
@@ -458,8 +468,8 @@ export default function IrisCalibrator({
                           strokeDasharray="10 6"
                         />
                         <circle
-                          cx={l.x}
-                          cy={l.y - lr}
+                          cx={c.x}
+                          cy={c.y - lr}
                           r={10}
                           fill="#fbbf24"
                           stroke="#0f172a"
@@ -469,18 +479,18 @@ export default function IrisCalibrator({
                         />
 
                         {/* зеница */}
-                        <circle cx={p.x} cy={p.y} r={pr * 1.35} fill="url(#pupilGlow)" />
+                        <circle cx={c.x} cy={c.y} r={pr * 1.35} fill="url(#pupilGlow)" />
                         <circle
-                          cx={p.x}
-                          cy={p.y}
+                          cx={c.x}
+                          cy={c.y}
                           r={pr}
                           fill="none"
                           stroke="#38bdf8"
                           strokeWidth={2.5}
                         />
                         <circle
-                          cx={p.x}
-                          cy={p.y - pr}
+                          cx={c.x}
+                          cy={c.y - pr}
                           r={10}
                           fill="#38bdf8"
                           stroke="#0f172a"
@@ -491,8 +501,8 @@ export default function IrisCalibrator({
 
                         {/* маркер 12:00 */}
                         <text
-                          x={l.x}
-                          y={l.y - lr - 14}
+                          x={c.x}
+                          y={c.y - lr - 14}
                           textAnchor="middle"
                           fill="#fbbf24"
                           fontSize={13}
