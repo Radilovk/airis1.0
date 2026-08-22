@@ -20,6 +20,11 @@ import {
 
 export type QualityVerdict = 'pass' | 'warn' | 'reject'
 
+/** Хвърля се, когато снимката не отговаря на условията за анализ. */
+export class IrisQualityRejectedError extends Error {
+  override readonly name = 'IrisQualityRejectedError'
+}
+
 export type QualityIssueCode =
   | 'pupil_not_found'
   | 'pupil_low_contrast'
@@ -303,6 +308,7 @@ export function analyseIrisQuality(
 
   // ── правила ───────────────────────────────────────────────────────────────
   const strip = options.stripCoverage
+  const flash = metrics.pupilSpecular > 0.005
   const issues: QualityIssue[] = []
 
   if (geometry.pupilConfidence < 0.18 || geometry.pupil.r <= 0) {
@@ -317,7 +323,7 @@ export function analyseIrisQuality(
       code: 'pupil_low_contrast',
       level: 'error',
       message: 'Границата на зеницата е неясна — не може да се постави координатна система.',
-      fix: 'Осветете окото странично (не с директна светкавица) и снимайте отново на рязко.',
+      fix: 'Нагласете синия кръг върху зеницата ръчно, или направете нова снимка на рязко с отворено око.',
     })
   } else if (geometry.pupilConfidence < 0.55) {
     // Средна лента на увереността. Автоматиката е дала резултат, но не е сигурна —
@@ -375,19 +381,27 @@ export function analyseIrisQuality(
     })
   }
 
-  if (glare > 0.09) {
+  // При снимка със светкавица малък блясък в зеницата е нормален — не е причина за отказ.
+  if (!flash && glare > 0.09) {
     issues.push({
       code: 'glare',
       level: 'error',
       message: 'Голям светлинен отблясък закрива част от ириса.',
-      fix: 'Изключете светкавицата и застанете така, че лампата или прозорецът да са встрани, а не отпред.',
+      fix: 'Снимайте със светкавица на ръка и отворено око, без огледални отражения върху ириса.',
     })
-  } else if (glare > 0.035) {
+  } else if (!flash && glare > 0.035) {
     issues.push({
       code: 'glare',
       level: 'warning',
       message: 'Има отблясъци върху ириса.',
-      fix: 'Леко завъртане на главата спрямо източника на светлина ги премахва.',
+      fix: 'Леко завъртете главата или направете нова снимка със светкавица.',
+    })
+  } else if (flash && glare > 0.14) {
+    issues.push({
+      code: 'glare',
+      level: 'error',
+      message: 'Отблясъкът закрива твърде голяма част от ирисовата тъкан.',
+      fix: 'Дръжте камерата по-близо и погледнете право в нея — блясъкът трябва да остане в зеницата.',
     })
   }
 

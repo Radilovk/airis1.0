@@ -26,7 +26,11 @@
 
 import type { IrisImage, QuestionnaireData } from '@/types'
 import type { IrisGeometry } from './iris-geometry'
-import { analyseIrisQualityFromDataUrl, type QualityReport } from './iris-quality'
+import {
+  analyseIrisQualityFromDataUrl,
+  IrisQualityRejectedError,
+  type QualityReport,
+} from './iris-quality'
 import {
   readabilityToPhysical,
   stripSectorToPhysical,
@@ -501,10 +505,10 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
 
   for (const prep of [leftPrep, rightPrep]) {
     if (prep.qualityVerdict === 'reject') {
-      addLog(
-        'warning',
-        `[${prep.side === 'left' ? 'Ляв' : 'Десен'}] Снимката е под прага за качество — ` +
-          'ирисовият принос ще бъде силно свит, планът стъпва на въпросника.'
+      const label = prep.side === 'left' ? 'Ляв' : 'Десен'
+      throw new IrisQualityRejectedError(
+        `${label} ирис: снимката не отговаря на условията за анализ ` +
+          `(${prep.qualityScore}/100). Направете нова снимка и калибрирайте отново.`
       )
     }
   }

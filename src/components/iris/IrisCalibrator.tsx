@@ -256,30 +256,27 @@ export default function IrisCalibrator({
   }
 
   /* ── решение ──────────────────────────────────────────────────────────── */
-  const geometryBlocking = useMemo(() => {
-    if (!report) return false
-    if (touched) return false // ръчната калибрация решава проблема с ориентацията
-    return report.issues.some(
-      i => i.level === 'error' && (i.code === 'pupil_not_found' || i.code === 'pupil_low_contrast')
-    )
+  const GEOMETRY_CODES = new Set(['pupil_not_found', 'pupil_low_contrast'])
+
+  const blockingErrors = useMemo(() => {
+    if (!report) return []
+    return report.issues.filter(i => {
+      if (i.level !== 'error') return false
+      if (touched && GEOMETRY_CODES.has(i.code)) return false
+      return true
+    })
   }, [report, touched])
 
-  const otherErrors = useMemo(
-    () =>
-      (report?.issues ?? []).filter(
-        i => i.level === 'error' && i.code !== 'pupil_not_found' && i.code !== 'pupil_low_contrast'
-      ),
-    [report]
-  )
   const warnings = useMemo(
     () => (report?.issues ?? []).filter(i => i.level === 'warning'),
     [report]
   )
 
-  const effectiveScore = touched && report ? Math.min(100, report.score + 18) : (report?.score ?? 0)
+  const cannotConfirm = blockingErrors.length > 0
+  const score = report?.score ?? 0
 
   const scoreTone =
-    effectiveScore >= 70 ? 'emerald' : effectiveScore >= 45 ? 'amber' : 'rose'
+    score >= 70 ? 'emerald' : score >= 45 ? 'amber' : 'rose'
   const toneClasses: Record<string, string> = {
     emerald: 'from-emerald-400 to-teal-500',
     amber: 'from-amber-400 to-orange-500',
@@ -297,7 +294,7 @@ export default function IrisCalibrator({
       limbusConfidence: geo.limbusConfidence,
       manual: touched,
     }
-    onConfirm(snapshot, { ...report, geometry: geo, score: effectiveScore })
+    onConfirm(snapshot, { ...report, geometry: geo, score })
   }
 
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
@@ -568,27 +565,27 @@ export default function IrisCalibrator({
                       strokeDasharray={2 * Math.PI * 42}
                       initial={{ strokeDashoffset: 2 * Math.PI * 42 }}
                       animate={{
-                        strokeDashoffset: 2 * Math.PI * 42 * (1 - effectiveScore / 100),
+                        strokeDashoffset: 2 * Math.PI * 42 * (1 - score / 100),
                       }}
                       transition={{ duration: 0.8, ease: 'easeOut' }}
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xl font-bold leading-none">
-                      {analysing ? '—' : effectiveScore}
+                      {analysing ? '—' : score}
                     </span>
                     <span className="text-[10px] text-slate-500">от 100</span>
                   </div>
                 </div>
                 <div className="min-w-0">
                   <p className="text-base font-semibold">
-                    {analysing ? 'Проверяваме снимката…' : geometryBlocking ? 'Нужна е нова снимка' : (report?.headline ?? '')}
+                    {analysing ? 'Проверяваме снимката…' : cannotConfirm ? 'Нужна е нова снимка' : (report?.headline ?? '')}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-400">
                     {analysing
                       ? 'Измерваме зеницата, лимбуса, резкостта и отблясъците.'
-                      : geometryBlocking
-                        ? 'Без ясно видима зеница няма къде да стъпи координатната система.'
+                      : cannotConfirm
+                        ? 'Снимката не отговаря на условията — направете нова или коригирайте кръговете.'
                         : touched
                           ? 'Калибрирано ръчно — координатната система е сигурна.'
                           : 'Координатната система е поставена автоматично.'}
@@ -633,20 +630,13 @@ export default function IrisCalibrator({
             {/* проблеми */}
             {!analysing && report && (
               <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                {geometryBlocking && (
-                  <IssueRow
-                    tone="error"
-                    title="Зеницата не се разчита"
-                    body="Качете по-ясна снимка, или нагласете сините и жълтите кръгове ръчно — това също отключва анализа."
-                  />
-                )}
-                {otherErrors.map(i => (
+                {blockingErrors.map(i => (
                   <IssueRow key={i.code} tone="error" title={i.message} body={i.fix} />
                 ))}
                 {warnings.map(i => (
                   <IssueRow key={i.code} tone="warn" title={i.message} body={i.fix} />
                 ))}
-                {!geometryBlocking && otherErrors.length === 0 && warnings.length === 0 && (
+                {!cannotConfirm && warnings.length === 0 && (
                   <IssueRow
                     tone="ok"
                     title="Няма установени проблеми"
@@ -714,11 +704,11 @@ export default function IrisCalibrator({
           </Button>
           <Button
             onClick={confirm}
-            disabled={analysing || !geo || !report || geometryBlocking}
+            disabled={analysing || !geo || !report || cannotConfirm}
             className="gap-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-white hover:from-sky-400 hover:to-indigo-400 disabled:opacity-40"
           >
             <Eye size={18} weight="bold" />
-            {geometryBlocking ? 'Нужна е нова снимка' : 'Потвърди и продължи'}
+            {cannotConfirm ? 'Нужна е нова снимка' : warnings.length > 0 ? 'Потвърди с предупреждения' : 'Потвърди и продължи'}
           </Button>
         </div>
       </motion.div>
