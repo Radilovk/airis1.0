@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Gemini live iris test</title>
+</head>
+<body style="background:#0b0b0e;color:#ddd;font:13px/1.6 ui-monospace,monospace;padding:16px">
+<pre id="out">работи…</pre>
+<script type="module">
+import { detectIrisGeometry, concentricGeometry } from '/src/lib/iris-geometry.ts'
+import { analyseIrisQualityFromDataUrl } from '/src/lib/iris-quality.ts'
+import { unwrapAnalysisFromDataUrl } from '/src/lib/iris-unwrap.ts'
+import { runIrisPipeline } from '/src/lib/iris-pipeline.ts'
+import { buildDetectionPrompt } from '/src/lib/analysis-prompts.ts'
+import { drawFlashEyeFixture } from '/src/lib/flash-eye-fixture.ts'
+
+const params = new URLSearchParams(location.search)
+const apiKey = params.get('key') || ''
+const model = params.get('model') || 'gemini-3.6-flash'
+const full = params.get('full') === '1'
+const useFlash = params.get('flash') === '1'
+
+const L = []
+const t0 = performance.now()
+const mark = (label) => L.push(`[${((performance.now() - t0) / 1000).toFixed(1)}s] ${label}`)
+
+function drawIris(rp, ri) {
+  const SIZE = 1200, CX = 600, CY = 600
+  const c = document.createElement('canvas')
+  c.width = c.height = SIZE
+  const x = c.getContext('2d')
+  x.fillStyle = '#e9e6e0'; x.fillRect(0, 0, SIZE, SIZE)
+  x.save(); x.beginPath(); x.arc(CX, CY, ri, 0, 7); x.clip()
+  x.fillStyle = '#9a8352'; x.fillRect(0, 0, SIZE, SIZE)
+  for (let i = 0; i < 240; i++) {
+    const a0 = (i / 240) * 2 * Math.PI - Math.PI / 2
+    const a1 = ((i + 0.62) / 240) * 2 * Math.PI - Math.PI / 2
+    x.fillStyle = i % 3 ? 'rgba(220,200,150,0.42)' : 'rgba(90,70,40,0.38)'
+    x.beginPath(); x.moveTo(CX, CY); x.arc(CX, CY, ri, a0, a1); x.fill()
+  }
+  x.restore()
+  x.fillStyle = '#0a0a0c'; x.beginPath(); x.arc(CX, CY, rp, 0, 7); x.fill()
+  return { dataUrl: c.toDataURL('image/jpeg', 0.92), SIZE, CX, CY, rp, ri }
+}
+
+async function callGemini(prompt, jsonMode, imageDataUrl) {
+  const parts = []
+  if (imageDataUrl) {
+    const m = imageDataUrl.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/i)
+    if (m) parts.push({ inline_data: { mime_type: 'image/jpeg', data: m[1] } })
+  }
+  parts.push({ text: jsonMode ? `${prompt}\n\nВърни САМО валиден JSON обект, без допълнителен текст.` : prompt })
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+        responseMimeType: jsonMode ? 'application/json' : undefined,
+      },
+    }),
+  })
+  const body = await res.text()
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${body.slice(0, 240)}`)
+  const data = JSON.parse(body)
+  return data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || ''
+}
+
+try {
+  if (!apiKey) throw new Error('Липсва ?key= в URL')
+
+  mark(`Модел: ${model}${useFlash ? ' · flash-eye fixture' : ''}`)
+  const ping = await callGemini('Отговори с една дума: OK', false)
+  mark(`Ping: ${ping.trim().slice(0, 40)}`)
+
+  let leftDraw, rightDraw, geometry
+  if (useFlash) {
+    const eye = drawFlashEyeFixture()
+    leftDraw = { dataUrl: eye.dataUrl, SIZE: eye.width, CX: eye.cx, CY: eye.cy, rp: eye.rp, ri: eye.ri }
+    rightDraw = { ...leftDraw }
+    geometry = {
+      pupil: { cx: eye.cx, cy: eye.cy, r: eye.rp },
+      limbus: { cx: eye.cx, cy: eye.cy, r: eye.ri },
+      imageWidth: eye.width,
+      imageHeight: eye.height,
+      pupilConfidence: 1,
+      limbusConfidence: 1,
+      manual: true,
+    }
+  } else {
+    const RP = 130, RI = 430
+    leftDraw = drawIris(RP, RI)
+    rightDraw = drawIris(RP, RI)
+    geometry = {
+      pupil: { cx: leftDraw.CX, cy: leftDraw.CY, r: RP },
+      limbus: { cx: leftDraw.CX, cy: leftDraw.CY, r: RI },
+      imageWidth: leftDraw.SIZE,
+      imageHeight: leftDraw.SIZE,
+      pupilConfidence: 1,
+      limbusConfidence: 1,
+      manual: true,
+    }
+  }
+
+  const leftQuality = await analyseIrisQualityFromDataUrl(leftDraw.dataUrl, { geometry, manualGeometry: true })
+  const rightQuality = await analyseIrisQualityFromDataUrl(rightDraw.dataUrl, { geometry, manualGeometry: true })
+  mark(`Качество ляв: ${leftQuality.score}/100 ${leftQuality.verdict}`)
+  mark(`Качество десен: ${rightQuality.score}/100 ${rightQuality.verdict}`)
+
+  const leftViews = await unwrapAnalysisFromDataUrl(leftDraw.dataUrl, geometry, 'left')
+  const strip = leftViews.readings[0].structure
+  const prompt = buildDetectionPrompt({
+    side: 'left',
+    layer: 'structure',
+    unreadableCells: strip.unreadableCells ?? [],
+    partialCells: strip.partialCells,
+    qualityScore: leftQuality.score,
+    flash: leftQuality.metrics?.pupilSpecular > 0.02,
+  })
+  mark('Единична vision заявка (structure strip)...')
+  const det0 = performance.now()
+  const detRaw = await callGemini(prompt, true, leftViews.readings[0].structure.dataUrl)
+  mark(`Vision OK за ${((performance.now() - det0) / 1000).toFixed(1)}s, ${detRaw.length} chars`)
+
+  if (full) {
+    mark('Пълен калибриран pipeline (requestDelay=0)...')
+    const pipe0 = performance.now()
+    const logs = []
+    const result = await runIrisPipeline({
+      leftIris: {
+        dataUrl: leftDraw.dataUrl,
+        side: 'left',
+        geometry,
+        quality: { verdict: leftQuality.verdict, score: leftQuality.score, issueCodes: leftQuality.issues.map(i => i.code) },
+      },
+      rightIris: {
+        dataUrl: rightDraw.dataUrl,
+        side: 'right',
+        geometry,
+        quality: { verdict: rightQuality.verdict, score: rightQuality.score, issueCodes: rightQuality.issues.map(i => i.code) },
+      },
+      questionnaire: { answers: {}, version: 'test' },
+      callLLM: (p, jsonMode, _retries, image) => callGemini(p, jsonMode, image),
+      addLog: (level, msg) => logs.push(`[${level}] ${msg}`),
+      onProgress: (step, pct) => { if (pct % 20 < 2) logs.push(`… ${step} (${Math.round(pct)}%)`) },
+      requestDelay: 0,
+    })
+    mark(`Pipeline готов за ${((performance.now() - pipe0) / 1000).toFixed(1)}s`)
+    mark(`Находки: ляв ${result.left.findings.length}, десен ${result.right.findings.length}`)
+    mark(`LLM пасове: ${result.left.passesOk + result.right.passesOk}/10`)
+    mark(`Средно качество: ${Math.round(result.imageQuality)}, покритие ${Math.round(result.stripCoverage * 100)}%`)
+    L.push('', '--- лог ---', ...logs.slice(-12))
+  } else {
+    L.push('', '(Добави &full=1 за пълен pipeline)')
+  }
+
+  window.__ok = true
+  window.__done = L.join('\n')
+  document.getElementById('out').textContent = window.__done
+} catch (e) {
+  mark(`ГРЕШКА: ${e.message}`)
+  window.__ok = false
+  window.__done = L.join('\n')
+  document.getElementById('out').textContent = window.__done
+}
+</script>
+</body>
+</html>

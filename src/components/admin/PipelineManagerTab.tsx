@@ -44,13 +44,16 @@ const GEMINI_MODELS = [
   // Псевдонимите с „-latest" не остаряват: Google ги пренасочва към текущия
   // модел. Изброените преди това пет (gemini-1.5-*, gemini-2.0-flash-exp)
   // вече не съществуват — проверено срещу API-то; всеки анализ с тях връщаше 404.
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
   'gemini-flash-latest',
   'gemini-pro-latest',
   'gemini-flash-lite-latest',
+  'gemini-3-flash-preview',
+  // gemini-2.5-* връща 404 за нови API ключове (авг. 2026)
   'gemini-2.5-flash',
   'gemini-2.5-pro',
   'gemini-2.5-flash-lite',
-  'gemini-3-flash-preview',
 ]
 
 export default function PipelineManagerTab() {

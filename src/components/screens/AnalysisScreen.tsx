@@ -70,7 +70,7 @@ export default function AnalysisScreen({
     model: 'gpt-4o',
     apiKey: '',
     useCustomKey: false,
-    requestDelay: 20000,
+    requestDelay: 2000,
     requestCount: 8,
     enableDiagnostics: true,  // Default: enable diagnostic checks
     usePipelineV9: true       // Default: use new v9 pipeline
@@ -240,7 +240,7 @@ export default function AnalysisScreen({
       model: 'gpt-4o',
       apiKey: '',
       useCustomKey: false,
-      requestDelay: 20000,
+      requestDelay: 2000,
       requestCount: 8
     }
     
@@ -254,7 +254,7 @@ export default function AnalysisScreen({
     
     const provider = finalConfig.provider
     const configuredModel = finalConfig.model
-    const requestDelay = Math.max(finalConfig.requestDelay ?? 20000, 15000)
+    const requestDelay = finalConfig.requestDelay ?? 2000
     const apiKey = finalConfig.apiKey || ''
     
     if (!apiKey || apiKey.trim() === '') {
@@ -947,14 +947,14 @@ ${response}
         model: 'gpt-4o',
         apiKey: '',
         useCustomKey: false,
-        requestDelay: 20000,
+        requestDelay: 2000,
         requestCount: 8,
         usePipelineV9: true
       }
       
       const provider = finalConfig.provider
       const configuredModel = finalConfig.model
-      const requestDelay = Math.max(finalConfig.requestDelay ?? 20000, 15000)
+      const requestDelay = finalConfig.requestDelay ?? 2000
       const requestCount = finalConfig.requestCount || 8
       const apiKey = finalConfig.apiKey || ''
       const usePipelineV9 = finalConfig.usePipelineV9 ?? true
@@ -988,7 +988,7 @@ ${response}
       const useCalibrated = finalConfig.useCalibratedPipeline ?? true
       if (useCalibrated) {
         try {
-          const calibratedReport = await runCalibratedAnalysis(requestDelay)
+          const calibratedReport = await runCalibratedAnalysis(0)
           if (calibratedReport) {
             setAnalysisRunning(false)
             setTimeout(() => onComplete(calibratedReport), 800)
@@ -2548,7 +2548,7 @@ JSON формат:
                   </div>
                   <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      ℹ️ Процесът с вашия {loadedConfig?.provider === 'gemini' ? 'Gemini' : 'OpenAI'} API ключ отнема 1-2 минути.
+                      ℹ️ Калибрираният анализ прави ~10 заявки към модела (паралелно, без изкуствени паузи) — обикновено 1–3 минути.
                     </p>
                   </div>
                 </div>

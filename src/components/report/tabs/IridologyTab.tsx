@@ -15,6 +15,7 @@ import type { AnalysisReport } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
 import UnwrappedIrisMap from '@/components/iris/UnwrappedIrisMap'
 import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
+import CalibratedIrisEyes from '@/components/report/CalibratedIrisEyes'
 import {
   Collapsible,
   CollapsibleContent,
@@ -84,11 +85,14 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.04 }}
+          className="space-y-4"
         >
+          <CalibratedIrisEyes report={report} />
           <CalibratedInsightPanel data={report.calibrated} />
         </motion.div>
       )}
 
+      {!report.calibrated && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -120,7 +124,9 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           </div>
         </Card>
       </motion.div>
+      )}
 
+      {!report.calibrated && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -166,7 +172,8 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           </div>
         </Card>
       </motion.div>
-      
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -175,19 +182,27 @@ export default function IridologyTab({ report }: IridologyTabProps) {
         <Card className="p-6">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-primary">
             <Eye size={20} weight="duotone" />
-            Интерактивна Топографска Карта
+            {report.calibrated ? 'Интерактивна карта на зоните' : 'Интерактивна Топографска Карта'}
           </h3>
+          {report.calibrated && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Кликнете върху оцветен сектор, за да видите находките. Картата е върху вашата снимка —
+              не е разгънат технически изглед.
+            </p>
+          )}
           <DualIrisTopographicMap
             leftIris={report.leftIris}
             rightIris={report.rightIris}
             leftImageUrl={report.leftIrisImage.dataUrl}
             rightImageUrl={report.rightIrisImage.dataUrl}
+            leftGeometry={report.leftIrisImage?.geometry}
+            rightGeometry={report.rightIrisImage?.geometry}
           />
         </Card>
       </motion.div>
 
-      {/* Unwrapped coordinate-system maps (minute × ring) */}
-      {(report.leftIris.zones?.some(z => z.minute_start !== undefined) ||
+      {/* Разгънатата лента е само за наследения анализ — клиентът вижда зоните върху снимката. */}
+      {!report.calibrated && (report.leftIris.zones?.some(z => z.minute_start !== undefined) ||
         report.rightIris.zones?.some(z => z.minute_start !== undefined) ||
         report.leftIrisMaps || report.rightIrisMaps) && (
         <motion.div
