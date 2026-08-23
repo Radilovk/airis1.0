@@ -18,6 +18,7 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import SystemScoresChart from '../SystemScoresChart'
+import { summarizeCalibratedReport } from '@/lib/calibrated-report-summary'
 import {
   Collapsible,
   CollapsibleContent,
@@ -511,7 +512,12 @@ function getSupportingFactors(report: AnalysisReport): string[] {
   const concernZones = report.leftIris.zones.filter(z => z.status === 'concern').length + 
                        report.rightIris.zones.filter(z => z.status === 'concern').length
   
-  if (concernZones === 0 && avgHealth >= 75) {
+  if (report.calibrated) {
+    const s = summarizeCalibratedReport(report.calibrated, { avgHealth })
+    if (s.verdict === 'stable' && s.planRelevant <= 2) {
+      factors.push('Ирисовите находки са малко на брой и не променят основния извод')
+    }
+  } else if (concernZones === 0 && avgHealth >= 75) {
     factors.push('Отсъствие на притеснителни зони в ириса')
   }
 
@@ -591,7 +597,12 @@ function getLimitingFactors(report: AnalysisReport): string[] {
 
   const attentionZones = leftZones.filter(z => z?.status === 'attention').length + 
                          rightZones.filter(z => z?.status === 'attention').length
-  if (attentionZones > 5) {
+  if (report.calibrated) {
+    const s = summarizeCalibratedReport(report.calibrated)
+    if (s.planRelevant >= 4) {
+      factors.push(`${s.planRelevant} ясни ирисови акцента насочват допълнителна подкрепа в плана`)
+    }
+  } else if (attentionZones > 5) {
     factors.push(`${attentionZones} зони изискващи внимание според иридологичния анализ`)
   }
 

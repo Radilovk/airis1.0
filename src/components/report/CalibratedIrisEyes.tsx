@@ -5,6 +5,7 @@ import { Eye } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
 import { cellCenterInView, sectorRingWedgePath } from '@/lib/iris-coords'
 import { sectorsFor } from '@/lib/iris-map'
+import { isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
 
 const VIEW = 320
@@ -27,7 +28,8 @@ function IrisEyePanel({
   findings: CalibratedAnalysisPayload['findings']
 }) {
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
-  const eyeFindings = findings.filter(f => f.side === side)
+  const allFindings = findings.filter(f => f.side === side)
+  const eyeFindings = allFindings.filter(isPlanRelevantFinding)
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
 
   const overlay = useMemo(() => {
@@ -46,7 +48,10 @@ function IrisEyePanel({
         <Eye size={18} weight="duotone" className="text-primary" />
         <h4 className="font-semibold">{sideLabel} ирис</h4>
         <Badge variant="outline" className="text-[10px]">
-          {eyeFindings.length} находки
+          {eyeFindings.length} за плана
+          {allFindings.length > eyeFindings.length
+            ? ` · ${allFindings.length} прегледани`
+            : ''}
         </Badge>
       </div>
 
@@ -105,7 +110,11 @@ function IrisEyePanel({
 
       <ul className="space-y-1.5 text-sm">
         {eyeFindings.length === 0 ? (
-          <li className="text-muted-foreground">Няма приети находки за това око.</li>
+          <li className="text-muted-foreground">
+            {allFindings.length > 0
+              ? `${allFindings.length} прегледани точки — нито една не е достатъчно ясна, за да промени плана.`
+              : 'Няма открити ирисови акценти за това око.'}
+          </li>
         ) : (
           eyeFindings.slice(0, 10).map((f, i) => {
             const sector = sectorsFor(side)[f.sector - 1]
@@ -141,11 +150,10 @@ export default function CalibratedIrisEyes({ report }: { report: AnalysisReport 
 
   return (
     <Card className="p-5 md:p-6">
-      <h3 className="mb-1 text-lg font-bold">Вашите ириси — зоните с находки</h3>
+      <h3 className="mb-1 text-lg font-bold">Къде на снимката са акцентите</h3>
       <p className="mb-5 text-sm text-muted-foreground">
-        Оцветените сектори показват къде на <strong>вашата снимка</strong> са открити признаци.
-        Червените маркери сочат точната клетка (сектор S1–S12, пръстен R0–R11).
-        Отблясъкът от светкавицата в зеницата не се брои като находка.
+        Показваме само зоните, които реално влияят на препоръките. Останалите микро-точки
+        са прегледани, но не означават проблем сами по себе си.
       </p>
       <div className="grid gap-8 md:grid-cols-2">
         <IrisEyePanel
