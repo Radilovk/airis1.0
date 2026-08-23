@@ -8,6 +8,8 @@ interface Props {
   data: CalibratedAnalysisPayload
   avgHealth: number
   briefSummary?: string
+  /** По-малко числа — за клиентския изглед. */
+  compact?: boolean
 }
 
 const VERDICT_STYLE = {
@@ -29,40 +31,51 @@ const VERDICT_STYLE = {
 } as const
 
 /** Единен водещ блок — какво означава анализът за клиента. */
-export default function CalibratedReportSummary({ data, avgHealth, briefSummary }: Props) {
+export default function CalibratedReportSummary({ data, avgHealth, briefSummary, compact }: Props) {
   const summary = summarizeCalibratedReport(data, { briefSummary, avgHealth })
   const style = VERDICT_STYLE[summary.verdict]
   const Icon = style.icon
 
   return (
     <Card className={`overflow-hidden border-0 bg-gradient-to-br ${style.ring} p-5 md:p-6`}>
-      <div className="flex flex-wrap items-start gap-3 mb-4">
+      <div className="flex flex-wrap items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-background/80 shadow-sm">
           <Icon size={24} weight="duotone" className="text-primary" />
         </div>
         <div className="min-w-0 flex-1">
-          <Badge variant="outline" className={`mb-2 text-[10px] ${style.badge}`}>
-            Обобщение на анализа
-          </Badge>
+          {!compact && (
+            <Badge variant="outline" className={`mb-2 text-[10px] ${style.badge}`}>
+              Обобщение на анализа
+            </Badge>
+          )}
           <h3 className="text-lg font-bold leading-tight">{summary.headline}</h3>
           <p className="mt-2 text-sm leading-relaxed text-foreground/90">{summary.lead}</p>
         </div>
-        <div className="text-right">
-          <p className="text-3xl font-bold tabular-nums text-primary">{avgHealth}</p>
-          <p className="text-[11px] text-muted-foreground">общ резултат</p>
-        </div>
+        {!compact && (
+          <div className="text-right">
+            <p className="text-3xl font-bold tabular-nums text-primary">{avgHealth}</p>
+            <p className="text-[11px] text-muted-foreground">общ резултат</p>
+          </div>
+        )}
       </div>
 
-      <p className="mb-4 rounded-lg border bg-background/60 px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
-        {summary.explanation}
-      </p>
+      {!compact && (
+        <>
+          <p className="mt-4 rounded-lg border bg-background/60 px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
+            {summary.explanation}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Прегледани точки" value={String(summary.totalDetected)} hint="микро-зони" />
+            <Stat label="За плана" value={String(summary.planRelevant)} hint="значими" />
+            <Stat label="Потвърдени" value={String(summary.confirmed)} hint="два прочита" />
+            <Stat label="Сектори" value={String(summary.sectorsAffected)} hint="с акцент" />
+          </div>
+        </>
+      )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Прегледани точки" value={String(summary.totalDetected)} hint="микро-зони в ириса" />
-        <Stat label="За плана" value={String(summary.planRelevant)} hint="достатъчно ясни" />
-        <Stat label="Потвърдени" value={String(summary.confirmed)} hint="два независими прочита" />
-        <Stat label="Сектори" value={String(summary.sectorsAffected)} hint="с акцент" />
-      </div>
+      {compact && (
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{summary.explanation}</p>
+      )}
     </Card>
   )
 }

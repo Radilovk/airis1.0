@@ -81,7 +81,59 @@ export function summarizeCalibratedReport(
   return { totalDetected, confirmed, planRelevant, sectorsAffected, verdict, headline, explanation, lead }
 }
 
-/** Брой зони за история / карти — само значими, не всички микро-находки. */
+export interface ClientInsight {
+  title: string
+  body: string
+  source: 'iris' | 'questionnaire' | 'both'
+}
+
+/** До 3–5 извода на прост език — KISS принципът от консултациите по иридология. */
+export function getTopClientInsights(
+  data: CalibratedAnalysisPayload,
+  limit = 3
+): ClientInsight[] {
+  const out: ClientInsight[] = []
+
+  for (const d of data.drivers.slice(0, limit)) {
+    out.push({
+      title: d.observation,
+      body: d.action,
+      source: d.source,
+    })
+    if (out.length >= limit) return out
+  }
+
+  const topFindings = data.findings
+    .filter(isPlanRelevantFinding)
+    .sort(
+      (a, b) =>
+        (b.confirmations ?? 0) - (a.confirmations ?? 0) ||
+        b.confidence - a.confidence
+    )
+
+  for (const f of topFindings) {
+    if (out.length >= limit) break
+    if (out.some(i => i.title.includes(f.label))) continue
+    out.push({
+      title: f.label,
+      body: `${f.side === 'left' ? 'Ляв' : 'Десен'} ирис · потвърдено ${
+        (f.confirmations ?? 1) >= 2 ? 'два пъти' : 'веднъж'
+      }`,
+      source: 'iris',
+    })
+  }
+
+  return out.slice(0, limit)
+}
+
+/** Трите водещи системи за компактен изглед. */
+export function topPrioritySystems(data: CalibratedAnalysisPayload) {
+  const ordered = data.focus
+    .map(key => data.systems.find(s => s.key === key))
+    .filter(Boolean) as CalibratedAnalysisPayload['systems']
+  return ordered.slice(0, 3)
+}
+
 export function significantZoneCount(report: {
   calibrated?: CalibratedAnalysisPayload
   leftIris?: { zones?: Array<{ status?: string }> }

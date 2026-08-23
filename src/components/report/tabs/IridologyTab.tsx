@@ -14,9 +14,7 @@ import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
 import UnwrappedIrisMap from '@/components/iris/UnwrappedIrisMap'
-import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
-import CalibratedIrisEyes from '@/components/report/CalibratedIrisEyes'
-import CalibratedReportSummary from '@/components/report/CalibratedReportSummary'
+import CalibratedClientReport from '@/components/report/CalibratedClientReport'
 import {
   Collapsible,
   CollapsibleContent,
@@ -26,11 +24,11 @@ import { useState } from 'react'
 
 interface IridologyTabProps {
   report: AnalysisReport
+  onOpenPlan?: () => void
 }
 
-export default function IridologyTab({ report }: IridologyTabProps) {
+export default function IridologyTab({ report, onOpenPlan }: IridologyTabProps) {
   const [expandedAnalysis, setExpandedAnalysis] = useState(false)
-  const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   
   const getStatusBadge = (status: 'normal' | 'attention' | 'concern') => {
     const variants = {
@@ -63,6 +61,11 @@ export default function IridologyTab({ report }: IridologyTabProps) {
 
   return (
     <div className="space-y-4">
+      {report.calibrated && (
+        <CalibratedClientReport report={report} onOpenPlan={onOpenPlan} />
+      )}
+
+      {!report.calibrated && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -79,24 +82,6 @@ export default function IridologyTab({ report }: IridologyTabProps) {
           </h2>
         </Card>
       </motion.div>
-
-      {/* Новият калибриран анализ. Показва се само когато отчетът е направен с
-          него — старите отчети продължават да се визуализират по стария начин. */}
-      {report.calibrated && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.04 }}
-          className="space-y-4"
-        >
-          <CalibratedReportSummary
-            data={report.calibrated}
-            avgHealth={avgHealth}
-            briefSummary={report.briefSummary}
-          />
-          <CalibratedIrisEyes report={report} />
-          <CalibratedInsightPanel data={report.calibrated} />
-        </motion.div>
       )}
 
       {!report.calibrated && (

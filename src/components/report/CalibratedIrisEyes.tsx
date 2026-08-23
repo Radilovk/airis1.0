@@ -21,15 +21,17 @@ function IrisEyePanel({
   dataUrl,
   geometry,
   findings,
+  maxPerEye = 8,
 }: {
   side: 'left' | 'right'
   dataUrl: string
   geometry?: IrisGeometrySnapshot
   findings: CalibratedAnalysisPayload['findings']
+  maxPerEye?: number
 }) {
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
   const allFindings = findings.filter(f => f.side === side)
-  const eyeFindings = allFindings.filter(isPlanRelevantFinding)
+  const eyeFindings = allFindings.filter(isPlanRelevantFinding).slice(0, maxPerEye)
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
 
   const overlay = useMemo(() => {
@@ -116,7 +118,7 @@ function IrisEyePanel({
               : 'Няма открити ирисови акценти за това око.'}
           </li>
         ) : (
-          eyeFindings.slice(0, 10).map((f, i) => {
+          eyeFindings.slice(0, maxPerEye).map((f, i) => {
             const sector = sectorsFor(side)[f.sector - 1]
             return (
               <li
@@ -143,8 +145,14 @@ function IrisEyePanel({
   )
 }
 
-/** Двете очи с маркирани зони върху реалната снимка — основният изглед за клиента. */
-export default function CalibratedIrisEyes({ report }: { report: AnalysisReport }) {
+/** Двете очи с маркирани зони върху реалната снимка. */
+export default function CalibratedIrisEyes({
+  report,
+  maxPerEye = 8,
+}: {
+  report: AnalysisReport
+  maxPerEye?: number
+}) {
   const cal = report.calibrated
   if (!cal) return null
 
@@ -161,12 +169,14 @@ export default function CalibratedIrisEyes({ report }: { report: AnalysisReport 
           dataUrl={report.leftIrisImage?.dataUrl ?? ''}
           geometry={report.leftIrisImage?.geometry}
           findings={cal.findings}
+          maxPerEye={maxPerEye}
         />
         <IrisEyePanel
           side="right"
           dataUrl={report.rightIrisImage?.dataUrl ?? ''}
           geometry={report.rightIrisImage?.geometry}
           findings={cal.findings}
+          maxPerEye={maxPerEye}
         />
       </div>
     </Card>
