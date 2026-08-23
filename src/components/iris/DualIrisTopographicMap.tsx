@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { IrisAnalysis, IrisZone } from '@/types'
+import type { IrisAnalysis, IrisGeometrySnapshot, IrisZone } from '@/types'
+import { fitImageInSquare } from '@/lib/image-utils'
 import { Eye } from '@phosphor-icons/react'
 
 interface DualIrisTopographicMapProps {
@@ -10,13 +11,17 @@ interface DualIrisTopographicMapProps {
   rightIris: IrisAnalysis
   leftImageUrl: string
   rightImageUrl: string
+  leftGeometry?: IrisGeometrySnapshot
+  rightGeometry?: IrisGeometrySnapshot
 }
 
 export default function DualIrisTopographicMap({
   leftIris,
   rightIris,
   leftImageUrl,
-  rightImageUrl
+  rightImageUrl,
+  leftGeometry,
+  rightGeometry,
 }: DualIrisTopographicMapProps) {
   const [hoveredZone, setHoveredZone] = useState<{ zone: IrisZone; side: 'left' | 'right' } | null>(null)
   const [selectedZone, setSelectedZone] = useState<{ zone: IrisZone; side: 'left' | 'right' } | null>(null)
@@ -93,13 +98,14 @@ export default function DualIrisTopographicMap({
     const anglePerZone = 360 / 12
 
     for (let i = 0; i < 12; i++) {
-      const existingZone = zones[i] || zones[0]
-      const startAngle = i * anglePerZone - 90
-      const endAngle = (i + 1) * anglePerZone - 90
+      const existingZone = zones.find(z => z.id === i + 1) ?? zones[i]
+      const hasAngles = existingZone?.angle && existingZone.angle.length === 2
+      const startAngle = hasAngles ? existingZone.angle[0] - 90 : i * anglePerZone - 90
+      const endAngle = hasAngles ? existingZone.angle[1] - 90 : (i + 1) * anglePerZone - 90
       const newZone: IrisZone = {
-        ...existingZone,
+        ...(existingZone ?? { id: i + 1, name: '', organ: '', status: 'normal', findings: '' }),
         id: i + 1,
-        angle: [startAngle, endAngle] as [number, number]
+        angle: [startAngle, endAngle] as [number, number],
       }
       normalized.push(newZone)
     }
@@ -111,22 +117,32 @@ export default function DualIrisTopographicMap({
     imageUrl: string,
     zones: IrisZone[],
     side: 'left' | 'right',
-    analysis: IrisAnalysis
+    analysis: IrisAnalysis,
+    geometry?: IrisGeometrySnapshot
   ) => {
     const normalizedZones = normalizeZones(zones)
     const size = 320
-    const radius = size / 2
-    const centerX = radius
-    const centerY = radius
-    const irisRadius = radius * 0.85
-    
-    const pupilRadius = irisRadius * 0.25
-    const innerRingStart = pupilRadius
+    let centerX: number
+    let centerY: number
+    let pupilRadius: number
+    let irisRadius: number
+    if (geometry?.imageWidth && geometry.imageHeight) {
+      const fit = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, size)
+      centerX = geometry.limbus.cx * fit.scale + fit.offsetX
+      centerY = geometry.limbus.cy * fit.scale + fit.offsetY
+      pupilRadius = geometry.pupil.r * fit.scale
+      irisRadius = geometry.limbus.r * fit.scale
+    } else {
+      const radius = size / 2
+      centerX = radius
+      centerY = radius
+      irisRadius = radius * 0.85
+      pupilRadius = irisRadius * 0.25
+    }
     const innerRingEnd = irisRadius * 0.33
-    const middleRingStart = innerRingEnd
     const middleRingEnd = irisRadius * 0.83
+    const middleRingStart = innerRingEnd
     const outerRingStart = middleRingEnd
-    const outerRingEnd = irisRadius
 
     return (
       <div className="relative flex-1 min-w-0">
@@ -135,7 +151,7 @@ export default function DualIrisTopographicMap({
             <img
               src={imageUrl}
               alt={`${side === 'left' ? 'Ляв' : 'Десен'} ирис`}
-              className="absolute inset-0 w-full h-full object-cover rounded-xl"
+              className="absolute inset-0 w-full h-full object-contain rounded-xl"
             />
           )}
           
@@ -330,8 +346,8 @@ export default function DualIrisTopographicMap({
 
       <div className="p-6 space-y-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {renderIris(leftImageUrl, leftIris.zones || [], 'left', leftIris)}
-          {renderIris(rightImageUrl, rightIris.zones || [], 'right', rightIris)}
+          {renderIris(leftImageUrl, leftIris.zones || [], 'left', leftIris, leftGeometry)}
+          {renderIris(rightImageUrl, rightIris.zones || [], 'right', rightIris, rightGeometry)}
         </div>
 
         <div className="border-t pt-6">

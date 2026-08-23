@@ -17,14 +17,52 @@ async function runPage(page, url, label) {
   return ok
 }
 
+async function runFlashEyeTest(page) {
+  console.log('\n=== Flash eye fixture (realistic upload) ===')
+  await page.goto(`${base}/__real-eye-test.html`, { waitUntil: 'networkidle', timeout: 120000 })
+  await page.evaluate(async () => {
+    const { drawFlashEyeFixture } = await import('/src/lib/flash-eye-fixture.ts')
+    const eye = drawFlashEyeFixture()
+    window.__flashDataUrl = eye.dataUrl
+  })
+  await page.evaluate(async () => {
+    const img = window.__flashDataUrl
+    const { detectIrisGeometry, concentricGeometry } = await import('/src/lib/iris-geometry.ts')
+    const { analyseIrisQualityFromDataUrl } = await import('/src/lib/iris-quality.ts')
+    const { unwrapAnalysisFromDataUrl } = await import('/src/lib/iris-unwrap.ts')
+    const L = []
+    const el = document.createElement('img')
+    el.src = img
+    await new Promise(r => { el.onload = r })
+    let geo = concentricGeometry(detectIrisGeometry(el))
+    const q = await analyseIrisQualityFromDataUrl(img, { geometry: geo, manualGeometry: true })
+    const views = await unwrapAnalysisFromDataUrl(img, geo, 'left')
+    const strip = views.readings[0].structure
+    const s = document.createElement('img')
+    s.src = strip.dataUrl
+    await new Promise(r => { s.onload = r })
+    L.push(`Flash eye: ${el.naturalWidth}×${el.naturalHeight}`)
+    L.push(`Quality: ${q.score}/100 ${q.verdict}, flash glare ${(q.metrics.pupilSpecular * 100).toFixed(1)}%`)
+    L.push(`AI strip: ${s.naturalWidth}×${s.naturalHeight}, coverage ${Math.round(strip.coverage * 100)}%`)
+    window.__done = L.join('\n')
+    window.__ok = q.verdict !== 'reject' && s.naturalWidth >= 1600
+  })
+  const text = await page.evaluate(() => window.__done)
+  const ok = await page.evaluate(() => window.__ok)
+  console.log(text)
+  console.log(`RESULT: ${ok ? 'PASS' : 'FAIL'}`)
+  return ok
+}
+
 const browser = await chromium.launch({ headless: true })
 const page = await browser.newPage()
 
 let allOk = true
 allOk = (await runPage(page, `${base}/__truth.html`, 'Coordinate truth')) && allOk
+allOk = (await runFlashEyeTest(page)) && allOk
 
 if (apiKey) {
-  const q = new URLSearchParams({ key: apiKey, model })
+  const q = new URLSearchParams({ key: apiKey, model, flash: '1' })
   if (full) q.set('full', '1')
   allOk = (await runPage(page, `${base}/__gemini-live.html?${q}`, 'Gemini live')) && allOk
 } else {

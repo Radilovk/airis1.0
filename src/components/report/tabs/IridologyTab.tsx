@@ -182,19 +182,27 @@ export default function IridologyTab({ report }: IridologyTabProps) {
         <Card className="p-6">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-primary">
             <Eye size={20} weight="duotone" />
-            Интерактивна Топографска Карта
+            {report.calibrated ? 'Интерактивна карта на зоните' : 'Интерактивна Топографска Карта'}
           </h3>
+          {report.calibrated && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Кликнете върху оцветен сектор, за да видите находките. Картата е върху вашата снимка —
+              не е разгънат технически изглед.
+            </p>
+          )}
           <DualIrisTopographicMap
             leftIris={report.leftIris}
             rightIris={report.rightIris}
             leftImageUrl={report.leftIrisImage.dataUrl}
             rightImageUrl={report.rightIrisImage.dataUrl}
+            leftGeometry={report.leftIrisImage?.geometry}
+            rightGeometry={report.rightIrisImage?.geometry}
           />
         </Card>
       </motion.div>
 
-      {/* Unwrapped coordinate-system maps (minute × ring) */}
-      {(report.leftIris.zones?.some(z => z.minute_start !== undefined) ||
+      {/* Разгънатата лента е само за наследения анализ — клиентът вижда зоните върху снимката. */}
+      {!report.calibrated && (report.leftIris.zones?.some(z => z.minute_start !== undefined) ||
         report.rightIris.zones?.some(z => z.minute_start !== undefined) ||
         report.leftIrisMaps || report.rightIrisMaps) && (
         <motion.div

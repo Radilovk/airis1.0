@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Real flash eye test</title>
+  <style>
+    body { background:#0b0b0e; color:#ddd; font:13px/1.5 ui-monospace,monospace; padding:16px; max-width:1200px; margin:0 auto }
+    pre { white-space:pre-wrap }
+    .row { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start }
+    img { max-width:100%; border-radius:8px; background:#111 }
+    .panel { flex:1; min-width:280px }
+    input[type=file] { margin:12px 0 }
+  </style>
+</head>
+<body>
+<h2>Тест с реална снимка (светкавица)</h2>
+<input type="file" id="file" accept="image/*" />
+<pre id="out">Изберете снимка или добавете ?img=/test-fixtures/flash-eye-sample.jpg</pre>
+<div class="row">
+  <div class="panel"><h3>Оригинал + зони</h3><canvas id="photo"></canvas></div>
+  <div class="panel"><h3>Лента за AI (пълен размер)</h3><img id="strip" alt="strip" /></div>
+</div>
+<script type="module">
+import { detectIrisGeometry, concentricGeometry } from '/src/lib/iris-geometry.ts'
+import { analyseIrisQualityFromDataUrl } from '/src/lib/iris-quality.ts'
+import { unwrapAnalysisFromDataUrl } from '/src/lib/iris-unwrap.ts'
+import { cellCenterInImage } from '/src/lib/iris-coords.ts'
+
+const out = document.getElementById('out')
+const L = []
+const log = (m) => { L.push(m); out.textContent = L.join('\n') }
+
+async function loadImage(src) {
+  const img = new Image()
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src })
+  return img
+}
+
+async function run(dataUrl) {
+  L.length = 0
+  const img = await loadImage(dataUrl)
+  log(`Снимка: ${img.naturalWidth}×${img.naturalHeight} px`)
+
+  let geo = detectIrisGeometry(img)
+  geo = concentricGeometry(geo)
+  log(`Геометрия: зеница r=${Math.round(geo.pupil.r)}, лимбус r=${Math.round(geo.limbus.r)}`)
+  log(`Център: (${Math.round(geo.limbus.cx)}, ${Math.round(geo.limbus.cy)})`)
+
+  const quality = await analyseIrisQualityFromDataUrl(dataUrl, { geometry: geo, manualGeometry: true })
+  log(`Качество: ${quality.score}/100 → ${quality.verdict}`)
+  log(`Светкавица в зеница: ${(quality.metrics.pupilSpecular * 100).toFixed(2)}%`)
+  log(`Проблеми: ${quality.issues.map(i => i.code).join(', ') || 'няма'}`)
+
+  const side = 'left'
+  const views = await unwrapAnalysisFromDataUrl(dataUrl, geo, side)
+  const strip = views.readings[0].structure
+  const stripImg = await loadImage(strip.dataUrl)
+  log(`\nЛЕНТА ЗА AI (structure): ${stripImg.naturalWidth}×${stripImg.naturalHeight} px`)
+  log(`Покритие: ${Math.round(strip.coverage * 100)}%, нечетими: ${strip.unreadableCells.length}/144`)
+  document.getElementById('strip').src = strip.dataUrl
+
+  const c = document.getElementById('photo')
+  const maxW = 480
+  const scale = Math.min(1, maxW / img.naturalWidth)
+  c.width = Math.round(img.naturalWidth * scale)
+  c.height = Math.round(img.naturalHeight * scale)
+  const x = c.getContext('2d')
+  x.drawImage(img, 0, 0, c.width, c.height)
+
+  x.strokeStyle = '#fbbf24'; x.lineWidth = 2
+  x.beginPath()
+  x.arc(geo.limbus.cx * scale, geo.limbus.cy * scale, geo.limbus.r * scale, 0, 7)
+  x.stroke()
+  x.strokeStyle = '#38bdf8'
+  x.beginPath()
+  x.arc(geo.pupil.cx * scale, geo.pupil.cy * scale, geo.pupil.r * scale, 0, 7)
+  x.stroke()
+
+  for (let s = 1; s <= 12; s++) {
+    const pt = cellCenterInImage(s, 5, geo)
+    x.fillStyle = 'rgba(239,68,68,0.7)'
+    x.beginPath()
+    x.arc(pt.x * scale, pt.y * scale, 4, 0, 7)
+    x.fill()
+  }
+
+  log('\n✓ Лентата се изпраща на модела на ПЪЛНА резолюция (~1670×980).')
+  log('✓ Клиентът вижда зоните върху оригиналната снимка, не разгънатата лента.')
+  window.__done = L.join('\n')
+  window.__ok = quality.verdict !== 'reject'
+}
+
+document.getElementById('file').addEventListener('change', async (e) => {
+  const f = e.target.files?.[0]
+  if (!f) return
+  const r = new FileReader()
+  r.onload = () => run(r.result)
+  r.readAsDataURL(f)
+})
+
+const q = new URLSearchParams(location.search).get('img')
+if (q) run(q)
+</script>
+</body>
+</html>

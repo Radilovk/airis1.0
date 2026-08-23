@@ -7,16 +7,18 @@
 <body style="background:#0b0b0e;color:#ddd;font:13px/1.6 ui-monospace,monospace;padding:16px">
 <pre id="out">работи…</pre>
 <script type="module">
-import { detectIrisGeometry } from '/src/lib/iris-geometry.ts'
+import { detectIrisGeometry, concentricGeometry } from '/src/lib/iris-geometry.ts'
 import { analyseIrisQualityFromDataUrl } from '/src/lib/iris-quality.ts'
 import { unwrapAnalysisFromDataUrl } from '/src/lib/iris-unwrap.ts'
 import { runIrisPipeline } from '/src/lib/iris-pipeline.ts'
 import { buildDetectionPrompt } from '/src/lib/analysis-prompts.ts'
+import { drawFlashEyeFixture } from '/src/lib/flash-eye-fixture.ts'
 
 const params = new URLSearchParams(location.search)
 const apiKey = params.get('key') || ''
 const model = params.get('model') || 'gemini-3.6-flash'
 const full = params.get('full') === '1'
+const useFlash = params.get('flash') === '1'
 
 const L = []
 const t0 = performance.now()
@@ -69,24 +71,37 @@ async function callGemini(prompt, jsonMode, imageDataUrl) {
 try {
   if (!apiKey) throw new Error('Липсва ?key= в URL')
 
-  mark(`Модел: ${model}`)
+  mark(`Модел: ${model}${useFlash ? ' · flash-eye fixture' : ''}`)
   const ping = await callGemini('Отговори с една дума: OK', false)
   mark(`Ping: ${ping.trim().slice(0, 40)}`)
 
-  const RP = 130, RI = 430
-  const leftDraw = drawIris(RP, RI)
-  const rightDraw = drawIris(RP, RI)
-  const geo = detectIrisGeometry(document.createElement('canvas'))
-  void geo
-
-  const geometry = {
-    pupil: { cx: leftDraw.CX, cy: leftDraw.CY, r: RP },
-    limbus: { cx: leftDraw.CX, cy: leftDraw.CY, r: RI },
-    imageWidth: leftDraw.SIZE,
-    imageHeight: leftDraw.SIZE,
-    pupilConfidence: 1,
-    limbusConfidence: 1,
-    manual: true,
+  let leftDraw, rightDraw, geometry
+  if (useFlash) {
+    const eye = drawFlashEyeFixture()
+    leftDraw = { dataUrl: eye.dataUrl, SIZE: eye.width, CX: eye.cx, CY: eye.cy, rp: eye.rp, ri: eye.ri }
+    rightDraw = { ...leftDraw }
+    geometry = {
+      pupil: { cx: eye.cx, cy: eye.cy, r: eye.rp },
+      limbus: { cx: eye.cx, cy: eye.cy, r: eye.ri },
+      imageWidth: eye.width,
+      imageHeight: eye.height,
+      pupilConfidence: 1,
+      limbusConfidence: 1,
+      manual: true,
+    }
+  } else {
+    const RP = 130, RI = 430
+    leftDraw = drawIris(RP, RI)
+    rightDraw = drawIris(RP, RI)
+    geometry = {
+      pupil: { cx: leftDraw.CX, cy: leftDraw.CY, r: RP },
+      limbus: { cx: leftDraw.CX, cy: leftDraw.CY, r: RI },
+      imageWidth: leftDraw.SIZE,
+      imageHeight: leftDraw.SIZE,
+      pupilConfidence: 1,
+      limbusConfidence: 1,
+      manual: true,
+    }
   }
 
   const leftQuality = await analyseIrisQualityFromDataUrl(leftDraw.dataUrl, { geometry, manualGeometry: true })
