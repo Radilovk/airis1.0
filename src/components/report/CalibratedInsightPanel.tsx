@@ -107,7 +107,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
             ))}
           </div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Планът по-долу вече е съобразен с горното — някои общи препоръки са
+            Планът в таб „План“ е съобразен с горното — някои общи препоръки са
             заменени или пропуснати нарочно.
           </p>
         </div>

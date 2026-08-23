@@ -14,7 +14,6 @@ import { motion } from 'framer-motion'
 import type { AnalysisReport } from '@/types'
 import DualIrisTopographicMap from '@/components/iris/DualIrisTopographicMap'
 import UnwrappedIrisMap from '@/components/iris/UnwrappedIrisMap'
-import CalibratedClientReport from '@/components/report/CalibratedClientReport'
 import {
   Collapsible,
   CollapsibleContent,
@@ -24,10 +23,9 @@ import { useState } from 'react'
 
 interface IridologyTabProps {
   report: AnalysisReport
-  onOpenPlan?: () => void
 }
 
-export default function IridologyTab({ report, onOpenPlan }: IridologyTabProps) {
+export default function IridologyTab({ report }: IridologyTabProps) {
   const [expandedAnalysis, setExpandedAnalysis] = useState(false)
   
   const getStatusBadge = (status: 'normal' | 'attention' | 'concern') => {
@@ -61,10 +59,6 @@ export default function IridologyTab({ report, onOpenPlan }: IridologyTabProps) 
 
   return (
     <div className="space-y-4">
-      {report.calibrated && (
-        <CalibratedClientReport report={report} onOpenPlan={onOpenPlan} />
-      )}
-
       {!report.calibrated && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}

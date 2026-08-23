@@ -21,17 +21,19 @@ function IrisEyePanel({
   dataUrl,
   geometry,
   findings,
-  maxPerEye = 8,
+  maxPerEye,
 }: {
   side: 'left' | 'right'
   dataUrl: string
   geometry?: IrisGeometrySnapshot
   findings: CalibratedAnalysisPayload['findings']
+  /** Ако е зададено — ограничава броя маркери; по подразбиране — всички значими. */
   maxPerEye?: number
 }) {
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
   const allFindings = findings.filter(f => f.side === side)
-  const eyeFindings = allFindings.filter(isPlanRelevantFinding).slice(0, maxPerEye)
+  const relevant = allFindings.filter(isPlanRelevantFinding)
+  const eyeFindings = maxPerEye != null ? relevant.slice(0, maxPerEye) : relevant
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
 
   const overlay = useMemo(() => {
@@ -118,7 +120,7 @@ function IrisEyePanel({
               : 'Няма открити ирисови акценти за това око.'}
           </li>
         ) : (
-          eyeFindings.slice(0, maxPerEye).map((f, i) => {
+          eyeFindings.map((f, i) => {
             const sector = sectorsFor(side)[f.sector - 1]
             return (
               <li
@@ -148,7 +150,7 @@ function IrisEyePanel({
 /** Двете очи с маркирани зони върху реалната снимка. */
 export default function CalibratedIrisEyes({
   report,
-  maxPerEye = 8,
+  maxPerEye,
 }: {
   report: AnalysisReport
   maxPerEye?: number
@@ -160,8 +162,8 @@ export default function CalibratedIrisEyes({
     <Card className="p-5 md:p-6">
       <h3 className="mb-1 text-lg font-bold">Къде на снимката са акцентите</h3>
       <p className="mb-5 text-sm text-muted-foreground">
-        Показваме само зоните, които реално влияят на препоръките. Останалите микро-точки
-        са прегледани, но не означават проблем сами по себе си.
+        Всяка маркирана зона е достатъчно ясна, за да повлияе на препоръките. Цветът показва
+        сигурността — червено = потвърдено два пъти, жълто = един ясен прочит.
       </p>
       <div className="grid gap-8 md:grid-cols-2">
         <IrisEyePanel

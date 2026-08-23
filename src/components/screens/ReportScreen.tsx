@@ -9,6 +9,7 @@ import {
   Target,
   Activity,
   ClipboardText,
+  Eye,
   FloppyDisk,
   Warning,
   ArrowsClockwise
@@ -19,6 +20,10 @@ import type { AnalysisReport } from '@/types'
 import OverviewTab from '@/components/report/tabs/OverviewTab'
 import IridologyTab from '@/components/report/tabs/IridologyTab'
 import PlanTab from '@/components/report/tabs/PlanTab'
+import {
+  CalibratedSummaryReport,
+  CalibratedIrisReport,
+} from '@/components/report/CalibratedClientReport'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
@@ -53,7 +58,7 @@ function ErrorFallback({ error }: { error: Error }) {
 
 export default function ReportScreen({ report, onRestart, onReanalyze }: ReportScreenProps) {
   const isCalibrated = !!report.calibrated
-  const [activeTab, setActiveTab] = useState(isCalibrated ? 'result' : 'overview')
+  const [activeTab, setActiveTab] = useState(isCalibrated ? 'summary' : 'overview')
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   const summary = report.calibrated
     ? summarizeCalibratedReport(report.calibrated, {
@@ -223,22 +228,31 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                 {avgHealth}
               </span>
             </div>
-            <h2 className="text-xl font-bold mb-2">
-              {summary?.headline ?? 'Общо здравословно състояние'}
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
-              {isCalibrated
-                ? summary?.lead ??
-                  'Персонален профил на база вашите снимки, цели и въпросник.'
-                : 'Вашият иридологичен профил е анализиран и оценен на база множество здравни показатели'}
-            </p>
+            {isCalibrated ? (
+              <>
+                <p className="text-sm font-medium text-muted-foreground">Общ резултат /100</p>
+                {summary && (
+                  <p className="mt-2 text-xs text-muted-foreground max-w-md mx-auto">
+                    {summary.planRelevant} значими находки · {summary.sectorsAffected} сектора ·{' '}
+                    {summary.confirmed} потвърдени
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-2">Общо здравословно състояние</h2>
+                <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                  Вашият иридологичен профил е анализиран и оценен на база множество здравни показатели
+                </p>
+              </>
+            )}
           </div>
         </motion.div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList
               className={`grid w-full h-auto p-1.5 bg-muted/50 rounded-xl shadow-inner ${
-                isCalibrated ? 'grid-cols-2' : 'grid-cols-3'
+                isCalibrated ? 'grid-cols-3' : 'grid-cols-3'
               }`}
             >
               {!isCalibrated && (
@@ -250,15 +264,32 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                   <span className="text-xs font-semibold">Общо състояние</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger
-                value={isCalibrated ? 'result' : 'iridology'}
-                className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
-              >
-                <Activity size={22} weight="duotone" />
-                <span className="text-xs font-semibold">
-                  {isCalibrated ? 'Вашият резултат' : 'Анализ'}
-                </span>
-              </TabsTrigger>
+              {isCalibrated ? (
+                <>
+                  <TabsTrigger
+                    value="summary"
+                    className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+                  >
+                    <Target size={22} weight="duotone" />
+                    <span className="text-xs font-semibold">Обобщение</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="iris"
+                    className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+                  >
+                    <Eye size={22} weight="duotone" />
+                    <span className="text-xs font-semibold">Ирис</span>
+                  </TabsTrigger>
+                </>
+              ) : (
+                <TabsTrigger
+                  value="iridology"
+                  className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+                >
+                  <Activity size={22} weight="duotone" />
+                  <span className="text-xs font-semibold">Анализ</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger
                 value="plan"
                 className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
@@ -277,11 +308,18 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
             )}
 
             {isCalibrated ? (
-              <TabsContent value="result" className="mt-6">
-                <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
-                  <IridologyTab report={report} onOpenPlan={() => setActiveTab('plan')} />
-                </ErrorBoundary>
-              </TabsContent>
+              <>
+                <TabsContent value="summary" className="mt-6">
+                  <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
+                    <CalibratedSummaryReport report={report} />
+                  </ErrorBoundary>
+                </TabsContent>
+                <TabsContent value="iris" className="mt-6">
+                  <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
+                    <CalibratedIrisReport report={report} />
+                  </ErrorBoundary>
+                </TabsContent>
+              </>
             ) : (
               <TabsContent value="iridology" className="mt-6">
                 <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>

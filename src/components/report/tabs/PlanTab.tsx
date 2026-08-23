@@ -45,18 +45,27 @@ export default function PlanTab({ report }: PlanTabProps) {
   }
 
   const { detailedPlan, motivationalSummary } = report
+  const isCalibrated = !!report.calibrated
+  const hasDrivers = (report.calibrated?.drivers.length ?? 0) > 0
   
-  const hasGeneralRecs = detailedPlan.generalRecommendations && detailedPlan.generalRecommendations.length > 0
+  const hasGeneralRecs = !isCalibrated && detailedPlan.generalRecommendations && detailedPlan.generalRecommendations.length > 0
   const hasFoodRecs = (detailedPlan.recommendedFoods && detailedPlan.recommendedFoods.length > 0) || 
                       (detailedPlan.avoidFoods && detailedPlan.avoidFoods.length > 0)
   const hasSupplements = detailedPlan.supplements && detailedPlan.supplements.length > 0
   const hasPsychRecs = detailedPlan.psychologicalRecommendations && detailedPlan.psychologicalRecommendations.length > 0
   const hasSpecialRecs = detailedPlan.specialRecommendations && detailedPlan.specialRecommendations.length > 0
   const hasTests = detailedPlan.recommendedTests && detailedPlan.recommendedTests.length > 0
+  const showFullPlan = isCalibrated
 
   return (
     <div className="space-y-3">
-      {motivationalSummary && (
+      {isCalibrated && hasDrivers && (
+        <Card className="border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+          Конкретните причини и приоритети са в таб „Обобщение“. Тук са само стъпките за действие.
+        </Card>
+      )}
+
+      {!isCalibrated && motivationalSummary && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -86,7 +95,9 @@ export default function PlanTab({ report }: PlanTabProps) {
                 id: 'general',
                 title: 'Общи Препоръки',
                 icon: Lightbulb,
-                content: detailedPlan.generalRecommendations.slice(0, 3)
+                content: showFullPlan
+                  ? detailedPlan.generalRecommendations
+                  : detailedPlan.generalRecommendations.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -111,7 +122,9 @@ export default function PlanTab({ report }: PlanTabProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
-            <SupplementsSection supplements={detailedPlan.supplements.slice(0, 3)} />
+            <SupplementsSection supplements={
+              showFullPlan ? detailedPlan.supplements : detailedPlan.supplements.slice(0, 3)
+            } />
           </motion.div>
         )}
 
@@ -126,7 +139,9 @@ export default function PlanTab({ report }: PlanTabProps) {
                 id: 'psychological',
                 title: 'Психологически Препоръки',
                 icon: Brain,
-                content: detailedPlan.psychologicalRecommendations.slice(0, 3)
+                content: showFullPlan
+                  ? detailedPlan.psychologicalRecommendations
+                  : detailedPlan.psychologicalRecommendations.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -143,7 +158,9 @@ export default function PlanTab({ report }: PlanTabProps) {
                 id: 'special',
                 title: 'Специални (Индивидуални) Препоръки',
                 icon: Leaf,
-                content: detailedPlan.specialRecommendations.slice(0, 3)
+                content: showFullPlan
+                  ? detailedPlan.specialRecommendations
+                  : detailedPlan.specialRecommendations.slice(0, 3)
               }} 
             />
           </motion.div>
@@ -160,7 +177,9 @@ export default function PlanTab({ report }: PlanTabProps) {
                 id: 'tests',
                 title: 'Препоръчителни Конкретни Изследвания',
                 icon: Flask,
-                content: detailedPlan.recommendedTests.slice(0, 3)
+                content: showFullPlan
+                  ? detailedPlan.recommendedTests
+                  : detailedPlan.recommendedTests.slice(0, 3)
               }} 
             />
           </motion.div>

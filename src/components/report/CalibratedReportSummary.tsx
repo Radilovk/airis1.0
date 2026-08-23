@@ -10,6 +10,8 @@ interface Props {
   briefSummary?: string
   /** По-малко числа — за клиентския изглед. */
   compact?: boolean
+  /** Скрива дублирания общ резултат (hero го показва). */
+  hideScore?: boolean
 }
 
 const VERDICT_STYLE = {
@@ -31,7 +33,7 @@ const VERDICT_STYLE = {
 } as const
 
 /** Единен водещ блок — какво означава анализът за клиента. */
-export default function CalibratedReportSummary({ data, avgHealth, briefSummary, compact }: Props) {
+export default function CalibratedReportSummary({ data, avgHealth, briefSummary, compact, hideScore }: Props) {
   const summary = summarizeCalibratedReport(data, { briefSummary, avgHealth })
   const style = VERDICT_STYLE[summary.verdict]
   const Icon = style.icon
@@ -51,7 +53,7 @@ export default function CalibratedReportSummary({ data, avgHealth, briefSummary,
           <h3 className="text-lg font-bold leading-tight">{summary.headline}</h3>
           <p className="mt-2 text-sm leading-relaxed text-foreground/90">{summary.lead}</p>
         </div>
-        {!compact && (
+        {!compact && !hideScore && (
           <div className="text-right">
             <p className="text-3xl font-bold tabular-nums text-primary">{avgHealth}</p>
             <p className="text-[11px] text-muted-foreground">общ резултат</p>
