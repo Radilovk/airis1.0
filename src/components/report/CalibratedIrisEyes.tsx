@@ -5,6 +5,7 @@ import { Eye } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
 import { cellCenterInView, sectorRingWedgePath } from '@/lib/iris-coords'
 import { sectorsFor } from '@/lib/iris-map'
+import { isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
 
 const VIEW = 320
@@ -20,14 +21,19 @@ function IrisEyePanel({
   dataUrl,
   geometry,
   findings,
+  maxPerEye,
 }: {
   side: 'left' | 'right'
   dataUrl: string
   geometry?: IrisGeometrySnapshot
   findings: CalibratedAnalysisPayload['findings']
+  /** Ако е зададено — ограничава броя маркери; по подразбиране — всички значими. */
+  maxPerEye?: number
 }) {
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
-  const eyeFindings = findings.filter(f => f.side === side)
+  const allFindings = findings.filter(f => f.side === side)
+  const relevant = allFindings.filter(isPlanRelevantFinding)
+  const eyeFindings = maxPerEye != null ? relevant.slice(0, maxPerEye) : relevant
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
 
   const overlay = useMemo(() => {
@@ -46,7 +52,10 @@ function IrisEyePanel({
         <Eye size={18} weight="duotone" className="text-primary" />
         <h4 className="font-semibold">{sideLabel} ирис</h4>
         <Badge variant="outline" className="text-[10px]">
-          {eyeFindings.length} находки
+          {eyeFindings.length} за плана
+          {allFindings.length > eyeFindings.length
+            ? ` · ${allFindings.length} прегледани`
+            : ''}
         </Badge>
       </div>
 
@@ -105,9 +114,13 @@ function IrisEyePanel({
 
       <ul className="space-y-1.5 text-sm">
         {eyeFindings.length === 0 ? (
-          <li className="text-muted-foreground">Няма приети находки за това око.</li>
+          <li className="text-muted-foreground">
+            {allFindings.length > 0
+              ? `${allFindings.length} прегледани точки — нито една не е достатъчно ясна, за да промени плана.`
+              : 'Няма открити ирисови акценти за това око.'}
+          </li>
         ) : (
-          eyeFindings.slice(0, 10).map((f, i) => {
+          eyeFindings.map((f, i) => {
             const sector = sectorsFor(side)[f.sector - 1]
             return (
               <li
@@ -134,18 +147,23 @@ function IrisEyePanel({
   )
 }
 
-/** Двете очи с маркирани зони върху реалната снимка — основният изглед за клиента. */
-export default function CalibratedIrisEyes({ report }: { report: AnalysisReport }) {
+/** Двете очи с маркирани зони върху реалната снимка. */
+export default function CalibratedIrisEyes({
+  report,
+  maxPerEye,
+}: {
+  report: AnalysisReport
+  maxPerEye?: number
+}) {
   const cal = report.calibrated
   if (!cal) return null
 
   return (
     <Card className="p-5 md:p-6">
-      <h3 className="mb-1 text-lg font-bold">Вашите ириси — зоните с находки</h3>
+      <h3 className="mb-1 text-lg font-bold">Къде на снимката са акцентите</h3>
       <p className="mb-5 text-sm text-muted-foreground">
-        Оцветените сектори показват къде на <strong>вашата снимка</strong> са открити признаци.
-        Червените маркери сочат точната клетка (сектор S1–S12, пръстен R0–R11).
-        Отблясъкът от светкавицата в зеницата не се брои като находка.
+        Всяка маркирана зона е достатъчно ясна, за да повлияе на препоръките. Цветът показва
+        сигурността — червено = потвърдено два пъти, жълто = един ясен прочит.
       </p>
       <div className="grid gap-8 md:grid-cols-2">
         <IrisEyePanel
@@ -153,12 +171,14 @@ export default function CalibratedIrisEyes({ report }: { report: AnalysisReport 
           dataUrl={report.leftIrisImage?.dataUrl ?? ''}
           geometry={report.leftIrisImage?.geometry}
           findings={cal.findings}
+          maxPerEye={maxPerEye}
         />
         <IrisEyePanel
           side="right"
           dataUrl={report.rightIrisImage?.dataUrl ?? ''}
           geometry={report.rightIrisImage?.geometry}
           findings={cal.findings}
+          maxPerEye={maxPerEye}
         />
       </div>
     </Card>

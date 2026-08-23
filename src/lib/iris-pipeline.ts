@@ -643,17 +643,22 @@ export function toIrisAnalysis(
 
   const zones: IrisZone[] = sectors.map(sec => {
     const inZone = detection.findings.filter(f => f.sector === sec.id)
-    const load = inZone.reduce((s, f) => s + f.load, 0)
+    // Само по-ясни находки оцветяват сектора — единични слаби точки не означават „зона за внимание".
+    const significant = inZone.filter(
+      f => (f.confirmations ?? 1) >= 2 || f.load >= 0.55 || f.confidence >= 0.7
+    )
+    const load = significant.reduce((s, f) => s + f.load, 0)
 
-    const status: IrisZone['status'] = load >= 1.2 ? 'concern' : load > 0 ? 'attention' : 'normal'
+    const status: IrisZone['status'] =
+      load >= 1.2 ? 'concern' : load >= 0.45 ? 'attention' : 'normal'
 
     const generated =
-      inZone.length > 0
-        ? inZone
+      significant.length > 0
+        ? significant
             .slice(0, 2)
             .map(f => `${FINDINGS[f.type].label} R${f.ring}`)
             .join('; ')
-        : 'Без отчетени признаци'
+        : 'Без значими признаци в този сектор'
 
     return {
       id: sec.id,

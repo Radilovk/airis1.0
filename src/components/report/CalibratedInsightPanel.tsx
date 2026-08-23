@@ -3,11 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
   CaretDown,
   Fire,
   Gauge,
   ListChecks,
-  MapPin,
   Scales,
   ShieldWarning,
   Target,
@@ -20,23 +24,10 @@ import type { CalibratedAnalysisPayload } from '@/types'
  * Показва трите неща, които правят резултата проверим, вместо просто красив:
  *   1. Приоритетните системи и защо са такива (проследими причини).
  *   2. Хранителните драйвери с обозначен ИЗТОЧНИК — въпросник, ирис, или и двете.
- *      Потребителят вижда черно на бяло кое идва от снимката и кое не.
- *   3. Разгънатите карти и точните адреси на находките (сектор × пръстен).
- *
- * Тежестта на ириса се показва явно. Когато снимката е слаба, числото пада и
- * това е видимо — вместо приложението да се преструва на уверено.
  */
 
 interface Props {
   data: CalibratedAnalysisPayload
-}
-
-type StripLayerKey = 'base' | 'structure' | 'pigment'
-
-const LAYER_LABEL: Record<StripLayerKey, string> = {
-  base: 'Общ',
-  structure: 'Структура',
-  pigment: 'Пигмент',
 }
 
 const STRENGTH_STYLE: Record<string, { label: string; cls: string }> = {
@@ -60,72 +51,13 @@ function scoreColour(score: number) {
 
 export default function CalibratedInsightPanel({ data }: Props) {
   const [openSystem, setOpenSystem] = useState<string | null>(null)
-  const [side, setSide] = useState<'left' | 'right'>('right')
-  const [layer, setLayer] = useState<StripLayerKey>('base')
+  const [techOpen, setTechOpen] = useState(false)
 
   const priority = data.systems.filter(s => s.priority)
   const secondary = data.systems.filter(s => !s.priority)
-  const strips = data.strips?.[side]
-  const activeStrip = strips?.[layer]
 
   return (
     <div className="space-y-6">
-      {/* ── Надеждност ────────────────────────────────────────────────────── */}
-      <Card className="overflow-hidden border-0 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-slate-100">
-        <div className="p-5 md:p-6">
-          <div className="mb-4 flex items-center gap-2.5">
-            <Gauge size={20} weight="duotone" className="text-sky-400" />
-            <h3 className="text-base font-semibold">Как е получен този резултат</h3>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric
-              label="Качество на снимките"
-              value={`${data.imageQuality}/100`}
-              hint="Резкост, видимост на зеницата, отблясъци"
-            />
-            <Metric
-              label="Разчетена площ"
-              value={`${Math.round(data.stripCoverage * 100)}%`}
-              hint="Останалото е закрито от клепач или отблясък"
-            />
-            {typeof data.agreement === 'number' && (
-              <Metric
-                label="Повторяемост"
-                value={`${Math.round(data.agreement * 100)}%`}
-                hint="Съвпадение между два независими прочита на едно и също око"
-              />
-            )}
-            <Metric
-              label="Тежест на ириса"
-              value={`${Math.round(data.irisWeight * 100)}%`}
-              hint="Останалото идва от въпросника"
-              accent
-            />
-          </div>
-
-          {typeof data.agreement === 'number' && (
-            <p className="mt-4 rounded-lg border border-sky-500/20 bg-sky-500/5 px-3.5 py-3 text-xs leading-relaxed text-slate-300">
-              <span className="font-medium text-sky-300">Как се проверява сам анализът.</span>{' '}
-              Всяко око се разчита <strong>два пъти</strong>. Кръглият ирис се разгъва в
-              правоъгълник, а мястото на среза е произволно — затова вторият прочит среща
-              кръга на друго място. Двете изображения са една и съща тъкан, но изглеждат
-              различно и се подават поотделно. Находка, която се появи и в двата прочита на
-              едно и също физическо място, е потвърдена
-              {typeof data.confirmedCount === 'number' ? ` — тук такива са ${data.confirmedCount}` : ''}.
-              Останалите тежат по-малко.
-            </p>
-          )}
-
-          <p className="mt-3 text-xs leading-relaxed text-slate-400">
-            Ирисовият анализ е помощен инструмент. Основата на препоръките е
-            въпросникът; находките от снимката само променят акцентите, и то
-            толкова, колкото качеството на снимката позволява.
-          </p>
-        </div>
-      </Card>
-
-      {/* ── Физиологични огради ───────────────────────────────────────────── */}
       {data.notices && data.notices.length > 0 && (
         <div>
           <div className="mb-3 flex items-center gap-2">
@@ -175,7 +107,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
             ))}
           </div>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Планът по-долу вече е съобразен с горното — някои общи препоръки са
+            Планът в таб „План“ е съобразен с горното — някои общи препоръки са
             заменени или пропуснати нарочно.
           </p>
         </div>
@@ -324,103 +256,34 @@ export default function CalibratedInsightPanel({ data }: Props) {
         </div>
       )}
 
-      {/* ── Карти и находки ───────────────────────────────────────────────── */}
-      {(activeStrip || data.findings.length > 0) && (
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <MapPin size={20} weight="duotone" className="text-primary" />
-            <h3 className="text-lg font-semibold">Разгъната карта и находки</h3>
-          </div>
-
-          <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 p-3">
-              <div className="flex overflow-hidden rounded-lg border">
-                {(['right', 'left'] as const).map(sd => (
-                  <button
-                    key={sd}
-                    onClick={() => setSide(sd)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      side === sd
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background hover:bg-muted'
-                    }`}
-                  >
-                    {sd === 'right' ? 'Десен' : 'Ляв'}
-                  </button>
-                ))}
+      {/* ── Технически детайли (скрити по подразбиране) ───────────────────── */}
+      <Collapsible open={techOpen} onOpenChange={setTechOpen}>
+        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-sm font-medium">
+          <span className="flex items-center gap-2">
+            <Gauge size={18} weight="duotone" />
+            Как е изчислен резултатът
+          </span>
+          <CaretDown size={16} className={`transition-transform ${techOpen ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Card className="mt-2 overflow-hidden border-0 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-slate-100">
+            <div className="p-5 md:p-6">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Metric label="Качество на снимките" value={`${data.imageQuality}/100`} hint="Резкост, зеница, отблясъци" />
+                <Metric label="Разчетена площ" value={`${Math.round(data.stripCoverage * 100)}%`} hint="Закрито от клепач/отблясък" />
+                {typeof data.agreement === 'number' && (
+                  <Metric label="Повторяемост" value={`${Math.round(data.agreement * 100)}%`} hint="Съвпадение между два прочита" />
+                )}
+                <Metric label="Тежест на ириса" value={`${Math.round(data.irisWeight * 100)}%`} hint="Останалото — въпросник" accent />
               </div>
-              <div className="flex overflow-hidden rounded-lg border">
-                {(Object.keys(LAYER_LABEL) as StripLayerKey[]).map(l => (
-                  <button
-                    key={l}
-                    onClick={() => setLayer(l)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      layer === l
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background hover:bg-muted'
-                    }`}
-                  >
-                    {LAYER_LABEL[l]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {activeStrip ? (
-              <div className="overflow-x-auto bg-white p-2">
-                <img
-                  src={activeStrip}
-                  alt={`Разгъната карта — ${side === 'right' ? 'десен' : 'ляв'} ирис, слой ${LAYER_LABEL[layer]}`}
-                  className="min-w-[720px]"
-                />
-              </div>
-            ) : (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Картата не е запазена за този анализ.
-              </div>
-            )}
-
-            <div className="p-4">
-              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-                Ирисът е „разгънат" в правоъгълник: <strong>12 колони</strong> (S1–S12 —
-                секторите по часовника) и <strong>12 реда</strong> (R0 при ръба на зеницата
-                до R11 при външния ръб). Всяка находка има точен адрес в тази мрежа.
+              <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                Много от прегледаните точки са нормални вариации на ириса и не влизат в плана,
+                освен ако не са потвърдени или достатъчно ясни.
               </p>
-
-              {data.findings.filter(f => f.side === side).length > 0 ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {data.findings
-                    .filter(f => f.side === side)
-                    .sort((a, b) => b.confidence - a.confidence)
-                    .map((f, i) => (
-                      <div
-                        key={`${f.type}-${f.sector}-${f.ring}-${i}`}
-                        className="flex items-center gap-3 rounded-lg border bg-muted/30 p-2.5"
-                      >
-                        <div className="flex flex-col items-center rounded-md bg-primary/10 px-2 py-1 text-primary">
-                          <span className="text-xs font-bold leading-none">S{f.sector}</span>
-                          <span className="text-[10px] leading-tight opacity-80">R{f.ring}</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{f.label}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            размер {f.size} · увереност {Math.round(f.confidence * 100)}%
-                            {f.priorityZones.length > 0 && ' · приоритетна зона'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  Не са приети находки за това око. Празният резултат е валиден —
-                  по-добре е от измислени находки.
-                </p>
-              )}
             </div>
           </Card>
-        </div>
-      )}
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* ── Дисклеймър ────────────────────────────────────────────────────── */}
       <Card className="border-amber-200 bg-amber-50/60 p-4">

@@ -14,6 +14,7 @@ import {
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { AnalysisReport } from '@/types'
+import { significantZoneCount } from '@/lib/calibrated-report-summary'
 
 interface HistoryScreenProps {
   onViewReport: (report: AnalysisReport) => void
@@ -91,8 +92,7 @@ export default function HistoryScreen({ onViewReport, onBack, onReanalyze }: His
             <div className="grid gap-6">
               {historyList.map((report, idx) => {
                 const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
-                const concernZones = report.leftIris.zones.filter(z => z.status !== 'normal').length +
-                                    report.rightIris.zones.filter(z => z.status !== 'normal').length
+                const accentZones = significantZoneCount(report)
                 
                 return (
                   <motion.div
@@ -131,8 +131,10 @@ export default function HistoryScreen({ onViewReport, onBack, onReanalyze }: His
                               <p className="text-2xl font-bold text-primary">{avgHealth}/100</p>
                             </div>
                             <div className="p-3 bg-muted/30 rounded-lg">
-                              <p className="text-xs text-muted-foreground mb-1">Зони за Внимание</p>
-                              <p className="text-2xl font-bold">{concernZones}</p>
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {report.calibrated ? 'Акценти в плана' : 'Зони за Внимание'}
+                              </p>
+                              <p className="text-2xl font-bold">{accentZones}</p>
                             </div>
                             <div className="p-3 bg-muted/30 rounded-lg">
                               <p className="text-xs text-muted-foreground mb-1">Препоръки</p>
