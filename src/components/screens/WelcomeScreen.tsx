@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug, Key } from '@phosphor-icons/react'
+import { Eye, Sparkle, Activity, FileText, ClockClockwise, Gear, Flask, Info, Bug, Key, Star } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import type { AIModelConfig, QuestionnaireData } from '@/types'
@@ -132,6 +132,15 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               className="px-8 py-6 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
             >
               Започни Анализ
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={() => { window.location.href = `${import.meta.env.BASE_URL}learn.html` }}
+              className="px-8 py-6 text-lg font-semibold gap-2 bg-gradient-to-r from-violet-500/20 to-pink-500/20 border-2 border-violet-400/50 hover:bg-violet-500/10"
+            >
+              <Star size={20} weight="duotone" />
+              Звездичко — Домашна работа
             </Button>
             {questionnaireData && (
               <Button
