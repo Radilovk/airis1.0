@@ -1,6 +1,6 @@
 import type { AnalysisReport } from '@/types'
-import { summarizeCalibratedReport, isPlanRelevantFinding, groupFindingsForDisplay } from '@/lib/calibrated-report-summary'
-import { ringBand } from '@/lib/iris-map'
+import { summarizeCalibratedReport, isPlanRelevantFinding, groupFindingsForDisplay, findingLocationLabel } from '@/lib/calibrated-report-summary'
+import { sectorsFor } from '@/lib/iris-map'
 
 function esc(s: string): string {
   return s
@@ -60,8 +60,8 @@ export function generateCalibratedReportHTML(report: AnalysisReport): string {
             ${
               items.length
                 ? items.map(f => {
-                    const band = ringBand(f.ring)
-                    return `<li><strong>${esc(f.label)}</strong> · сектор ${f.sector}, ${esc(band.label)}</li>`
+                    const sector = sectorsFor(f.side)[f.sector - 1]
+                    return `<li><strong>${esc(f.label)}</strong> · ${esc(findingLocationLabel(f, sector?.label))}</li>`
                   }).join('')
                 : '<li class="muted">Няма значими маркери за това око.</li>'
             }

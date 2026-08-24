@@ -27,6 +27,9 @@ import {
   minuteToSector,
   priorityZonesFor,
   ringBand,
+  isBoundaryRing,
+  isCircumferentialFinding,
+  BOUNDARY_RING_WEIGHT,
   sectorsFor,
   systemLabel,
   type FindingType,
@@ -252,7 +255,11 @@ export function normalizeFindings(
       (readable === undefined ? 1 : Math.min(1, readable / 0.9)) *
       (partialKeys.has(`${sector}:${ring}`) ? 0.6 : 1)
 
-    const load = typeWeight(def.weight) * SIZE_WEIGHT[size] * confidence * boost * readableFactor
+    const boundaryFactor =
+      isBoundaryRing(ring) && !isCircumferentialFinding(type) ? BOUNDARY_RING_WEIGHT : 1
+
+    const load =
+      typeWeight(def.weight) * SIZE_WEIGHT[size] * confidence * boost * readableFactor * boundaryFactor
 
     out.push({
       side,

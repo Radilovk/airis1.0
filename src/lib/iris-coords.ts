@@ -4,7 +4,7 @@
  */
 import type { IrisGeometrySnapshot } from '@/types'
 import { fitImageInSquare } from './image-utils'
-import { ringBand } from './iris-map'
+import { ringBand, isCircumferentialFinding, type RingBandDef } from './iris-map'
 
 /** Център на клетка (sector 1..12, ring 0..11) в пиксели на оригиналната снимка. */
 export function cellCenterInImage(
@@ -67,6 +67,96 @@ export function polarToView(
   const ix = cx + radius * Math.sin(thetaRad)
   const iy = cy - radius * Math.cos(thetaRad)
   return { x: ix * scale + offsetX, y: iy * scale + offsetY }
+}
+
+/** SVG path за пълен пръstenен пояс (360°) — околообхватни находки. */
+export function fullBandAnnulusPath(
+  band: RingBandDef,
+  geometry: IrisGeometrySnapshot,
+  viewSize: number
+): string {
+  const cx = geometry.limbus.cx
+  const cy = geometry.limbus.cy
+  const rp = geometry.pupil.r
+  const ri = geometry.limbus.r
+  const span = ri - rp
+  const inner = rp + span * (band.rings[0] / 12)
+  const outer = rp + span * ((band.rings[1] + 1) / 12)
+  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
+  const riScaled = outer * scale
+  const roScaled = inner * scale
+
+  const fit = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
+  const vcx = cx * fit.scale + fit.offsetX
+  const vcy = cy * fit.scale + fit.offsetY
+
+  return [
+    `M ${vcx + roScaled} ${vcy}`,
+    `A ${roScaled} ${roScaled} 0 1 1 ${vcx - roScaled} ${vcy}`,
+    `A ${roScaled} ${roScaled} 0 1 1 ${vcx + roScaled} ${vcy}`,
+    `M ${vcx + riScaled} ${vcy}`,
+    `A ${riScaled} ${riScaled} 0 1 0 ${vcx - riScaled} ${vcy}`,
+    `A ${riScaled} ${riScaled} 0 1 0 ${vcx + riScaled} ${vcy}`,
+    'Z',
+  ].join(' ')
+}
+
+/** SVG path за един пръsten R0..R11 по цялата окружност. */
+export function fullRingAnnulusPath(
+  ring: number,
+  geometry: IrisGeometrySnapshot,
+  viewSize: number
+): string {
+  const cx = geometry.limbus.cx
+  const cy = geometry.limbus.cy
+  const { inner, outer } = ringBandRadii(ring, geometry)
+  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
+  const riScaled = outer * scale
+  const roScaled = inner * scale
+
+  const fit = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
+  const vcx = cx * fit.scale + fit.offsetX
+  const vcy = cy * fit.scale + fit.offsetY
+
+  return [
+    `M ${vcx + roScaled} ${vcy}`,
+    `A ${roScaled} ${roScaled} 0 1 1 ${vcx - roScaled} ${vcy}`,
+    `A ${roScaled} ${roScaled} 0 1 1 ${vcx + roScaled} ${vcy}`,
+    `M ${vcx + riScaled} ${vcy}`,
+    `A ${riScaled} ${riScaled} 0 1 0 ${vcx - riScaled} ${vcy}`,
+    `A ${riScaled} ${riScaled} 0 1 0 ${vcx + riScaled} ${vcy}`,
+    'Z',
+  ].join(' ')
+}
+
+/** Избира overlay path: околообхватна дъга или секторен клин по пояс. */
+export function findingOverlayPath(
+  finding: { type: string; sector: number; ring: number },
+  geometry: IrisGeometrySnapshot,
+  viewSize: number
+): string {
+  if (isCircumferentialFinding(finding.type)) {
+    const band = ringBand(finding.ring)
+    const spansFullBand =
+      finding.type === 'sodium_ring' ||
+      finding.type === 'scurf_rim' ||
+      finding.type === 'lymphatic_rosary'
+    if (spansFullBand) return fullBandAnnulusPath(band, geometry, viewSize)
+    return fullRingAnnulusPath(finding.ring, geometry, viewSize)
+  }
+  return sectorBandWedgePath(finding.sector, finding.ring, geometry, viewSize)
+}
+
+/** Точка на 12:00 по пръстена — за маркер при околообхватни находки. */
+export function ringTopCenterInView(
+  ring: number,
+  geometry: IrisGeometrySnapshot,
+  viewSize: number
+): { x: number; y: number } {
+  const cx = geometry.limbus.cx
+  const cy = geometry.limbus.cy
+  const r = ringRadius(ring, geometry)
+  return polarToView(cx, cy, r, 0, geometry, viewSize)
 }
 
 /** SVG path за секторен сегмент в целия пръstenен пояс (IPB, STOM, ANW …). */
