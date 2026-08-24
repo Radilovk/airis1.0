@@ -222,11 +222,13 @@ export default function InteractiveRecommendations({ recommendations }: Interact
                                 {rec.title}
                               </h4>
                             </div>
-                            <Badge 
-                              className={`text-xs flex-shrink-0 border ${getPriorityColor(rec.priority)}`}
-                            >
-                              {getPriorityLabel(rec.priority)}
-                            </Badge>
+                            {rec.priority === 'high' && (
+                              <Badge
+                                className={`text-xs flex-shrink-0 border ${getPriorityColor(rec.priority)}`}
+                              >
+                                {getPriorityLabel(rec.priority)}
+                              </Badge>
+                            )}
                           </div>
                           <p className={`text-sm leading-relaxed ${
                             isChecked ? 'text-muted-foreground line-through' : 'text-foreground/80'

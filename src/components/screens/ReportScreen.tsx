@@ -233,8 +233,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                 <p className="text-sm font-medium text-muted-foreground">Общ резултат /100</p>
                 {summary && (
                   <p className="mt-2 text-xs text-muted-foreground max-w-md mx-auto">
-                    {summary.planRelevant} значими находки · {summary.sectorsAffected} сектора ·{' '}
-                    {summary.confirmed} потвърдени
+                    {summary.planRelevant} значими находки · {summary.sectorsAffected} сектора
                   </p>
                 )}
               </>

@@ -76,9 +76,11 @@ export default function RecommendationCard({ recommendation, index }: Recommenda
               </div>
               <h4 className="font-semibold text-base mb-2">{recommendation.title}</h4>
             </div>
-            <Badge className={`${config.color} border flex-shrink-0`}>
-              {config.label}
-            </Badge>
+            {recommendation.priority === 'high' && (
+              <Badge className={`${config.color} border flex-shrink-0`}>
+                {config.label}
+              </Badge>
+            )}
           </div>
 
           <p className="text-sm text-muted-foreground leading-relaxed">

@@ -1,26 +1,24 @@
 import type { QuestionConfig } from '@/types'
 
+/**
+ * Въпросник — кратък, ясен, mobile-first.
+ * Задължителни: профил, цели, активност, сън, хидратация.
+ * Останалото е по избор (може да се пропусне).
+ */
 export const defaultQuestions: QuestionConfig[] = [
   {
     id: 'name',
     type: 'text',
     question: 'Как се казвате?',
-    description: 'Въведете вашето име',
     required: true,
-    validation: {
-      min: 2
-    }
+    validation: { min: 2 },
   },
   {
     id: 'age',
     type: 'number',
-    question: 'Колко години сте?',
-    description: 'Въведете вашата възраст',
+    question: 'На колко години сте?',
     required: true,
-    validation: {
-      min: 1,
-      max: 120
-    }
+    validation: { min: 1, max: 120 },
   },
   {
     id: 'gender',
@@ -30,206 +28,172 @@ export const defaultQuestions: QuestionConfig[] = [
     options: [
       { value: 'male', label: 'Мъж' },
       { value: 'female', label: 'Жена' },
-      { value: 'other', label: 'Друго' }
-    ]
+      { value: 'other', label: 'Предпочитам да не казвам' },
+    ],
   },
   {
     id: 'weight',
     type: 'number',
-    question: 'Колко е теглото ви?',
-    description: 'В килограми (кг)',
+    question: 'Тегло (кг)',
     required: true,
-    validation: {
-      min: 20,
-      max: 300
-    }
+    validation: { min: 20, max: 300 },
   },
   {
     id: 'height',
     type: 'number',
-    question: 'Колко е ръстът ви?',
-    description: 'В сантиметри (см)',
+    question: 'Ръст (см)',
     required: true,
-    validation: {
-      min: 50,
-      max: 250
-    }
+    validation: { min: 50, max: 250 },
   },
   {
     id: 'goals',
     type: 'checkbox',
-    question: 'Каква е основната ви цел?',
-    description: 'Изберете една или повече цели',
+    question: 'Какво искате да постигнете?',
+    description: 'Можете да изберете няколко',
     required: true,
     allowOther: true,
     options: [
       { value: 'Отслабване', label: 'Отслабване' },
-      { value: 'Подобряване на здравето', label: 'Подобряване на здравето' },
-      { value: 'Антиейджинг', label: 'Антиейджинг' },
-      { value: 'Укрепване на мускулите', label: 'Укрепване на мускулите' },
+      { value: 'Подобряване на здравето', label: 'По-добро здраве' },
+      { value: 'Увеличаване на енергията', label: 'Повече енергия' },
+      { value: 'Подобряване на съня', label: 'По-добър сън' },
       { value: 'Емоционален баланс', label: 'Емоционален баланс' },
-      { value: 'Увеличаване на енергията', label: 'Увеличаване на енергията' },
-      { value: 'Подобряване на съня', label: 'Подобряване на съня' }
-    ]
+      { value: 'Укрепване на мускулите', label: 'По-силни мускули' },
+      { value: 'Антиейджинг', label: 'Антиейджинг' },
+    ],
   },
   {
     id: 'healthStatus',
     type: 'checkbox',
-    question: 'Здравен статус',
-    description: 'Изберете всички, които се отнасят за вас',
+    question: 'Имате ли някое от следните състояния?',
+    description: 'По избор — помага за по-безопасен план',
     required: false,
     allowOther: true,
     options: [
       { value: 'Затлъстяване', label: 'Затлъстяване' },
       { value: 'Инсулинова резистентност', label: 'Инсулинова резистентност' },
-      { value: 'Диабет 2 тип', label: 'Диабет 2 тип' },
+      { value: 'Диабет 2 тип', label: 'Диабет тип 2' },
       { value: 'Автоимунен тиреоидит', label: 'Автоимунен тиреоидит' },
-      { value: 'Рефлуксна болест', label: 'Рефлуксна болест' },
-      { value: 'Хипертония', label: 'Хипертония' },
+      { value: 'Рефлуксна болест', label: 'Рефлукс' },
+      { value: 'Хипертония', label: 'Високо кръвно' },
       { value: 'Менопауза', label: 'Менопауза' },
-      { value: 'Бременност', label: 'Бременност' }
-    ]
+      { value: 'Бременност', label: 'Бременност' },
+    ],
   },
   {
     id: 'complaints',
     type: 'textarea',
-    question: 'Текущи оплаквания',
-    description: 'Опишете какви симптоми или оплаквания имате в момента',
-    required: false
+    question: 'Какво ви притеснява в момента?',
+    description: 'Симптоми, оплаквания — по избор',
+    required: false,
   },
   {
     id: 'medicalConditions',
     type: 'textarea',
-    question: 'Медицински състояния',
-    description: 'Споделете информация за хронични заболявания или медицински състояния',
-    required: false
-  },
-  {
-    id: 'familyHistory',
-    type: 'textarea',
-    question: 'Фамилна обремененост',
-    description: 'Например: сърдечни заболявания, диабет в семейството',
-    required: false
+    question: 'Хронични заболявания или лечение',
+    description: 'Включете и семейна обремененост, ако е важно',
+    required: false,
   },
   {
     id: 'activityLevel',
     type: 'radio',
-    question: 'Ниво на физическа активност',
-    description: 'Изберете нивото, което най-добре ви описва',
+    question: 'Колко често се движите?',
     required: true,
     options: [
-      { value: 'sedentary', label: 'Заседнал (без физическа активност)' },
-      { value: 'light', label: 'Лека активност (1-2 пъти седмично)' },
-      { value: 'moderate', label: 'Умерена активност (3-4 пъти седмично)' },
-      { value: 'active', label: 'Активен (5-6 пъти седмично)' },
-      { value: 'very-active', label: 'Много активен (ежедневно интензивно)' }
-    ]
+      { value: 'sedentary', label: 'Почти не се движа' },
+      { value: 'light', label: '1–2 пъти седмично' },
+      { value: 'moderate', label: '3–4 пъти седмично' },
+      { value: 'active', label: '5–6 пъти седмично' },
+      { value: 'very-active', label: 'Всеки ден, интензивно' },
+    ],
   },
   {
     id: 'stressLevel',
     type: 'radio',
-    question: 'Ниво на стрес',
-    description: 'Как бихте оценили вашето ежедневно ниво на стрес?',
+    question: 'Колко стрес имате ежедневно?',
     required: true,
     options: [
-      { value: 'low', label: 'Нисък' },
-      { value: 'moderate', label: 'Умерен' },
-      { value: 'high', label: 'Висок' },
-      { value: 'very-high', label: 'Много висок' }
-    ]
+      { value: 'low', label: 'Малко' },
+      { value: 'moderate', label: 'Умерено' },
+      { value: 'high', label: 'Много' },
+      { value: 'very-high', label: 'Постоянно висок' },
+    ],
   },
   {
     id: 'sleepHours',
     type: 'slider',
-    question: 'Колко часа спите на нощ?',
-    description: 'Средно на нощ',
+    question: 'Колко часа спите?',
     required: true,
-    validation: {
-      min: 3,
-      max: 12
-    }
+    validation: { min: 3, max: 12 },
   },
   {
     id: 'sleepQuality',
     type: 'radio',
-    question: 'Качество на съня',
-    description: 'Как бихте оценили качеството на вашия сън?',
+    question: 'Как оценявате съня си?',
     required: true,
     options: [
-      { value: 'poor', label: 'Лошо' },
-      { value: 'fair', label: 'Средно' },
-      { value: 'good', label: 'Добро' },
-      { value: 'excellent', label: 'Отлично' }
-    ]
+      { value: 'poor', label: 'Лош' },
+      { value: 'fair', label: 'Среден' },
+      { value: 'good', label: 'Добър' },
+      { value: 'excellent', label: 'Отличен' },
+    ],
   },
   {
     id: 'hydration',
     type: 'slider',
-    question: 'Колко чаши вода пиете дневно?',
-    description: 'Чаши вода (около 250мл)',
+    question: 'Колко чаши вода пиете на ден?',
+    description: 'Една чаша ≈ 250 ml',
     required: true,
-    validation: {
-      min: 0,
-      max: 15
-    }
+    validation: { min: 0, max: 15 },
   },
   {
     id: 'dietaryProfile',
     type: 'checkbox',
-    question: 'Хранителен режим',
-    description: 'Изберете вашия хранителен режим',
+    question: 'Храните се по някакъв режим?',
     required: false,
     allowOther: true,
     options: [
       { value: 'Вегетариански', label: 'Вегетариански' },
       { value: 'Веган', label: 'Веган' },
-      { value: 'Интермитентен фастинг', label: 'Интермитентен фастинг' },
+      { value: 'Интермитентен фастинг', label: 'Интермитентен глад' },
       { value: 'Кето', label: 'Кето' },
       { value: 'Средиземноморска', label: 'Средиземноморска' },
-      { value: 'Безглутенова', label: 'Безглутенова' }
-    ]
+      { value: 'Безглутенова', label: 'Без глутен' },
+    ],
   },
   {
     id: 'dietaryHabits',
     type: 'checkbox',
-    question: 'Хранителни навици',
-    description: 'Изберете навиците, които имате',
+    question: 'Кои от тези навици имате?',
     required: false,
     options: [
-      { value: 'Бърза храна', label: 'Бърза храна' },
-      { value: 'Сладки храни', label: 'Сладки храни' },
-      { value: 'Алкохол', label: 'Алкохол' },
+      { value: 'Бърза храна', label: 'Често бърза храна' },
+      { value: 'Сладки храни', label: 'Много сладко' },
+      { value: 'Алкохол', label: 'Редовен алкохол' },
       { value: 'Нередовност', label: 'Нередовно хранене' },
-      { value: 'Прескачане на закуска', label: 'Прескачане на закуска' },
-      { value: 'Късно хранене', label: 'Късно хранене' }
-    ]
+      { value: 'Прескачане на закуска', label: 'Прескачам закуска' },
+      { value: 'Късно хранене', label: 'Храня се късно вечер' },
+    ],
   },
   {
-    id: 'foodIntolerances',
+    id: 'foodRestrictions',
     type: 'textarea',
-    question: 'Хранителна непоносимост',
-    description: 'Например: лактоза, глутен',
-    required: false
-  },
-  {
-    id: 'allergies',
-    type: 'textarea',
-    question: 'Алергии',
-    description: 'Например: ядки, морски дарове, пчелни продукти',
-    required: false
+    question: 'Алергии или непоносимост към храни',
+    description: 'Например: лактоза, глутен, ядки',
+    required: false,
   },
   {
     id: 'medications',
     type: 'textarea',
-    question: 'Прием на медикаменти и хранителни добавки',
-    description: 'Включете и безрецептурни лекарства, витамини, минерали',
-    required: false
+    question: 'Лекарства и добавки',
+    description: 'Включете витамини и безрецептурни продукти',
+    required: false,
   },
   {
     id: 'documents',
     type: 'file',
-    question: 'Медицински документи (опционално)',
-    description: 'Качете снимки или документи на лабораторни тестове, анамнези и други изследвания',
-    required: false
-  }
+    question: 'Медицински документи',
+    description: 'По избор — лабораторни резултати, снимки',
+    required: false,
+  },
 ]

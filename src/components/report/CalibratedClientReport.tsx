@@ -2,6 +2,7 @@ import type { AnalysisReport } from '@/types'
 import CalibratedReportSummary from '@/components/report/CalibratedReportSummary'
 import CalibratedIrisEyes from '@/components/report/CalibratedIrisEyes'
 import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
+import CalibratedSystemsChart from '@/components/report/CalibratedSystemsChart'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Target } from '@phosphor-icons/react'
@@ -47,6 +48,8 @@ export function CalibratedSummaryReport({ report }: Props) {
         briefSummary={report.briefSummary}
         hideScore
       />
+
+      <CalibratedSystemsChart systems={cal.systems} />
 
       <CalibratedInsightPanel data={cal} />
     </div>

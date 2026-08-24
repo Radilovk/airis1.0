@@ -61,7 +61,7 @@ export default function PlanTab({ report }: PlanTabProps) {
     <div className="space-y-3">
       {isCalibrated && hasDrivers && (
         <Card className="border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-          Конкретните причини и приоритети са в таб „Обобщение“. Тук са само стъпките за действие.
+          Тук са конкретните стъпки — храни, добавки и навици.
         </Card>
       )}
 

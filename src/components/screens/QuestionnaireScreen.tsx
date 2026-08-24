@@ -101,12 +101,23 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       return
     }
 
+    advanceQuestion()
+  }
+
+  const handleSkip = () => {
+    if (currentQuestion.required) return
+    setAnswers({ ...answers, [currentQuestion.id]: currentQuestion.type === 'checkbox' ? [] : '' })
+    advanceQuestion()
+  }
+
+  const advanceQuestion = () => {
     if (showOther[currentQuestion.id] && otherValues[currentQuestion.id]) {
       const otherValue = otherValues[currentQuestion.id]
+      const answer = answers[currentQuestion.id]
       if (Array.isArray(answer)) {
         setAnswers({
           ...answers,
-          [currentQuestion.id]: [...answer.filter(v => v !== 'other'), otherValue]
+          [currentQuestion.id]: [...answer.filter(v => v !== 'other'), otherValue],
         })
       }
     }
@@ -125,29 +136,39 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   }
 
   const completeQuestionnaire = () => {
+    const mergedAnswers = { ...answers }
+    for (const q of questions) {
+      if (showOther[q.id] && otherValues[q.id]) {
+        const val = mergedAnswers[q.id]
+        if (Array.isArray(val)) {
+          mergedAnswers[q.id] = [...val.filter((v: string) => v !== 'other'), otherValues[q.id]]
+        }
+      }
+    }
+
     const finalData: QuestionnaireData = {
-      name: answers.name || '',
-      age: Number(answers.age) || 0,
-      gender: answers.gender || 'other',
-      weight: Number(answers.weight) || 0,
-      height: Number(answers.height) || 0,
-      goals: answers.goals || [],
-      healthStatus: answers.healthStatus || [],
-      complaints: answers.complaints || '',
-      medicalConditions: answers.medicalConditions || '',
-      familyHistory: answers.familyHistory || '',
-      activityLevel: answers.activityLevel || 'moderate',
-      stressLevel: answers.stressLevel || 'moderate',
-      sleepHours: Number(answers.sleepHours) || 7,
-      sleepQuality: answers.sleepQuality || 'good',
-      hydration: Number(answers.hydration) || 8,
-      dietaryProfile: answers.dietaryProfile || [],
-      dietaryHabits: answers.dietaryHabits || [],
-      foodIntolerances: answers.foodIntolerances || '',
-      allergies: answers.allergies || '',
-      medications: answers.medications || '',
+      name: mergedAnswers.name || '',
+      age: Number(mergedAnswers.age) || 0,
+      gender: mergedAnswers.gender || 'other',
+      weight: Number(mergedAnswers.weight) || 0,
+      height: Number(mergedAnswers.height) || 0,
+      goals: mergedAnswers.goals || [],
+      healthStatus: mergedAnswers.healthStatus || [],
+      complaints: mergedAnswers.complaints || '',
+      medicalConditions: mergedAnswers.medicalConditions || '',
+      familyHistory: mergedAnswers.familyHistory || '',
+      activityLevel: mergedAnswers.activityLevel || 'moderate',
+      stressLevel: mergedAnswers.stressLevel || 'moderate',
+      sleepHours: Number(mergedAnswers.sleepHours) || 7,
+      sleepQuality: mergedAnswers.sleepQuality || 'good',
+      hydration: Number(mergedAnswers.hydration) || 8,
+      dietaryProfile: mergedAnswers.dietaryProfile || [],
+      dietaryHabits: mergedAnswers.dietaryHabits || [],
+      foodIntolerances: mergedAnswers.foodRestrictions || mergedAnswers.foodIntolerances || '',
+      allergies: mergedAnswers.foodRestrictions || mergedAnswers.allergies || '',
+      medications: mergedAnswers.medications || '',
       uploadedDocuments: uploadedFiles,
-      customAnswers: answers
+      customAnswers: mergedAnswers,
     }
 
     onComplete(finalData)
@@ -464,28 +485,26 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
-      <div className="max-w-2xl w-full">
+    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background to-muted/20 pb-28">
+      <div className="flex-1 flex items-start justify-center p-4 pt-6 md:p-8 md:pt-10">
+      <div className="max-w-lg w-full">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
+          className="mb-5"
         >
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Въпрос {currentQuestionIndex + 1} от {questions.length}
-              </p>
-            </div>
-            <Badge variant="outline" className="gap-1">
-              <CheckCircle className="w-3 h-3" />
-              {currentQuestionIndex} / {questions.length}
-            </Badge>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-muted-foreground">
+              Стъпка {currentQuestionIndex + 1} от {questions.length}
+            </p>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {Math.round(progress)}%
+            </span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-1.5" />
         </motion.div>
 
-        <Card className="p-6 md:p-8">
+        <Card className="border-0 shadow-lg shadow-primary/5 p-5 md:p-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentQuestion.id}
@@ -496,12 +515,16 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               className="space-y-6"
             >
               <div className="space-y-2">
-                <h2 className="text-2xl md:text-3xl font-bold">
+                <h2 className="text-xl md:text-2xl font-bold leading-snug tracking-tight">
                   {currentQuestion.question}
-                  {currentQuestion.required && <span className="text-destructive ml-1">*</span>}
+                  {currentQuestion.required && (
+                    <span className="text-destructive ml-0.5" aria-hidden>*</span>
+                  )}
                 </h2>
                 {currentQuestion.description && (
-                  <p className="text-muted-foreground">{currentQuestion.description}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {currentQuestion.description}
+                  </p>
                 )}
               </div>
 
@@ -510,39 +533,41 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               </div>
             </motion.div>
           </AnimatePresence>
-
-          <div className="flex justify-between items-center mt-8 pt-6 border-t gap-4">
-            {currentQuestionIndex > 0 ? (
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                className="gap-2"
-              >
-                <ArrowLeft size={16} weight="bold" />
-                Назад
-              </Button>
-            ) : (
-              <div />
-            )}
-            
-            <Button
-              onClick={handleNext}
-              className="gap-2 ml-auto"
-            >
-              {currentQuestionIndex === questions.length - 1 ? (
-                <>
-                  Напред към Снимките
-                  <CheckCircle size={16} weight="bold" />
-                </>
-              ) : (
-                <>
-                  Напред
-                  <ArrowRight size={16} weight="bold" />
-                </>
-              )}
-            </Button>
-          </div>
         </Card>
+      </div>
+      </div>
+
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur-lg px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          {currentQuestionIndex > 0 ? (
+            <Button variant="outline" onClick={handleBack} className="gap-2 shrink-0" size="lg">
+              <ArrowLeft size={18} weight="bold" />
+              <span className="hidden xs:inline">Назад</span>
+            </Button>
+          ) : (
+            <div className="w-[72px] shrink-0" />
+          )}
+
+          {!currentQuestion.required && (
+            <Button variant="ghost" onClick={handleSkip} className="text-muted-foreground" size="lg">
+              Пропусни
+            </Button>
+          )}
+
+          <Button onClick={handleNext} className="gap-2 ml-auto flex-1 sm:flex-none" size="lg">
+            {currentQuestionIndex === questions.length - 1 ? (
+              <>
+                Към снимките
+                <CheckCircle size={18} weight="bold" />
+              </>
+            ) : (
+              <>
+                Напред
+                <ArrowRight size={18} weight="bold" />
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )
