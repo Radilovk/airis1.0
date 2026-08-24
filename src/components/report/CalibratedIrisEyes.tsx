@@ -3,9 +3,9 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Eye } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
-import { cellCenterInView, sectorRingWedgePath } from '@/lib/iris-coords'
-import { sectorsFor } from '@/lib/iris-map'
-import { isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
+import { cellCenterInView, sectorBandWedgePath } from '@/lib/iris-coords'
+import { sectorsFor, ringBand, type RingBandDef } from '@/lib/iris-map'
+import { isPlanRelevantFinding, groupFindingsForDisplay } from '@/lib/calibrated-report-summary'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
 
 const VIEW = 320
@@ -33,7 +33,8 @@ function IrisEyePanel({
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
   const allFindings = findings.filter(f => f.side === side)
   const relevant = allFindings.filter(isPlanRelevantFinding)
-  const eyeFindings = maxPerEye != null ? relevant.slice(0, maxPerEye) : relevant
+  const grouped = groupFindingsForDisplay(relevant)
+  const eyeFindings = maxPerEye != null ? grouped.slice(0, maxPerEye) : grouped
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
 
   const overlay = useMemo(() => {
@@ -70,7 +71,7 @@ function IrisEyePanel({
             {eyeFindings.map((f, i) => (
               <path
                 key={`w-${f.type}-${f.sector}-${f.ring}-${i}`}
-                d={sectorRingWedgePath(f.sector, f.ring, geometry, VIEW)}
+                d={sectorBandWedgePath(f.sector, f.ring, geometry, VIEW)}
                 fill={loadColor(f.confidence)}
                 stroke={activeIdx === i ? '#fff' : 'rgba(255,255,255,0.35)'}
                 strokeWidth={activeIdx === i ? 2 : 1}
@@ -122,21 +123,23 @@ function IrisEyePanel({
         ) : (
           eyeFindings.map((f, i) => {
             const sector = sectorsFor(side)[f.sector - 1]
+            const band: RingBandDef = ringBand(f.ring)
             return (
               <li
-                key={`${f.type}-${f.sector}-${f.ring}-${i}`}
+                key={`${f.type}-${f.sector}-${band.key}-${i}`}
                 className={`flex gap-2 rounded-lg px-2.5 py-2 transition-colors ${activeIdx === i ? 'bg-primary/15 ring-1 ring-primary/30' : 'bg-muted/40'}`}
                 onMouseEnter={() => setActiveIdx(i)}
                 onMouseLeave={() => setActiveIdx(null)}
               >
                 <span className="shrink-0 font-mono text-xs text-primary">
-                  S{f.sector}/R{f.ring}
+                  С{f.sector}
                 </span>
                 <span className="min-w-0">
                   <span className="font-medium">{f.label}</span>
-                  {sector && (
-                    <span className="block text-[11px] text-muted-foreground">{sector.label}</span>
-                  )}
+                  <span className="block text-[11px] text-muted-foreground">
+                    {band.label}
+                    {sector ? ` · ${sector.label}` : ''}
+                  </span>
                 </span>
               </li>
             )
@@ -162,8 +165,8 @@ export default function CalibratedIrisEyes({
     <Card className="p-5 md:p-6">
       <h3 className="mb-1 text-lg font-bold">Къде на снимката са акцентите</h3>
       <p className="mb-5 text-sm text-muted-foreground">
-        Маркираните зони са достатъчно ясни, за да повлияят на препоръките. По-наситен
-        цвят означава по-висока увереност в находката.
+        Маркираните зони са по пръstenни пояси от атласа (IPB, STOM, ANW, ORG, LYM, SCU) —
+        не по отделни микро-пръstenи. Показваме само достатъчно ясни находки.
       </p>
       <div className="grid gap-8 md:grid-cols-2">
         <IrisEyePanel
