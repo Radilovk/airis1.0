@@ -3,6 +3,7 @@
  * в разбираемо обобщение за клиента.
  */
 import type { CalibratedAnalysisPayload } from '@/types'
+import { ringBand } from '@/lib/iris-map'
 
 export type CalibratedVerdict = 'stable' | 'mild' | 'focus'
 
@@ -19,7 +20,29 @@ export interface CalibratedReportSummary {
 
 /** Находка, която заслужава да се покаже на снимката и в списъка. */
 export function isPlanRelevantFinding(f: CalibratedAnalysisPayload['findings'][number]): boolean {
-  return f.confidence >= 0.55
+  return f.confidence >= 0.6
+}
+
+/**
+ * Групира находки по сектор + пръstenен пояс + тип.
+ * R1 и R2 в STOM стават един маркер — така е в manual.json / RING_BANDS.
+ */
+export function groupFindingsForDisplay(
+  findings: CalibratedAnalysisPayload['findings']
+): CalibratedAnalysisPayload['findings'] {
+  const map = new Map<string, CalibratedAnalysisPayload['findings'][number]>()
+
+  for (const f of findings) {
+    const band = ringBand(f.ring)
+    const key = `${f.side}:${f.type}:${f.sector}:${band.key}`
+    const prev = map.get(key)
+    if (!prev || f.confidence > prev.confidence) {
+      const midRing = Math.round((band.rings[0] + band.rings[1]) / 2)
+      map.set(key, { ...f, ring: midRing })
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.confidence - a.confidence)
 }
 
 export function summarizeCalibratedReport(

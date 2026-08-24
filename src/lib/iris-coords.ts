@@ -4,6 +4,7 @@
  */
 import type { IrisGeometrySnapshot } from '@/types'
 import { fitImageInSquare } from './image-utils'
+import { ringBand } from './iris-map'
 
 /** Център на клетка (sector 1..12, ring 0..11) в пиксели на оригиналната снимка. */
 export function cellCenterInImage(
@@ -66,6 +67,42 @@ export function polarToView(
   const ix = cx + radius * Math.sin(thetaRad)
   const iy = cy - radius * Math.cos(thetaRad)
   return { x: ix * scale + offsetX, y: iy * scale + offsetY }
+}
+
+/** SVG path за секторен сегмент в целия пръstenен пояс (IPB, STOM, ANW …). */
+export function sectorBandWedgePath(
+  sector: number,
+  ring: number,
+  geometry: IrisGeometrySnapshot,
+  viewSize: number
+): string {
+  const cx = geometry.limbus.cx
+  const cy = geometry.limbus.cy
+  const rp = geometry.pupil.r
+  const ri = geometry.limbus.r
+  const span = ri - rp
+  const band = ringBand(ring)
+  const inner = rp + span * (band.rings[0] / 12)
+  const outer = rp + span * ((band.rings[1] + 1) / 12)
+  const { start, end } = sectorAngles(sector)
+  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
+  const riScaled = outer * scale
+  const roScaled = inner * scale
+
+  const p1 = polarToView(cx, cy, inner, start, geometry, viewSize)
+  const p2 = polarToView(cx, cy, outer, start, geometry, viewSize)
+  const p3 = polarToView(cx, cy, outer, end, geometry, viewSize)
+  const p4 = polarToView(cx, cy, inner, end, geometry, viewSize)
+
+  const largeArc = end - start > Math.PI ? 1 : 0
+  return [
+    `M ${p1.x} ${p1.y}`,
+    `L ${p2.x} ${p2.y}`,
+    `A ${riScaled} ${riScaled} 0 ${largeArc} 1 ${p3.x} ${p3.y}`,
+    `L ${p4.x} ${p4.y}`,
+    `A ${roScaled} ${roScaled} 0 ${largeArc} 0 ${p1.x} ${p1.y}`,
+    'Z',
+  ].join(' ')
 }
 
 /** SVG path за секторен сегмент между два пръстена. */

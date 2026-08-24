@@ -1,5 +1,6 @@
 import type { AnalysisReport } from '@/types'
-import { summarizeCalibratedReport, isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
+import { summarizeCalibratedReport, isPlanRelevantFinding, groupFindingsForDisplay } from '@/lib/calibrated-report-summary'
+import { ringBand } from '@/lib/iris-map'
 
 function esc(s: string): string {
   return s
@@ -15,7 +16,7 @@ export function generateCalibratedReportHTML(report: AnalysisReport): string {
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   const summary = summarizeCalibratedReport(cal, { briefSummary: report.briefSummary, avgHealth })
   const bmi = (report.questionnaireData.weight / ((report.questionnaireData.height / 100) ** 2)).toFixed(1)
-  const relevantFindings = cal.findings.filter(isPlanRelevantFinding)
+  const relevantFindings = groupFindingsForDisplay(cal.findings.filter(isPlanRelevantFinding))
   const plan = report.detailedPlan
 
   const systemsHtml = cal.systems
@@ -58,7 +59,10 @@ export function generateCalibratedReportHTML(report: AnalysisReport): string {
           <ul class="findings-list">
             ${
               items.length
-                ? items.map(f => `<li><strong>${esc(f.label)}</strong> · сектор ${f.sector}, пръsten ${f.ring}</li>`).join('')
+                ? items.map(f => {
+                    const band = ringBand(f.ring)
+                    return `<li><strong>${esc(f.label)}</strong> · сектор ${f.sector}, ${esc(band.label)}</li>`
+                  }).join('')
                 : '<li class="muted">Няма значими маркери за това око.</li>'
             }
           </ul>

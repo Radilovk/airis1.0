@@ -233,7 +233,7 @@ export function normalizeFindings(
     if (ring < def.validRings[0] || ring > def.validRings[1]) continue
 
     const confidence = Math.max(0, Math.min(1, Number(o.confidence ?? 0.6)))
-    if (confidence < 0.35) continue
+    if (confidence < 0.45) continue
 
     const size = asSize(o.size)
     const centreMinute = (sector - 1) * 5 + 2.5
