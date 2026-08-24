@@ -1300,12 +1300,10 @@
       <input type="password" id="api-key-input" placeholder="Gemini API ключ (AIza...)" />
       <label for="model-select" style="display:block;font-weight:700;margin-bottom:6px;font-size:.9rem">AI модел</label>
       <select id="model-select" style="width:100%;padding:12px;border:2px solid #dfe6e9;border-radius:12px;font-family:inherit;font-size:16px;margin-bottom:12px;font-weight:700">
-        <option value="gemini-2.0-flash">Gemini 2.0 Flash — препоръчан (без thinking)</option>
-        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite — бърз</option>
-        <option value="gemini-2.5-flash">Gemini 2.5 Flash — thinking изключен</option>
+        <!-- Попълва се от JS — LEARN_MODELS -->
       </select>
       <p style="font-size:.82rem;color:var(--text-light);margin-bottom:16px;line-height:1.4">
-        ⚠️ Модели с „thinking" (Gemini 3, 2.5 Pro) консумират токени за размисъл и често връщат счупен JSON. За домашна работа ползвай 2.0 Flash.
+        Thinking е изключен (<code>minimal</code> / <code>budget:0</code>). За снимки + JSON препоръчваме Flash Lite.
       </p>
       <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-weight:700;cursor:pointer">
         <input type="checkbox" id="focus-mode-check" checked />
@@ -1331,7 +1329,7 @@
       combo: 0,
       answered: false,
       apiKey: '',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash-lite',
       focusMode: true,
     };
 
@@ -1357,31 +1355,54 @@
       calculation: 'Сметка',
     };
 
-    // Модел по подразбиране — БЕЗ thinking (важно за чист JSON)
-    const LEARN_DEFAULT_MODEL = 'gemini-2.0-flash';
+    // Актуални модели (авг. 2026) — синхронизирани с AdminScreen
+    const LEARN_MODELS = [
+      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite — препоръчан' },
+      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+      { id: 'gemini-flash-lite-latest', label: 'Flash Lite (latest)' },
+      { id: 'gemini-flash-latest', label: 'Flash (latest)' },
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    ];
 
-    function isThinkingHeavyModel(model) {
-      return /gemini-3|2\.5-pro|pro-latest|flash-latest/i.test(model || '');
-    }
+    const LEARN_DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+    const LEARN_MODEL_IDS = new Set(LEARN_MODELS.map(m => m.id));
 
-    function resolveLearnModel(model) {
+    function normalizeLearnModel(model) {
       const m = (model || '').trim();
-      if (!m) return LEARN_DEFAULT_MODEL;
-      // Не ползвай thinking модели от основното приложение
-      if (isThinkingHeavyModel(m)) return LEARN_DEFAULT_MODEL;
-      return m;
+      if (LEARN_MODEL_IDS.has(m)) return m;
+      // Мапване от основното приложение към най-близкия актуален
+      if (/flash-lite|3\.5-flash-lite/i.test(m)) return 'gemini-3.5-flash-lite';
+      if (/3\.6-flash/i.test(m)) return 'gemini-3.6-flash';
+      if (/3\.5-flash/i.test(m)) return 'gemini-3.5-flash';
+      if (m === 'gemini-flash-latest') return 'gemini-flash-latest';
+      if (m === 'gemini-flash-lite-latest') return 'gemini-flash-lite-latest';
+      if (/2\.5-flash-lite/i.test(m)) return 'gemini-2.5-flash-lite';
+      if (/2\.5-flash/i.test(m)) return 'gemini-2.5-flash';
+      return LEARN_DEFAULT_MODEL;
     }
 
     function buildThinkingConfig(model) {
-      // Gemini 2.5 Flash/Lite: изключи thinking (консумира токени, чупи JSON)
-      if (/2\.5-flash/i.test(model)) {
+      const m = model || LEARN_DEFAULT_MODEL;
+      // Gemini 3.x: "minimal" = без thinking за повечето задачи (официално от Google)
+      if (/gemini-3|flash-latest/i.test(m)) {
+        return { thinkingConfig: { thinkingLevel: 'minimal' } };
+      }
+      // Gemini 2.5 Flash/Lite: thinkingBudget 0 изключва thinking
+      if (/2\.5/i.test(m)) {
         return { thinkingConfig: { thinkingBudget: 0 } };
       }
-      // Gemini 3.x: минимален thinking (не може напълно да се изключи)
-      if (/gemini-3/i.test(model)) {
-        return { thinkingConfig: { thinkingLevel: 'low' } };
-      }
       return {};
+    }
+
+    function populateModelSelect() {
+      const sel = $('model-select');
+      if (!sel) return;
+      sel.innerHTML = LEARN_MODELS.map(m =>
+        `<option value="${m.id}">${m.label}</option>`
+      ).join('');
+      sel.value = normalizeLearnModel(state.model);
     }
 
     function extractGeminiText(data) {
@@ -1560,12 +1581,14 @@
         });
         if (config?.apiKey) {
           state.apiKey = config.apiKey;
-          // НЕ наследяваме модела от основното приложение — там често е thinking модел
+          if (config.model?.includes('gemini')) {
+            state.model = normalizeLearnModel(config.model);
+          }
         }
       } catch (_) {}
-      // Собствен модел за learn (localStorage има приоритет)
       const savedModel = localStorage.getItem('learn_model');
-      state.model = resolveLearnModel(savedModel || LEARN_DEFAULT_MODEL);
+      if (savedModel) state.model = normalizeLearnModel(savedModel);
+      else state.model = normalizeLearnModel(state.model);
     }
 
     // ── Robust AI JSON parsing ──
@@ -1677,7 +1700,7 @@ ${raw.slice(0, 6000)}`;
       }
       parts.push({ text: prompt });
 
-      const model = resolveLearnModel(state.model);
+      const model = normalizeLearnModel(state.model);
       const generationConfig = {
         temperature: 0.1,
         maxOutputTokens: 8192,
@@ -1706,7 +1729,7 @@ ${raw.slice(0, 6000)}`;
       const text = extractGeminiText(data);
       if (!text) {
         const reason = data?.candidates?.[0]?.finishReason || 'unknown';
-        throw new Error(`AI не върна текст (причина: ${reason}). Опитай с Gemini 2.0 Flash.`);
+        throw new Error(`AI не върна текст (причина: ${reason}). Опитай с Gemini 3.5 Flash Lite.`);
       }
       return text;
     }
@@ -2714,14 +2737,14 @@ ANSWER: value + mode (exact|numeric|set|fuzzy|ai)
     // Settings
     $('settings-open').addEventListener('click', () => {
       $('api-key-input').value = state.apiKey;
-      $('model-select').value = resolveLearnModel(state.model);
+      $('model-select').value = normalizeLearnModel(state.model);
       $('focus-mode-check').checked = state.focusMode;
       $('settings-modal').classList.add('open');
     });
     $('settings-close').addEventListener('click', () => $('settings-modal').classList.remove('open'));
     $('settings-save').addEventListener('click', () => {
       state.apiKey = $('api-key-input').value.trim();
-      state.model = resolveLearnModel($('model-select').value);
+      state.model = normalizeLearnModel($('model-select').value);
       state.focusMode = $('focus-mode-check').checked;
       localStorage.setItem('learn_api_key', state.apiKey);
       localStorage.setItem('learn_model', state.model);
@@ -2733,7 +2756,8 @@ ANSWER: value + mode (exact|numeric|set|fuzzy|ai)
     (async () => {
       await loadApiKey();
       state.focusMode = localStorage.getItem('learn_focus_mode') !== 'false';
-      state.model = resolveLearnModel(state.model);
+      state.model = normalizeLearnModel(state.model);
+      populateModelSelect();
       if (!state.apiKey) {
         // Show settings hint on first visit
         setTimeout(() => {
