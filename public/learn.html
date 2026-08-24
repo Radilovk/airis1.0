@@ -1012,6 +1012,36 @@
 
     .hidden { display: none !important; }
 
+    .analyze-error-toast {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 20px;
+      animation: fadeIn .25s ease;
+    }
+    .analyze-error-inner {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+    }
+    .analyze-error-inner p {
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
     @media (max-width: 380px) {
       .welcome-title { font-size: 1.6rem; }
       .task-question { font-size: 1.35rem; }
@@ -1365,6 +1395,106 @@
       } catch (_) {}
     }
 
+    // ── Robust AI JSON parsing ──
+    function repairJsonString(str) {
+      let s = str.trim();
+      // Remove markdown fences
+      s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+      // Smart quotes → straight quotes
+      s = s.replace(/[\u201c\u201d\u00ab\u00bb]/g, '"');
+      s = s.replace(/[\u2018\u2019]/g, "'");
+      // Trailing commas before } or ]
+      s = s.replace(/,\s*([}\]])/g, '$1');
+      // Remove control chars except newline/tab in strings is risky - skip
+      return s;
+    }
+
+    function extractJsonObject(text) {
+      const start = text.indexOf('{');
+      if (start === -1) return null;
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) return text.slice(start, i + 1);
+        }
+      }
+      // Truncated — try to close
+      let partial = text.slice(start);
+      partial = repairJsonString(partial);
+      const opens = (partial.match(/\{/g) || []).length;
+      const closes = (partial.match(/\}/g) || []).length;
+      const openBrackets = (partial.match(/\[/g) || []).length;
+      const closeBrackets = (partial.match(/\]/g) || []).length;
+      partial += ']'.repeat(Math.max(0, openBrackets - closeBrackets));
+      partial += '}'.repeat(Math.max(0, opens - closes));
+      return partial;
+    }
+
+    function parseAIJson(raw) {
+      if (!raw || typeof raw !== 'string') return null;
+      const attempts = [
+        () => JSON.parse(raw),
+        () => JSON.parse(repairJsonString(raw)),
+        () => JSON.parse(extractJsonObject(raw)),
+        () => JSON.parse(repairJsonString(extractJsonObject(raw) || '')),
+      ];
+      for (const attempt of attempts) {
+        try {
+          const result = attempt();
+          if (result && typeof result === 'object') return result;
+        } catch (_) { /* next */ }
+      }
+      return null;
+    }
+
+    async function parseAIJsonWithRetry(raw, imageDataUrl) {
+      let parsed = parseAIJson(raw);
+      if (parsed?.tasks?.length) return parsed;
+
+      // Ask AI to fix its own broken JSON
+      try {
+        const fixPrompt = `Поправи следния счупен JSON. Върни САМО валиден JSON обект, без текст преди/след.
+Правила: двойни кавички, без trailing commas, escape-ни кавички в текстове.
+Оригинал:
+${raw.slice(0, 6000)}`;
+        const fixed = await callGemini(fixPrompt, null, true);
+        parsed = parseAIJson(fixed);
+        if (parsed?.tasks?.length) return parsed;
+      } catch (_) { /* fall through */ }
+
+      // Simpler re-extraction with minimal schema
+      try {
+        const simple = await callGemini(SIMPLE_EXTRACT_PROMPT, imageDataUrl, true);
+        parsed = parseAIJson(simple);
+        if (parsed?.tasks?.length) return parsed;
+      } catch (_) { /* fall through */ }
+
+      return null;
+    }
+
+    function showAnalyzeError(message) {
+      const el = document.createElement('div');
+      el.className = 'analyze-error-toast';
+      el.innerHTML = `
+        <div class="analyze-error-inner">
+          <span style="font-size:2rem">😕</span>
+          <p>${escapeHtml(message)}</p>
+          <button class="btn btn-primary" id="error-dismiss">Опитай пак</button>
+        </div>`;
+      document.body.appendChild(el);
+      el.querySelector('#error-dismiss').addEventListener('click', () => el.remove());
+      setTimeout(() => el.remove(), 12000);
+    }
+
     // ── Gemini API ──
     async function callGemini(prompt, imageDataUrl, jsonMode = true) {
       const parts = [];
@@ -1393,76 +1523,65 @@
 
       const body = await res.text();
       if (!res.ok) throw new Error(`AI грешка ${res.status}: ${body.slice(0, 200)}`);
-      const data = JSON.parse(body);
+      let data;
+      try { data = JSON.parse(body); }
+      catch { throw new Error('AI сървърът върна неочакван отговор. Опитай пак.'); }
       return data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
     }
 
-    const EXTRACT_PROMPT = `Ти си учител за деца 7-8 г. в България. Анализирай снимката на домашна работа (тетрадка, лист, учебник).
-
-ИГНОРИРАЙ ръкописните отговори на детето.
-Всяка подточка (а, б, в) и всяко отделно уравнение = ОТДЕЛНА задача.
-
-За ВСЯКА задача върни гъвкава JSON схема с display (как да се покаже) и input (как да се отговори):
+    const SIMPLE_EXTRACT_PROMPT = `Анализирай снимката на домашна работа за деца 7-8 г. Игнорирай ръкописни отговори.
+Върни САМО валиден JSON (без trailing commas, escape-вай кавички в текстове):
 
 {
-  "subject": "математика|български|природни|друго",
+  "tasks": [
+    {
+      "meta": { "source": "Стр. 60 · Задача 1", "emoji": "🔢" },
+      "display": [
+        { "type": "paragraph", "text": "текст на задачата", "style": "story" },
+        { "type": "heading", "text": "въпрос?" }
+      ],
+      "input": { "type": "number", "layout": "numpad" },
+      "answer": { "value": "20", "mode": "numeric" },
+      "hint": "подсказка"
+    }
+  ]
+}
+
+За сравнение: input.type="symbol_pick", symbols=["<","=",">"], answer.value="="
+За избор: input.type="single_choice", options=["А","Б","В"]
+Раздели всяка подточка и уравнение. Макс 20 задачи.`;
+
+    const EXTRACT_PROMPT = `Ти си учител за деца 7-8 г. в България. Анализирай снимката на домашна работа.
+
+ВАЖНО ЗА JSON:
+- Върни САМО валиден JSON — без trailing commas, без коментари
+- В текстовете escape-вай кавички: \\"
+- Не слагай нов ред в стойности на strings
+
+ИГНОРИРАЙ ръкописните отговори. Всяка подточка = отделна задача.
+
+{
+  "subject": "математика",
   "tasks": [
     {
       "meta": { "source": "Стр. 60 · Задача 1", "emoji": "📖", "badge": "Текстова задача" },
       "display": [
         { "type": "badge", "text": "Текстова задача" },
-        { "type": "paragraph", "text": "Пълен текст на историята...", "style": "story" },
-        { "type": "heading", "text": "Колко маси е имало?", "size": "md" }
+        { "type": "paragraph", "text": "Пълен текст...", "style": "story" },
+        { "type": "heading", "text": "Въпрос?", "size": "md" }
       ],
-      "input": {
-        "type": "number",
-        "label": "Твоят отговор",
-        "layout": "numpad"
-      },
+      "input": { "type": "number", "layout": "numpad", "label": "Твоят отговор" },
       "answer": { "value": "20", "mode": "numeric" },
-      "hint": "Сложи продадените и останалите!"
+      "hint": "Подсказка"
     }
   ]
 }
 
-DISPLAY блокове (комбинирай свободно):
-- badge: { type, text }
-- label: { type, text } — напр. "а)"
-- heading: { type, text, size: "sm"|"md"|"lg" }
-- paragraph: { type, text, style: "normal"|"story"|"instruction" }
-- math: { type, expression: "20 = 15 + 3 + □", highlightBlanks: true }
-- compare: { type, left: "10 + 6", right: "4 + 12" }
-- list: { type, items: ["..."], ordered: true|false }
-- table: { type, headers: ["А","Б"], rows: [["1","2"]] }
-- callout: { type, text, icon: "💡" }
-- divider: { type }
-- columns: { type, columns: [[блокове], [блокове]] }
+DISPLAY: badge, label, heading, paragraph, math, compare, list, table, callout, divider, columns
+INPUT: number, text, single_choice, multi_choice, symbol_pick, fill_blanks, true_false, composite, ordering
+ANSWER: value + mode (exact|numeric|set|fuzzy|ai)
 
-INPUT типове (избери най-подходящия):
-- number: числов отговор. layout: "field"|"numpad"
-- text: свободен текст (български, думи)
-- single_choice: { options: ["А","Б","В","Г"] } — един верен
-- multi_choice: { options: [...], min: 1, max: 3 } — няколко верни
-- symbol_pick: { symbols: ["<","=",">"] } — за сравнения
-- fill_blanks: { parts: ["14 + 2 + ", { id:"x", placeholder:"?" }, " = 20"] }
-- true_false: { labels: ["Да","Не"] }
-- composite: { fields: [{ id:"a", type:"number", label:"Отговор а" }, ...] }
-- ordering: { items: ["първо","второ","трето"] } — подреди
-
-ANSWER:
-- value: string | number | string[] | { id: value, ... }
-- accept: ["синоними"] — по избор
-- mode: "exact"|"numeric"|"set"|"fuzzy"|"ai"
-
-ПРИМЕРИ:
-1. Текстова задача → display:[story paragraph, heading], input:number/numpad
-2. Уравнение 20=15+3+□ → display:[math], input:number или fill_blanks
-3. Сравнение → display:[compare], input:symbol_pick
-4. Избери верния отговор → display:[paragraph], input:single_choice
-5. Маркирай всички четни → input:multi_choice
-6. Задача с а) и б) → 2 отделни tasks с label блок
-
-Максимум 25 задачи. Прост български език.`;
+Максимум 20 задачи. Прост български.`;
 
     // ═══════════════════════════════════════════
     // FLEXIBLE TASK ENGINE
@@ -1685,15 +1804,10 @@ ANSWER:
 
     async function extractTasks(imageDataUrl) {
       const raw = await callGemini(EXTRACT_PROMPT, imageDataUrl, true);
-      let parsed;
-      try { parsed = JSON.parse(raw); }
-      catch {
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('AI не върна валиден JSON');
-        parsed = JSON.parse(match[0]);
-      }
-      if (!parsed.tasks?.length) {
-        throw new Error('Не открих задачи. Снимай по-ясно!');
+      const parsed = await parseAIJsonWithRetry(raw, imageDataUrl);
+
+      if (!parsed?.tasks?.length) {
+        throw new Error('Не успях да прочета задачите. Снимай по-ясно — цялата страница да се вижда, без размазване.');
       }
       return flattenTasks(parsed.tasks);
     }
@@ -1767,9 +1881,9 @@ ANSWER:
 Върни JSON: {"correct":true/false,"feedback":"кратко на български"}
 Приемай синоними и малки грешки.`;
           const raw = await callGemini(prompt, null, true);
-          const result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw);
-          if (result.feedback) setMascot(result.feedback);
-          return !!result.correct;
+          const result = parseAIJson(raw);
+          if (result?.feedback) setMascot(result.feedback);
+          return !!result?.correct;
         } catch { /* fall through */ }
       }
       return false;
@@ -2395,7 +2509,10 @@ ANSWER:
         updateStats();
         showOverview();
       } catch (err) {
-        alert(err.message || 'Грешка при анализ. Провери API ключа и опитай пак.');
+        const msg = (err.message || '').includes('JSON') || (err.message || '').includes('position')
+          ? 'AI върна счупени данни. Опитай с по-ясна снимка — цялата страница, добра светлина.'
+          : (err.message || 'Грешка при анализ. Провери API ключа и опитай пак.');
+        showAnalyzeError(msg);
         showScreen('capture');
       }
     });
