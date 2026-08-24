@@ -18,28 +18,8 @@ import {
 } from '@phosphor-icons/react'
 import type { CalibratedAnalysisPayload } from '@/types'
 
-/**
- * CalibratedInsightPanel — витрината на новия анализ.
- *
- * Показва трите неща, които правят резултата проверим, вместо просто красив:
- *   1. Приоритетните системи и защо са такива (проследими причини).
- *   2. Хранителните драйвери с обозначен ИЗТОЧНИК — въпросник, ирис, или и двете.
- */
-
 interface Props {
   data: CalibratedAnalysisPayload
-}
-
-const STRENGTH_STYLE: Record<string, { label: string; cls: string }> = {
-  high: { label: 'висок приоритет', cls: 'bg-rose-100 text-rose-800 border-rose-200' },
-  medium: { label: 'среден', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
-  low: { label: 'нисък', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
-}
-
-const SOURCE_STYLE: Record<string, { label: string; cls: string }> = {
-  both: { label: 'въпросник + ирис', cls: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-  iris: { label: 'от ириса', cls: 'bg-sky-100 text-sky-800 border-sky-200' },
-  questionnaire: { label: 'от въпросника', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
 }
 
 function scoreColour(score: number) {
@@ -62,7 +42,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
         <div>
           <div className="mb-3 flex items-center gap-2">
             <ShieldWarning size={20} weight="duotone" className="text-amber-600" />
-            <h3 className="text-lg font-semibold">Важно за твоя случай</h3>
+            <h3 className="text-lg font-semibold">Важно за вашия случай</h3>
           </div>
           <div className="space-y-2">
             {data.notices.map((n, i) => (
@@ -79,51 +59,34 @@ export default function CalibratedInsightPanel({ data }: Props) {
                       : 'border-amber-300 bg-amber-50/70'
                   }`}
                 >
-                  <div className="flex gap-3">
-                    <div
-                      className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
-                        n.level === 'critical' ? 'bg-rose-500' : 'bg-amber-500'
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <p
-                        className={`text-sm font-semibold ${
-                          n.level === 'critical' ? 'text-rose-900' : 'text-amber-900'
-                        }`}
-                      >
-                        {n.title}
-                      </p>
-                      <p
-                        className={`mt-1 text-xs leading-relaxed ${
-                          n.level === 'critical' ? 'text-rose-800' : 'text-amber-800'
-                        }`}
-                      >
-                        {n.body}
-                      </p>
-                    </div>
-                  </div>
+                  <p
+                    className={`text-sm font-semibold ${
+                      n.level === 'critical' ? 'text-rose-900' : 'text-amber-900'
+                    }`}
+                  >
+                    {n.title}
+                  </p>
+                  <p
+                    className={`mt-1 text-sm leading-relaxed ${
+                      n.level === 'critical' ? 'text-rose-800' : 'text-amber-800'
+                    }`}
+                  >
+                    {n.body}
+                  </p>
                 </Card>
               </motion.div>
             ))}
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Планът в таб „План“ е съобразен с горното — някои общи препоръки са
-            заменени или пропуснати нарочно.
-          </p>
         </div>
       )}
 
-      {/* ── Приоритетни системи ───────────────────────────────────────────── */}
       <div>
         <div className="mb-3 flex items-center gap-2">
           <Target size={20} weight="duotone" className="text-primary" />
-          <h3 className="text-lg font-semibold">Приоритетен фокус</h3>
-          <Badge variant="secondary" className="ml-1 text-[10px]">
-            метаболизъм · ендокринна · храносмилане
-          </Badge>
+          <h3 className="text-lg font-semibold">Системи във фокус</h3>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {priority.map((s, i) => {
             const c = scoreColour(s.score)
             const rank = data.focus.indexOf(s.key)
@@ -135,19 +98,21 @@ export default function CalibratedInsightPanel({ data }: Props) {
                 transition={{ delay: i * 0.07 }}
               >
                 <Card
-                  className="h-full cursor-pointer p-4 transition-shadow hover:shadow-md"
+                  className="h-full cursor-pointer p-4 transition-shadow active:scale-[0.99] hover:shadow-md"
                   onClick={() => setOpenSystem(openSystem === s.key ? null : s.key)}
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-semibold leading-tight">{s.label}</p>
                       {rank === 0 && (
                         <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
-                          <Fire size={12} weight="fill" /> водеща тема
+                          <Fire size={12} weight="fill" /> основен фокус
                         </span>
                       )}
                     </div>
-                    <span className={`text-2xl font-bold tabular-nums ${c.text}`}>{s.score}</span>
+                    <span className={`shrink-0 text-2xl font-bold tabular-nums ${c.text}`}>
+                      {s.score}
+                    </span>
                   </div>
 
                   <div className="mb-2 h-2 overflow-hidden rounded-full bg-muted">
@@ -159,7 +124,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
                     />
                   </div>
 
-                  <p className="text-xs leading-relaxed text-muted-foreground">{s.description}</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{s.description}</p>
 
                   <AnimatePresence initial={false}>
                     {openSystem === s.key && s.reasons.length > 0 && (
@@ -167,11 +132,11 @@ export default function CalibratedInsightPanel({ data }: Props) {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="mt-3 space-y-1 overflow-hidden border-t pt-3 text-xs text-muted-foreground"
+                        className="mt-3 space-y-1.5 overflow-hidden border-t pt-3 text-sm text-muted-foreground"
                       >
                         {s.reasons.map((r, k) => (
-                          <li key={k} className="flex gap-1.5">
-                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                          <li key={k} className="flex gap-2">
+                            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
                             <span>{r}</span>
                           </li>
                         ))}
@@ -180,10 +145,13 @@ export default function CalibratedInsightPanel({ data }: Props) {
                   </AnimatePresence>
 
                   {s.reasons.length > 0 && (
-                    <button className="mt-2 flex items-center gap-1 text-[11px] text-primary">
-                      {openSystem === s.key ? 'скрий причините' : 'защо?'}
+                    <button
+                      type="button"
+                      className="mt-2 flex items-center gap-1 text-xs font-medium text-primary"
+                    >
+                      {openSystem === s.key ? 'Скрий подробностите' : 'Виж подробностите'}
                       <CaretDown
-                        size={11}
+                        size={12}
                         className={`transition-transform ${openSystem === s.key ? 'rotate-180' : ''}`}
                       />
                     </button>
@@ -194,106 +162,96 @@ export default function CalibratedInsightPanel({ data }: Props) {
           })}
         </div>
 
-        {/* останалите системи */}
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {secondary.map(s => {
-            const c = scoreColour(s.score)
-            return (
-              <Card key={s.key} className="p-3">
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{s.label}</span>
-                  <span className={`text-sm font-bold tabular-nums ${c.text}`}>{s.score}</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full bg-gradient-to-r ${c.bar}`}
-                    style={{ width: `${s.score}%` }}
-                  />
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+        {secondary.length > 0 && (
+          <div className="mt-3 grid gap-2 grid-cols-2 lg:grid-cols-4">
+            {secondary.map(s => {
+              const c = scoreColour(s.score)
+              return (
+                <Card key={s.key} className="p-3">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium">{s.label}</span>
+                    <span className={`shrink-0 text-sm font-bold tabular-nums ${c.text}`}>
+                      {s.score}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${c.bar}`}
+                      style={{ width: `${s.score}%` }}
+                    />
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* ── Драйвери ──────────────────────────────────────────────────────── */}
       {data.drivers.length > 0 && (
         <div>
           <div className="mb-3 flex items-center gap-2">
             <ListChecks size={20} weight="duotone" className="text-primary" />
-            <h3 className="text-lg font-semibold">Какво движи плана</h3>
+            <h3 className="text-lg font-semibold">Ключови насоки</h3>
           </div>
           <div className="space-y-2">
-            {data.drivers.map((d, i) => {
-              const st = STRENGTH_STYLE[d.strength] ?? STRENGTH_STYLE.low
-              const src = SOURCE_STYLE[d.source] ?? SOURCE_STYLE.questionnaire
-              return (
-                <motion.div
-                  key={d.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.4) }}
-                >
-                  <Card className="p-4">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                        {i + 1}
-                      </span>
-                      <Badge variant="outline" className={`text-[10px] ${st.cls}`}>
-                        {st.label}
+            {data.drivers.map((d, i) => (
+              <motion.div
+                key={d.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.4) }}
+              >
+                <Card className="p-4">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {i + 1}
+                    </span>
+                    {d.strength === 'high' && (
+                      <Badge variant="outline" className="border-rose-200 bg-rose-50 text-[10px] text-rose-800">
+                        Висок приоритет
                       </Badge>
-                      <Badge variant="outline" className={`text-[10px] ${src.cls}`}>
-                        {src.label}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-medium">{d.observation}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.action}</p>
-                  </Card>
-                </motion.div>
-              )
-            })}
+                    )}
+                  </div>
+                  <p className="text-sm font-medium leading-snug">{d.observation}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{d.action}</p>
+                </Card>
+              </motion.div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ── Технически детайли (скрити по подразбиране) ───────────────────── */}
       <Collapsible open={techOpen} onOpenChange={setTechOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border bg-muted/30 px-4 py-3 text-sm font-medium">
+        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border bg-muted/30 px-4 py-3.5 text-sm font-medium active:bg-muted/50">
           <span className="flex items-center gap-2">
             <Gauge size={18} weight="duotone" />
-            Как е изчислен резултатът
+            Подробности за анализа
           </span>
           <CaretDown size={16} className={`transition-transform ${techOpen ? 'rotate-180' : ''}`} />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Card className="mt-2 overflow-hidden border-0 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-slate-100">
             <div className="p-5 md:p-6">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Metric label="Качество на снимките" value={`${data.imageQuality}/100`} hint="Резкост, зеница, отблясъци" />
-                <Metric label="Разчетена площ" value={`${Math.round(data.stripCoverage * 100)}%`} hint="Закрито от клепач/отблясък" />
-                {typeof data.agreement === 'number' && (
-                  <Metric label="Повторяемост" value={`${Math.round(data.agreement * 100)}%`} hint="Съвпадение между два прочита" />
-                )}
-                <Metric label="Тежест на ириса" value={`${Math.round(data.irisWeight * 100)}%`} hint="Останалото — въпросник" accent />
+              <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                <Metric label="Качество на снимките" value={`${data.imageQuality}/100`} hint="Резкост и осветеност" />
+                <Metric label="Видима площ" value={`${Math.round(data.stripCoverage * 100)}%`} hint="Незакрита от клепач" />
+                <Metric label="Дял на ириса" value={`${Math.round(data.irisWeight * 100)}%`} hint="В общата оценка" accent />
               </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                Много от прегледаните точки са нормални вариации на ириса и не влизат в плана,
-                освен ако не са потвърдени или достатъчно ясни.
+                Много от прегледаните зони са нормални вариации и не влизат в плана.
               </p>
             </div>
           </Card>
         </CollapsibleContent>
       </Collapsible>
 
-      {/* ── Дисклеймър ────────────────────────────────────────────────────── */}
-      <Card className="border-amber-200 bg-amber-50/60 p-4">
+      <Card className="border-amber-200/80 bg-amber-50/50 p-4">
         <div className="flex gap-2.5">
           <Scales size={18} weight="duotone" className="mt-0.5 shrink-0 text-amber-700" />
           <p className="text-xs leading-relaxed text-amber-900">
-            Този анализ <strong>не е медицинска диагностика</strong> и не замества преглед,
-            изследвания или лечение. Ирисодиагностиката няма доказана диагностична стойност
-            в конвенционалната медицина. Тук тя се използва като допълнителен ориентир към
-            въпросника при съставянето на хранителен план. При оплаквания се обърнете към лекар.
+            Този анализ <strong>не е медицинска диагностика</strong> и не замества преглед
+            или лечение. Използва се като ориентир за хранителен и начин на живот план.
+            При оплаквания се обърнете към лекар.
           </p>
         </div>
       </Card>

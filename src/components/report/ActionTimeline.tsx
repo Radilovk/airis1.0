@@ -165,7 +165,7 @@ export default function ActionTimeline({ report }: ActionTimelineProps) {
                         <span>{item.duration}</span>
                       </div>
                     </div>
-                    {getPriorityBadge(item.priority)}
+                    {item.priority === 'high' && getPriorityBadge(item.priority)}
                   </div>
                   
                   <div className="space-y-2">

@@ -10,9 +10,9 @@ import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } 
 
 const VIEW = 320
 
-function loadColor(confidence: number, confirmations?: number): string {
-  if ((confirmations ?? 1) >= 2) return 'rgba(239, 68, 68, 0.55)'
-  if (confidence >= 0.7) return 'rgba(234, 179, 8, 0.5)'
+function loadColor(confidence: number): string {
+  if (confidence >= 0.75) return 'rgba(239, 68, 68, 0.55)'
+  if (confidence >= 0.6) return 'rgba(234, 179, 8, 0.5)'
   return 'rgba(250, 204, 21, 0.35)'
 }
 
@@ -71,7 +71,7 @@ function IrisEyePanel({
               <path
                 key={`w-${f.type}-${f.sector}-${f.ring}-${i}`}
                 d={sectorRingWedgePath(f.sector, f.ring, geometry, VIEW)}
-                fill={loadColor(f.confidence, f.confirmations)}
+                fill={loadColor(f.confidence)}
                 stroke={activeIdx === i ? '#fff' : 'rgba(255,255,255,0.35)'}
                 strokeWidth={activeIdx === i ? 2 : 1}
                 className="pointer-events-auto cursor-pointer"
@@ -162,8 +162,8 @@ export default function CalibratedIrisEyes({
     <Card className="p-5 md:p-6">
       <h3 className="mb-1 text-lg font-bold">Къде на снимката са акцентите</h3>
       <p className="mb-5 text-sm text-muted-foreground">
-        Всяка маркирана зона е достатъчно ясна, за да повлияе на препоръките. Цветът показва
-        сигурността — червено = потвърдено два пъти, жълто = един ясен прочит.
+        Маркираните зони са достатъчно ясни, за да повлияят на препоръките. По-наситен
+        цвят означава по-висока увереност в находката.
       </p>
       <div className="grid gap-8 md:grid-cols-2">
         <IrisEyePanel

@@ -407,13 +407,20 @@ export async function detectEye(
     await Promise.all(jobs.map(([layer, idx, progress]) => runDetection(layer, idx, progress)))
   }
 
-  // Сливане на двата прочита. Тук се ражда измерената повторяемост.
-  const merged = mergeSeamReadings(perReading[0] ?? [], perReading[1] ?? [])
+  // Един прочит на око — structure + pigment; без втори шев.
+  const merged =
+    perReading.length >= 2
+      ? mergeSeamReadings(perReading[0] ?? [], perReading[1] ?? [])
+      : {
+          findings: (perReading[0] ?? []).map(f => ({ ...f, confirmations: 1 as const })),
+          confirmed: 0,
+          total: perReading[0]?.length ?? 0,
+          agreement: 1,
+        }
   const collected = merged.findings
   addLog(
-    merged.agreement >= 0.5 ? 'success' : 'warning',
-    `[Детекция ${sideName}] Два прочита с различен шев: ${merged.confirmed} от ` +
-      `${merged.total} находки съвпадат (${Math.round(merged.agreement * 100)} % повторяемост)`
+    'success',
+    `[Детекция ${sideName}] ${collected.length} приети находки от structure и pigment слоевете`
   )
 
   // Конституция — кратък пас върху базовия слой.
@@ -546,15 +553,11 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
 
   const allFindings = [...left.findings, ...right.findings]
   const passTotal = left.passesOk + right.passesOk
-  if (passTotal < 10) {
-    addLog('warning', `Успели LLM паса: ${passTotal} от 10 — част от данните липсват.`)
+  const expectedPasses = 6
+  if (passTotal < expectedPasses) {
+    addLog('warning', `Успели LLM паса: ${passTotal} от ${expectedPasses} — част от данните липсват.`)
   }
   const agreement = (left.agreement + right.agreement) / 2
-  addLog(
-    agreement >= 0.5 ? 'success' : 'warning',
-    `Повторяемост на разчитането: ${Math.round(agreement * 100)} % ` +
-      `(${left.confirmedCount + right.confirmedCount} потвърдени находки от два независими прочита)`
-  )
   addLog(
     'success',
     `Общо ${allFindings.length} приети находки` +

@@ -872,7 +872,7 @@ export function unwrapAnalysisFromDataUrl(
       try {
         resolve({
           base: unwrapIris(img, geo, side, { ...options, layer: 'base' }),
-          readings: [0, SEAM_ROTATION].map(rotationSectors => ({
+          readings: [0].map(rotationSectors => ({
             rotationSectors,
             structure: unwrapIris(img, geo, side, { ...options, layer: 'structure', rotationSectors }),
             pigment: unwrapIris(img, geo, side, { ...options, layer: 'pigment', rotationSectors }),

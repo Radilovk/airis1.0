@@ -66,10 +66,9 @@ export default function CalibratedReportSummary({ data, avgHealth, briefSummary,
           <p className="mt-4 rounded-lg border bg-background/60 px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
             {summary.explanation}
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Прегледани точки" value={String(summary.totalDetected)} hint="микро-зони" />
-            <Stat label="За плана" value={String(summary.planRelevant)} hint="значими" />
-            <Stat label="Потвърдени" value={String(summary.confirmed)} hint="два прочита" />
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <Stat label="Прегледани" value={String(summary.totalDetected)} hint="зони" />
+            <Stat label="Значими" value={String(summary.planRelevant)} hint="за плана" />
             <Stat label="Сектори" value={String(summary.sectorsAffected)} hint="с акцент" />
           </div>
         </>

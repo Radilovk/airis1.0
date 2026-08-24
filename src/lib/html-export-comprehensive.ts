@@ -1,6 +1,11 @@
 import type { AnalysisReport } from '@/types'
+import { generateCalibratedReportHTML } from '@/lib/html-export-calibrated'
 
 export function generateComprehensiveReportHTML(report: AnalysisReport): string {
+  if (report.calibrated) {
+    return generateCalibratedReportHTML(report)
+  }
+
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   const bmi = (report.questionnaireData.weight / ((report.questionnaireData.height / 100) ** 2)).toFixed(1)
   const leftZones = report.leftIris?.zones || []
