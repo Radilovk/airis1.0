@@ -1,9 +1,8 @@
 import type { QuestionConfig } from '@/types'
 
 /**
- * Въпросник — кратък, ясен, mobile-first.
- * Задължителни: профил, цели, активност, сън, хидратация.
- * Останалото е по избор (може да се пропусне).
+ * Въпросник — само стойностни въпроси с условна логика (пол, възраст, ИТМ).
+ * Опциите се филтрират динамично в questionnaire-logic.ts.
  */
 export const defaultQuestions: QuestionConfig[] = [
   {
@@ -49,24 +48,24 @@ export const defaultQuestions: QuestionConfig[] = [
     id: 'goals',
     type: 'checkbox',
     question: 'Какво искате да постигнете?',
-    description: 'Можете да изберете няколко',
+    description: 'Показваме само подходящи цели според вашето тегло',
     required: true,
     allowOther: true,
     options: [
       { value: 'Отслабване', label: 'Отслабване' },
+      { value: 'Наддаване на тегло', label: 'Наддаване на тегло' },
       { value: 'Подобряване на здравето', label: 'По-добро здраве' },
       { value: 'Увеличаване на енергията', label: 'Повече енергия' },
       { value: 'Подобряване на съня', label: 'По-добър сън' },
       { value: 'Емоционален баланс', label: 'Емоционален баланс' },
       { value: 'Укрепване на мускулите', label: 'По-силни мускули' },
-      { value: 'Антиейджинг', label: 'Антиейджинг' },
     ],
   },
   {
     id: 'healthStatus',
     type: 'checkbox',
     question: 'Имате ли някое от следните състояния?',
-    description: 'По избор — помага за по-безопасен план',
+    description: 'По избор — списъкът се адаптира според пол, възраст и тегло',
     required: false,
     allowOther: true,
     options: [
@@ -78,20 +77,14 @@ export const defaultQuestions: QuestionConfig[] = [
       { value: 'Хипертония', label: 'Високо кръвно' },
       { value: 'Менопауза', label: 'Менопауза' },
       { value: 'Бременност', label: 'Бременност' },
+      { value: 'Кърмене', label: 'Кърмене / лактация' },
     ],
   },
   {
     id: 'complaints',
     type: 'textarea',
-    question: 'Какво ви притеснява в момента?',
-    description: 'Симптоми, оплаквания — по избор',
-    required: false,
-  },
-  {
-    id: 'medicalConditions',
-    type: 'textarea',
-    question: 'Хронични заболявания или лечение',
-    description: 'Включете и семейна обремененост, ако е важно',
+    question: 'Оплаквания, диагнози или лечение',
+    description: 'Симптоми, хронични заболявания, семейна обремененост — по избор',
     required: false,
   },
   {
@@ -193,7 +186,7 @@ export const defaultQuestions: QuestionConfig[] = [
     id: 'documents',
     type: 'file',
     question: 'Медицински документи',
-    description: 'По избор — лабораторни резултати, снимки',
+    description: 'По избор — лабораторни резултати',
     required: false,
   },
 ]

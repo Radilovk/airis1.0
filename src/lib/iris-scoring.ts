@@ -556,7 +556,9 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
   if (has(q.dietaryHabits, 'сладк', 'захар', 'газирани', 'бърза храна', 'тестен'))
     add('metabolic', 0.22, 'чести бързи въглехидрати в менюто')
   if (has(q.goals, 'отслабв', 'тегло', 'килограм'))
-    add('metabolic', 0.15, 'заявена цел, свързана с телесното тегло')
+    add('metabolic', 0.15, 'заявена цел, свързана с намаляване на тегло')
+  if (has(q.goals, 'наддаван', 'качван'))
+    add('metabolic', 0.12, 'заявена цел за качване на тегло')
 
   // ── храносмилане ──
   if (has(q.healthStatus, 'гастрит', 'рефлукс', 'киселин', 'язва', 'колит', 'храносмилане', 'запек', 'подуване'))
