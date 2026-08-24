@@ -28,6 +28,8 @@ import {
   getFilteredOptions,
   sanitizeAnswers,
   normalizeQuestionnairePayload,
+  applyCheckboxExclusion,
+  getQuestionSectionLabel,
   QUESTIONNAIRE_CONFIG_VERSION,
 } from '@/lib/questionnaire-logic'
 
@@ -75,19 +77,36 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     ? ((currentQuestionIndex + 1) / visibleQuestions.length) * 100
     : 0
 
-  const setAnswersSanitized = useCallback((next: Record<string, any>) => {
-    setAnswers(sanitizeAnswers(next))
-  }, [])
+  const setAnswersSanitized = useCallback(
+    (next: Record<string, any>) => {
+      setAnswers(sanitizeAnswers(next, allQuestions))
+    },
+    [allQuestions]
+  )
 
   useEffect(() => {
     setAnswers(prev => {
-      const cleaned = sanitizeAnswers(prev)
-      const goalsChanged = JSON.stringify(cleaned.goals) !== JSON.stringify(prev.goals)
-      const healthChanged = JSON.stringify(cleaned.healthStatus) !== JSON.stringify(prev.healthStatus)
-      if (goalsChanged || healthChanged) return cleaned
+      const cleaned = sanitizeAnswers(prev, allQuestions)
+      const changed =
+        JSON.stringify(cleaned.goals) !== JSON.stringify(prev.goals) ||
+        JSON.stringify(cleaned.healthStatus) !== JSON.stringify(prev.healthStatus) ||
+        cleaned.healthGate !== prev.healthGate ||
+        cleaned.dietGate !== prev.dietGate ||
+        cleaned.complaints !== prev.complaints ||
+        cleaned.medications !== prev.medications
+      if (changed) return cleaned
       return prev
     })
-  }, [answers.gender, answers.age, answers.weight, answers.height])
+  }, [
+    allQuestions,
+    answers.gender,
+    answers.age,
+    answers.weight,
+    answers.height,
+    answers.goals,
+    answers.healthGate,
+    answers.dietGate,
+  ])
 
   useEffect(() => {
     if (currentQuestionIndex >= visibleQuestions.length && visibleQuestions.length > 0) {
@@ -185,7 +204,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       }
     }
 
-    onComplete(normalizeQuestionnairePayload(mergedAnswers, uploadedFiles))
+    onComplete(normalizeQuestionnairePayload(mergedAnswers, uploadedFiles, allQuestions))
   }
 
   const handleCheckboxChange = (questionId: string, value: string, checked: boolean) => {
@@ -199,7 +218,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     }
     
     if (checked) {
-      setAnswersSanitized({ ...answers, [questionId]: [...current, value] })
+      const next = applyCheckboxExclusion(questionId, current, value, true)
+      setAnswersSanitized({ ...answers, [questionId]: next })
     } else {
       setAnswersSanitized({ ...answers, [questionId]: current.filter(v => v !== value) })
     }
@@ -530,6 +550,11 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               className="space-y-6"
             >
               <div className="space-y-2">
+                {getQuestionSectionLabel(currentQuestion.id) && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">
+                    {getQuestionSectionLabel(currentQuestion.id)}
+                  </p>
+                )}
                 <h2 className="text-xl md:text-2xl font-bold leading-snug tracking-tight">
                   {currentQuestion.question}
                   {currentQuestion.required && (

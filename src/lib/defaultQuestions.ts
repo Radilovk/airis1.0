@@ -1,10 +1,11 @@
 import type { QuestionConfig } from '@/types'
 
 /**
- * Въпросник — само стойностни въпроси с условна логика (пол, възраст, ИТМ).
- * Опциите се филтрират динамично в questionnaire-logic.ts.
+ * Въпросник v3 — decision tree с gate въпроси и автоматично разклоняване.
+ * Логиката е в questionnaire-logic.ts; редът тук определя flow-а.
  */
 export const defaultQuestions: QuestionConfig[] = [
+  // ── Профил ──
   {
     id: 'name',
     type: 'text',
@@ -44,11 +45,13 @@ export const defaultQuestions: QuestionConfig[] = [
     required: true,
     validation: { min: 50, max: 250 },
   },
+
+  // ── Цели ──
   {
     id: 'goals',
     type: 'checkbox',
     question: 'Какво искате да постигнете?',
-    description: 'Показваме само подходящи цели според вашето тегло',
+    description: 'Показваме само цели, подходящи за вашето тегло',
     required: true,
     allowOther: true,
     options: [
@@ -61,11 +64,24 @@ export const defaultQuestions: QuestionConfig[] = [
       { value: 'Укрепване на мускулите', label: 'По-силни мускули' },
     ],
   },
+
+  // ── Здраве (gate или автоматично) ──
+  {
+    id: 'healthGate',
+    type: 'radio',
+    question: 'Имате ли диагностицирано състояние, бременност или приемате лекарства?',
+    description: 'При здрав профил може да пропуснете следващите здравни въпроси',
+    required: true,
+    options: [
+      { value: 'yes', label: 'Да, има нещо за споделяне' },
+      { value: 'no', label: 'Не, здрав съм / няма нищо специално' },
+    ],
+  },
   {
     id: 'healthStatus',
     type: 'checkbox',
-    question: 'Имате ли някое от следните състояния?',
-    description: 'По избор — списъкът се адаптира според пол, възраст и тегло',
+    question: 'Кои от следните състояния имате?',
+    description: 'Списъкът е адаптиран според пол, възраст и тегло',
     required: false,
     allowOther: true,
     options: [
@@ -83,10 +99,19 @@ export const defaultQuestions: QuestionConfig[] = [
   {
     id: 'complaints',
     type: 'textarea',
-    question: 'Оплаквания, диагнози или лечение',
-    description: 'Симптоми, хронични заболявания, семейна обремененост — по избор',
+    question: 'Оплаквания, диагнози или семейна обремененост',
+    description: 'По избор — помага за по-точен план',
     required: false,
   },
+  {
+    id: 'medications',
+    type: 'textarea',
+    question: 'Лекарства и добавки',
+    description: 'Включете витамини и безрецептурни продукти',
+    required: false,
+  },
+
+  // ── Начин на живот ──
   {
     id: 'activityLevel',
     type: 'radio',
@@ -123,6 +148,7 @@ export const defaultQuestions: QuestionConfig[] = [
     id: 'sleepQuality',
     type: 'radio',
     question: 'Как оценявате съня си?',
+    description: 'Показва се при недостатъчен сън или ако сте посочили сън като цел',
     required: true,
     options: [
       { value: 'poor', label: 'Лош' },
@@ -138,6 +164,19 @@ export const defaultQuestions: QuestionConfig[] = [
     description: 'Една чаша ≈ 250 ml',
     required: true,
     validation: { min: 0, max: 15 },
+  },
+
+  // ── Хранене (gate или автоматично) ──
+  {
+    id: 'dietGate',
+    type: 'radio',
+    question: 'Искате ли да добавите хранителни предпочитания или ограничения?',
+    description: 'При стандартен профил може да пропуснете',
+    required: true,
+    options: [
+      { value: 'yes', label: 'Да, имам предпочитания или ограничения' },
+      { value: 'no', label: 'Не, няма специални изисквания' },
+    ],
   },
   {
     id: 'dietaryProfile',
@@ -175,13 +214,8 @@ export const defaultQuestions: QuestionConfig[] = [
     description: 'Например: лактоза, глутен, ядки',
     required: false,
   },
-  {
-    id: 'medications',
-    type: 'textarea',
-    question: 'Лекарства и добавки',
-    description: 'Включете витамини и безрецептурни продукти',
-    required: false,
-  },
+
+  // ── Документи (само при здрав блок) ──
   {
     id: 'documents',
     type: 'file',
