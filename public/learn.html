@@ -306,6 +306,124 @@
       line-height: 1.35;
       color: var(--text);
     }
+    .task-story {
+      background: linear-gradient(135deg, #f8f9ff, #eef2ff);
+      border-left: 5px solid var(--purple);
+      border-radius: 16px;
+      padding: 16px 18px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .equation-display {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 1.8rem;
+      font-weight: 800;
+      text-align: center;
+      background: #f1f2f6;
+      border-radius: 16px;
+      padding: 20px 16px;
+      letter-spacing: .04em;
+      color: var(--purple-dark);
+    }
+    .equation-display .blank {
+      display: inline-block;
+      min-width: 48px;
+      height: 48px;
+      line-height: 48px;
+      background: var(--yellow);
+      border: 3px dashed var(--orange);
+      border-radius: 10px;
+      margin: 0 4px;
+      vertical-align: middle;
+      animation: pulse 1.5s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .compare-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .compare-expr {
+      background: #f1f2f6;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .compare-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn-compare {
+      width: 80px;
+      height: 80px;
+      font-size: 2.2rem;
+      font-weight: 900;
+      border-radius: 20px;
+      border: 3px solid transparent;
+      background: var(--card);
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      cursor: pointer;
+      transition: transform .15s, border-color .15s;
+    }
+    .btn-compare:active { transform: scale(.92); }
+    .btn-compare.correct { background: var(--green-light); border-color: var(--green); }
+    .btn-compare.wrong { background: #fab1a0; border-color: var(--orange); }
+
+    /* ── Overview ── */
+    .overview-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .overview-item {
+      background: rgba(255,255,255,.92);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .overview-item .oi-num {
+      background: var(--purple);
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .overview-item .oi-text {
+      font-weight: 700;
+      font-size: .95rem;
+      line-height: 1.35;
+      flex: 1;
+    }
+    .overview-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
     .task-image-thumb {
       max-height: 120px;
       border-radius: 12px;
@@ -552,6 +670,8 @@
     }
     .focus-ring.active { opacity: 1; }
 
+    .hidden { display: none !important; }
+
     @media (max-width: 380px) {
       .welcome-title { font-size: 1.6rem; }
       .task-question { font-size: 1.35rem; }
@@ -589,6 +709,9 @@
         <p class="welcome-sub">Снимай домашната си работа и аз ще я превърна в игра! 🎮</p>
         <button class="btn btn-primary" id="btn-start">
           <span class="btn-icon">📸</span> Да започваме!
+        </button>
+        <button class="btn btn-secondary" id="btn-demo" style="margin-top:4px">
+          <span class="btn-icon">🎯</span> Пробвай с пример
         </button>
       </div>
     </section>
@@ -630,6 +753,15 @@
       </div>
     </section>
 
+    <!-- Overview (след анализ) -->
+    <section class="screen" id="screen-overview">
+      <h2 class="overview-title" id="overview-title">Намерих 0 задачи! 🎯</h2>
+      <div class="overview-list" id="overview-list"></div>
+      <button class="btn btn-primary" id="btn-play">
+        <span class="btn-icon">🚀</span> Да започваме!
+      </button>
+    </section>
+
     <!-- Task -->
     <section class="screen" id="screen-task">
       <div class="mascot-bar">
@@ -639,6 +771,8 @@
       <div class="task-card" id="task-card">
         <div class="task-number" id="task-number">Задача 1 от 5</div>
         <div class="task-emoji" id="task-emoji">🔢</div>
+        <div class="task-story hidden" id="task-story"></div>
+        <div class="equation-display hidden" id="task-equation"></div>
         <div class="task-question" id="task-question">5 + 3 = ?</div>
         <div id="task-answer-area"></div>
         <button class="hint-btn" id="hint-btn">💡 Покажи подсказка</button>
@@ -707,8 +841,16 @@
     };
 
     const TASK_EMOJIS = {
-      math: '🔢', reading: '📖', writing: '✏️', science: '🔬',
+      math: '🔢', word_problem: '📖', equation: '➕', comparison: '⚖️',
+      reading: '📖', writing: '✏️', science: '🔬',
       default: '❓', draw: '🎨', grammar: '📝',
+    };
+
+    const TASK_KIND_LABELS = {
+      word_problem: 'Текстова задача',
+      equation: 'Уравнение',
+      comparison: 'Сравнение',
+      calculation: 'Сметка',
     };
 
     // ── DOM refs ──
@@ -717,6 +859,7 @@
       welcome: $('screen-welcome'),
       capture: $('screen-capture'),
       analyzing: $('screen-analyzing'),
+      overview: $('screen-overview'),
       task: $('screen-task'),
       complete: $('screen-complete'),
     };
@@ -819,7 +962,7 @@
     function showScreen(name) {
       Object.values(screens).forEach(s => s.classList.remove('active'));
       screens[name].classList.add('active');
-      const showHeader = ['task', 'capture', 'analyzing'].includes(name);
+      const showHeader = ['task', 'capture', 'analyzing', 'overview'].includes(name);
       $('header').classList.toggle('hidden', !showHeader);
       $('progress-track').classList.toggle('hidden', name !== 'task');
       if (name === 'task') updateProgress();
@@ -913,35 +1056,114 @@
       return data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
     }
 
-    const EXTRACT_PROMPT = `Ти си учител по начално образование за деца на 7-8 години в България.
+    const EXTRACT_PROMPT = `Ти си учител по математика за 1.-2. клас (деца 7-8 г.) в България.
 
-Анализирай снимката на домашна работа и извлечи ВСИЧКИ задачи, които виждаш.
+Анализирай снимката на РАБОТНА ТЕТРАДКА по математика и извлечи ВСИЧКИ задачи.
 
-Върни JSON с този формат:
+ВАЖНО:
+- ИГНОРИРАЙ ръкописните отговори на детето (синьо/молив) — те НЕ са верни отговори за нас
+- Всяка подточка а), б), в) е ОТДЕЛНА задача
+- Ако една задача има няколко уравнения (напр. 6 реда с □), всяко уравнение е ОТДЕЛНА задача
+- Запази номерацията от тетрадката (стр., задача, подточка)
+
+ТИПОВЕ ЗАДАЧИ от български учебници:
+1. ТЕКСТОВА ЗАДАЧА (word_problem): история + въпрос. type="number"
+2. УРАВНЕНИЕ (equation): "20 = 15 + 3 + □" — намери числото в □. type="number", equation поле
+3. СРАВНЕНИЕ (comparison): "10 + 6 □ 4 + 12" — избери <, = или >. type="comparison", choices=["<","=",">"]
+4. СМЕТКА (calculation): "Събери събираемите 12, 5 и 3". type="number"
+
+Върни JSON:
 {
-  "subject": "математика|български|природни|друго",
+  "subject": "математика",
   "tasks": [
     {
-      "id": 1,
-      "question": "Ясен въпрос за детето (на български, кратък)",
-      "type": "choice|number|text",
-      "correctAnswer": "верният отговор",
-      "choices": ["опция А", "опция Б", "опция В", "опция Г"],
-      "hint": "кратка подсказка за детето",
-      "category": "math|reading|writing|science|grammar|draw|default"
+      "pageRef": "60",
+      "taskRef": "1",
+      "subRef": "",
+      "kind": "word_problem|equation|comparison|calculation",
+      "story": "Пълният текст на историята (само за word_problem)",
+      "equation": "20 = 15 + 3 + □",
+      "leftExpr": "10 + 6",
+      "rightExpr": "4 + 12",
+      "question": "Кратък въпрос за детето",
+      "type": "number|comparison|choice",
+      "correctAnswer": "20",
+      "choices": null,
+      "hint": "Подсказка: какво трябва да сметнеш?",
+      "category": "math"
     }
   ]
 }
 
+ПРИМЕРИ от реална тетрадка:
+- "След като продали 14 маси, останали 6. Колко маси е имало?" → correctAnswer: "20", kind: word_problem
+- "20 = 15 + 3 + □" → correctAnswer: "2", kind: equation
+- "10 + 6 □ 4 + 12" → correctAnswer: "=", kind: comparison
+- "След 2 години Таня ще е на 20. На колко е сега?" → correctAnswer: "18"
+- "Разказ от стр. 10 до стр. 15 — колко страници?" → correctAnswer: "6" (15-10+1 или 15-10 в зависимост от контекста)
+
 ПРАВИЛА:
-- За деца 7-8 г. — прост език, кратки изречения
-- За математика: type="number" или type="choice" с 3-4 опции
-- За български/четене: type="choice" с възможни отговори
-- choices: ВИНАГИ включи верния отговор + 2-3 грешни (разбъркай ги)
-- Ако задачата е неясна, опитай се да я преформулираш ясно
-- Максимум 15 задачи
-- Ако не виждаш задачи, върни празен tasks масив
-- correctAnswer трябва да съвпада ТОЧНО с една от choices (ако type=choice)`;
+- Прост български език, кратки изречения
+- Максимум 20 задачи (раздели всички подточки)
+- correctAnswer само число или символ (<, =, >)
+- За comparison: choices ВИНАГИ ["<", "=", ">"]
+- Ако не виждаш задачи → празен tasks масив`;
+
+    function normalizeTask(t, i) {
+      const kind = t.kind || (t.equation ? 'equation' : t.leftExpr ? 'comparison' : t.story ? 'word_problem' : 'calculation');
+      let type = t.type || 'number';
+      if (kind === 'comparison') type = 'comparison';
+
+      let choices = t.choices;
+      if (type === 'comparison') choices = ['<', '=', '>'];
+      else if (choices?.length) choices = shuffle([...choices]);
+
+      const pageRef = t.pageRef ? `Стр. ${t.pageRef}` : '';
+      const taskRef = t.taskRef ? `Задача ${t.taskRef}${t.subRef || ''}` : '';
+      const source = [pageRef, taskRef].filter(Boolean).join(' · ');
+
+      return {
+        id: t.id || i + 1,
+        source,
+        kind,
+        story: t.story || '',
+        equation: t.equation || '',
+        leftExpr: t.leftExpr || '',
+        rightExpr: t.rightExpr || '',
+        question: t.question || t.story || t.equation || `Задача ${i + 1}`,
+        type,
+        correctAnswer: String(t.correctAnswer ?? '').trim(),
+        choices,
+        hint: t.hint || defaultHint(kind),
+        category: t.category || 'math',
+        emoji: TASK_EMOJIS[kind] || TASK_EMOJIS.math,
+      };
+    }
+
+    function defaultHint(kind) {
+      const hints = {
+        word_problem: 'Прочети внимателно и помисли какво трябва да сметнеш!',
+        equation: 'Кое число липсва в квадратчето?',
+        comparison: 'Сметни и двете страни и сравни!',
+        calculation: 'Събери числата!',
+      };
+      return hints[kind] || 'Помисли внимателно!';
+    }
+
+    function flattenTasks(rawTasks) {
+      const flat = [];
+      rawTasks.forEach((t, i) => {
+        // Ако AI върне subTasks масив
+        if (t.subTasks?.length) {
+          t.subTasks.forEach((sub, j) => {
+            flat.push(normalizeTask({ ...t, ...sub, subRef: sub.subRef || String.fromCharCode(1072 + j) }, flat.length));
+          });
+        } else {
+          flat.push(normalizeTask(t, flat.length));
+        }
+      });
+      return flat;
+    }
 
     async function extractTasks(imageDataUrl) {
       const raw = await callGemini(EXTRACT_PROMPT, imageDataUrl, true);
@@ -955,19 +1177,32 @@
       }
 
       if (!parsed.tasks?.length) {
-        throw new Error('Не открих задачи на снимката. Опитай с по-ясна снимка!');
+        throw new Error('Не открих задачи на снимката. Снимай по-ясно — всички номера и текст да се виждат!');
       }
 
-      return parsed.tasks.map((t, i) => ({
-        id: t.id || i + 1,
-        question: t.question || `Задача ${i + 1}`,
-        type: t.type || 'text',
-        correctAnswer: String(t.correctAnswer || '').trim(),
-        choices: t.choices?.length ? shuffle([...t.choices]) : null,
-        hint: t.hint || 'Помисли внимателно!',
-        category: t.category || 'default',
-        emoji: TASK_EMOJIS[t.category] || TASK_EMOJIS.default,
-      }));
+      return flattenTasks(parsed.tasks);
+    }
+
+    function showOverview() {
+      $('overview-title').textContent = `Намерих ${state.tasks.length} задачи! 🎯`;
+      const list = $('overview-list');
+      list.innerHTML = '';
+      state.tasks.forEach((t, i) => {
+        const item = document.createElement('div');
+        item.className = 'overview-item';
+        const preview = t.story
+          ? t.story.slice(0, 60) + (t.story.length > 60 ? '…' : '')
+          : t.equation || t.question;
+        item.innerHTML = `
+          <div class="oi-num">${i + 1}</div>
+          <div class="oi-text">
+            <span style="color:var(--purple);font-size:.8rem">${TASK_KIND_LABELS[t.kind] || 'Задача'}${t.source ? ' · ' + t.source : ''}</span><br/>
+            ${preview}
+          </div>
+        `;
+        list.appendChild(item);
+      });
+      showScreen('overview');
     }
 
     async function verifyAnswer(task, userAnswer) {
@@ -1006,6 +1241,74 @@
       return arr;
     }
 
+    const DEMO_TASKS = [
+      {
+        pageRef: '60', taskRef: '1', kind: 'word_problem',
+        story: 'След като продали 14 маси, в магазина останали още 6. Колко маси е имало в този магазин?',
+        question: 'Колко маси е имало?',
+        type: 'number', correctAnswer: '20',
+        hint: 'Сложи продадените и останалите маси!',
+      },
+      {
+        pageRef: '60', taskRef: '2', kind: 'word_problem',
+        story: 'След 2 години Таня ще празнува двадесетия си рожден ден. На колко години е Таня сега?',
+        question: 'На колко години е Таня сега?',
+        type: 'number', correctAnswer: '18',
+        hint: 'Извади 2 от 20!',
+      },
+      {
+        pageRef: '60', taskRef: '3', subRef: '1', kind: 'equation',
+        equation: '20 = 15 + 3 + □',
+        question: 'Кое число липсва?',
+        type: 'number', correctAnswer: '2',
+        hint: '15 + 3 = 18. Колко остава до 20?',
+      },
+      {
+        pageRef: '60', taskRef: '3', subRef: '2', kind: 'equation',
+        equation: '14 + 2 + □ = 20',
+        type: 'number', correctAnswer: '4',
+        hint: '14 + 2 = 16. Колко остава до 20?',
+      },
+      {
+        pageRef: '60', taskRef: '4', kind: 'word_problem',
+        story: 'Торта струва 17 лв. Ако Доника купи тази торта, ще й останат 3 лв. Колко лева има Доника?',
+        type: 'number', correctAnswer: '20',
+        hint: 'Сложи цената на тортата и останалите пари!',
+      },
+      {
+        pageRef: '61', taskRef: '2', subRef: '1', kind: 'comparison',
+        leftExpr: '10 + 6', rightExpr: '4 + 12',
+        question: 'Кой знак е правилен?',
+        type: 'comparison', correctAnswer: '=',
+        hint: 'Сметни: 10+6=? и 4+12=?',
+      },
+      {
+        pageRef: '61', taskRef: '2', subRef: '2', kind: 'comparison',
+        leftExpr: '13 + 5', rightExpr: '15 + 3',
+        type: 'comparison', correctAnswer: '=',
+        hint: 'И двете страни дали са равни?',
+      },
+      {
+        pageRef: '61', taskRef: '3', kind: 'word_problem',
+        story: 'В първия сет тенисист направил 18 успешни и 7 неуспешни сервиса. С колко успешните са повече от неуспешните?',
+        type: 'number', correctAnswer: '11',
+        hint: 'Извади 7 от 18!',
+      },
+    ];
+
+    function startDemo() {
+      getAudio();
+      state.tasks = flattenTasks(DEMO_TASKS);
+      state.currentIndex = 0;
+      state.stars = 0;
+      state.xp = 0;
+      state.correctCount = 0;
+      state.streak = 0;
+      state.combo = 0;
+      updateStats();
+      showOverview();
+    }
+
     // ── Photo handling ──
     function handlePhoto(file) {
       if (!file) return;
@@ -1030,14 +1333,55 @@
       if (!task) return showComplete();
 
       state.answered = false;
-      $('task-number').textContent = `Задача ${state.currentIndex + 1} от ${state.tasks.length}`;
+      const label = task.source
+        ? `${task.source} · ${state.currentIndex + 1}/${state.tasks.length}`
+        : `Задача ${state.currentIndex + 1} от ${state.tasks.length}`;
+      $('task-number').textContent = label;
       $('task-emoji').textContent = task.emoji;
-      $('task-question').textContent = task.question;
+
+      // Story (текстова задача)
+      const storyEl = $('task-story');
+      if (task.story && task.kind === 'word_problem') {
+        storyEl.textContent = task.story;
+        storyEl.classList.remove('hidden');
+      } else {
+        storyEl.classList.add('hidden');
+      }
+
+      // Equation display
+      const eqEl = $('task-equation');
+      if (task.equation) {
+        eqEl.innerHTML = task.equation
+          .replace(/□/g, '<span class="blank">?</span>')
+          .replace(/☐/g, '<span class="blank">?</span>')
+          .replace(/\[\s*\]/g, '<span class="blank">?</span>');
+        eqEl.classList.remove('hidden');
+      } else {
+        eqEl.classList.add('hidden');
+      }
+
+      // Question (скрий ако е същото като story)
+      const qEl = $('task-question');
+      if (task.kind === 'word_problem' && task.question && task.question !== task.story) {
+        qEl.textContent = task.question;
+        qEl.classList.remove('hidden');
+      } else if (task.kind === 'comparison') {
+        qEl.textContent = 'Кой знак е правилен?';
+        qEl.classList.remove('hidden');
+      } else if (task.equation) {
+        qEl.textContent = 'Кое число липсва?';
+        qEl.classList.remove('hidden');
+      } else if (task.kind !== 'word_problem') {
+        qEl.textContent = task.question;
+        qEl.classList.remove('hidden');
+      } else {
+        qEl.classList.add('hidden');
+      }
+
       $('hint-box').classList.remove('visible');
       $('hint-box').textContent = task.hint;
       setMascot(randomMsg(MASCOT_MESSAGES.welcome));
 
-      // Break suggestion every 5 tasks
       if (state.currentIndex > 0 && state.currentIndex % 5 === 0) {
         setTimeout(() => setMascot(randomMsg(MASCOT_MESSAGES.break)), 2000);
       }
@@ -1045,38 +1389,12 @@
       const area = $('task-answer-area');
       area.innerHTML = '';
 
-      if (task.type === 'choice' && task.choices?.length) {
-        const div = document.createElement('div');
-        div.className = 'choices';
-        task.choices.forEach(choice => {
-          const btn = document.createElement('button');
-          btn.className = 'btn btn-choice';
-          btn.textContent = choice;
-          btn.addEventListener('click', () => handleChoiceAnswer(btn, choice, task));
-          div.appendChild(btn);
-        });
-        area.appendChild(div);
+      if (task.type === 'comparison') {
+        renderComparison(area, task);
+      } else if (task.type === 'choice' && task.choices?.length) {
+        renderChoices(area, task);
       } else {
-        const wrap = document.createElement('div');
-        wrap.className = 'answer-input-wrap';
-        const input = document.createElement('input');
-        input.className = 'answer-input';
-        input.type = task.type === 'number' ? 'number' : 'text';
-        input.placeholder = task.type === 'number' ? '?' : 'Твоят отговор...';
-        input.inputMode = task.type === 'number' ? 'numeric' : 'text';
-        input.autocomplete = 'off';
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') handleTextAnswer(input, task);
-        });
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-green';
-        btn.innerHTML = '✓';
-        btn.style.minWidth = '64px';
-        btn.addEventListener('click', () => handleTextAnswer(input, task));
-        wrap.appendChild(input);
-        wrap.appendChild(btn);
-        area.appendChild(wrap);
-        setTimeout(() => input.focus(), 300);
+        renderNumberInput(area, task);
       }
 
       if (state.focusMode) {
@@ -1084,6 +1402,84 @@
         $('task-card').style.position = 'relative';
         $('task-card').style.zIndex = '10';
       }
+    }
+
+    function renderComparison(area, task) {
+      const row = document.createElement('div');
+      row.className = 'compare-row';
+      row.innerHTML = `
+        <span class="compare-expr">${task.leftExpr || '?'}</span>
+        <span style="font-size:2rem;color:var(--purple)">?</span>
+        <span class="compare-expr">${task.rightExpr || '?'}</span>
+      `;
+      area.appendChild(row);
+
+      const btns = document.createElement('div');
+      btns.className = 'compare-btns';
+      ['<', '=', '>'].forEach(sym => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-compare';
+        btn.textContent = sym;
+        btn.addEventListener('click', () => handleCompareAnswer(btn, sym, task, btns));
+        btns.appendChild(btn);
+      });
+      area.appendChild(btns);
+    }
+
+    function renderChoices(area, task) {
+      const div = document.createElement('div');
+      div.className = 'choices';
+      task.choices.forEach(choice => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-choice';
+        btn.textContent = choice;
+        btn.addEventListener('click', () => handleChoiceAnswer(btn, choice, task));
+        div.appendChild(btn);
+      });
+      area.appendChild(div);
+    }
+
+    function renderNumberInput(area, task) {
+      const wrap = document.createElement('div');
+      wrap.className = 'answer-input-wrap';
+      const input = document.createElement('input');
+      input.className = 'answer-input';
+      input.type = 'number';
+      input.inputMode = 'numeric';
+      input.placeholder = '?';
+      input.autocomplete = 'off';
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleTextAnswer(input, task);
+      });
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-green';
+      btn.innerHTML = '✓';
+      btn.style.minWidth = '64px';
+      btn.addEventListener('click', () => handleTextAnswer(input, task));
+      wrap.appendChild(input);
+      wrap.appendChild(btn);
+      area.appendChild(wrap);
+      setTimeout(() => input.focus(), 300);
+    }
+
+    async function handleCompareAnswer(btn, sym, task, container) {
+      if (state.answered) return;
+      state.answered = true;
+      const correct = await verifyAnswer(task, sym);
+      container.querySelectorAll('.btn-compare').forEach(b => b.style.pointerEvents = 'none');
+
+      if (correct) {
+        btn.classList.add('correct');
+        onCorrect();
+      } else {
+        btn.classList.add('wrong');
+        container.querySelectorAll('.btn-compare').forEach(b => {
+          if (b.textContent === task.correctAnswer) b.classList.add('correct');
+        });
+        onWrong();
+        setMascot(`Верният знак е: ${task.correctAnswer}`);
+      }
+      setTimeout(nextTask, correct ? 1400 : 2200);
     }
 
     async function handleChoiceAnswer(btn, choice, task) {
@@ -1226,6 +1622,8 @@
       showScreen('capture');
     });
 
+    $('btn-demo').addEventListener('click', startDemo);
+
     $('btn-camera').addEventListener('click', () => $('camera-input').click());
     $('btn-gallery').addEventListener('click', () => $('file-input').click());
 
@@ -1249,8 +1647,7 @@
         state.streak = 0;
         state.combo = 0;
         updateStats();
-        showScreen('task');
-        renderTask();
+        showOverview();
       } catch (err) {
         alert(err.message || 'Грешка при анализ. Провери API ключа и опитай пак.');
         showScreen('capture');
@@ -1263,6 +1660,11 @@
     });
 
     $('btn-restart').addEventListener('click', resetGame);
+
+    $('btn-play').addEventListener('click', () => {
+      showScreen('task');
+      renderTask();
+    });
 
     // Settings
     $('settings-open').addEventListener('click', () => {
