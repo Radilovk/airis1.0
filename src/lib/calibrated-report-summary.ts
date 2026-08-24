@@ -3,7 +3,7 @@
  * в разбираемо обобщение за клиента.
  */
 import type { CalibratedAnalysisPayload } from '@/types'
-import { ringBand } from '@/lib/iris-map'
+import { ringBand, isCircumferentialFinding, boundaryRingNote } from '@/lib/iris-map'
 
 export type CalibratedVerdict = 'stable' | 'mild' | 'focus'
 
@@ -25,6 +25,7 @@ export function isPlanRelevantFinding(f: CalibratedAnalysisPayload['findings'][n
 
 /**
  * Групира находки по сектор + пръstenен пояс + тип.
+ * Околообхватните знаци (nerve_rings, sodium_ring …) се сливат по око+тип+пояс.
  * R1 и R2 в STOM стават един маркер — така е в manual.json / RING_BANDS.
  */
 export function groupFindingsForDisplay(
@@ -34,15 +35,35 @@ export function groupFindingsForDisplay(
 
   for (const f of findings) {
     const band = ringBand(f.ring)
-    const key = `${f.side}:${f.type}:${f.sector}:${band.key}`
+    const circum = isCircumferentialFinding(f.type)
+    const key = circum
+      ? `${f.side}:${f.type}:${band.key}`
+      : `${f.side}:${f.type}:${f.sector}:${band.key}`
     const prev = map.get(key)
     if (!prev || f.confidence > prev.confidence) {
       const midRing = Math.round((band.rings[0] + band.rings[1]) / 2)
-      map.set(key, { ...f, ring: midRing })
+      map.set(key, { ...f, ring: midRing, sector: circum ? 1 : f.sector })
     }
   }
 
   return Array.from(map.values()).sort((a, b) => b.confidence - a.confidence)
+}
+
+/** Подзаглавие за списък с находки — пояс с %, сектор или околообхватен знак. */
+export function findingLocationLabel(
+  f: CalibratedAnalysisPayload['findings'][number],
+  sectorLabel?: string
+): string {
+  const band = ringBand(f.ring)
+  const parts: string[] = [`${band.label} (${band.pct[0]}–${band.pct[1]}%)`]
+  if (isCircumferentialFinding(f.type)) {
+    parts.unshift('околообхватен пръsten')
+  } else if (sectorLabel) {
+    parts.push(sectorLabel)
+  }
+  const boundary = boundaryRingNote(f.ring)
+  if (boundary) parts.push(boundary)
+  return parts.join(' · ')
 }
 
 export function summarizeCalibratedReport(

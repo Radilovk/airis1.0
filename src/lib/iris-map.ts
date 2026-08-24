@@ -297,6 +297,28 @@ export function ringBand(ring: number): RingBandDef {
   return RING_BANDS.find(b => r >= b.rings[0] && r <= b.rings[1]) ?? RING_BANDS[3]
 }
 
+/** Пръстени на границата между пояси — R2 (22 %) и R4 (38 %) по manual.json. */
+export const BOUNDARY_RINGS = new Set([2, 4])
+
+/** Намаление на тежестта при гранични пръстени (STOM/ANW и ANW/ORG). */
+export const BOUNDARY_RING_WEIGHT = 0.82
+
+export function isBoundaryRing(ring: number): boolean {
+  return BOUNDARY_RINGS.has(Math.round(ring))
+}
+
+/** Етикет с процентен диапазон от атласа, напр. „Стомашен пръsten (12–22 %)“. */
+export function ringBandDisplayLabel(band: RingBandDef): string {
+  return `${band.label} (${band.pct[0]}–${band.pct[1]}%)`
+}
+
+export function boundaryRingNote(ring: number): string | undefined {
+  const r = Math.round(ring)
+  if (r === 2) return 'граница STOM/ANW (22%)'
+  if (r === 4) return 'граница ANW/ORG (38%)'
+  return undefined
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * РЕЧНИК НА НАХОДКИТЕ
  *
@@ -371,6 +393,11 @@ export interface FindingDef {
   validRings: [number, number]
   /** Дали е глобален признак (важи за целия ирис, а не за конкретен сектор). */
   global?: boolean
+  /**
+   * Околообхватен пръстен — в разгънатата лента е хоризонтална дъга по цялата
+   * ширина. В UI се рисува като пълен пръстен, не като секторен клин.
+   */
+  circumferential?: boolean
 }
 
 export const FINDINGS: Record<FindingType, FindingDef> = {
@@ -425,6 +452,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
     weight: 0.5,
     systems: {},
     validRings: [2, 11],
+    circumferential: true,
   },
   pigment_orange: {
     type: 'pigment_orange',
@@ -471,6 +499,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
     weight: 0.7,
     systems: { nervous: 1.0, endocrine: 0.6 },
     validRings: [3, 10],
+    circumferential: true,
   },
   lymphatic_rosary: {
     type: 'lymphatic_rosary',
@@ -480,6 +509,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
     weight: 0.8,
     systems: { immune: 1.0, detox: 0.6 },
     validRings: [9, 11],
+    circumferential: true,
   },
   scurf_rim: {
     type: 'scurf_rim',
@@ -489,6 +519,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
     weight: 0.6,
     systems: { detox: 1.0 },
     validRings: [10, 11],
+    circumferential: true,
   },
   sodium_ring: {
     type: 'sodium_ring',
@@ -499,6 +530,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
     systems: { circulatory: 1.0, metabolic: 0.8 },
     validRings: [10, 11],
     global: true,
+    circumferential: true,
   },
   pupil_flattening: {
     type: 'pupil_flattening',
@@ -536,6 +568,13 @@ export function resolveFindingType(v: unknown): FindingType | null {
 
 export function isFindingType(v: unknown): v is FindingType {
   return typeof v === 'string' && v in FINDINGS
+}
+
+/** Околообхватен пръstenен знак — рисува се като пълен пръsten, не секторен клин. */
+export function isCircumferentialFinding(type: FindingType | string): boolean {
+  if (!isFindingType(type)) return false
+  const def = FINDINGS[type]
+  return def.circumferential === true || def.global === true
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

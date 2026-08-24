@@ -173,19 +173,108 @@ export interface InterpretationOutput {
 
 /* ── помощни ─────────────────────────────────────────────────────────────── */
 
-/** Изчиства ограждащи ```json блокове и парсва. Хвърля при неуспех. */
-export function parseJsonResponse(raw: string): unknown {
+/** Премахва markdown ограждания и излишен текст около JSON обекта. */
+function stripJsonMarkdown(raw: string): string {
   let cleaned = raw.trim()
   if (cleaned.includes('```')) {
     cleaned = cleaned.replace(/```json/gi, '').replace(/```/g, '').trim()
   }
-  // Някои модели добавят текст преди/след обекта.
   const first = cleaned.indexOf('{')
   const last = cleaned.lastIndexOf('}')
-  if (first > 0 || (last >= 0 && last < cleaned.length - 1)) {
-    if (first >= 0 && last > first) cleaned = cleaned.slice(first, last + 1)
+  if (first >= 0 && last > first) cleaned = cleaned.slice(first, last + 1)
+  return cleaned
+}
+
+/** Чести поправки на невалиден JSON от LLM. */
+function repairJsonSyntax(text: string): string {
+  return text
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/\r\n/g, '\n')
+}
+
+/** Извлича finding обекти от счупен JSON масив. */
+function salvageFindingsArray(text: string): unknown[] {
+  const marker = text.search(/"findings"\s*:/i)
+  if (marker < 0) return []
+  const arrStart = text.indexOf('[', marker)
+  if (arrStart < 0) return []
+
+  const out: unknown[] = []
+  let i = arrStart + 1
+
+  while (i < text.length) {
+    while (i < text.length && /[\s,]/.test(text[i])) i++
+    if (text[i] === ']') break
+    if (text[i] !== '{') break
+
+    let depth = 0
+    const start = i
+    let inStr = false
+    let esc = false
+
+    for (; i < text.length; i++) {
+      const c = text[i]
+      if (inStr) {
+        if (esc) esc = false
+        else if (c === '\\') esc = true
+        else if (c === '"') inStr = false
+        continue
+      }
+      if (c === '"') {
+        inStr = true
+        continue
+      }
+      if (c === '{') depth++
+      if (c === '}') {
+        depth--
+        if (depth === 0) {
+          const chunk = repairJsonSyntax(text.slice(start, i + 1))
+          try {
+            out.push(JSON.parse(chunk))
+          } catch {
+            /* пропускаме счупен елемент */
+          }
+          i++
+          break
+        }
+      }
+    }
   }
-  return JSON.parse(cleaned)
+
+  return out
+}
+
+/** Парсва JSON от LLM с поправки и частично възстановяване на findings. */
+export function parseDetectionJson(raw: string): Record<string, unknown> {
+  const cleaned = stripJsonMarkdown(raw)
+
+  for (const attempt of [cleaned, repairJsonSyntax(cleaned)]) {
+    try {
+      const parsed = JSON.parse(attempt) as Record<string, unknown>
+      if (Array.isArray(parsed.findings)) return parsed
+    } catch {
+      /* следващ опит */
+    }
+  }
+
+  const salvaged = salvageFindingsArray(cleaned)
+  if (salvaged.length > 0) {
+    return { findings: salvaged, readable: true, _salvaged: true }
+  }
+
+  return JSON.parse(repairJsonSyntax(cleaned)) as Record<string, unknown>
+}
+
+/** Изчиства ограждащи ```json блокове и парсва. Хвърля при неуспех. */
+export function parseJsonResponse(raw: string): unknown {
+  const cleaned = stripJsonMarkdown(raw)
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    return JSON.parse(repairJsonSyntax(cleaned))
+  }
 }
 
 function isConstitution(v: unknown): v is Constitution {
@@ -351,7 +440,8 @@ export async function detectEye(
 
     try {
       const response = await withLlmSlot(() => callLLM(prompt, true, 2, strip.dataUrl))
-      const parsed = parseJsonResponse(response) as Record<string, unknown>
+      const parsed = parseDetectionJson(response)
+      const salvaged = parsed._salvaged === true
       const rawList = Array.isArray(parsed.findings) ? parsed.findings : []
 
       // Секторите се връщат към ФИЗИЧЕСКИ преди нормализирането: приоритетните
@@ -377,6 +467,7 @@ export async function detectEye(
       addLog(
         'success',
         `[Детекция ${sideName}] ${label}, шев ${seam}: ${normalized.length} приети` +
+          (salvaged ? ' (JSON частично поправен)' : '') +
           (rawList.length > normalized.length
             ? `, ${rawList.length - normalized.length} отхвърлени като невалидни`
             : '')
