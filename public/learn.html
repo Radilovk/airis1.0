@@ -424,6 +424,346 @@
       margin-bottom: 16px;
       text-shadow: 0 2px 8px rgba(0,0,0,.15);
     }
+
+    /* ── Flexible display blocks ── */
+    .task-display {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .task-input-zone {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 2px dashed #eee;
+    }
+    .blk-badge {
+      display: inline-block;
+      align-self: flex-start;
+      background: var(--purple);
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .blk-label {
+      font-size: .9rem;
+      font-weight: 800;
+      color: var(--purple);
+    }
+    .blk-heading {
+      font-size: 1.35rem;
+      font-weight: 900;
+      line-height: 1.35;
+      text-align: center;
+      color: var(--text);
+    }
+    .blk-heading.sm { font-size: 1.1rem; }
+    .blk-paragraph {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .blk-paragraph.story {
+      background: linear-gradient(135deg, #f8f9ff, #eef2ff);
+      border-left: 5px solid var(--purple);
+      border-radius: 16px;
+      padding: 16px 18px;
+    }
+    .blk-paragraph.instruction {
+      color: var(--text-light);
+      font-size: 1rem;
+      text-align: center;
+    }
+    .blk-math {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: clamp(1.3rem, 5vw, 1.8rem);
+      font-weight: 800;
+      text-align: center;
+      background: #f1f2f6;
+      border-radius: 16px;
+      padding: 18px 14px;
+      color: var(--purple-dark);
+      word-break: break-word;
+    }
+    .blk-math .blank {
+      display: inline-block;
+      min-width: 44px;
+      height: 44px;
+      line-height: 44px;
+      background: var(--yellow);
+      border: 3px dashed var(--orange);
+      border-radius: 10px;
+      margin: 0 3px;
+      vertical-align: middle;
+    }
+    .blk-compare {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .blk-compare-expr {
+      background: #f1f2f6;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+    .blk-compare-gap {
+      font-size: 2rem;
+      color: var(--purple);
+      font-weight: 900;
+    }
+    .blk-list {
+      padding-left: 1.4rem;
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+    .blk-list li { margin-bottom: 4px; }
+    .blk-table-wrap { overflow-x: auto; }
+    .blk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-weight: 700;
+      font-size: .95rem;
+    }
+    .blk-table th, .blk-table td {
+      border: 2px solid #dfe6e9;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .blk-table th { background: #f1f2f6; }
+    .blk-callout {
+      background: #fff9e6;
+      border: 2px solid var(--yellow);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .blk-divider {
+      height: 2px;
+      background: #eee;
+      border: none;
+      margin: 4px 0;
+    }
+    .blk-columns {
+      display: grid;
+      gap: 12px;
+    }
+    .blk-columns.cols-2 { grid-template-columns: 1fr 1fr; }
+
+    /* ── Flexible input widgets ── */
+    .input-label {
+      font-size: .95rem;
+      font-weight: 800;
+      color: var(--text-light);
+      text-align: center;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .input-field {
+      flex: 1;
+      min-height: var(--tap);
+      border: 3px solid #dfe6e9;
+      border-radius: 16px;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 1.4rem;
+      font-weight: 800;
+      text-align: center;
+      outline: none;
+      transition: border-color .2s, background .2s;
+    }
+    .input-field:focus { border-color: var(--purple); }
+    .input-field.correct { border-color: var(--green); background: #dff9ee; }
+    .input-field.wrong { border-color: var(--orange); background: #ffeaa7; }
+    .input-field:disabled { opacity: .7; }
+
+    .widget-choices { display: flex; flex-direction: column; gap: 10px; }
+    .widget-choices.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .widget-choices.horizontal {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .widget-symbol-pick { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-symbol {
+      min-width: 72px;
+      height: 72px;
+      font-size: 2rem;
+      font-weight: 900;
+      border-radius: 20px;
+      border: 3px solid transparent;
+      background: var(--card);
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    .btn-symbol:active { transform: scale(.92); }
+    .btn-symbol.correct { background: var(--green-light); border-color: var(--green); }
+    .btn-symbol.wrong { background: #fab1a0; border-color: var(--orange); }
+
+    .widget-multi .multi-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #f8f9fa;
+      border: 3px solid #dfe6e9;
+      border-radius: 14px;
+      padding: 14px 16px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 1.1rem;
+      transition: border-color .15s, background .15s;
+    }
+    .widget-multi .multi-item.selected {
+      border-color: var(--purple);
+      background: #eef2ff;
+    }
+    .widget-multi .multi-check {
+      width: 28px; height: 28px;
+      border: 3px solid #b2bec3;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+    .widget-multi .multi-item.selected .multi-check {
+      background: var(--purple);
+      border-color: var(--purple);
+      color: #fff;
+    }
+
+    .widget-fill-blanks {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      line-height: 2.2;
+    }
+    .widget-fill-blanks .fb-input {
+      width: 56px;
+      height: 52px;
+      border: 3px solid var(--orange);
+      border-radius: 12px;
+      background: var(--yellow);
+      font-family: inherit;
+      font-size: 1.3rem;
+      font-weight: 900;
+      text-align: center;
+      outline: none;
+    }
+    .widget-fill-blanks .fb-input:focus { border-color: var(--purple); }
+
+    .widget-composite { display: flex; flex-direction: column; gap: 12px; }
+    .widget-composite .composite-field label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 800;
+      color: var(--text-light);
+      margin-bottom: 6px;
+    }
+
+    .widget-numpad { display: flex; flex-direction: column; gap: 10px; }
+    .numpad-display {
+      min-height: 56px;
+      background: #f1f2f6;
+      border-radius: 14px;
+      font-size: 2rem;
+      font-weight: 900;
+      text-align: center;
+      line-height: 56px;
+      color: var(--purple-dark);
+      letter-spacing: .1em;
+    }
+    .numpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .numpad-key {
+      height: 56px;
+      border: none;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 3px 10px rgba(0,0,0,.08);
+      font-family: inherit;
+      font-size: 1.5rem;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .numpad-key:active { transform: scale(.94); background: #eef2ff; }
+    .numpad-key.wide { grid-column: span 2; }
+
+    .widget-ordering .order-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 3px solid #dfe6e9;
+      border-radius: 14px;
+      padding: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .widget-ordering .order-item.picked {
+      border-color: var(--purple);
+      background: #eef2ff;
+    }
+    .widget-ordering .order-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--purple);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .widget-ordering .order-num.empty {
+      background: #dfe6e9;
+      color: transparent;
+    }
+
+    .widget-tf { display: flex; gap: 12px; justify-content: center; }
+    .btn-tf {
+      flex: 1;
+      max-width: 160px;
+      min-height: 72px;
+      font-size: 1.3rem;
+    }
+
+    .submit-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .submit-row .btn { flex: 1; }
+
+    .input-zone.correct .btn-choice,
+    .input-zone.correct .btn-symbol { pointer-events: none; }
     .task-image-thumb {
       max-height: 120px;
       border-radius: 12px;
@@ -771,10 +1111,8 @@
       <div class="task-card" id="task-card">
         <div class="task-number" id="task-number">Задача 1 от 5</div>
         <div class="task-emoji" id="task-emoji">🔢</div>
-        <div class="task-story hidden" id="task-story"></div>
-        <div class="equation-display hidden" id="task-equation"></div>
-        <div class="task-question" id="task-question">5 + 3 = ?</div>
-        <div id="task-answer-area"></div>
+        <div class="task-display" id="task-display"></div>
+        <div class="task-input-zone" id="task-input-zone"></div>
         <button class="hint-btn" id="hint-btn">💡 Покажи подсказка</button>
         <div class="hint-box" id="hint-box"></div>
       </div>
@@ -1056,104 +1394,272 @@
       return data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
     }
 
-    const EXTRACT_PROMPT = `Ти си учител по математика за 1.-2. клас (деца 7-8 г.) в България.
+    const EXTRACT_PROMPT = `Ти си учител за деца 7-8 г. в България. Анализирай снимката на домашна работа (тетрадка, лист, учебник).
 
-Анализирай снимката на РАБОТНА ТЕТРАДКА по математика и извлечи ВСИЧКИ задачи.
+ИГНОРИРАЙ ръкописните отговори на детето.
+Всяка подточка (а, б, в) и всяко отделно уравнение = ОТДЕЛНА задача.
 
-ВАЖНО:
-- ИГНОРИРАЙ ръкописните отговори на детето (синьо/молив) — те НЕ са верни отговори за нас
-- Всяка подточка а), б), в) е ОТДЕЛНА задача
-- Ако една задача има няколко уравнения (напр. 6 реда с □), всяко уравнение е ОТДЕЛНА задача
-- Запази номерацията от тетрадката (стр., задача, подточка)
+За ВСЯКА задача върни гъвкава JSON схема с display (как да се покаже) и input (как да се отговори):
 
-ТИПОВЕ ЗАДАЧИ от български учебници:
-1. ТЕКСТОВА ЗАДАЧА (word_problem): история + въпрос. type="number"
-2. УРАВНЕНИЕ (equation): "20 = 15 + 3 + □" — намери числото в □. type="number", equation поле
-3. СРАВНЕНИЕ (comparison): "10 + 6 □ 4 + 12" — избери <, = или >. type="comparison", choices=["<","=",">"]
-4. СМЕТКА (calculation): "Събери събираемите 12, 5 и 3". type="number"
-
-Върни JSON:
 {
-  "subject": "математика",
+  "subject": "математика|български|природни|друго",
   "tasks": [
     {
-      "pageRef": "60",
-      "taskRef": "1",
-      "subRef": "",
-      "kind": "word_problem|equation|comparison|calculation",
-      "story": "Пълният текст на историята (само за word_problem)",
-      "equation": "20 = 15 + 3 + □",
-      "leftExpr": "10 + 6",
-      "rightExpr": "4 + 12",
-      "question": "Кратък въпрос за детето",
-      "type": "number|comparison|choice",
-      "correctAnswer": "20",
-      "choices": null,
-      "hint": "Подсказка: какво трябва да сметнеш?",
-      "category": "math"
+      "meta": { "source": "Стр. 60 · Задача 1", "emoji": "📖", "badge": "Текстова задача" },
+      "display": [
+        { "type": "badge", "text": "Текстова задача" },
+        { "type": "paragraph", "text": "Пълен текст на историята...", "style": "story" },
+        { "type": "heading", "text": "Колко маси е имало?", "size": "md" }
+      ],
+      "input": {
+        "type": "number",
+        "label": "Твоят отговор",
+        "layout": "numpad"
+      },
+      "answer": { "value": "20", "mode": "numeric" },
+      "hint": "Сложи продадените и останалите!"
     }
   ]
 }
 
-ПРИМЕРИ от реална тетрадка:
-- "След като продали 14 маси, останали 6. Колко маси е имало?" → correctAnswer: "20", kind: word_problem
-- "20 = 15 + 3 + □" → correctAnswer: "2", kind: equation
-- "10 + 6 □ 4 + 12" → correctAnswer: "=", kind: comparison
-- "След 2 години Таня ще е на 20. На колко е сега?" → correctAnswer: "18"
-- "Разказ от стр. 10 до стр. 15 — колко страници?" → correctAnswer: "6" (15-10+1 или 15-10 в зависимост от контекста)
+DISPLAY блокове (комбинирай свободно):
+- badge: { type, text }
+- label: { type, text } — напр. "а)"
+- heading: { type, text, size: "sm"|"md"|"lg" }
+- paragraph: { type, text, style: "normal"|"story"|"instruction" }
+- math: { type, expression: "20 = 15 + 3 + □", highlightBlanks: true }
+- compare: { type, left: "10 + 6", right: "4 + 12" }
+- list: { type, items: ["..."], ordered: true|false }
+- table: { type, headers: ["А","Б"], rows: [["1","2"]] }
+- callout: { type, text, icon: "💡" }
+- divider: { type }
+- columns: { type, columns: [[блокове], [блокове]] }
 
-ПРАВИЛА:
-- Прост български език, кратки изречения
-- Максимум 20 задачи (раздели всички подточки)
-- correctAnswer само число или символ (<, =, >)
-- За comparison: choices ВИНАГИ ["<", "=", ">"]
-- Ако не виждаш задачи → празен tasks масив`;
+INPUT типове (избери най-подходящия):
+- number: числов отговор. layout: "field"|"numpad"
+- text: свободен текст (български, думи)
+- single_choice: { options: ["А","Б","В","Г"] } — един верен
+- multi_choice: { options: [...], min: 1, max: 3 } — няколко верни
+- symbol_pick: { symbols: ["<","=",">"] } — за сравнения
+- fill_blanks: { parts: ["14 + 2 + ", { id:"x", placeholder:"?" }, " = 20"] }
+- true_false: { labels: ["Да","Не"] }
+- composite: { fields: [{ id:"a", type:"number", label:"Отговор а" }, ...] }
+- ordering: { items: ["първо","второ","трето"] } — подреди
 
-    function normalizeTask(t, i) {
-      const kind = t.kind || (t.equation ? 'equation' : t.leftExpr ? 'comparison' : t.story ? 'word_problem' : 'calculation');
-      let type = t.type || 'number';
-      if (kind === 'comparison') type = 'comparison';
+ANSWER:
+- value: string | number | string[] | { id: value, ... }
+- accept: ["синоними"] — по избор
+- mode: "exact"|"numeric"|"set"|"fuzzy"|"ai"
 
-      let choices = t.choices;
-      if (type === 'comparison') choices = ['<', '=', '>'];
-      else if (choices?.length) choices = shuffle([...choices]);
+ПРИМЕРИ:
+1. Текстова задача → display:[story paragraph, heading], input:number/numpad
+2. Уравнение 20=15+3+□ → display:[math], input:number или fill_blanks
+3. Сравнение → display:[compare], input:symbol_pick
+4. Избери верния отговор → display:[paragraph], input:single_choice
+5. Маркирай всички четни → input:multi_choice
+6. Задача с а) и б) → 2 отделни tasks с label блок
 
-      const pageRef = t.pageRef ? `Стр. ${t.pageRef}` : '';
-      const taskRef = t.taskRef ? `Задача ${t.taskRef}${t.subRef || ''}` : '';
-      const source = [pageRef, taskRef].filter(Boolean).join(' · ');
+Максимум 25 задачи. Прост български език.`;
+
+    // ═══════════════════════════════════════════
+    // FLEXIBLE TASK ENGINE
+    // ═══════════════════════════════════════════
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function renderMathExpression(expr, highlight = true) {
+      if (!highlight) return escapeHtml(expr);
+      return escapeHtml(expr)
+        .replace(/□/g, '<span class="blank">?</span>')
+        .replace(/☐/g, '<span class="blank">?</span>')
+        .replace(/\[\s*\]/g, '<span class="blank">?</span>');
+    }
+
+    const DisplayRenderers = {
+      badge(b) {
+        const el = document.createElement('span');
+        el.className = 'blk-badge';
+        el.textContent = b.text || '';
+        return el;
+      },
+      label(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-label';
+        el.textContent = b.text || '';
+        return el;
+      },
+      heading(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-heading' + (b.size === 'sm' ? ' sm' : '');
+        el.textContent = b.text || '';
+        return el;
+      },
+      paragraph(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-paragraph' + (b.style ? ` ${b.style}` : '');
+        el.textContent = b.text || '';
+        return el;
+      },
+      math(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-math';
+        el.innerHTML = renderMathExpression(b.expression || b.text || '', b.highlightBlanks !== false);
+        return el;
+      },
+      compare(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-compare';
+        el.innerHTML = `
+          <span class="blk-compare-expr">${escapeHtml(b.left || '?')}</span>
+          <span class="blk-compare-gap">?</span>
+          <span class="blk-compare-expr">${escapeHtml(b.right || '?')}</span>`;
+        return el;
+      },
+      list(b) {
+        const el = document.createElement(b.ordered ? 'ol' : 'ul');
+        el.className = 'blk-list';
+        (b.items || []).forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          el.appendChild(li);
+        });
+        return el;
+      },
+      table(b) {
+        const wrap = document.createElement('div');
+        wrap.className = 'blk-table-wrap';
+        const table = document.createElement('table');
+        table.className = 'blk-table';
+        if (b.headers?.length) {
+          const thead = document.createElement('thead');
+          const tr = document.createElement('tr');
+          b.headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; tr.appendChild(th); });
+          thead.appendChild(tr);
+          table.appendChild(thead);
+        }
+        const tbody = document.createElement('tbody');
+        (b.rows || []).forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => { const td = document.createElement('td'); td.textContent = cell; tr.appendChild(td); });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        return wrap;
+      },
+      callout(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-callout';
+        el.textContent = (b.icon ? b.icon + ' ' : '') + (b.text || '');
+        return el;
+      },
+      divider() {
+        const el = document.createElement('hr');
+        el.className = 'blk-divider';
+        return el;
+      },
+      columns(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-columns' + (b.columns?.length === 2 ? ' cols-2' : '');
+        (b.columns || []).forEach(col => {
+          const colEl = document.createElement('div');
+          renderDisplayBlocks(colEl, col);
+          el.appendChild(colEl);
+        });
+        return el;
+      },
+      image(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-callout';
+        el.textContent = b.caption || '🖼️ Изображение от задачата';
+        return el;
+      },
+    };
+
+    function renderDisplayBlocks(container, blocks) {
+      (blocks || []).forEach(block => {
+        const type = block?.type || 'paragraph';
+        const renderer = DisplayRenderers[type];
+        if (renderer) {
+          container.appendChild(renderer(block));
+        } else if (block.text) {
+          container.appendChild(DisplayRenderers.paragraph({ text: block.text, style: block.style }));
+        }
+      });
+    }
+
+    function legacyToSchema(raw, index) {
+      const display = [];
+      if (raw.badge || raw.kind) {
+        display.push({ type: 'badge', text: raw.badge || TASK_KIND_LABELS[raw.kind] || 'Задача' });
+      }
+      if (raw.story) display.push({ type: 'paragraph', text: raw.story, style: 'story' });
+      if (raw.equation) display.push({ type: 'math', expression: raw.equation });
+      if (raw.leftExpr && raw.rightExpr) display.push({ type: 'compare', left: raw.leftExpr, right: raw.rightExpr });
+      if (raw.question && raw.question !== raw.story && !raw.equation) {
+        display.push({ type: 'heading', text: raw.question, size: 'md' });
+      } else if (raw.question && raw.equation) {
+        display.push({ type: 'heading', text: raw.question, size: 'sm' });
+      }
+      if (!display.length && raw.question) {
+        display.push({ type: 'paragraph', text: raw.question });
+      }
+
+      let input = raw.input;
+      if (!input) {
+        const type = raw.type || 'number';
+        if (type === 'comparison') {
+          input = { type: 'symbol_pick', symbols: ['<', '=', '>'] };
+        } else if (type === 'choice' && raw.choices?.length) {
+          input = { type: 'single_choice', options: shuffle([...raw.choices]) };
+        } else if (type === 'text') {
+          input = { type: 'text', placeholder: 'Твоят отговор...' };
+        } else {
+          input = { type: 'number', layout: 'numpad' };
+        }
+      }
+
+      let answer = raw.answer;
+      if (!answer) {
+        answer = { value: raw.correctAnswer, mode: typeof raw.correctAnswer === 'number' ? 'numeric' : 'exact' };
+      }
+
+      const pageRef = raw.pageRef ? `Стр. ${raw.pageRef}` : '';
+      const taskRef = raw.taskRef ? `Задача ${raw.taskRef}${raw.subRef || ''}` : '';
+      const source = raw.meta?.source || [pageRef, taskRef].filter(Boolean).join(' · ');
 
       return {
-        id: t.id || i + 1,
-        source,
-        kind,
-        story: t.story || '',
-        equation: t.equation || '',
-        leftExpr: t.leftExpr || '',
-        rightExpr: t.rightExpr || '',
-        question: t.question || t.story || t.equation || `Задача ${i + 1}`,
-        type,
-        correctAnswer: String(t.correctAnswer ?? '').trim(),
-        choices,
-        hint: t.hint || defaultHint(kind),
-        category: t.category || 'math',
-        emoji: TASK_EMOJIS[kind] || TASK_EMOJIS.math,
+        id: raw.id || index + 1,
+        meta: {
+          source,
+          emoji: raw.meta?.emoji || raw.emoji || TASK_EMOJIS[raw.kind] || '❓',
+          badge: raw.meta?.badge || raw.badge,
+        },
+        display,
+        input,
+        answer,
+        hint: raw.hint || 'Помисли внимателно!',
       };
     }
 
-    function defaultHint(kind) {
-      const hints = {
-        word_problem: 'Прочети внимателно и помисли какво трябва да сметнеш!',
-        equation: 'Кое число липсва в квадратчето?',
-        comparison: 'Сметни и двете страни и сравни!',
-        calculation: 'Събери числата!',
-      };
-      return hints[kind] || 'Помисли внимателно!';
+    function normalizeTask(raw, index) {
+      if (raw.display?.length && raw.input && raw.answer) {
+        const t = { ...raw, id: raw.id || index + 1 };
+        if (!t.meta) t.meta = {};
+        if (!t.meta.emoji) t.meta.emoji = '❓';
+        if (t.input.type === 'single_choice' && t.input.options) {
+          t.input = { ...t.input, options: shuffle([...t.input.options]) };
+        }
+        return t;
+      }
+      return legacyToSchema(raw, index);
     }
 
     function flattenTasks(rawTasks) {
       const flat = [];
-      rawTasks.forEach((t, i) => {
-        // Ако AI върне subTasks масив
+      rawTasks.forEach((t) => {
         if (t.subTasks?.length) {
           t.subTasks.forEach((sub, j) => {
             flat.push(normalizeTask({ ...t, ...sub, subRef: sub.subRef || String.fromCharCode(1072 + j) }, flat.length));
@@ -1165,21 +1671,27 @@
       return flat;
     }
 
+    function taskPreview(task) {
+      for (const b of task.display || []) {
+        if (b.text) return b.text.slice(0, 70) + (b.text.length > 70 ? '…' : '');
+        if (b.expression) return b.expression;
+        if (b.left) return `${b.left} ? ${b.right}`;
+      }
+      return task.meta?.badge || 'Задача';
+    }
+
     async function extractTasks(imageDataUrl) {
       const raw = await callGemini(EXTRACT_PROMPT, imageDataUrl, true);
       let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
+      try { parsed = JSON.parse(raw); }
+      catch {
         const match = raw.match(/\{[\s\S]*\}/);
         if (!match) throw new Error('AI не върна валиден JSON');
         parsed = JSON.parse(match[0]);
       }
-
       if (!parsed.tasks?.length) {
-        throw new Error('Не открих задачи на снимката. Снимай по-ясно — всички номера и текст да се виждат!');
+        throw new Error('Не открих задачи. Снимай по-ясно!');
       }
-
       return flattenTasks(parsed.tasks);
     }
 
@@ -1190,47 +1702,442 @@
       state.tasks.forEach((t, i) => {
         const item = document.createElement('div');
         item.className = 'overview-item';
-        const preview = t.story
-          ? t.story.slice(0, 60) + (t.story.length > 60 ? '…' : '')
-          : t.equation || t.question;
+        const badge = t.display?.find(b => b.type === 'badge')?.text || t.meta?.badge || 'Задача';
         item.innerHTML = `
           <div class="oi-num">${i + 1}</div>
           <div class="oi-text">
-            <span style="color:var(--purple);font-size:.8rem">${TASK_KIND_LABELS[t.kind] || 'Задача'}${t.source ? ' · ' + t.source : ''}</span><br/>
-            ${preview}
-          </div>
-        `;
+            <span style="color:var(--purple);font-size:.8rem">${badge}${t.meta?.source ? ' · ' + t.meta.source : ''}</span><br/>
+            ${escapeHtml(taskPreview(t))}
+          </div>`;
         list.appendChild(item);
       });
       showScreen('overview');
     }
 
-    async function verifyAnswer(task, userAnswer) {
-      const normalized = (s) => String(s).trim().toLowerCase().replace(/\s+/g, ' ');
-      if (normalized(userAnswer) === normalized(task.correctAnswer)) return true;
+    function normalizeVal(v) {
+      if (v == null) return '';
+      return String(v).trim().toLowerCase().replace(/\s+/g, ' ');
+    }
 
-      // Fuzzy number match
-      const numUser = parseFloat(userAnswer);
-      const numCorrect = parseFloat(task.correctAnswer);
-      if (!isNaN(numUser) && !isNaN(numCorrect) && numUser === numCorrect) return true;
+    function valuesMatch(expected, given, mode = 'exact') {
+      if (Array.isArray(expected)) {
+        const exp = expected.map(normalizeVal).sort();
+        const giv = (Array.isArray(given) ? given : [given]).map(normalizeVal).sort();
+        if (mode === 'set') return exp.length === giv.length && exp.every((v, i) => v === giv[i]);
+        return exp.some(e => giv.includes(e));
+      }
+      if (typeof expected === 'object' && expected !== null && !Array.isArray(expected)) {
+        if (typeof given !== 'object' || given === null) return false;
+        return Object.keys(expected).every(k => valuesMatch(expected[k], given[k], mode));
+      }
+      const e = normalizeVal(expected);
+      const g = normalizeVal(given);
+      if (e === g) return true;
+      if (mode === 'numeric' || mode === 'exact') {
+        const ne = parseFloat(expected);
+        const ng = parseFloat(given);
+        if (!isNaN(ne) && !isNaN(ng) && ne === ng) return true;
+      }
+      return false;
+    }
 
-      // AI fallback for text answers
-      if (task.type === 'text' && state.apiKey) {
+    async function verifyAnswer(task, userValue) {
+      const ans = task.answer || {};
+      const expected = ans.value ?? ans;
+      const mode = ans.mode || 'exact';
+
+      if (valuesMatch(expected, userValue, mode)) return true;
+
+      if (ans.accept?.length) {
+        for (const alt of ans.accept) {
+          if (valuesMatch(alt, userValue, mode)) return true;
+        }
+      }
+
+      if ((mode === 'ai' || mode === 'fuzzy' || task.input?.type === 'text') && state.apiKey) {
         try {
-          const prompt = `Дете на 7 години отговори на задача.
-Въпрос: "${task.question}"
-Очакван отговор: "${task.correctAnswer}"
-Отговор на детето: "${userAnswer}"
-
-Върни JSON: {"correct": true/false, "feedback": "кратко насърчително съобщение на български"}
-Приемай синоними и малки правописни грешки.`;
+          const q = taskPreview(task);
+          const prompt = `Дете 7 г. отговори.
+Задача: "${q}"
+Очакван: ${JSON.stringify(expected)}
+Отговор: ${JSON.stringify(userValue)}
+Върни JSON: {"correct":true/false,"feedback":"кратко на български"}
+Приемай синоними и малки грешки.`;
           const raw = await callGemini(prompt, null, true);
           const result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw);
           if (result.feedback) setMascot(result.feedback);
           return !!result.correct;
-        } catch { return false; }
+        } catch { /* fall through */ }
       }
       return false;
+    }
+
+    function formatExpected(task) {
+      const v = task.answer?.value ?? task.answer;
+      if (Array.isArray(v)) return v.join(', ');
+      if (typeof v === 'object' && v !== null) return Object.values(v).join(', ');
+      return String(v);
+    }
+
+    // ── Input widget factory ──
+    let activeWidget = null;
+
+    function mountInput(zone, task, onResult) {
+      zone.innerHTML = '';
+      zone.className = 'task-input-zone input-zone';
+      const input = task.input || { type: 'number' };
+
+      if (input.label) {
+        const lbl = document.createElement('div');
+        lbl.className = 'input-label';
+        lbl.textContent = input.label;
+        zone.appendChild(lbl);
+      }
+
+      const widget = InputWidgets[input.type] || InputWidgets.number;
+      const controls = widget(zone, input, (value) => {
+        if (state.answered) return;
+        onResult(value);
+      });
+      activeWidget = controls;
+      return controls;
+    }
+
+    const InputWidgets = {
+      number(zone, cfg, submit) {
+        if (cfg.layout === 'numpad') return InputWidgets.numpad(zone, cfg, submit);
+
+        const row = document.createElement('div');
+        row.className = 'input-row';
+        const field = document.createElement('input');
+        field.className = 'input-field';
+        field.type = 'number';
+        field.inputMode = 'numeric';
+        field.placeholder = cfg.placeholder || '?';
+        field.addEventListener('keydown', e => { if (e.key === 'Enter') trySubmit(); });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.innerHTML = '✓';
+        btn.style.minWidth = '64px';
+        btn.addEventListener('click', trySubmit);
+        row.appendChild(field);
+        row.appendChild(btn);
+        zone.appendChild(row);
+        setTimeout(() => field.focus(), 200);
+
+        function trySubmit() {
+          const v = field.value.trim();
+          if (!v) return;
+          submit(v);
+        }
+        return { disable: () => { field.disabled = true; }, mark: (ok) => field.classList.add(ok ? 'correct' : 'wrong') };
+      },
+
+      text(zone, cfg, submit) {
+        const row = document.createElement('div');
+        row.className = 'input-row';
+        const field = document.createElement('input');
+        field.className = 'input-field';
+        field.type = 'text';
+        field.placeholder = cfg.placeholder || '...';
+        field.addEventListener('keydown', e => { if (e.key === 'Enter' && field.value.trim()) submit(field.value.trim()); });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.innerHTML = '✓';
+        btn.style.minWidth = '64px';
+        btn.addEventListener('click', () => { if (field.value.trim()) submit(field.value.trim()); });
+        row.appendChild(field);
+        row.appendChild(btn);
+        zone.appendChild(row);
+        setTimeout(() => field.focus(), 200);
+        return { disable: () => { field.disabled = true; }, mark: (ok) => field.classList.add(ok ? 'correct' : 'wrong') };
+      },
+
+      numpad(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-numpad';
+        const display = document.createElement('div');
+        display.className = 'numpad-display';
+        display.textContent = cfg.placeholder || '?';
+        let val = '';
+        const grid = document.createElement('div');
+        grid.className = 'numpad-grid';
+        const keys = ['1','2','3','4','5','6','7','8','9','⌫','0','✓'];
+        keys.forEach(k => {
+          const btn = document.createElement('button');
+          btn.className = 'numpad-key' + (k === '✓' ? ' wide' : '');
+          btn.textContent = k;
+          btn.addEventListener('click', () => {
+            if (k === '⌫') { val = val.slice(0, -1); display.textContent = val || '?'; }
+            else if (k === '✓') { if (val) submit(val); }
+            else { val += k; display.textContent = val; }
+          });
+          grid.appendChild(btn);
+        });
+        wrap.appendChild(display);
+        wrap.appendChild(grid);
+        zone.appendChild(wrap);
+        return { disable: () => grid.querySelectorAll('button').forEach(b => b.disabled = true),
+          mark: (ok) => { display.style.background = ok ? '#dff9ee' : '#ffeaa7'; } };
+      },
+
+      single_choice(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-choices' + (cfg.layout === 'grid' ? ' grid' : cfg.layout === 'horizontal' ? ' horizontal' : '');
+        const btns = [];
+        (cfg.options || []).forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-choice';
+          btn.textContent = opt;
+          btn.addEventListener('click', () => submit(opt));
+          btns.push(btn);
+          wrap.appendChild(btn);
+        });
+        zone.appendChild(wrap);
+        return {
+          disable: () => btns.forEach(b => b.style.pointerEvents = 'none'),
+          mark: (ok, chosen) => btns.forEach(b => {
+            if (b.textContent.trim() === String(chosen).trim()) b.classList.add(ok ? 'correct' : 'wrong');
+            else if (!ok && b.textContent.trim() === formatExpected({ answer: cfg._answer })) b.classList.add('correct');
+          }),
+          _btns: btns,
+        };
+      },
+
+      multi_choice(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-multi';
+        const selected = new Set();
+        const items = [];
+        (cfg.options || []).forEach(opt => {
+          const item = document.createElement('div');
+          item.className = 'multi-item';
+          item.innerHTML = `<span class="multi-check"></span><span>${escapeHtml(opt)}</span>`;
+          item.addEventListener('click', () => {
+            if (selected.has(opt)) { selected.delete(opt); item.classList.remove('selected'); item.querySelector('.multi-check').textContent = ''; }
+            else {
+              if (cfg.max && selected.size >= cfg.max) return;
+              selected.add(opt); item.classList.add('selected'); item.querySelector('.multi-check').textContent = '✓';
+            }
+          });
+          items.push(item);
+          wrap.appendChild(item);
+        });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.textContent = '✓ Готово';
+        btn.addEventListener('click', () => {
+          if (selected.size >= (cfg.min || 1)) submit([...selected]);
+        });
+        zone.appendChild(wrap);
+        zone.appendChild(btn);
+        return { disable: () => { items.forEach(i => i.style.pointerEvents = 'none'); btn.disabled = true; } };
+      },
+
+      symbol_pick(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-symbol-pick';
+        const symbols = cfg.symbols || ['<', '=', '>'];
+        const btns = [];
+        symbols.forEach(sym => {
+          const btn = document.createElement('button');
+          btn.className = 'btn-symbol';
+          btn.textContent = sym;
+          btn.addEventListener('click', () => submit(sym));
+          btns.push(btn);
+          wrap.appendChild(btn);
+        });
+        zone.appendChild(wrap);
+        return {
+          disable: () => btns.forEach(b => b.style.pointerEvents = 'none'),
+          mark: (ok, chosen, expected) => btns.forEach(b => {
+            if (b.textContent === chosen) b.classList.add(ok ? 'correct' : 'wrong');
+            if (!ok && b.textContent === expected) b.classList.add('correct');
+          }),
+        };
+      },
+
+      fill_blanks(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-fill-blanks';
+        const inputs = {};
+        (cfg.parts || []).forEach(part => {
+          if (typeof part === 'string') {
+            const span = document.createElement('span');
+            span.textContent = part;
+            wrap.appendChild(span);
+          } else {
+            const inp = document.createElement('input');
+            inp.className = 'fb-input';
+            inp.id = part.id || 'x';
+            inp.placeholder = part.placeholder || '?';
+            inp.inputMode = 'numeric';
+            inputs[part.id || 'x'] = inp;
+            wrap.appendChild(inp);
+          }
+        });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.textContent = '✓';
+        btn.style.marginTop = '12px';
+        btn.addEventListener('click', () => {
+          const vals = {};
+          let filled = true;
+          Object.entries(inputs).forEach(([k, el]) => {
+            if (!el.value.trim()) filled = false;
+            vals[k] = el.value.trim();
+          });
+          if (filled) submit(Object.keys(vals).length === 1 ? Object.values(vals)[0] : vals);
+        });
+        zone.appendChild(wrap);
+        zone.appendChild(btn);
+        return { disable: () => Object.values(inputs).forEach(i => i.disabled = true) };
+      },
+
+      true_false(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-tf';
+        const labels = cfg.labels || ['Да', 'Не'];
+        const btns = [];
+        labels.forEach(lbl => {
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-choice btn-tf';
+          btn.textContent = lbl;
+          btn.addEventListener('click', () => submit(lbl));
+          btns.push(btn);
+          wrap.appendChild(btn);
+        });
+        zone.appendChild(wrap);
+        return { disable: () => btns.forEach(b => b.style.pointerEvents = 'none') };
+      },
+
+      composite(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-composite';
+        const fields = {};
+        (cfg.fields || []).forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'composite-field';
+          if (f.label) { const lbl = document.createElement('label'); lbl.textContent = f.label; row.appendChild(lbl); }
+          const inp = document.createElement('input');
+          inp.className = 'input-field';
+          inp.type = f.type === 'number' ? 'number' : 'text';
+          inp.placeholder = f.placeholder || '?';
+          fields[f.id] = inp;
+          row.appendChild(inp);
+          wrap.appendChild(row);
+        });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.textContent = '✓ Готово';
+        btn.addEventListener('click', () => {
+          const vals = {};
+          let ok = true;
+          Object.entries(fields).forEach(([k, el]) => {
+            if (!el.value.trim()) ok = false;
+            vals[k] = el.value.trim();
+          });
+          if (ok) submit(vals);
+        });
+        zone.appendChild(wrap);
+        zone.appendChild(btn);
+        return { disable: () => Object.values(fields).forEach(i => i.disabled = true) };
+      },
+
+      ordering(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-ordering';
+        const order = [];
+        const items = shuffle([...(cfg.items || [])]);
+        const picked = [];
+        items.forEach(text => {
+          const item = document.createElement('div');
+          item.className = 'order-item';
+          item.innerHTML = `<span class="order-num empty">·</span><span>${escapeHtml(text)}</span>`;
+          item.addEventListener('click', () => {
+            if (item.classList.contains('picked')) return;
+            picked.push(text);
+            item.classList.add('picked');
+            item.querySelector('.order-num').textContent = picked.length;
+            item.querySelector('.order-num').classList.remove('empty');
+            if (picked.length === items.length) submit(picked);
+          });
+          wrap.appendChild(item);
+        });
+        zone.appendChild(wrap);
+        return { disable: () => wrap.querySelectorAll('.order-item').forEach(i => i.style.pointerEvents = 'none') };
+      },
+    };
+
+    // ── Task rendering ──
+    function renderTask() {
+      const task = state.tasks[state.currentIndex];
+      if (!task) return showComplete();
+
+      state.answered = false;
+      const label = task.meta?.source
+        ? `${task.meta.source} · ${state.currentIndex + 1}/${state.tasks.length}`
+        : `Задача ${state.currentIndex + 1} от ${state.tasks.length}`;
+      $('task-number').textContent = label;
+      $('task-emoji').textContent = task.meta?.emoji || '❓';
+
+      const displayEl = $('task-display');
+      displayEl.innerHTML = '';
+      renderDisplayBlocks(displayEl, task.display);
+
+      $('hint-box').classList.remove('visible');
+      $('hint-box').textContent = task.hint || '';
+      setMascot(randomMsg(MASCOT_MESSAGES.welcome));
+
+      if (state.currentIndex > 0 && state.currentIndex % 5 === 0) {
+        setTimeout(() => setMascot(randomMsg(MASCOT_MESSAGES.break)), 2000);
+      }
+
+      const inputZone = $('task-input-zone');
+      if (task.input?.type === 'single_choice') {
+        task.input._answer = task.answer;
+      }
+
+      mountInput(inputZone, task, async (value) => {
+        await handleAnswer(task, value);
+      });
+
+      if (state.focusMode) {
+        $('focus-ring').classList.add('active');
+        $('task-card').style.position = 'relative';
+        $('task-card').style.zIndex = '10';
+      }
+    }
+
+    async function handleAnswer(task, value) {
+      if (state.answered) return;
+      state.answered = true;
+
+      const correct = await verifyAnswer(task, value);
+      if (activeWidget?.disable) activeWidget.disable();
+
+      const expected = formatExpected(task);
+
+      if (activeWidget?.mark) {
+        if (task.input?.type === 'symbol_pick') {
+          activeWidget.mark(correct, value, expected);
+        } else if (task.input?.type === 'single_choice') {
+          activeWidget._btns?.forEach(b => {
+            if (b.textContent.trim() === String(value).trim()) b.classList.add(correct ? 'correct' : 'wrong');
+            if (!correct && b.textContent.trim() === expected) b.classList.add('correct');
+          });
+        } else {
+          activeWidget.mark(correct);
+        }
+      }
+
+      if (correct) {
+        onCorrect();
+      } else {
+        onWrong();
+        setMascot(`Верният отговор: ${expected}`);
+      }
+      setTimeout(nextTask, correct ? 1400 : 2400);
     }
 
     function shuffle(arr) {
@@ -1243,62 +2150,94 @@
 
     const DEMO_TASKS = [
       {
-        pageRef: '60', taskRef: '1', kind: 'word_problem',
-        story: 'След като продали 14 маси, в магазина останали още 6. Колко маси е имало в този магазин?',
-        question: 'Колко маси е имало?',
-        type: 'number', correctAnswer: '20',
+        meta: { source: 'Стр. 60 · Задача 1', emoji: '📖', badge: 'Текстова задача' },
+        display: [
+          { type: 'badge', text: 'Текстова задача' },
+          { type: 'paragraph', text: 'След като продали 14 маси, в магазина останали още 6. Колко маси е имало в този магазин?', style: 'story' },
+          { type: 'heading', text: 'Колко маси е имало?', size: 'md' },
+        ],
+        input: { type: 'number', layout: 'numpad', label: 'Твоят отговор' },
+        answer: { value: '20', mode: 'numeric' },
         hint: 'Сложи продадените и останалите маси!',
       },
       {
-        pageRef: '60', taskRef: '2', kind: 'word_problem',
-        story: 'След 2 години Таня ще празнува двадесетия си рожден ден. На колко години е Таня сега?',
-        question: 'На колко години е Таня сега?',
-        type: 'number', correctAnswer: '18',
+        meta: { source: 'Стр. 60 · Задача 2', emoji: '🎂' },
+        display: [
+          { type: 'paragraph', text: 'След 2 години Таня ще празнува двадесетия си рожден ден. На колко години е Таня сега?', style: 'story' },
+        ],
+        input: { type: 'number', layout: 'numpad' },
+        answer: { value: '18', mode: 'numeric' },
         hint: 'Извади 2 от 20!',
       },
       {
-        pageRef: '60', taskRef: '3', subRef: '1', kind: 'equation',
-        equation: '20 = 15 + 3 + □',
-        question: 'Кое число липсва?',
-        type: 'number', correctAnswer: '2',
+        meta: { source: 'Стр. 60 · Задача 3', emoji: '➕' },
+        display: [
+          { type: 'math', expression: '20 = 15 + 3 + □' },
+          { type: 'heading', text: 'Кое число липсва?', size: 'sm' },
+        ],
+        input: {
+          type: 'fill_blanks',
+          parts: ['20 = 15 + 3 + ', { id: 'x', placeholder: '?' }],
+        },
+        answer: { value: '2', mode: 'numeric' },
         hint: '15 + 3 = 18. Колко остава до 20?',
       },
       {
-        pageRef: '60', taskRef: '3', subRef: '2', kind: 'equation',
-        equation: '14 + 2 + □ = 20',
-        type: 'number', correctAnswer: '4',
-        hint: '14 + 2 = 16. Колко остава до 20?',
+        meta: { source: 'Стр. 61 · Задача 2а', emoji: '⚖️' },
+        display: [
+          { type: 'badge', text: 'Сравнение' },
+          { type: 'compare', left: '10 + 6', right: '4 + 12' },
+          { type: 'paragraph', text: 'Сметни и двете страни. Кой знак е правилен?', style: 'instruction' },
+        ],
+        input: { type: 'symbol_pick', symbols: ['<', '=', '>'] },
+        answer: { value: '=', mode: 'exact' },
+        hint: '10+6=? и 4+12=?',
       },
       {
-        pageRef: '60', taskRef: '4', kind: 'word_problem',
-        story: 'Торта струва 17 лв. Ако Доника купи тази торта, ще й останат 3 лв. Колко лева има Доника?',
-        type: 'number', correctAnswer: '20',
-        hint: 'Сложи цената на тортата и останалите пари!',
+        meta: { source: 'Стр. 61 · Задача 2б', emoji: '⚖️' },
+        display: [{ type: 'compare', left: '7 + 13', right: '20 - 1' }],
+        input: { type: 'symbol_pick', symbols: ['<', '=', '>'] },
+        answer: { value: '<', mode: 'exact' },
+        hint: '7+13=20, а 20-1=19',
       },
       {
-        pageRef: '61', taskRef: '2', subRef: '1', kind: 'comparison',
-        leftExpr: '10 + 6', rightExpr: '4 + 12',
-        question: 'Кой знак е правилен?',
-        type: 'comparison', correctAnswer: '=',
-        hint: 'Сметни: 10+6=? и 4+12=?',
-      },
-      {
-        pageRef: '61', taskRef: '2', subRef: '2', kind: 'comparison',
-        leftExpr: '13 + 5', rightExpr: '15 + 3',
-        type: 'comparison', correctAnswer: '=',
-        hint: 'И двете страни дали са равни?',
-      },
-      {
-        pageRef: '61', taskRef: '3', kind: 'word_problem',
-        story: 'В първия сет тенисист направил 18 успешни и 7 неуспешни сервиса. С колко успешните са повече от неуспешните?',
-        type: 'number', correctAnswer: '11',
+        meta: { source: 'Стр. 61 · Задача 3', emoji: '🎾' },
+        display: [
+          { type: 'paragraph', text: 'В първия сет тенисист направил 18 успешни и 7 неуспешни сервиса.', style: 'story' },
+          { type: 'heading', text: 'С колко успешните са повече?', size: 'md' },
+        ],
+        input: { type: 'number', layout: 'field' },
+        answer: { value: '11', mode: 'numeric' },
         hint: 'Извади 7 от 18!',
+      },
+      {
+        meta: { source: 'Демо · Български', emoji: '📝' },
+        display: [
+          { type: 'paragraph', text: 'Коя дума е глагол?', style: 'instruction' },
+        ],
+        input: {
+          type: 'single_choice',
+          options: ['къща', 'бяга', 'червен', 'три'],
+          layout: 'grid',
+        },
+        answer: { value: 'бяга', mode: 'exact' },
+        hint: 'Глагол показва действие!',
+      },
+      {
+        meta: { source: 'Демо · Вярно/Невярно', emoji: '✅' },
+        display: [
+          { type: 'paragraph', text: '15 + 5 = 21', style: 'story' },
+          { type: 'heading', text: 'Вярно ли е?', size: 'md' },
+        ],
+        input: { type: 'true_false', labels: ['Да', 'Не'] },
+        answer: { value: 'Не', mode: 'exact' },
+        hint: 'Сметни 15 + 5',
       },
     ];
 
     function startDemo() {
       getAudio();
-      state.tasks = flattenTasks(DEMO_TASKS);
+      state.tasks = DEMO_TASKS.map((t, i) => normalizeTask(t, i));
       state.currentIndex = 0;
       state.stars = 0;
       state.xp = 0;
@@ -1326,202 +2265,6 @@
 
     $('file-input').addEventListener('change', (e) => handlePhoto(e.target.files[0]));
     $('camera-input').addEventListener('change', (e) => handlePhoto(e.target.files[0]));
-
-    // ── Task rendering ──
-    function renderTask() {
-      const task = state.tasks[state.currentIndex];
-      if (!task) return showComplete();
-
-      state.answered = false;
-      const label = task.source
-        ? `${task.source} · ${state.currentIndex + 1}/${state.tasks.length}`
-        : `Задача ${state.currentIndex + 1} от ${state.tasks.length}`;
-      $('task-number').textContent = label;
-      $('task-emoji').textContent = task.emoji;
-
-      // Story (текстова задача)
-      const storyEl = $('task-story');
-      if (task.story && task.kind === 'word_problem') {
-        storyEl.textContent = task.story;
-        storyEl.classList.remove('hidden');
-      } else {
-        storyEl.classList.add('hidden');
-      }
-
-      // Equation display
-      const eqEl = $('task-equation');
-      if (task.equation) {
-        eqEl.innerHTML = task.equation
-          .replace(/□/g, '<span class="blank">?</span>')
-          .replace(/☐/g, '<span class="blank">?</span>')
-          .replace(/\[\s*\]/g, '<span class="blank">?</span>');
-        eqEl.classList.remove('hidden');
-      } else {
-        eqEl.classList.add('hidden');
-      }
-
-      // Question (скрий ако е същото като story)
-      const qEl = $('task-question');
-      if (task.kind === 'word_problem' && task.question && task.question !== task.story) {
-        qEl.textContent = task.question;
-        qEl.classList.remove('hidden');
-      } else if (task.kind === 'comparison') {
-        qEl.textContent = 'Кой знак е правилен?';
-        qEl.classList.remove('hidden');
-      } else if (task.equation) {
-        qEl.textContent = 'Кое число липсва?';
-        qEl.classList.remove('hidden');
-      } else if (task.kind !== 'word_problem') {
-        qEl.textContent = task.question;
-        qEl.classList.remove('hidden');
-      } else {
-        qEl.classList.add('hidden');
-      }
-
-      $('hint-box').classList.remove('visible');
-      $('hint-box').textContent = task.hint;
-      setMascot(randomMsg(MASCOT_MESSAGES.welcome));
-
-      if (state.currentIndex > 0 && state.currentIndex % 5 === 0) {
-        setTimeout(() => setMascot(randomMsg(MASCOT_MESSAGES.break)), 2000);
-      }
-
-      const area = $('task-answer-area');
-      area.innerHTML = '';
-
-      if (task.type === 'comparison') {
-        renderComparison(area, task);
-      } else if (task.type === 'choice' && task.choices?.length) {
-        renderChoices(area, task);
-      } else {
-        renderNumberInput(area, task);
-      }
-
-      if (state.focusMode) {
-        $('focus-ring').classList.add('active');
-        $('task-card').style.position = 'relative';
-        $('task-card').style.zIndex = '10';
-      }
-    }
-
-    function renderComparison(area, task) {
-      const row = document.createElement('div');
-      row.className = 'compare-row';
-      row.innerHTML = `
-        <span class="compare-expr">${task.leftExpr || '?'}</span>
-        <span style="font-size:2rem;color:var(--purple)">?</span>
-        <span class="compare-expr">${task.rightExpr || '?'}</span>
-      `;
-      area.appendChild(row);
-
-      const btns = document.createElement('div');
-      btns.className = 'compare-btns';
-      ['<', '=', '>'].forEach(sym => {
-        const btn = document.createElement('button');
-        btn.className = 'btn-compare';
-        btn.textContent = sym;
-        btn.addEventListener('click', () => handleCompareAnswer(btn, sym, task, btns));
-        btns.appendChild(btn);
-      });
-      area.appendChild(btns);
-    }
-
-    function renderChoices(area, task) {
-      const div = document.createElement('div');
-      div.className = 'choices';
-      task.choices.forEach(choice => {
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-choice';
-        btn.textContent = choice;
-        btn.addEventListener('click', () => handleChoiceAnswer(btn, choice, task));
-        div.appendChild(btn);
-      });
-      area.appendChild(div);
-    }
-
-    function renderNumberInput(area, task) {
-      const wrap = document.createElement('div');
-      wrap.className = 'answer-input-wrap';
-      const input = document.createElement('input');
-      input.className = 'answer-input';
-      input.type = 'number';
-      input.inputMode = 'numeric';
-      input.placeholder = '?';
-      input.autocomplete = 'off';
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleTextAnswer(input, task);
-      });
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-green';
-      btn.innerHTML = '✓';
-      btn.style.minWidth = '64px';
-      btn.addEventListener('click', () => handleTextAnswer(input, task));
-      wrap.appendChild(input);
-      wrap.appendChild(btn);
-      area.appendChild(wrap);
-      setTimeout(() => input.focus(), 300);
-    }
-
-    async function handleCompareAnswer(btn, sym, task, container) {
-      if (state.answered) return;
-      state.answered = true;
-      const correct = await verifyAnswer(task, sym);
-      container.querySelectorAll('.btn-compare').forEach(b => b.style.pointerEvents = 'none');
-
-      if (correct) {
-        btn.classList.add('correct');
-        onCorrect();
-      } else {
-        btn.classList.add('wrong');
-        container.querySelectorAll('.btn-compare').forEach(b => {
-          if (b.textContent === task.correctAnswer) b.classList.add('correct');
-        });
-        onWrong();
-        setMascot(`Верният знак е: ${task.correctAnswer}`);
-      }
-      setTimeout(nextTask, correct ? 1400 : 2200);
-    }
-
-    async function handleChoiceAnswer(btn, choice, task) {
-      if (state.answered) return;
-      state.answered = true;
-      const correct = await verifyAnswer(task, choice);
-      const allBtns = btn.parentElement.querySelectorAll('.btn-choice');
-      allBtns.forEach(b => b.style.pointerEvents = 'none');
-
-      if (correct) {
-        btn.classList.add('correct');
-        onCorrect();
-      } else {
-        btn.classList.add('wrong');
-        allBtns.forEach(b => {
-          if (b.textContent.trim() === task.correctAnswer) b.classList.add('correct');
-        });
-        onWrong();
-      }
-      setTimeout(nextTask, correct ? 1400 : 2200);
-    }
-
-    async function handleTextAnswer(input, task) {
-      if (state.answered) return;
-      const val = input.value.trim();
-      if (!val) { input.focus(); return; }
-      state.answered = true;
-      input.disabled = true;
-
-      const correct = await verifyAnswer(task, val);
-      if (correct) {
-        input.style.borderColor = 'var(--green)';
-        input.style.background = '#dff9ee';
-        onCorrect();
-      } else {
-        input.style.borderColor = 'var(--orange)';
-        input.style.background = '#ffeaa7';
-        onWrong();
-        setMascot(`Верният отговор е: ${task.correctAnswer}`);
-      }
-      setTimeout(nextTask, correct ? 1400 : 2500);
-    }
 
     function onCorrect() {
       state.correctCount++;
