@@ -2548,7 +2548,7 @@ JSON формат:
                   </div>
                   <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      ℹ️ Калибрираният анализ прави ~10 заявки към модела (паралелно, без изкуствени паузи) — обикновено 1–3 минути.
+                      Обикновено отнема 1–2 минути. Моля, не затваряйте приложението.
                     </p>
                   </div>
                 </div>
@@ -2605,7 +2605,7 @@ JSON формат:
                 className="gap-2"
               >
                 <Bug size={16} />
-                {showDebug ? 'Скрий логове' : 'Покажи логове'}
+                {showDebug ? 'Скрий детайли' : 'Технически детайли'}
               </Button>
               
               {(diagnosticResponses.left || diagnosticResponses.right) && (
@@ -2631,7 +2631,7 @@ JSON формат:
                 <Card className="p-4 bg-muted/50">
                   <div className="flex items-center gap-2 mb-3">
                     <Bug size={20} className="text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">Debug Логове</h3>
+                    <h3 className="text-sm font-semibold">Технически логове</h3>
                   </div>
                   <ScrollArea className="h-[300px] w-full">
                     <div className="space-y-1 text-left">
