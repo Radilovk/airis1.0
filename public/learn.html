@@ -1,0 +1,2440 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#6C5CE7" />
+  <title>Звездичко — Домашна работа</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #6C5CE7;
+      --purple-dark: #5A4BD1;
+      --pink: #FD79A8;
+      --yellow: #FDCB6E;
+      --green: #00B894;
+      --green-light: #55EFC4;
+      --blue: #74B9FF;
+      --orange: #E17055;
+      --bg: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 40%, #fd79a8 100%);
+      --card: #ffffff;
+      --text: #2d3436;
+      --text-light: #636e72;
+      --shadow: 0 8px 32px rgba(108, 92, 231, 0.25);
+      --radius: 24px;
+      --tap: 64px;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Nunito', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    #app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      max-width: 520px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      flex-shrink: 0;
+    }
+    .header.hidden { display: none; }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    .logo-mascot { font-size: 2rem; animation: bounce 2s ease infinite; }
+
+    .stats-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .stat-pill {
+      background: rgba(255,255,255,.92);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-weight: 800;
+      font-size: .95rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .progress-track {
+      height: 10px;
+      background: rgba(255,255,255,.3);
+      border-radius: 999px;
+      margin: 0 16px 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .progress-track.hidden { display: none; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--yellow), var(--green-light));
+      border-radius: 999px;
+      transition: width .6s cubic-bezier(.34,1.56,.64,1);
+      box-shadow: 0 0 12px rgba(253,203,110,.6);
+    }
+
+    /* ── Screens ── */
+    .screen {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      padding: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .screen.active { display: flex; }
+
+    /* ── Welcome ── */
+    .welcome-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 20px;
+    }
+    .welcome-mascot {
+      font-size: 7rem;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,.2));
+      animation: float 3s ease-in-out infinite;
+    }
+    .welcome-title {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 3px 12px rgba(0,0,0,.2);
+      line-height: 1.2;
+    }
+    .welcome-sub {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,.9);
+      font-weight: 700;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: var(--tap);
+      padding: 14px 28px;
+      border: none;
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 1.2rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .btn:active { transform: scale(.94); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--yellow), #f39c12);
+      color: var(--text);
+      box-shadow: 0 6px 20px rgba(243,156,18,.4);
+    }
+    .btn-primary:hover { box-shadow: 0 8px 28px rgba(243,156,18,.5); }
+    .btn-secondary {
+      background: rgba(255,255,255,.92);
+      color: var(--purple);
+      box-shadow: var(--shadow);
+    }
+    .btn-green {
+      background: linear-gradient(135deg, var(--green-light), var(--green));
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(0,184,148,.4);
+    }
+    .btn-choice {
+      width: 100%;
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      border: 3px solid transparent;
+      font-size: 1.3rem;
+      min-height: 72px;
+    }
+    .btn-choice:hover { border-color: var(--purple); }
+    .btn-choice.correct {
+      background: var(--green-light);
+      border-color: var(--green);
+      animation: pop .4s ease;
+    }
+    .btn-choice.wrong {
+      background: #fab1a0;
+      border-color: var(--orange);
+      animation: shake .4s ease;
+    }
+    .btn-icon { font-size: 1.5rem; }
+
+    /* ── Capture ── */
+    .capture-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+    }
+    .photo-preview {
+      width: 100%;
+      max-height: 45vh;
+      border-radius: var(--radius);
+      object-fit: contain;
+      background: rgba(0,0,0,.15);
+      box-shadow: var(--shadow);
+      display: none;
+    }
+    .photo-preview.visible { display: block; }
+    .capture-hint {
+      background: rgba(255,255,255,.9);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.5;
+      box-shadow: var(--shadow);
+    }
+    .capture-hint .emoji { font-size: 2.5rem; display: block; margin-bottom: 8px; }
+    .capture-buttons { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+    #file-input, #camera-input { display: none; }
+
+    /* ── Analyzing ── */
+    .analyzing {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      text-align: center;
+    }
+    .scanner {
+      width: 200px;
+      height: 200px;
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.15);
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .scanner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: .7;
+    }
+    .scanner-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, var(--green-light), transparent);
+      animation: scan 1.5s ease-in-out infinite;
+      box-shadow: 0 0 16px var(--green-light);
+    }
+    .analyzing-text {
+      color: #fff;
+      font-size: 1.3rem;
+      font-weight: 800;
+      text-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    .analyzing-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4,end) infinite;
+    }
+
+    /* ── Task ── */
+    .task-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      box-shadow: var(--shadow);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .task-number {
+      font-size: .9rem;
+      font-weight: 800;
+      color: var(--purple);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .task-emoji { font-size: 3rem; text-align: center; }
+    .task-question {
+      font-size: 1.6rem;
+      font-weight: 900;
+      text-align: center;
+      line-height: 1.35;
+      color: var(--text);
+    }
+    .task-story {
+      background: linear-gradient(135deg, #f8f9ff, #eef2ff);
+      border-left: 5px solid var(--purple);
+      border-radius: 16px;
+      padding: 16px 18px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .equation-display {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 1.8rem;
+      font-weight: 800;
+      text-align: center;
+      background: #f1f2f6;
+      border-radius: 16px;
+      padding: 20px 16px;
+      letter-spacing: .04em;
+      color: var(--purple-dark);
+    }
+    .equation-display .blank {
+      display: inline-block;
+      min-width: 48px;
+      height: 48px;
+      line-height: 48px;
+      background: var(--yellow);
+      border: 3px dashed var(--orange);
+      border-radius: 10px;
+      margin: 0 4px;
+      vertical-align: middle;
+      animation: pulse 1.5s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .compare-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .compare-expr {
+      background: #f1f2f6;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .compare-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn-compare {
+      width: 80px;
+      height: 80px;
+      font-size: 2.2rem;
+      font-weight: 900;
+      border-radius: 20px;
+      border: 3px solid transparent;
+      background: var(--card);
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      cursor: pointer;
+      transition: transform .15s, border-color .15s;
+    }
+    .btn-compare:active { transform: scale(.92); }
+    .btn-compare.correct { background: var(--green-light); border-color: var(--green); }
+    .btn-compare.wrong { background: #fab1a0; border-color: var(--orange); }
+
+    /* ── Overview ── */
+    .overview-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .overview-item {
+      background: rgba(255,255,255,.92);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .overview-item .oi-num {
+      background: var(--purple);
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .overview-item .oi-text {
+      font-weight: 700;
+      font-size: .95rem;
+      line-height: 1.35;
+      flex: 1;
+    }
+    .overview-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+
+    /* ── Flexible display blocks ── */
+    .task-display {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .task-input-zone {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 2px dashed #eee;
+    }
+    .blk-badge {
+      display: inline-block;
+      align-self: flex-start;
+      background: var(--purple);
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .blk-label {
+      font-size: .9rem;
+      font-weight: 800;
+      color: var(--purple);
+    }
+    .blk-heading {
+      font-size: 1.35rem;
+      font-weight: 900;
+      line-height: 1.35;
+      text-align: center;
+      color: var(--text);
+    }
+    .blk-heading.sm { font-size: 1.1rem; }
+    .blk-paragraph {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .blk-paragraph.story {
+      background: linear-gradient(135deg, #f8f9ff, #eef2ff);
+      border-left: 5px solid var(--purple);
+      border-radius: 16px;
+      padding: 16px 18px;
+    }
+    .blk-paragraph.instruction {
+      color: var(--text-light);
+      font-size: 1rem;
+      text-align: center;
+    }
+    .blk-math {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: clamp(1.3rem, 5vw, 1.8rem);
+      font-weight: 800;
+      text-align: center;
+      background: #f1f2f6;
+      border-radius: 16px;
+      padding: 18px 14px;
+      color: var(--purple-dark);
+      word-break: break-word;
+    }
+    .blk-math .blank {
+      display: inline-block;
+      min-width: 44px;
+      height: 44px;
+      line-height: 44px;
+      background: var(--yellow);
+      border: 3px dashed var(--orange);
+      border-radius: 10px;
+      margin: 0 3px;
+      vertical-align: middle;
+    }
+    .blk-compare {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .blk-compare-expr {
+      background: #f1f2f6;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+    .blk-compare-gap {
+      font-size: 2rem;
+      color: var(--purple);
+      font-weight: 900;
+    }
+    .blk-list {
+      padding-left: 1.4rem;
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+    .blk-list li { margin-bottom: 4px; }
+    .blk-table-wrap { overflow-x: auto; }
+    .blk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-weight: 700;
+      font-size: .95rem;
+    }
+    .blk-table th, .blk-table td {
+      border: 2px solid #dfe6e9;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .blk-table th { background: #f1f2f6; }
+    .blk-callout {
+      background: #fff9e6;
+      border: 2px solid var(--yellow);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .blk-divider {
+      height: 2px;
+      background: #eee;
+      border: none;
+      margin: 4px 0;
+    }
+    .blk-columns {
+      display: grid;
+      gap: 12px;
+    }
+    .blk-columns.cols-2 { grid-template-columns: 1fr 1fr; }
+
+    /* ── Flexible input widgets ── */
+    .input-label {
+      font-size: .95rem;
+      font-weight: 800;
+      color: var(--text-light);
+      text-align: center;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .input-field {
+      flex: 1;
+      min-height: var(--tap);
+      border: 3px solid #dfe6e9;
+      border-radius: 16px;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 1.4rem;
+      font-weight: 800;
+      text-align: center;
+      outline: none;
+      transition: border-color .2s, background .2s;
+    }
+    .input-field:focus { border-color: var(--purple); }
+    .input-field.correct { border-color: var(--green); background: #dff9ee; }
+    .input-field.wrong { border-color: var(--orange); background: #ffeaa7; }
+    .input-field:disabled { opacity: .7; }
+
+    .widget-choices { display: flex; flex-direction: column; gap: 10px; }
+    .widget-choices.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .widget-choices.horizontal {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .widget-symbol-pick { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-symbol {
+      min-width: 72px;
+      height: 72px;
+      font-size: 2rem;
+      font-weight: 900;
+      border-radius: 20px;
+      border: 3px solid transparent;
+      background: var(--card);
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    .btn-symbol:active { transform: scale(.92); }
+    .btn-symbol.correct { background: var(--green-light); border-color: var(--green); }
+    .btn-symbol.wrong { background: #fab1a0; border-color: var(--orange); }
+
+    .widget-multi .multi-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #f8f9fa;
+      border: 3px solid #dfe6e9;
+      border-radius: 14px;
+      padding: 14px 16px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 1.1rem;
+      transition: border-color .15s, background .15s;
+    }
+    .widget-multi .multi-item.selected {
+      border-color: var(--purple);
+      background: #eef2ff;
+    }
+    .widget-multi .multi-check {
+      width: 28px; height: 28px;
+      border: 3px solid #b2bec3;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+    .widget-multi .multi-item.selected .multi-check {
+      background: var(--purple);
+      border-color: var(--purple);
+      color: #fff;
+    }
+
+    .widget-fill-blanks {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      line-height: 2.2;
+    }
+    .widget-fill-blanks .fb-input {
+      width: 56px;
+      height: 52px;
+      border: 3px solid var(--orange);
+      border-radius: 12px;
+      background: var(--yellow);
+      font-family: inherit;
+      font-size: 1.3rem;
+      font-weight: 900;
+      text-align: center;
+      outline: none;
+    }
+    .widget-fill-blanks .fb-input:focus { border-color: var(--purple); }
+
+    .widget-composite { display: flex; flex-direction: column; gap: 12px; }
+    .widget-composite .composite-field label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 800;
+      color: var(--text-light);
+      margin-bottom: 6px;
+    }
+
+    .widget-numpad { display: flex; flex-direction: column; gap: 10px; }
+    .numpad-display {
+      min-height: 56px;
+      background: #f1f2f6;
+      border-radius: 14px;
+      font-size: 2rem;
+      font-weight: 900;
+      text-align: center;
+      line-height: 56px;
+      color: var(--purple-dark);
+      letter-spacing: .1em;
+    }
+    .numpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .numpad-key {
+      height: 56px;
+      border: none;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 3px 10px rgba(0,0,0,.08);
+      font-family: inherit;
+      font-size: 1.5rem;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .numpad-key:active { transform: scale(.94); background: #eef2ff; }
+    .numpad-key.wide { grid-column: span 2; }
+
+    .widget-ordering .order-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 3px solid #dfe6e9;
+      border-radius: 14px;
+      padding: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .widget-ordering .order-item.picked {
+      border-color: var(--purple);
+      background: #eef2ff;
+    }
+    .widget-ordering .order-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--purple);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .widget-ordering .order-num.empty {
+      background: #dfe6e9;
+      color: transparent;
+    }
+
+    .widget-tf { display: flex; gap: 12px; justify-content: center; }
+    .btn-tf {
+      flex: 1;
+      max-width: 160px;
+      min-height: 72px;
+      font-size: 1.3rem;
+    }
+
+    .submit-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .submit-row .btn { flex: 1; }
+
+    .input-zone.correct .btn-choice,
+    .input-zone.correct .btn-symbol { pointer-events: none; }
+    .task-image-thumb {
+      max-height: 120px;
+      border-radius: 12px;
+      object-fit: contain;
+      align-self: center;
+      opacity: .85;
+    }
+    .choices { display: flex; flex-direction: column; gap: 12px; }
+    .answer-input-wrap { display: flex; gap: 10px; }
+    .answer-input {
+      flex: 1;
+      min-height: var(--tap);
+      border: 3px solid #dfe6e9;
+      border-radius: 16px;
+      padding: 12px 20px;
+      font-family: inherit;
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-align: center;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .answer-input:focus { border-color: var(--purple); }
+
+    .hint-btn {
+      background: none;
+      border: none;
+      color: var(--purple);
+      font-family: inherit;
+      font-weight: 700;
+      font-size: .95rem;
+      cursor: pointer;
+      text-align: center;
+      padding: 8px;
+    }
+    .hint-box {
+      background: #fff9e6;
+      border: 2px dashed var(--yellow);
+      border-radius: 16px;
+      padding: 14px;
+      font-weight: 700;
+      text-align: center;
+      display: none;
+      animation: fadeIn .3s ease;
+    }
+    .hint-box.visible { display: block; }
+
+    /* ── Mascot bubble ── */
+    .mascot-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      padding: 8px 0;
+      flex-shrink: 0;
+    }
+    .mascot-avatar {
+      font-size: 3rem;
+      flex-shrink: 0;
+      transition: transform .3s;
+    }
+    .mascot-avatar.celebrate { animation: bounce .6s ease; }
+    .mascot-bubble {
+      background: rgba(255,255,255,.95);
+      border-radius: 20px 20px 20px 4px;
+      padding: 12px 16px;
+      font-weight: 700;
+      font-size: 1rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      flex: 1;
+      line-height: 1.4;
+    }
+
+    /* ── Complete ── */
+    .complete-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 20px;
+    }
+    .trophy { font-size: 6rem; animation: bounce 1s ease infinite; }
+    .complete-title {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 3px 12px rgba(0,0,0,.2);
+    }
+    .complete-stats {
+      background: rgba(255,255,255,.92);
+      border-radius: var(--radius);
+      padding: 24px 32px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 260px;
+    }
+    .complete-stat {
+      font-size: 1.2rem;
+      font-weight: 800;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .complete-stat span { font-size: 1.5rem; }
+
+    /* ── Settings modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .modal h2 { font-size: 1.3rem; margin-bottom: 12px; }
+    .modal p { font-size: .95rem; color: var(--text-light); margin-bottom: 16px; line-height: 1.5; }
+    .modal input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #dfe6e9;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 1rem;
+      margin-bottom: 16px;
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── Celebration overlay ── */
+    #confetti-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+    .flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(85,239,196,.3);
+      pointer-events: none;
+      z-index: 40;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .flash-overlay.show { opacity: 1; }
+
+    .combo-badge {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 3rem;
+      font-weight: 900;
+      color: var(--yellow);
+      text-shadow: 0 4px 16px rgba(0,0,0,.3);
+      z-index: 45;
+      pointer-events: none;
+      transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    .combo-badge.show { transform: translate(-50%, -50%) scale(1); }
+
+    .settings-btn {
+      background: rgba(255,255,255,.3);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Animations ── */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50% { transform: translateY(-16px) rotate(3deg); }
+    }
+    @keyframes scan {
+      0% { top: 0; }
+      50% { top: calc(100% - 4px); }
+      100% { top: 0; }
+    }
+    @keyframes dots {
+      0% { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes starBurst {
+      0% { transform: scale(0) rotate(0deg); opacity: 1; }
+      100% { transform: scale(2) rotate(180deg); opacity: 0; }
+    }
+
+    .star-burst {
+      position: fixed;
+      font-size: 2rem;
+      pointer-events: none;
+      z-index: 46;
+      animation: starBurst .8s ease forwards;
+    }
+
+    /* ── Focus mode (ADHD) ── */
+    .focus-ring {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+    .focus-ring.active { opacity: 1; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 380px) {
+      .welcome-title { font-size: 1.6rem; }
+      .task-question { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="confetti-canvas"></canvas>
+  <div class="flash-overlay" id="flash"></div>
+  <div class="combo-badge" id="combo-badge"></div>
+  <div class="focus-ring" id="focus-ring"></div>
+
+  <div id="app">
+    <header class="header hidden" id="header">
+      <div class="logo">
+        <span class="logo-mascot" id="header-mascot">⭐</span>
+        <span>Звездичко</span>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-pill" id="stars-pill">⭐ <span id="stars-count">0</span></div>
+        <div class="stat-pill" id="xp-pill">⚡ <span id="xp-count">0</span></div>
+        <button class="settings-btn" id="settings-open" title="Настройки">⚙️</button>
+      </div>
+    </header>
+
+    <div class="progress-track hidden" id="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+
+    <!-- Welcome -->
+    <section class="screen active" id="screen-welcome">
+      <div class="welcome-hero">
+        <div class="welcome-mascot">⭐</div>
+        <h1 class="welcome-title">Готов ли си<br/>за приключение?</h1>
+        <p class="welcome-sub">Снимай домашната си работа и аз ще я превърна в игра! 🎮</p>
+        <button class="btn btn-primary" id="btn-start">
+          <span class="btn-icon">📸</span> Да започваме!
+        </button>
+        <button class="btn btn-secondary" id="btn-demo" style="margin-top:4px">
+          <span class="btn-icon">🎯</span> Пробвай с пример
+        </button>
+      </div>
+    </section>
+
+    <!-- Capture -->
+    <section class="screen" id="screen-capture">
+      <div class="capture-area">
+        <div class="capture-hint" id="capture-hint">
+          <span class="emoji">📷</span>
+          Сложи тетрадката на масата и я снимай ясно — всички задачи да се виждат!
+        </div>
+        <img class="photo-preview" id="photo-preview" alt="Снимка на домашна работа" />
+        <div class="capture-buttons">
+          <button class="btn btn-primary" id="btn-camera">
+            <span class="btn-icon">📷</span> Снимай с камерата
+          </button>
+          <button class="btn btn-secondary" id="btn-gallery">
+            <span class="btn-icon">🖼️</span> Избери снимка
+          </button>
+          <button class="btn btn-green hidden" id="btn-analyze">
+            <span class="btn-icon">✨</span> Анализирай задачите!
+          </button>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" />
+      <input type="file" id="camera-input" accept="image/*" capture="environment" />
+    </section>
+
+    <!-- Analyzing -->
+    <section class="screen" id="screen-analyzing">
+      <div class="analyzing">
+        <div class="scanner">
+          <img id="scanner-img" alt="" />
+          <div class="scanner-line"></div>
+        </div>
+        <p class="analyzing-text">
+          Чета задачите<span class="analyzing-dots"></span>
+        </p>
+      </div>
+    </section>
+
+    <!-- Overview (след анализ) -->
+    <section class="screen" id="screen-overview">
+      <h2 class="overview-title" id="overview-title">Намерих 0 задачи! 🎯</h2>
+      <div class="overview-list" id="overview-list"></div>
+      <button class="btn btn-primary" id="btn-play">
+        <span class="btn-icon">🚀</span> Да започваме!
+      </button>
+    </section>
+
+    <!-- Task -->
+    <section class="screen" id="screen-task">
+      <div class="mascot-bar">
+        <div class="mascot-avatar" id="mascot-avatar">⭐</div>
+        <div class="mascot-bubble" id="mascot-bubble">Хайде, ти можеш!</div>
+      </div>
+      <div class="task-card" id="task-card">
+        <div class="task-number" id="task-number">Задача 1 от 5</div>
+        <div class="task-emoji" id="task-emoji">🔢</div>
+        <div class="task-display" id="task-display"></div>
+        <div class="task-input-zone" id="task-input-zone"></div>
+        <button class="hint-btn" id="hint-btn">💡 Покажи подсказка</button>
+        <div class="hint-box" id="hint-box"></div>
+      </div>
+    </section>
+
+    <!-- Complete -->
+    <section class="screen" id="screen-complete">
+      <div class="complete-hero">
+        <div class="trophy">🏆</div>
+        <h2 class="complete-title">БРАВО, ШАМПИОН!</h2>
+        <div class="complete-stats">
+          <div class="complete-stat">Звезди <span id="final-stars">⭐ 0</span></div>
+          <div class="complete-stat">Точки <span id="final-xp">⚡ 0</span></div>
+          <div class="complete-stat">Верни <span id="final-correct">✅ 0/0</span></div>
+        </div>
+        <button class="btn btn-primary" id="btn-restart">
+          <span class="btn-icon">🔄</span> Нова снимка
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <h2>⚙️ Настройки</h2>
+      <p>За AI анализ на задачите е нужен Google Gemini API ключ. Можеш да го въведеш тук или да го настроиш в основното приложение.</p>
+      <input type="password" id="api-key-input" placeholder="Gemini API ключ (AIza...)" />
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-weight:700;cursor:pointer">
+        <input type="checkbox" id="focus-mode-check" checked />
+        Фокус режим (по-лесно за концентрация)
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="settings-close">Затвори</button>
+        <button class="btn btn-green" id="settings-save">Запази</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ── State ──
+    const state = {
+      photoDataUrl: null,
+      tasks: [],
+      currentIndex: 0,
+      stars: 0,
+      xp: 0,
+      correctCount: 0,
+      streak: 0,
+      combo: 0,
+      answered: false,
+      apiKey: '',
+      model: 'gemini-2.0-flash',
+      focusMode: true,
+    };
+
+    const MASCOT_MESSAGES = {
+      welcome: ['Хайде, ти можеш!', 'Ще бъде супер забавно!', 'Готов съм да помагам!'],
+      correct: ['БРАВО! 🎉', 'Супер си! ⭐', 'Точно така! 💪', 'Уау, страхотно! 🌟', 'Гений! 🧠'],
+      wrong: ['Хм, опитай пак! 💪', 'Почти! Още веднъж?', 'Не се отказвай! 🌈', 'Мисли още малко... 🤔'],
+      hint: ['Ето малка помощ!', 'Погледни подсказката 👇'],
+      complete: ['Шампион си! 🏆', 'Невероятно свърши! 🎊'],
+      break: ['Малка пауза? 💧', 'Пий вода и продължи! 🚰'],
+    };
+
+    const TASK_EMOJIS = {
+      math: '🔢', word_problem: '📖', equation: '➕', comparison: '⚖️',
+      reading: '📖', writing: '✏️', science: '🔬',
+      default: '❓', draw: '🎨', grammar: '📝',
+    };
+
+    const TASK_KIND_LABELS = {
+      word_problem: 'Текстова задача',
+      equation: 'Уравнение',
+      comparison: 'Сравнение',
+      calculation: 'Сметка',
+    };
+
+    // ── DOM refs ──
+    const $ = (id) => document.getElementById(id);
+    const screens = {
+      welcome: $('screen-welcome'),
+      capture: $('screen-capture'),
+      analyzing: $('screen-analyzing'),
+      overview: $('screen-overview'),
+      task: $('screen-task'),
+      complete: $('screen-complete'),
+    };
+
+    // ── Audio (Web Audio API — no external files) ──
+    let audioCtx = null;
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playTone(freq, duration, type = 'sine', vol = 0.15) {
+      try {
+        const ctx = getAudio();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (_) {}
+    }
+
+    function playCorrect() {
+      playTone(523, 0.1);
+      setTimeout(() => playTone(659, 0.1), 100);
+      setTimeout(() => playTone(784, 0.15), 200);
+      setTimeout(() => playTone(1047, 0.2), 300);
+    }
+
+    function playWrong() {
+      playTone(300, 0.2, 'triangle', 0.1);
+      setTimeout(() => playTone(250, 0.3, 'triangle', 0.08), 150);
+    }
+
+    function playLevelUp() {
+      [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => playTone(f, 0.15), i * 80));
+    }
+
+    // ── Confetti ──
+    const confettiCanvas = $('confetti-canvas');
+    const confettiCtx = confettiCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeConfetti() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeConfetti);
+    resizeConfetti();
+
+    function launchConfetti(count = 80) {
+      const colors = ['#FDCB6E', '#FD79A8', '#6C5CE7', '#00B894', '#74B9FF', '#E17055'];
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * confettiCanvas.width,
+          y: -10,
+          w: 6 + Math.random() * 8,
+          h: 4 + Math.random() * 6,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 6,
+          vy: 2 + Math.random() * 5,
+          rot: Math.random() * 360,
+          vr: (Math.random() - 0.5) * 12,
+          life: 1,
+        });
+      }
+      if (!confettiAnimating) animateConfetti();
+    }
+
+    let confettiAnimating = false;
+    function animateConfetti() {
+      confettiAnimating = true;
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      particles = particles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.12;
+        p.rot += p.vr;
+        p.life -= 0.008;
+        if (p.life <= 0) return false;
+        confettiCtx.save();
+        confettiCtx.translate(p.x, p.y);
+        confettiCtx.rotate((p.rot * Math.PI) / 180);
+        confettiCtx.globalAlpha = p.life;
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        confettiCtx.restore();
+        return true;
+      });
+      if (particles.length > 0) requestAnimationFrame(animateConfetti);
+      else confettiAnimating = false;
+    }
+
+    // ── Screen navigation ──
+    function showScreen(name) {
+      Object.values(screens).forEach(s => s.classList.remove('active'));
+      screens[name].classList.add('active');
+      const showHeader = ['task', 'capture', 'analyzing', 'overview'].includes(name);
+      $('header').classList.toggle('hidden', !showHeader);
+      $('progress-track').classList.toggle('hidden', name !== 'task');
+      if (name === 'task') updateProgress();
+    }
+
+    function updateProgress() {
+      if (!state.tasks.length) return;
+      const pct = (state.currentIndex / state.tasks.length) * 100;
+      $('progress-fill').style.width = `${pct}%`;
+    }
+
+    function updateStats() {
+      $('stars-count').textContent = state.stars;
+      $('xp-count').textContent = state.xp;
+    }
+
+    function randomMsg(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function setMascot(msg, celebrate = false) {
+      $('mascot-bubble').textContent = msg;
+      const avatar = $('mascot-avatar');
+      avatar.classList.toggle('celebrate', celebrate);
+      if (celebrate) setTimeout(() => avatar.classList.remove('celebrate'), 600);
+    }
+
+    // ── API Key loading ──
+    async function loadApiKey() {
+      // URL param
+      const params = new URLSearchParams(location.search);
+      if (params.get('key')) {
+        state.apiKey = params.get('key');
+        return;
+      }
+
+      // localStorage override
+      const saved = localStorage.getItem('learn_api_key');
+      if (saved) { state.apiKey = saved; return; }
+
+      // IndexedDB from main app
+      try {
+        const db = await new Promise((resolve, reject) => {
+          const req = indexedDB.open('airis_storage', 1);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        const config = await new Promise((resolve) => {
+          const tx = db.transaction(['settings'], 'readonly');
+          const store = tx.objectStore('settings');
+          const req = store.get('ai-model-config');
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        });
+        if (config?.apiKey) {
+          state.apiKey = config.apiKey;
+          if (config.model?.includes('gemini')) state.model = config.model;
+        }
+      } catch (_) {}
+    }
+
+    // ── Gemini API ──
+    async function callGemini(prompt, imageDataUrl, jsonMode = true) {
+      const parts = [];
+      if (imageDataUrl) {
+        const m = imageDataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/i);
+        if (m) parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
+      }
+      parts.push({ text: prompt });
+
+      const model = state.model || 'gemini-2.0-flash';
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 8192,
+              responseMimeType: jsonMode ? 'application/json' : undefined,
+            },
+          }),
+        }
+      );
+
+      const body = await res.text();
+      if (!res.ok) throw new Error(`AI грешка ${res.status}: ${body.slice(0, 200)}`);
+      const data = JSON.parse(body);
+      return data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+    }
+
+    const EXTRACT_PROMPT = `Ти си учител за деца 7-8 г. в България. Анализирай снимката на домашна работа (тетрадка, лист, учебник).
+
+ИГНОРИРАЙ ръкописните отговори на детето.
+Всяка подточка (а, б, в) и всяко отделно уравнение = ОТДЕЛНА задача.
+
+За ВСЯКА задача върни гъвкава JSON схема с display (как да се покаже) и input (как да се отговори):
+
+{
+  "subject": "математика|български|природни|друго",
+  "tasks": [
+    {
+      "meta": { "source": "Стр. 60 · Задача 1", "emoji": "📖", "badge": "Текстова задача" },
+      "display": [
+        { "type": "badge", "text": "Текстова задача" },
+        { "type": "paragraph", "text": "Пълен текст на историята...", "style": "story" },
+        { "type": "heading", "text": "Колко маси е имало?", "size": "md" }
+      ],
+      "input": {
+        "type": "number",
+        "label": "Твоят отговор",
+        "layout": "numpad"
+      },
+      "answer": { "value": "20", "mode": "numeric" },
+      "hint": "Сложи продадените и останалите!"
+    }
+  ]
+}
+
+DISPLAY блокове (комбинирай свободно):
+- badge: { type, text }
+- label: { type, text } — напр. "а)"
+- heading: { type, text, size: "sm"|"md"|"lg" }
+- paragraph: { type, text, style: "normal"|"story"|"instruction" }
+- math: { type, expression: "20 = 15 + 3 + □", highlightBlanks: true }
+- compare: { type, left: "10 + 6", right: "4 + 12" }
+- list: { type, items: ["..."], ordered: true|false }
+- table: { type, headers: ["А","Б"], rows: [["1","2"]] }
+- callout: { type, text, icon: "💡" }
+- divider: { type }
+- columns: { type, columns: [[блокове], [блокове]] }
+
+INPUT типове (избери най-подходящия):
+- number: числов отговор. layout: "field"|"numpad"
+- text: свободен текст (български, думи)
+- single_choice: { options: ["А","Б","В","Г"] } — един верен
+- multi_choice: { options: [...], min: 1, max: 3 } — няколко верни
+- symbol_pick: { symbols: ["<","=",">"] } — за сравнения
+- fill_blanks: { parts: ["14 + 2 + ", { id:"x", placeholder:"?" }, " = 20"] }
+- true_false: { labels: ["Да","Не"] }
+- composite: { fields: [{ id:"a", type:"number", label:"Отговор а" }, ...] }
+- ordering: { items: ["първо","второ","трето"] } — подреди
+
+ANSWER:
+- value: string | number | string[] | { id: value, ... }
+- accept: ["синоними"] — по избор
+- mode: "exact"|"numeric"|"set"|"fuzzy"|"ai"
+
+ПРИМЕРИ:
+1. Текстова задача → display:[story paragraph, heading], input:number/numpad
+2. Уравнение 20=15+3+□ → display:[math], input:number или fill_blanks
+3. Сравнение → display:[compare], input:symbol_pick
+4. Избери верния отговор → display:[paragraph], input:single_choice
+5. Маркирай всички четни → input:multi_choice
+6. Задача с а) и б) → 2 отделни tasks с label блок
+
+Максимум 25 задачи. Прост български език.`;
+
+    // ═══════════════════════════════════════════
+    // FLEXIBLE TASK ENGINE
+    // ═══════════════════════════════════════════
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function renderMathExpression(expr, highlight = true) {
+      if (!highlight) return escapeHtml(expr);
+      return escapeHtml(expr)
+        .replace(/□/g, '<span class="blank">?</span>')
+        .replace(/☐/g, '<span class="blank">?</span>')
+        .replace(/\[\s*\]/g, '<span class="blank">?</span>');
+    }
+
+    const DisplayRenderers = {
+      badge(b) {
+        const el = document.createElement('span');
+        el.className = 'blk-badge';
+        el.textContent = b.text || '';
+        return el;
+      },
+      label(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-label';
+        el.textContent = b.text || '';
+        return el;
+      },
+      heading(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-heading' + (b.size === 'sm' ? ' sm' : '');
+        el.textContent = b.text || '';
+        return el;
+      },
+      paragraph(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-paragraph' + (b.style ? ` ${b.style}` : '');
+        el.textContent = b.text || '';
+        return el;
+      },
+      math(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-math';
+        el.innerHTML = renderMathExpression(b.expression || b.text || '', b.highlightBlanks !== false);
+        return el;
+      },
+      compare(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-compare';
+        el.innerHTML = `
+          <span class="blk-compare-expr">${escapeHtml(b.left || '?')}</span>
+          <span class="blk-compare-gap">?</span>
+          <span class="blk-compare-expr">${escapeHtml(b.right || '?')}</span>`;
+        return el;
+      },
+      list(b) {
+        const el = document.createElement(b.ordered ? 'ol' : 'ul');
+        el.className = 'blk-list';
+        (b.items || []).forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          el.appendChild(li);
+        });
+        return el;
+      },
+      table(b) {
+        const wrap = document.createElement('div');
+        wrap.className = 'blk-table-wrap';
+        const table = document.createElement('table');
+        table.className = 'blk-table';
+        if (b.headers?.length) {
+          const thead = document.createElement('thead');
+          const tr = document.createElement('tr');
+          b.headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; tr.appendChild(th); });
+          thead.appendChild(tr);
+          table.appendChild(thead);
+        }
+        const tbody = document.createElement('tbody');
+        (b.rows || []).forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => { const td = document.createElement('td'); td.textContent = cell; tr.appendChild(td); });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        return wrap;
+      },
+      callout(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-callout';
+        el.textContent = (b.icon ? b.icon + ' ' : '') + (b.text || '');
+        return el;
+      },
+      divider() {
+        const el = document.createElement('hr');
+        el.className = 'blk-divider';
+        return el;
+      },
+      columns(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-columns' + (b.columns?.length === 2 ? ' cols-2' : '');
+        (b.columns || []).forEach(col => {
+          const colEl = document.createElement('div');
+          renderDisplayBlocks(colEl, col);
+          el.appendChild(colEl);
+        });
+        return el;
+      },
+      image(b) {
+        const el = document.createElement('div');
+        el.className = 'blk-callout';
+        el.textContent = b.caption || '🖼️ Изображение от задачата';
+        return el;
+      },
+    };
+
+    function renderDisplayBlocks(container, blocks) {
+      (blocks || []).forEach(block => {
+        const type = block?.type || 'paragraph';
+        const renderer = DisplayRenderers[type];
+        if (renderer) {
+          container.appendChild(renderer(block));
+        } else if (block.text) {
+          container.appendChild(DisplayRenderers.paragraph({ text: block.text, style: block.style }));
+        }
+      });
+    }
+
+    function legacyToSchema(raw, index) {
+      const display = [];
+      if (raw.badge || raw.kind) {
+        display.push({ type: 'badge', text: raw.badge || TASK_KIND_LABELS[raw.kind] || 'Задача' });
+      }
+      if (raw.story) display.push({ type: 'paragraph', text: raw.story, style: 'story' });
+      if (raw.equation) display.push({ type: 'math', expression: raw.equation });
+      if (raw.leftExpr && raw.rightExpr) display.push({ type: 'compare', left: raw.leftExpr, right: raw.rightExpr });
+      if (raw.question && raw.question !== raw.story && !raw.equation) {
+        display.push({ type: 'heading', text: raw.question, size: 'md' });
+      } else if (raw.question && raw.equation) {
+        display.push({ type: 'heading', text: raw.question, size: 'sm' });
+      }
+      if (!display.length && raw.question) {
+        display.push({ type: 'paragraph', text: raw.question });
+      }
+
+      let input = raw.input;
+      if (!input) {
+        const type = raw.type || 'number';
+        if (type === 'comparison') {
+          input = { type: 'symbol_pick', symbols: ['<', '=', '>'] };
+        } else if (type === 'choice' && raw.choices?.length) {
+          input = { type: 'single_choice', options: shuffle([...raw.choices]) };
+        } else if (type === 'text') {
+          input = { type: 'text', placeholder: 'Твоят отговор...' };
+        } else {
+          input = { type: 'number', layout: 'numpad' };
+        }
+      }
+
+      let answer = raw.answer;
+      if (!answer) {
+        answer = { value: raw.correctAnswer, mode: typeof raw.correctAnswer === 'number' ? 'numeric' : 'exact' };
+      }
+
+      const pageRef = raw.pageRef ? `Стр. ${raw.pageRef}` : '';
+      const taskRef = raw.taskRef ? `Задача ${raw.taskRef}${raw.subRef || ''}` : '';
+      const source = raw.meta?.source || [pageRef, taskRef].filter(Boolean).join(' · ');
+
+      return {
+        id: raw.id || index + 1,
+        meta: {
+          source,
+          emoji: raw.meta?.emoji || raw.emoji || TASK_EMOJIS[raw.kind] || '❓',
+          badge: raw.meta?.badge || raw.badge,
+        },
+        display,
+        input,
+        answer,
+        hint: raw.hint || 'Помисли внимателно!',
+      };
+    }
+
+    function normalizeTask(raw, index) {
+      if (raw.display?.length && raw.input && raw.answer) {
+        const t = { ...raw, id: raw.id || index + 1 };
+        if (!t.meta) t.meta = {};
+        if (!t.meta.emoji) t.meta.emoji = '❓';
+        if (t.input.type === 'single_choice' && t.input.options) {
+          t.input = { ...t.input, options: shuffle([...t.input.options]) };
+        }
+        return t;
+      }
+      return legacyToSchema(raw, index);
+    }
+
+    function flattenTasks(rawTasks) {
+      const flat = [];
+      rawTasks.forEach((t) => {
+        if (t.subTasks?.length) {
+          t.subTasks.forEach((sub, j) => {
+            flat.push(normalizeTask({ ...t, ...sub, subRef: sub.subRef || String.fromCharCode(1072 + j) }, flat.length));
+          });
+        } else {
+          flat.push(normalizeTask(t, flat.length));
+        }
+      });
+      return flat;
+    }
+
+    function taskPreview(task) {
+      for (const b of task.display || []) {
+        if (b.text) return b.text.slice(0, 70) + (b.text.length > 70 ? '…' : '');
+        if (b.expression) return b.expression;
+        if (b.left) return `${b.left} ? ${b.right}`;
+      }
+      return task.meta?.badge || 'Задача';
+    }
+
+    async function extractTasks(imageDataUrl) {
+      const raw = await callGemini(EXTRACT_PROMPT, imageDataUrl, true);
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch {
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('AI не върна валиден JSON');
+        parsed = JSON.parse(match[0]);
+      }
+      if (!parsed.tasks?.length) {
+        throw new Error('Не открих задачи. Снимай по-ясно!');
+      }
+      return flattenTasks(parsed.tasks);
+    }
+
+    function showOverview() {
+      $('overview-title').textContent = `Намерих ${state.tasks.length} задачи! 🎯`;
+      const list = $('overview-list');
+      list.innerHTML = '';
+      state.tasks.forEach((t, i) => {
+        const item = document.createElement('div');
+        item.className = 'overview-item';
+        const badge = t.display?.find(b => b.type === 'badge')?.text || t.meta?.badge || 'Задача';
+        item.innerHTML = `
+          <div class="oi-num">${i + 1}</div>
+          <div class="oi-text">
+            <span style="color:var(--purple);font-size:.8rem">${badge}${t.meta?.source ? ' · ' + t.meta.source : ''}</span><br/>
+            ${escapeHtml(taskPreview(t))}
+          </div>`;
+        list.appendChild(item);
+      });
+      showScreen('overview');
+    }
+
+    function normalizeVal(v) {
+      if (v == null) return '';
+      return String(v).trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+
+    function valuesMatch(expected, given, mode = 'exact') {
+      if (Array.isArray(expected)) {
+        const exp = expected.map(normalizeVal).sort();
+        const giv = (Array.isArray(given) ? given : [given]).map(normalizeVal).sort();
+        if (mode === 'set') return exp.length === giv.length && exp.every((v, i) => v === giv[i]);
+        return exp.some(e => giv.includes(e));
+      }
+      if (typeof expected === 'object' && expected !== null && !Array.isArray(expected)) {
+        if (typeof given !== 'object' || given === null) return false;
+        return Object.keys(expected).every(k => valuesMatch(expected[k], given[k], mode));
+      }
+      const e = normalizeVal(expected);
+      const g = normalizeVal(given);
+      if (e === g) return true;
+      if (mode === 'numeric' || mode === 'exact') {
+        const ne = parseFloat(expected);
+        const ng = parseFloat(given);
+        if (!isNaN(ne) && !isNaN(ng) && ne === ng) return true;
+      }
+      return false;
+    }
+
+    async function verifyAnswer(task, userValue) {
+      const ans = task.answer || {};
+      const expected = ans.value ?? ans;
+      const mode = ans.mode || 'exact';
+
+      if (valuesMatch(expected, userValue, mode)) return true;
+
+      if (ans.accept?.length) {
+        for (const alt of ans.accept) {
+          if (valuesMatch(alt, userValue, mode)) return true;
+        }
+      }
+
+      if ((mode === 'ai' || mode === 'fuzzy' || task.input?.type === 'text') && state.apiKey) {
+        try {
+          const q = taskPreview(task);
+          const prompt = `Дете 7 г. отговори.
+Задача: "${q}"
+Очакван: ${JSON.stringify(expected)}
+Отговор: ${JSON.stringify(userValue)}
+Върни JSON: {"correct":true/false,"feedback":"кратко на български"}
+Приемай синоними и малки грешки.`;
+          const raw = await callGemini(prompt, null, true);
+          const result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || raw);
+          if (result.feedback) setMascot(result.feedback);
+          return !!result.correct;
+        } catch { /* fall through */ }
+      }
+      return false;
+    }
+
+    function formatExpected(task) {
+      const v = task.answer?.value ?? task.answer;
+      if (Array.isArray(v)) return v.join(', ');
+      if (typeof v === 'object' && v !== null) return Object.values(v).join(', ');
+      return String(v);
+    }
+
+    // ── Input widget factory ──
+    let activeWidget = null;
+
+    function mountInput(zone, task, onResult) {
+      zone.innerHTML = '';
+      zone.className = 'task-input-zone input-zone';
+      const input = task.input || { type: 'number' };
+
+      if (input.label) {
+        const lbl = document.createElement('div');
+        lbl.className = 'input-label';
+        lbl.textContent = input.label;
+        zone.appendChild(lbl);
+      }
+
+      const widget = InputWidgets[input.type] || InputWidgets.number;
+      const controls = widget(zone, input, (value) => {
+        if (state.answered) return;
+        onResult(value);
+      });
+      activeWidget = controls;
+      return controls;
+    }
+
+    const InputWidgets = {
+      number(zone, cfg, submit) {
+        if (cfg.layout === 'numpad') return InputWidgets.numpad(zone, cfg, submit);
+
+        const row = document.createElement('div');
+        row.className = 'input-row';
+        const field = document.createElement('input');
+        field.className = 'input-field';
+        field.type = 'number';
+        field.inputMode = 'numeric';
+        field.placeholder = cfg.placeholder || '?';
+        field.addEventListener('keydown', e => { if (e.key === 'Enter') trySubmit(); });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.innerHTML = '✓';
+        btn.style.minWidth = '64px';
+        btn.addEventListener('click', trySubmit);
+        row.appendChild(field);
+        row.appendChild(btn);
+        zone.appendChild(row);
+        setTimeout(() => field.focus(), 200);
+
+        function trySubmit() {
+          const v = field.value.trim();
+          if (!v) return;
+          submit(v);
+        }
+        return { disable: () => { field.disabled = true; }, mark: (ok) => field.classList.add(ok ? 'correct' : 'wrong') };
+      },
+
+      text(zone, cfg, submit) {
+        const row = document.createElement('div');
+        row.className = 'input-row';
+        const field = document.createElement('input');
+        field.className = 'input-field';
+        field.type = 'text';
+        field.placeholder = cfg.placeholder || '...';
+        field.addEventListener('keydown', e => { if (e.key === 'Enter' && field.value.trim()) submit(field.value.trim()); });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.innerHTML = '✓';
+        btn.style.minWidth = '64px';
+        btn.addEventListener('click', () => { if (field.value.trim()) submit(field.value.trim()); });
+        row.appendChild(field);
+        row.appendChild(btn);
+        zone.appendChild(row);
+        setTimeout(() => field.focus(), 200);
+        return { disable: () => { field.disabled = true; }, mark: (ok) => field.classList.add(ok ? 'correct' : 'wrong') };
+      },
+
+      numpad(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-numpad';
+        const display = document.createElement('div');
+        display.className = 'numpad-display';
+        display.textContent = cfg.placeholder || '?';
+        let val = '';
+        const grid = document.createElement('div');
+        grid.className = 'numpad-grid';
+        const keys = ['1','2','3','4','5','6','7','8','9','⌫','0','✓'];
+        keys.forEach(k => {
+          const btn = document.createElement('button');
+          btn.className = 'numpad-key' + (k === '✓' ? ' wide' : '');
+          btn.textContent = k;
+          btn.addEventListener('click', () => {
+            if (k === '⌫') { val = val.slice(0, -1); display.textContent = val || '?'; }
+            else if (k === '✓') { if (val) submit(val); }
+            else { val += k; display.textContent = val; }
+          });
+          grid.appendChild(btn);
+        });
+        wrap.appendChild(display);
+        wrap.appendChild(grid);
+        zone.appendChild(wrap);
+        return { disable: () => grid.querySelectorAll('button').forEach(b => b.disabled = true),
+          mark: (ok) => { display.style.background = ok ? '#dff9ee' : '#ffeaa7'; } };
+      },
+
+      single_choice(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-choices' + (cfg.layout === 'grid' ? ' grid' : cfg.layout === 'horizontal' ? ' horizontal' : '');
+        const btns = [];
+        (cfg.options || []).forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-choice';
+          btn.textContent = opt;
+          btn.addEventListener('click', () => submit(opt));
+          btns.push(btn);
+          wrap.appendChild(btn);
+        });
+        zone.appendChild(wrap);
+        return {
+          disable: () => btns.forEach(b => b.style.pointerEvents = 'none'),
+          mark: (ok, chosen) => btns.forEach(b => {
+            if (b.textContent.trim() === String(chosen).trim()) b.classList.add(ok ? 'correct' : 'wrong');
+            else if (!ok && b.textContent.trim() === formatExpected({ answer: cfg._answer })) b.classList.add('correct');
+          }),
+          _btns: btns,
+        };
+      },
+
+      multi_choice(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-multi';
+        const selected = new Set();
+        const items = [];
+        (cfg.options || []).forEach(opt => {
+          const item = document.createElement('div');
+          item.className = 'multi-item';
+          item.innerHTML = `<span class="multi-check"></span><span>${escapeHtml(opt)}</span>`;
+          item.addEventListener('click', () => {
+            if (selected.has(opt)) { selected.delete(opt); item.classList.remove('selected'); item.querySelector('.multi-check').textContent = ''; }
+            else {
+              if (cfg.max && selected.size >= cfg.max) return;
+              selected.add(opt); item.classList.add('selected'); item.querySelector('.multi-check').textContent = '✓';
+            }
+          });
+          items.push(item);
+          wrap.appendChild(item);
+        });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.textContent = '✓ Готово';
+        btn.addEventListener('click', () => {
+          if (selected.size >= (cfg.min || 1)) submit([...selected]);
+        });
+        zone.appendChild(wrap);
+        zone.appendChild(btn);
+        return { disable: () => { items.forEach(i => i.style.pointerEvents = 'none'); btn.disabled = true; } };
+      },
+
+      symbol_pick(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-symbol-pick';
+        const symbols = cfg.symbols || ['<', '=', '>'];
+        const btns = [];
+        symbols.forEach(sym => {
+          const btn = document.createElement('button');
+          btn.className = 'btn-symbol';
+          btn.textContent = sym;
+          btn.addEventListener('click', () => submit(sym));
+          btns.push(btn);
+          wrap.appendChild(btn);
+        });
+        zone.appendChild(wrap);
+        return {
+          disable: () => btns.forEach(b => b.style.pointerEvents = 'none'),
+          mark: (ok, chosen, expected) => btns.forEach(b => {
+            if (b.textContent === chosen) b.classList.add(ok ? 'correct' : 'wrong');
+            if (!ok && b.textContent === expected) b.classList.add('correct');
+          }),
+        };
+      },
+
+      fill_blanks(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-fill-blanks';
+        const inputs = {};
+        (cfg.parts || []).forEach(part => {
+          if (typeof part === 'string') {
+            const span = document.createElement('span');
+            span.textContent = part;
+            wrap.appendChild(span);
+          } else {
+            const inp = document.createElement('input');
+            inp.className = 'fb-input';
+            inp.id = part.id || 'x';
+            inp.placeholder = part.placeholder || '?';
+            inp.inputMode = 'numeric';
+            inputs[part.id || 'x'] = inp;
+            wrap.appendChild(inp);
+          }
+        });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.textContent = '✓';
+        btn.style.marginTop = '12px';
+        btn.addEventListener('click', () => {
+          const vals = {};
+          let filled = true;
+          Object.entries(inputs).forEach(([k, el]) => {
+            if (!el.value.trim()) filled = false;
+            vals[k] = el.value.trim();
+          });
+          if (filled) submit(Object.keys(vals).length === 1 ? Object.values(vals)[0] : vals);
+        });
+        zone.appendChild(wrap);
+        zone.appendChild(btn);
+        return { disable: () => Object.values(inputs).forEach(i => i.disabled = true) };
+      },
+
+      true_false(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-tf';
+        const labels = cfg.labels || ['Да', 'Не'];
+        const btns = [];
+        labels.forEach(lbl => {
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-choice btn-tf';
+          btn.textContent = lbl;
+          btn.addEventListener('click', () => submit(lbl));
+          btns.push(btn);
+          wrap.appendChild(btn);
+        });
+        zone.appendChild(wrap);
+        return { disable: () => btns.forEach(b => b.style.pointerEvents = 'none') };
+      },
+
+      composite(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-composite';
+        const fields = {};
+        (cfg.fields || []).forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'composite-field';
+          if (f.label) { const lbl = document.createElement('label'); lbl.textContent = f.label; row.appendChild(lbl); }
+          const inp = document.createElement('input');
+          inp.className = 'input-field';
+          inp.type = f.type === 'number' ? 'number' : 'text';
+          inp.placeholder = f.placeholder || '?';
+          fields[f.id] = inp;
+          row.appendChild(inp);
+          wrap.appendChild(row);
+        });
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-green';
+        btn.textContent = '✓ Готово';
+        btn.addEventListener('click', () => {
+          const vals = {};
+          let ok = true;
+          Object.entries(fields).forEach(([k, el]) => {
+            if (!el.value.trim()) ok = false;
+            vals[k] = el.value.trim();
+          });
+          if (ok) submit(vals);
+        });
+        zone.appendChild(wrap);
+        zone.appendChild(btn);
+        return { disable: () => Object.values(fields).forEach(i => i.disabled = true) };
+      },
+
+      ordering(zone, cfg, submit) {
+        const wrap = document.createElement('div');
+        wrap.className = 'widget-ordering';
+        const order = [];
+        const items = shuffle([...(cfg.items || [])]);
+        const picked = [];
+        items.forEach(text => {
+          const item = document.createElement('div');
+          item.className = 'order-item';
+          item.innerHTML = `<span class="order-num empty">·</span><span>${escapeHtml(text)}</span>`;
+          item.addEventListener('click', () => {
+            if (item.classList.contains('picked')) return;
+            picked.push(text);
+            item.classList.add('picked');
+            item.querySelector('.order-num').textContent = picked.length;
+            item.querySelector('.order-num').classList.remove('empty');
+            if (picked.length === items.length) submit(picked);
+          });
+          wrap.appendChild(item);
+        });
+        zone.appendChild(wrap);
+        return { disable: () => wrap.querySelectorAll('.order-item').forEach(i => i.style.pointerEvents = 'none') };
+      },
+    };
+
+    // ── Task rendering ──
+    function renderTask() {
+      const task = state.tasks[state.currentIndex];
+      if (!task) return showComplete();
+
+      state.answered = false;
+      const label = task.meta?.source
+        ? `${task.meta.source} · ${state.currentIndex + 1}/${state.tasks.length}`
+        : `Задача ${state.currentIndex + 1} от ${state.tasks.length}`;
+      $('task-number').textContent = label;
+      $('task-emoji').textContent = task.meta?.emoji || '❓';
+
+      const displayEl = $('task-display');
+      displayEl.innerHTML = '';
+      renderDisplayBlocks(displayEl, task.display);
+
+      $('hint-box').classList.remove('visible');
+      $('hint-box').textContent = task.hint || '';
+      setMascot(randomMsg(MASCOT_MESSAGES.welcome));
+
+      if (state.currentIndex > 0 && state.currentIndex % 5 === 0) {
+        setTimeout(() => setMascot(randomMsg(MASCOT_MESSAGES.break)), 2000);
+      }
+
+      const inputZone = $('task-input-zone');
+      if (task.input?.type === 'single_choice') {
+        task.input._answer = task.answer;
+      }
+
+      mountInput(inputZone, task, async (value) => {
+        await handleAnswer(task, value);
+      });
+
+      if (state.focusMode) {
+        $('focus-ring').classList.add('active');
+        $('task-card').style.position = 'relative';
+        $('task-card').style.zIndex = '10';
+      }
+    }
+
+    async function handleAnswer(task, value) {
+      if (state.answered) return;
+      state.answered = true;
+
+      const correct = await verifyAnswer(task, value);
+      if (activeWidget?.disable) activeWidget.disable();
+
+      const expected = formatExpected(task);
+
+      if (activeWidget?.mark) {
+        if (task.input?.type === 'symbol_pick') {
+          activeWidget.mark(correct, value, expected);
+        } else if (task.input?.type === 'single_choice') {
+          activeWidget._btns?.forEach(b => {
+            if (b.textContent.trim() === String(value).trim()) b.classList.add(correct ? 'correct' : 'wrong');
+            if (!correct && b.textContent.trim() === expected) b.classList.add('correct');
+          });
+        } else {
+          activeWidget.mark(correct);
+        }
+      }
+
+      if (correct) {
+        onCorrect();
+      } else {
+        onWrong();
+        setMascot(`Верният отговор: ${expected}`);
+      }
+      setTimeout(nextTask, correct ? 1400 : 2400);
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    const DEMO_TASKS = [
+      {
+        meta: { source: 'Стр. 60 · Задача 1', emoji: '📖', badge: 'Текстова задача' },
+        display: [
+          { type: 'badge', text: 'Текстова задача' },
+          { type: 'paragraph', text: 'След като продали 14 маси, в магазина останали още 6. Колко маси е имало в този магазин?', style: 'story' },
+          { type: 'heading', text: 'Колко маси е имало?', size: 'md' },
+        ],
+        input: { type: 'number', layout: 'numpad', label: 'Твоят отговор' },
+        answer: { value: '20', mode: 'numeric' },
+        hint: 'Сложи продадените и останалите маси!',
+      },
+      {
+        meta: { source: 'Стр. 60 · Задача 2', emoji: '🎂' },
+        display: [
+          { type: 'paragraph', text: 'След 2 години Таня ще празнува двадесетия си рожден ден. На колко години е Таня сега?', style: 'story' },
+        ],
+        input: { type: 'number', layout: 'numpad' },
+        answer: { value: '18', mode: 'numeric' },
+        hint: 'Извади 2 от 20!',
+      },
+      {
+        meta: { source: 'Стр. 60 · Задача 3', emoji: '➕' },
+        display: [
+          { type: 'math', expression: '20 = 15 + 3 + □' },
+          { type: 'heading', text: 'Кое число липсва?', size: 'sm' },
+        ],
+        input: {
+          type: 'fill_blanks',
+          parts: ['20 = 15 + 3 + ', { id: 'x', placeholder: '?' }],
+        },
+        answer: { value: '2', mode: 'numeric' },
+        hint: '15 + 3 = 18. Колко остава до 20?',
+      },
+      {
+        meta: { source: 'Стр. 61 · Задача 2а', emoji: '⚖️' },
+        display: [
+          { type: 'badge', text: 'Сравнение' },
+          { type: 'compare', left: '10 + 6', right: '4 + 12' },
+          { type: 'paragraph', text: 'Сметни и двете страни. Кой знак е правилен?', style: 'instruction' },
+        ],
+        input: { type: 'symbol_pick', symbols: ['<', '=', '>'] },
+        answer: { value: '=', mode: 'exact' },
+        hint: '10+6=? и 4+12=?',
+      },
+      {
+        meta: { source: 'Стр. 61 · Задача 2б', emoji: '⚖️' },
+        display: [{ type: 'compare', left: '7 + 13', right: '20 - 1' }],
+        input: { type: 'symbol_pick', symbols: ['<', '=', '>'] },
+        answer: { value: '<', mode: 'exact' },
+        hint: '7+13=20, а 20-1=19',
+      },
+      {
+        meta: { source: 'Стр. 61 · Задача 3', emoji: '🎾' },
+        display: [
+          { type: 'paragraph', text: 'В първия сет тенисист направил 18 успешни и 7 неуспешни сервиса.', style: 'story' },
+          { type: 'heading', text: 'С колко успешните са повече?', size: 'md' },
+        ],
+        input: { type: 'number', layout: 'field' },
+        answer: { value: '11', mode: 'numeric' },
+        hint: 'Извади 7 от 18!',
+      },
+      {
+        meta: { source: 'Демо · Български', emoji: '📝' },
+        display: [
+          { type: 'paragraph', text: 'Коя дума е глагол?', style: 'instruction' },
+        ],
+        input: {
+          type: 'single_choice',
+          options: ['къща', 'бяга', 'червен', 'три'],
+          layout: 'grid',
+        },
+        answer: { value: 'бяга', mode: 'exact' },
+        hint: 'Глагол показва действие!',
+      },
+      {
+        meta: { source: 'Демо · Вярно/Невярно', emoji: '✅' },
+        display: [
+          { type: 'paragraph', text: '15 + 5 = 21', style: 'story' },
+          { type: 'heading', text: 'Вярно ли е?', size: 'md' },
+        ],
+        input: { type: 'true_false', labels: ['Да', 'Не'] },
+        answer: { value: 'Не', mode: 'exact' },
+        hint: 'Сметни 15 + 5',
+      },
+    ];
+
+    function startDemo() {
+      getAudio();
+      state.tasks = DEMO_TASKS.map((t, i) => normalizeTask(t, i));
+      state.currentIndex = 0;
+      state.stars = 0;
+      state.xp = 0;
+      state.correctCount = 0;
+      state.streak = 0;
+      state.combo = 0;
+      updateStats();
+      showOverview();
+    }
+
+    // ── Photo handling ──
+    function handlePhoto(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.photoDataUrl = e.target.result;
+        const preview = $('photo-preview');
+        preview.src = state.photoDataUrl;
+        preview.classList.add('visible');
+        $('capture-hint').style.display = 'none';
+        $('btn-analyze').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    $('file-input').addEventListener('change', (e) => handlePhoto(e.target.files[0]));
+    $('camera-input').addEventListener('change', (e) => handlePhoto(e.target.files[0]));
+
+    function onCorrect() {
+      state.correctCount++;
+      state.streak++;
+      state.combo++;
+
+      const bonus = state.streak >= 3 ? 2 : 1;
+      const earnedStars = 1 + bonus;
+      state.stars += earnedStars;
+      state.xp += 10 * (state.combo >= 3 ? 2 : 1);
+
+      updateStats();
+      playCorrect();
+      launchConfetti(state.streak >= 3 ? 120 : 60);
+      flashScreen();
+      setMascot(randomMsg(MASCOT_MESSAGES.correct), true);
+
+      if (state.combo >= 3) showCombo(state.combo);
+      if (state.xp > 0 && state.xp % 50 === 0) playLevelUp();
+
+      spawnStars(earnedStars);
+    }
+
+    function onWrong() {
+      state.streak = 0;
+      state.combo = 0;
+      playWrong();
+      setMascot(randomMsg(MASCOT_MESSAGES.wrong));
+    }
+
+    function flashScreen() {
+      const el = $('flash');
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 200);
+    }
+
+    function showCombo(n) {
+      const el = $('combo-badge');
+      el.textContent = `🔥 ${n}x КОМБО!`;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1200);
+    }
+
+    function spawnStars(count) {
+      for (let i = 0; i < count; i++) {
+        const star = document.createElement('div');
+        star.className = 'star-burst';
+        star.textContent = '⭐';
+        star.style.left = `${30 + Math.random() * 40}%`;
+        star.style.top = `${20 + Math.random() * 30}%`;
+        document.body.appendChild(star);
+        setTimeout(() => star.remove(), 800);
+      }
+    }
+
+    function nextTask() {
+      $('focus-ring').classList.remove('active');
+      state.currentIndex++;
+      updateProgress();
+      if (state.currentIndex >= state.tasks.length) {
+        showComplete();
+      } else {
+        renderTask();
+      }
+    }
+
+    function showComplete() {
+      $('final-stars').textContent = `⭐ ${state.stars}`;
+      $('final-xp').textContent = `⚡ ${state.xp}`;
+      $('final-correct').textContent = `✅ ${state.correctCount}/${state.tasks.length}`;
+      showScreen('complete');
+      launchConfetti(150);
+      playLevelUp();
+      setMascot(randomMsg(MASCOT_MESSAGES.complete), true);
+    }
+
+    function resetGame() {
+      state.tasks = [];
+      state.currentIndex = 0;
+      state.stars = 0;
+      state.xp = 0;
+      state.correctCount = 0;
+      state.streak = 0;
+      state.combo = 0;
+      state.photoDataUrl = null;
+      updateStats();
+      $('photo-preview').classList.remove('visible');
+      $('capture-hint').style.display = '';
+      $('btn-analyze').classList.add('hidden');
+      $('file-input').value = '';
+      $('camera-input').value = '';
+      showScreen('capture');
+    }
+
+    // ── Event listeners ──
+    $('btn-start').addEventListener('click', () => {
+      getAudio();
+      showScreen('capture');
+    });
+
+    $('btn-demo').addEventListener('click', startDemo);
+
+    $('btn-camera').addEventListener('click', () => $('camera-input').click());
+    $('btn-gallery').addEventListener('click', () => $('file-input').click());
+
+    $('btn-analyze').addEventListener('click', async () => {
+      if (!state.photoDataUrl) return;
+
+      if (!state.apiKey) {
+        $('settings-modal').classList.add('open');
+        return;
+      }
+
+      showScreen('analyzing');
+      $('scanner-img').src = state.photoDataUrl;
+
+      try {
+        state.tasks = await extractTasks(state.photoDataUrl);
+        state.currentIndex = 0;
+        state.stars = 0;
+        state.xp = 0;
+        state.correctCount = 0;
+        state.streak = 0;
+        state.combo = 0;
+        updateStats();
+        showOverview();
+      } catch (err) {
+        alert(err.message || 'Грешка при анализ. Провери API ключа и опитай пак.');
+        showScreen('capture');
+      }
+    });
+
+    $('hint-btn').addEventListener('click', () => {
+      $('hint-box').classList.add('visible');
+      setMascot(randomMsg(MASCOT_MESSAGES.hint));
+    });
+
+    $('btn-restart').addEventListener('click', resetGame);
+
+    $('btn-play').addEventListener('click', () => {
+      showScreen('task');
+      renderTask();
+    });
+
+    // Settings
+    $('settings-open').addEventListener('click', () => {
+      $('api-key-input').value = state.apiKey;
+      $('focus-mode-check').checked = state.focusMode;
+      $('settings-modal').classList.add('open');
+    });
+    $('settings-close').addEventListener('click', () => $('settings-modal').classList.remove('open'));
+    $('settings-save').addEventListener('click', () => {
+      state.apiKey = $('api-key-input').value.trim();
+      state.focusMode = $('focus-mode-check').checked;
+      localStorage.setItem('learn_api_key', state.apiKey);
+      localStorage.setItem('learn_focus_mode', state.focusMode);
+      $('settings-modal').classList.remove('open');
+    });
+
+    // Init
+    (async () => {
+      await loadApiKey();
+      state.focusMode = localStorage.getItem('learn_focus_mode') !== 'false';
+      if (!state.apiKey) {
+        // Show settings hint on first visit
+        setTimeout(() => {
+          if (!state.apiKey) $('settings-modal').classList.add('open');
+        }, 1500);
+      }
+    })();
+  </script>
+</body>
+</html>
