@@ -313,7 +313,7 @@ function questionnaireBlock(q: QuestionnaireData): string {
     `непоносимости: ${q.foodIntolerances || 'няма'} | алергии: ${q.allergies || 'няма'}`,
     `медикаменти: ${q.medications || 'няма'}`,
     `стрес: ${q.stressLevel || 'не е посочен'} | сън: ${q.sleepHours ?? '?'} ч (${q.sleepQuality || '?'})`,
-    `активност: ${q.activityLevel || 'не е посочена'} | вода: ${q.hydration ?? '?'} л/ден`,
+    `активност: ${q.activityLevel || 'не е посочена'} | вода: ${q.hydration ?? '?'} чаши/ден (~${((q.hydration ?? 0) * 0.25).toFixed(1)} л)`,
     `фамилна анамнеза: ${q.familyHistory || 'няма'}`,
     `медицински състояния: ${q.medicalConditions || 'няма'}`,
   ].join('\n')

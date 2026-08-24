@@ -43,6 +43,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useIsMobile } from '@/hooks/use-mobile'
 import type { QuestionConfig, QuestionnaireConfig, QuestionType, QuestionOption } from '@/types'
 import { defaultQuestions } from '@/lib/defaultQuestions'
+import { QUESTIONNAIRE_CONFIG_VERSION } from '@/lib/questionnaire-logic'
 
 interface SortableQuestionProps {
   question: QuestionConfig
@@ -424,7 +425,7 @@ function QuestionEditor({ question, onSave, onCancel }: QuestionEditorProps) {
 export default function QuestionnaireManager() {
   const [questionnaireConfig, setQuestionnaireConfig] = useKVWithFallback<QuestionnaireConfig>('questionnaire-config', {
     questions: defaultQuestions,
-    version: '1.0'
+    version: QUESTIONNAIRE_CONFIG_VERSION
   })
 
   const [editingQuestion, setEditingQuestion] = useState<QuestionConfig | null>(null)
@@ -564,7 +565,7 @@ export default function QuestionnaireManager() {
     try {
       await setQuestionnaireConfig({
         questions: defaultQuestions,
-        version: '1.0'
+        version: QUESTIONNAIRE_CONFIG_VERSION
       })
       toast.success('Въпросникът е възстановен')
     } catch (error) {

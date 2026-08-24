@@ -135,7 +135,8 @@ export function buildSafetyProfile(q: QuestionnaireData): SafetyProfile {
   const pregnancy =
     inList(q.healthStatus, 'бременност') || inText(['бременн', 'бременост'], ...free)
 
-  const breastfeeding = inText(['кърм', 'лактаци'], ...free)
+  const breastfeeding =
+    inList(q.healthStatus, 'кърмен', 'лактаци') || inText(['кърм', 'лактаци'], ...free)
 
   const minor = (q.age ?? 30) < 18
 

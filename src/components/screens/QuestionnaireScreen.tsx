@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -23,6 +23,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import type { QuestionnaireData, QuestionConfig, QuestionnaireConfig, UploadedDocument } from '@/types'
 import { defaultQuestions } from '@/lib/defaultQuestions'
+import {
+  getVisibleQuestions,
+  getFilteredOptions,
+  sanitizeAnswers,
+  normalizeQuestionnairePayload,
+  QUESTIONNAIRE_CONFIG_VERSION,
+} from '@/lib/questionnaire-logic'
 
 interface QuestionnaireScreenProps {
   onComplete: (data: QuestionnaireData) => void
@@ -32,10 +39,15 @@ interface QuestionnaireScreenProps {
 export default function QuestionnaireScreen({ onComplete, initialData }: QuestionnaireScreenProps) {
   const [questionnaireConfig] = useKVWithFallback<QuestionnaireConfig>('questionnaire-config', {
     questions: defaultQuestions,
-    version: '1.0'
+    version: QUESTIONNAIRE_CONFIG_VERSION,
   })
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const allQuestions = useMemo(() => {
+    const cfg = questionnaireConfig
+    if (!cfg || cfg.version !== QUESTIONNAIRE_CONFIG_VERSION) return defaultQuestions
+    return cfg.questions.length > 0 ? cfg.questions : defaultQuestions
+  }, [questionnaireConfig])
+
   const [answers, setAnswers] = useState<Record<string, any>>(() => {
     if (initialData) {
       return {
@@ -46,15 +58,42 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     }
     return {}
   })
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [otherValues, setOtherValues] = useState<Record<string, string>>({})
   const [showOther, setShowOther] = useState<Record<string, boolean>>({})
   const [uploadedFiles, setUploadedFiles] = useState<UploadedDocument[]>(
     initialData?.uploadedDocuments || []
   )
 
-  const questions = questionnaireConfig?.questions || defaultQuestions
-  const currentQuestion = questions[currentQuestionIndex]
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100
+  const visibleQuestions = useMemo(
+    () => getVisibleQuestions(allQuestions, answers),
+    [allQuestions, answers]
+  )
+
+  const currentQuestion = visibleQuestions[currentQuestionIndex]
+  const progress = visibleQuestions.length
+    ? ((currentQuestionIndex + 1) / visibleQuestions.length) * 100
+    : 0
+
+  const setAnswersSanitized = useCallback((next: Record<string, any>) => {
+    setAnswers(sanitizeAnswers(next))
+  }, [])
+
+  useEffect(() => {
+    setAnswers(prev => {
+      const cleaned = sanitizeAnswers(prev)
+      const goalsChanged = JSON.stringify(cleaned.goals) !== JSON.stringify(prev.goals)
+      const healthChanged = JSON.stringify(cleaned.healthStatus) !== JSON.stringify(prev.healthStatus)
+      if (goalsChanged || healthChanged) return cleaned
+      return prev
+    })
+  }, [answers.gender, answers.age, answers.weight, answers.height])
+
+  useEffect(() => {
+    if (currentQuestionIndex >= visibleQuestions.length && visibleQuestions.length > 0) {
+      setCurrentQuestionIndex(Math.max(0, visibleQuestions.length - 1))
+    }
+  }, [currentQuestionIndex, visibleQuestions.length])
 
   const validateAnswer = (question: QuestionConfig, value: any): boolean => {
     if (question.type === 'file') {
@@ -106,7 +145,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
 
   const handleSkip = () => {
     if (currentQuestion.required) return
-    setAnswers({ ...answers, [currentQuestion.id]: currentQuestion.type === 'checkbox' ? [] : '' })
+    setAnswersSanitized({ ...answers, [currentQuestion.id]: currentQuestion.type === 'checkbox' ? [] : '' })
     advanceQuestion()
   }
 
@@ -122,7 +161,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       }
     }
 
-    if (currentQuestionIndex < questions.length - 1) {
+    if (currentQuestionIndex < visibleQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1)
     } else {
       completeQuestionnaire()
@@ -137,7 +176,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
 
   const completeQuestionnaire = () => {
     const mergedAnswers = { ...answers }
-    for (const q of questions) {
+    for (const q of allQuestions) {
       if (showOther[q.id] && otherValues[q.id]) {
         const val = mergedAnswers[q.id]
         if (Array.isArray(val)) {
@@ -146,32 +185,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       }
     }
 
-    const finalData: QuestionnaireData = {
-      name: mergedAnswers.name || '',
-      age: Number(mergedAnswers.age) || 0,
-      gender: mergedAnswers.gender || 'other',
-      weight: Number(mergedAnswers.weight) || 0,
-      height: Number(mergedAnswers.height) || 0,
-      goals: mergedAnswers.goals || [],
-      healthStatus: mergedAnswers.healthStatus || [],
-      complaints: mergedAnswers.complaints || '',
-      medicalConditions: mergedAnswers.medicalConditions || '',
-      familyHistory: mergedAnswers.familyHistory || '',
-      activityLevel: mergedAnswers.activityLevel || 'moderate',
-      stressLevel: mergedAnswers.stressLevel || 'moderate',
-      sleepHours: Number(mergedAnswers.sleepHours) || 7,
-      sleepQuality: mergedAnswers.sleepQuality || 'good',
-      hydration: Number(mergedAnswers.hydration) || 8,
-      dietaryProfile: mergedAnswers.dietaryProfile || [],
-      dietaryHabits: mergedAnswers.dietaryHabits || [],
-      foodIntolerances: mergedAnswers.foodRestrictions || mergedAnswers.foodIntolerances || '',
-      allergies: mergedAnswers.foodRestrictions || mergedAnswers.allergies || '',
-      medications: mergedAnswers.medications || '',
-      uploadedDocuments: uploadedFiles,
-      customAnswers: mergedAnswers,
-    }
-
-    onComplete(finalData)
+    onComplete(normalizeQuestionnairePayload(mergedAnswers, uploadedFiles))
   }
 
   const handleCheckboxChange = (questionId: string, value: string, checked: boolean) => {
@@ -185,9 +199,9 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     }
     
     if (checked) {
-      setAnswers({ ...answers, [questionId]: [...current, value] })
+      setAnswersSanitized({ ...answers, [questionId]: [...current, value] })
     } else {
-      setAnswers({ ...answers, [questionId]: current.filter(v => v !== value) })
+      setAnswersSanitized({ ...answers, [questionId]: current.filter(v => v !== value) })
     }
   }
 
@@ -247,6 +261,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   const renderQuestion = () => {
     const question = currentQuestion
     const value = answers[question.id]
+    const options = getFilteredOptions(question, answers)
 
     switch (question.type) {
       case 'text':
@@ -257,7 +272,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               type="text"
               placeholder="Въведете отговор..."
               value={value || ''}
-              onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+              onChange={(e) => setAnswersSanitized({ ...answers, [question.id]: e.target.value })}
               className="text-lg h-12"
               autoFocus
             />
@@ -272,7 +287,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               type="number"
               placeholder="Въведете число..."
               value={value || ''}
-              onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+              onChange={(e) => setAnswersSanitized({ ...answers, [question.id]: e.target.value })}
               className="text-lg h-12"
               autoFocus
               min={question.validation?.min}
@@ -288,7 +303,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               id={question.id}
               placeholder="Въведете отговор..."
               value={value || ''}
-              onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+              onChange={(e) => setAnswersSanitized({ ...answers, [question.id]: e.target.value })}
               className="min-h-[150px] text-base resize-none"
               autoFocus
             />
@@ -299,10 +314,10 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
         return (
           <RadioGroup
             value={value}
-            onValueChange={(val) => setAnswers({ ...answers, [question.id]: val })}
+            onValueChange={(val) => setAnswersSanitized({ ...answers, [question.id]: val })}
             className="space-y-3"
           >
-            {question.options?.map((option) => (
+            {options.map((option) => (
               <div
                 key={option.value}
                 className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
@@ -310,7 +325,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50 hover:bg-muted/30'
                 }`}
-                onClick={() => setAnswers({ ...answers, [question.id]: option.value })}
+                onClick={() => setAnswersSanitized({ ...answers, [question.id]: option.value })}
               >
                 <RadioGroupItem value={option.value} id={option.value} className="mt-0.5" />
                 <Label htmlFor={option.value} className="font-normal cursor-pointer flex-1 leading-snug">
@@ -324,7 +339,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       case 'checkbox':
         return (
           <div className="space-y-3">
-            {question.options?.map((option) => (
+            {options.map((option) => (
               <div
                 key={option.value}
                 className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
@@ -399,7 +414,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
             </div>
             <Slider
               value={[sliderValue]}
-              onValueChange={(val) => setAnswers({ ...answers, [question.id]: val[0] })}
+              onValueChange={(val) => setAnswersSanitized({ ...answers, [question.id]: val[0] })}
               min={question.validation?.min || 0}
               max={question.validation?.max || 100}
               step={0.5}
@@ -495,7 +510,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
         >
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-muted-foreground">
-              Стъпка {currentQuestionIndex + 1} от {questions.length}
+              Стъпка {currentQuestionIndex + 1} от {visibleQuestions.length}
             </p>
             <span className="text-xs tabular-nums text-muted-foreground">
               {Math.round(progress)}%
@@ -555,7 +570,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
           )}
 
           <Button onClick={handleNext} className="gap-2 ml-auto flex-1 sm:flex-none" size="lg">
-            {currentQuestionIndex === questions.length - 1 ? (
+            {currentQuestionIndex === visibleQuestions.length - 1 ? (
               <>
                 Към снимките
                 <CheckCircle size={18} weight="bold" />
