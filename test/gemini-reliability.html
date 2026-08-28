@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Gemini finding reliability</title></head>
+<body style="background:#0b0b0e;color:#ddd;font:13px/1.6 ui-monospace,monospace;padding:16px">
+<pre id="out">Gemini reliability test…</pre>
+<script type="module">
+/**
+ * LIVE VALIDATION — Gemini vision vs synthetic ground truth.
+ *
+ * Reference methodology:
+ * - Test–retest: same strip, two independent LLM calls (ICC-style repeatability)
+ * - Dual-seam: 12:00 vs 6:00 unwrap (location-first merge, МЕТОДИКА_2 §10)
+ * - Location recall/precision vs injected markers (object-detection style)
+ *
+ * NOT clinical diagnostic validity (NHMRC 2024 ≈ chance for manual iridology).
+ */
+import { unwrapIris, stripSectorToPhysical, readabilityToPhysical } from '/src/lib/iris-unwrap.ts'
+import { buildDetectionPrompt } from '/src/lib/analysis-prompts.ts'
+import { parseDetectionJson } from '/src/lib/iris-pipeline.ts'
+import { normalizeFindings, mergeSeamReadings } from '/src/lib/iris-scoring.ts'
+import {
+  evaluateLocationRecall,
+  evaluateLocationPrecision,
+  evaluateSeamTestRetest,
+  formatReliabilityReport,
+  evaluateReliabilitySuite,
+} from '/src/lib/finding-reliability.ts'
+
+const params = new URLSearchParams(location.search)
+const apiKey = params.get('key') || ''
+const model = params.get('model') || 'gemini-3.6-flash'
+const retest = params.get('retest') !== '0'
+
+const L = []
+const t0 = performance.now()
+const mark = (s) => L.push(`[${((performance.now() - t0) / 1000).toFixed(1)}s] ${s}`)
+
+/** Ground truth — физически координати на нарочно нарисуваните петна. */
+const GROUND_TRUTH = [
+  { sector: 5, ring: 4, type: 'pigment_orange', label: 'orange S5 R4' },
+  { sector: 9, ring: 6, type: 'pigment_brown', label: 'brown S9 R6' },
+  { sector: 3, ring: 8, type: 'pigment_orange', label: 'orange S3 R8' },
+]
+
+const SIZE = 1200, CX = 600, CY = 600, RP = 125, RI = 420
+
+function cellCentre(sector, ring) {
+  const minute = (sector - 1) * 5 + 2.5
+  const theta = (minute / 60) * 2 * Math.PI
+  const r = RP + (RI - RP) * ((ring + 0.5) / 12)
+  return { x: CX + r * Math.sin(theta), y: CY - r * Math.cos(theta) }
+}
+
+function drawSyntheticIris() {
+  const c = document.createElement('canvas')
+  c.width = c.height = SIZE
+  const x = c.getContext('2d')
+  x.fillStyle = '#e9e6e0'
+  x.fillRect(0, 0, SIZE, SIZE)
+  x.save()
+  x.beginPath()
+  x.arc(CX, CY, RI, 0, 7)
+  x.clip()
+  x.fillStyle = '#9a8352'
+  x.fillRect(0, 0, SIZE, SIZE)
+  for (let i = 0; i < 240; i++) {
+    const a0 = (i / 240) * 2 * Math.PI - Math.PI / 2
+    const a1 = ((i + 0.62) / 240) * 2 * Math.PI - Math.PI / 2
+    x.fillStyle = i % 3 ? 'rgba(220,200,150,0.42)' : 'rgba(90,70,40,0.38)'
+    x.beginPath()
+    x.moveTo(CX, CY)
+    x.arc(CX, CY, RI, a0, a1)
+    x.fill()
+  }
+  // Injected findings (ground truth)
+  const spots = [
+    { ...GROUND_TRUTH[0], color: 'rgba(210,120,40,0.95)', r: 16 },
+    { ...GROUND_TRUTH[1], color: 'rgba(80,45,20,0.95)', r: 14 },
+    { ...GROUND_TRUTH[2], color: 'rgba(220,140,50,0.9)', r: 12 },
+  ]
+  for (const s of spots) {
+    const p = cellCentre(s.sector, s.ring)
+    const g = x.createRadialGradient(p.x, p.y, 1, p.x, p.y, s.r)
+    g.addColorStop(0, s.color)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    x.fillStyle = g
+    x.beginPath()
+    x.arc(p.x, p.y, s.r, 0, 7)
+    x.fill()
+  }
+  x.restore()
+  x.fillStyle = '#0a0a0c'
+  x.beginPath()
+  x.arc(CX, CY, RP, 0, 7)
+  x.fill()
+  return c.toDataURL('image/jpeg', 0.92)
+}
+
+async function callGemini(prompt, imageDataUrl) {
+  const parts = [{ text: `${prompt}\n\nВърни САМО валиден JSON.` }]
+  const m = imageDataUrl.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/i)
+  if (m) parts.unshift({ inline_data: { mime_type: 'image/jpeg', data: m[1] } })
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { temperature: 0.15, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+      }),
+    }
+  )
+  const body = await res.text()
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${body.slice(0, 300)}`)
+  const data = JSON.parse(body)
+  return data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || ''
+}
+
+function normalizeFromRaw(rawList, side, strip, rotationSectors) {
+  const physical = rawList.map(item => {
+    const o = { ...(item || {}) }
+    const sec = Number(o.sector)
+    if (Number.isFinite(sec)) o.sector = stripSectorToPhysical(sec, rotationSectors)
+    return o
+  })
+  const cells = {
+    readability: readabilityToPhysical(strip.readability, rotationSectors),
+    partialCells: (strip.partialCells || []).map(c => ({
+      sector: stripSectorToPhysical(c.sector, rotationSectors),
+      ring: c.ring,
+    })),
+  }
+  return normalizeFindings(physical, side, cells)
+}
+
+async function detectOnce(side, strip, rotationSectors, qualityScore = 85) {
+  const prompt = buildDetectionPrompt({
+    side,
+    layer: 'pigment',
+    unreadableCells: strip.unreadableCells ?? [],
+    partialCells: strip.partialCells ?? [],
+    qualityScore,
+    flash: false,
+  })
+  const raw = await callGemini(prompt, strip.dataUrl)
+  const parsed = parseDetectionJson(raw)
+  const list = Array.isArray(parsed.findings) ? parsed.findings : []
+  return normalizeFromRaw(list, side, strip, rotationSectors)
+}
+
+function matchTestRetest(a, b) {
+  let matched = 0
+  const used = new Set()
+  for (const fa of a) {
+    for (let i = 0; i < b.length; i++) {
+      if (used.has(i)) continue
+      const fb = b[i]
+      const sameBand = fa.ring >= 0 && fb.ring >= 0 &&
+        Math.abs(fa.ring - fb.ring) <= 1 &&
+        (Math.abs(fa.sector - fb.sector) % 12 <= 1 || Math.abs(fa.sector - fb.sector) >= 11)
+      if (sameBand) { used.add(i); matched++; break }
+    }
+  }
+  const total = Math.max(a.length, b.length, 1)
+  return { matched, total: Math.max(a.length, b.length), agreement: matched / total }
+}
+
+try {
+  if (!apiKey) throw new Error('Missing ?key=')
+
+  mark(`Model: ${model}`)
+  const ping = await callGemini('Reply with JSON: {"ok":true}', 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAA//2Q==')
+  mark(`API ping OK (${ping.length} chars)`)
+
+  const dataUrl = drawSyntheticIris()
+  const geo = {
+    pupil: { cx: CX, cy: CY, r: RP },
+    limbus: { cx: CX, cy: CY, r: RI },
+    imageWidth: SIZE,
+    imageHeight: SIZE,
+  }
+  const img = new Image()
+  await new Promise((r, j) => { img.onload = r; img.onerror = j; img.src = dataUrl })
+
+  const seams = [0, 6]
+  const side = 'right'
+  const bySeam = []
+
+  for (const seam of seams) {
+    const strip = unwrapIris(img, geo, side, { layer: 'pigment', rotationSectors: seam })
+    mark(`Seam ${seam === 0 ? '12:00' : '6:00'}: strip ${strip.dataUrl.length} chars, coverage ${Math.round(strip.coverage * 100)}%`)
+
+    mark(`  LLM pass A (pigment)...`)
+    const passA = await detectOnce(side, strip, seam)
+    mark(`  Pass A: ${passA.length} findings`)
+
+    let passB = passA
+    if (retest) {
+      mark(`  LLM pass B (test-retest)...`)
+      passB = await detectOnce(side, strip, seam)
+      mark(`  Pass B: ${passB.length} findings`)
+      const tr = matchTestRetest(passA, passB)
+      mark(`  Test-retest location agreement: ${(tr.agreement * 100).toFixed(0)}% (${tr.matched}/${tr.total})`)
+    }
+
+    bySeam.push({ seam, passA, passB, strip })
+  }
+
+  const allFindings = [...bySeam[0].passA, ...bySeam[1].passA]
+  const merged = mergeSeamReadings(bySeam[0].passA, bySeam[1].passA)
+  const seamEval = evaluateSeamTestRetest(bySeam[0].passA, bySeam[1].passA)
+
+  const recall = evaluateLocationRecall(allFindings, GROUND_TRUTH)
+  const precision = evaluateLocationPrecision(allFindings, GROUND_TRUTH)
+
+  mark('')
+  mark('─── GROUND TRUTH (injected) ───')
+  for (const g of GROUND_TRUTH) mark(`  ${g.label} → ${g.type}`)
+  mark('')
+  mark('─── DETECTED (merged seams, pass A) ───')
+  if (merged.findings.length === 0) mark('  (none accepted)')
+  for (const f of merged.findings.slice(0, 12)) {
+    mark(`  ${f.type} S${f.sector} R${f.ring} conf=${f.confidence.toFixed(2)} conf×${f.confirmations ?? 1}`)
+  }
+
+  mark('')
+  mark(`LOCATION RECALL vs injected: ${recall.matched}/${recall.total} (${(recall.recall * 100).toFixed(0)}%)`)
+  if (recall.misses.length) mark(`  Missed: ${recall.misses.map(m => m.label).join(', ')}`)
+  mark(`LOCATION PRECISION: ${(precision.precision * 100).toFixed(0)}% (${precision.truePositives} TP, ${precision.falsePositives} FP)`)
+  mark(`DUAL-SEAM agreement: ${(seamEval.locationAgreement * 100).toFixed(0)}% · type stability ${(seamEval.typeStability * 100).toFixed(0)}%`)
+
+  const suite = evaluateReliabilitySuite({
+    detected: allFindings,
+    truth: GROUND_TRUTH,
+    seamReadA: bySeam[0].passA,
+    seamReadB: bySeam[1].passA,
+    thresholds: { minLocationRecall: 0.33, minLocationPrecision: 0.25, minSeamLocationAgreement: 0.2 },
+  })
+
+  L.push('')
+  L.push(formatReliabilityReport(suite))
+  L.push('')
+  L.push('INTERPRETATION:')
+  L.push('- Recall ≥33% on synthetic = model sees some injected pigment (baseline)')
+  L.push('- Seam agreement = same physical zone at two unwrap cuts')
+  L.push('- Low type stability is EXPECTED (МЕТОДИКА_2 §8.5)')
+
+  const passRecall = recall.recall >= 0.33
+  const passApi = true
+  window.__ok = passApi && passRecall
+  window.__metrics = { recall, precision, seamEval, suite, model }
+  window.__done = L.join('\n')
+  document.getElementById('out').textContent = window.__done
+} catch (e) {
+  mark(`ERROR: ${e.message}`)
+  window.__ok = false
+  window.__done = L.join('\n')
+  document.getElementById('out').textContent = window.__done
+}
+</script>
+</body>
+</html>

@@ -9,7 +9,11 @@
         "build": "tsc -b --noCheck && vite build",
         "lint": "eslint .",
         "optimize": "vite optimize",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test:browser": "cp test/coordinate-truth.html public/__truth.html && cp test/finding-reliability.html public/__reliability.html && node scripts/browser-tests.mjs",
+        "test:reliability": "cp test/finding-reliability.html public/__reliability.html && node scripts/run-reliability-test.mjs",
+        "test:gemini": "mkdir -p test/reports && cp test/gemini-reliability.html public/__gemini-reliability.html && node scripts/run-gemini-reliability.mjs",
+        "test:all": "npm run test:reliability && npm run test:gemini"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.3.1",
@@ -86,6 +90,7 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.4.19",
         "globals": "^16.0.0",
+        "playwright": "^1.62.1",
         "tailwindcss": "^4.1.11",
         "typescript": "~5.7.2",
         "typescript-eslint": "^8.38.0",

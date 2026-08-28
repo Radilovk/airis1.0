@@ -761,7 +761,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         uploadDiagnostics.log('HANDLE_NEXT_MISSING_GEOMETRY', 'warning', { missing })
         setIsSaving(false)
         toast.error(
-          `${missing === 'left' ? 'Левият' : 'Десният'} ирис не е калибриран. Отворете калибрирането, за да се постави координатната система.`
+          `${missing === 'left' ? 'Левият' : 'Десният'} ирис не е настроен. Отворете настройката на снимката.`
         )
         setCalibrating({
           side: missing as 'left' | 'right',
@@ -827,7 +827,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     setCalibrating(null)
     setImagesVersion(v => v + 1)
     toast.success(
-      `${calibrating.side === 'left' ? 'Ляв' : 'Десен'} ирис калибриран · качество ${quality.score}/100`
+      `${calibrating.side === 'left' ? 'Ляв' : 'Десен'} ирис е настроен · качество ${quality.score}/100`
     )
   }
 
@@ -848,7 +848,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   /** Затваряне без потвърждение — снимката остава, но без геометрия. */
   const handleCalibrationCancel = () => {
     setCalibrating(null)
-    toast.info('Калибрирането е отложено. Анализът изисква калибрирана снимка.')
+    toast.info('Настройката е отложена. Анализът изисква настроена снимка.')
   }
 
   /** Повторно отваряне на калибратора за вече качена снимка. */
@@ -880,7 +880,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
               <Camera size={32} weight="duotone" className="text-primary" />
             </div>
             <h2 className="text-3xl font-bold mb-2">
-              {isReanalysis ? 'Качване на Снимки за Повторен Анализ' : 'Качване на Снимки'}
+              {isReanalysis ? 'Качване на снимки за повторен анализ' : 'Качване на снимки'}
             </h2>
             <p className="text-muted-foreground">
               {isReanalysis 
@@ -905,12 +905,12 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
             <h3 className="font-semibold mb-3">📋 Инструкции за качествени снимки:</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>• <strong>Снимайте със светкавица</strong> на ръка, на рязко, с отворено око</li>
-              <li>• <strong>Зеницата трябва да се вижда ясно</strong> — тя е нулевата точка на координатната система</li>
+              <li>• <strong>Зеницата трябва да се вижда ясно</strong> — от нея започва картата на ириса</li>
               <li>• Заснемете отблизо — ирисът да заема поне една трета от кадъра</li>
               <li>• Докоснете екрана за фокус върху ириса преди снимката</li>
               <li>• Отворете окото широко — клепачът не трябва да закрива ириса</li>
               <li>• Избягвайте огледални отражения (прозорец, лампа) върху ириса</li>
-              <li>• След качване следва <strong>калибриране</strong>: нагласете кръговете и потвърдете само ако снимката минава проверката</li>
+              <li>• След качване <strong>настройте окото</strong>: подредете кръговете и потвърдете, ако снимката е добра</li>
             </ul>
           </Card>
 
@@ -931,7 +931,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
               key={`left-${imagesVersion}`}
             >
               <Card className="p-6">
-                <Label className="text-lg font-semibold mb-4 block">Ляв Ирис</Label>
+                <Label className="text-lg font-semibold mb-4 block">Ляв ирис</Label>
                 
                 {!leftImageRef.current ? (
                   <div
@@ -1007,7 +1007,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
               key={`right-${imagesVersion}`}
             >
               <Card className="p-6">
-                <Label className="text-lg font-semibold mb-4 block">Десен Ирис</Label>
+                <Label className="text-lg font-semibold mb-4 block">Десен ирис</Label>
                 
                 {!rightImageRef.current ? (
                   <div
@@ -1019,7 +1019,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                     onClick={() => !isProcessing && rightInputRef.current?.click()}
                   >
                     <Upload size={48} weight="duotone" className="mx-auto mb-4 text-muted-foreground" />
-                    <p className="font-medium mb-2">Кликнете або пуснете снимка</p>
+                    <p className="font-medium mb-2">Кликнете или пуснете снимка</p>
                     <p className="text-sm text-muted-foreground">PNG, JPG до 10MB</p>
                     <input
                       ref={rightInputRef}
@@ -1089,7 +1089,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
               disabled={!leftImageRef.current || !rightImageRef.current || isProcessing || editingSide !== null || isSaving}
               className="gap-2"
             >
-              {isSaving ? 'Запазване...' : 'Започни Анализ'}
+              {isSaving ? 'Запазване...' : 'Започни анализ'}
               <ArrowRight size={20} weight="bold" />
             </Button>
           </motion.div>
@@ -1150,7 +1150,7 @@ function CalibrationStatus({
     >
       <span className="flex items-center gap-2 text-sm font-medium">
         <Crosshair size={16} weight="bold" />
-        {calibrated ? 'Калибриран' : 'Изисква калибриране'}
+        {calibrated ? 'Настроено' : 'Нужна настройка'}
       </span>
       <span className="text-xs font-semibold tabular-nums">
         {calibrated && q ? `${q.score}/100` : 'отвори →'}

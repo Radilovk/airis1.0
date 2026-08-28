@@ -20,6 +20,17 @@ async function runPage(page, url, label) {
   return markerOk
 }
 
+async function runReliabilityTest(page) {
+  console.log('\n=== Finding reliability (synthetic benchmark) ===')
+  await page.goto(`${base}/__reliability.html`, { waitUntil: 'networkidle', timeout: 120000 })
+  await page.waitForFunction(() => window.__done, null, { timeout: 120000 })
+  const text = await page.evaluate(() => window.__done)
+  const pass = await page.evaluate(() => window.__ok)
+  console.log(text)
+  console.log(`RESULT: ${pass ? 'PASS' : 'FAIL'}`)
+  return pass
+}
+
 async function runFlashEyeTest(page) {
   console.log('\n=== Flash eye fixture (realistic upload) ===')
   await page.goto(`${base}/__real-eye-test.html`, { waitUntil: 'networkidle', timeout: 120000 })
@@ -62,6 +73,7 @@ const page = await browser.newPage()
 
 let allOk = true
 allOk = (await runPage(page, `${base}/__truth.html`, 'Coordinate truth')) && allOk
+allOk = (await runReliabilityTest(page)) && allOk
 allOk = (await runFlashEyeTest(page)) && allOk
 
 if (apiKey) {

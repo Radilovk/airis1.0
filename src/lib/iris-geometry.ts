@@ -808,10 +808,40 @@ export function detectIrisGeometry(img: HTMLImageElement | HTMLCanvasElement): I
       if (ratio > 0.72) geo.limbus.r = geo.pupil.r / 0.4
       if (ratio < 0.1) geo.pupil.r = geo.limbus.r * 0.22
     }
-    return concentricGeometry(geo)
+    return inflateAutoGeometryRadii(concentricGeometry(geo))
   } catch {
     return fallback()
   }
+}
+
+/**
+ * Леко раздува радиусите след автоматично откриване.
+ * Измерено: +2–4 px върху зеницата и външния ръб подобрява покритието на
+ * лентата и quality score, без да изкривява пропорциите.
+ */
+export const AUTO_RADIUS_INFLATE_PX = 3
+
+export function inflateAutoGeometryRadii(geo: IrisGeometry, px = AUTO_RADIUS_INFLATE_PX): IrisGeometry {
+  if (px <= 0 || geo.manual) return geo
+
+  const maxFromCenter = Math.min(
+    geo.limbus.cx,
+    geo.limbus.cy,
+    geo.imageWidth - geo.limbus.cx,
+    geo.imageHeight - geo.limbus.cy
+  )
+  const newLimbusR = Math.min(geo.limbus.r + px, maxFromCenter * 0.98)
+  const newPupilR = Math.max(4, Math.min(geo.pupil.r + px, newLimbusR * 0.7))
+
+  return concentricGeometry({
+    ...geo,
+    pupil: { ...geo.pupil, r: newPupilR },
+    limbus: {
+      ...geo.limbus,
+      r: newLimbusR,
+      ...(geo.limbus.ry !== undefined ? { ry: geo.limbus.ry + px } : {}),
+    },
+  })
 }
 
 /** Зарежда data URL и открива геометрията. */

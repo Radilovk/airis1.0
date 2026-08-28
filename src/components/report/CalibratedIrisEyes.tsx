@@ -168,8 +168,8 @@ export default function CalibratedIrisEyes({
     <Card className="p-5 md:p-6">
       <h3 className="mb-1 text-lg font-bold">Къде на снимката са акцентите</h3>
       <p className="mb-5 text-sm text-muted-foreground">
-        Маркираните зони са по пръstenни пояси от атласа (IPB 0–12%, STOM 12–22%, ANW 22–38% …).
-        Околообхватните знаци (стресови пръstenи, липиден ръб и др.) се показват като пълен пръsten.
+        Маркираните зони показват пръстенните пояси на ириса — от центъра (около зеницата) към периферията.
+        Околообхватните знаци (напр. стресови пръстени) се показват като пълен кръг.
       </p>
       <div className="grid gap-8 md:grid-cols-2">
         <IrisEyePanel

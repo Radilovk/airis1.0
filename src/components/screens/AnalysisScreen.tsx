@@ -17,6 +17,7 @@ import { FINDINGS } from '@/lib/iris-map'
 import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
+import { RECOMMENDED_GEMINI_MODEL } from '@/lib/ai-models'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -39,7 +40,7 @@ export default function AnalysisScreen({
   onComplete
 }: AnalysisScreenProps) {
   const [progress, setProgress] = useState(0)
-  const [status, setStatus] = useState('Зареждане на AI конфигурация...')
+  const [status, setStatus] = useState('Зареждане на настройките...')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -66,8 +67,8 @@ export default function AnalysisScreen({
   const rightUnwrapRef = useRef<IrisUnwrapResult | null>(null)
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
-    provider: 'openai',
-    model: 'gpt-4o',
+    provider: 'gemini',
+    model: RECOMMENDED_GEMINI_MODEL,
     apiKey: '',
     useCustomKey: false,
     requestDelay: 2000,
@@ -943,8 +944,8 @@ ${response}
     try {
       const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
       const finalConfig = storedConfig || aiConfig || {
-        provider: 'openai',
-        model: 'gpt-4o',
+        provider: 'gemini',
+        model: RECOMMENDED_GEMINI_MODEL,
         apiKey: '',
         useCustomKey: false,
         requestDelay: 2000,
@@ -1269,18 +1270,16 @@ ${response}
       
       let userFriendlyMessage = errorMessage
       if (errorMessage.includes('429') || errorMessage.includes('Too many requests') || errorMessage.includes('rate limit') || errorMessage.includes('Rate limit')) {
-        userFriendlyMessage = `⏱️ Rate Limit Достигнат
+        userFriendlyMessage = `Достигнат е лимитът на заявките
 
-GitHub Spark API има ограничения за брой заявки в минута.
+Сървърът временно ограничава броя заявки.
 
-🔧 Решения:
-1. ⏳ Изчакайте 5-10 минути и опитайте отново
-2. 🔑 Добавете собствен API ключ в Admin панела:
-   • OpenAI (препоръчано за стабилност)
-   • Google Gemini (безплатен tier с по-висок лимит)
+Какво можете да направите:
+1. Изчакайте 5–10 минути и опитайте отново
+2. Добавете собствен API ключ в настройките (OpenAI или Google Gemini)
 
-💡 С собствен API ключ няма да имате rate limit проблеми.`
-        addLog('error', 'Rate limit достигнат - твърде много заявки.')
+С собствен ключ лимитите обикновено са по-високи.`
+        addLog('error', 'Достигнат е лимит на заявките.')
       } else {
         addLog('error', `Фатална грешка: ${errorMessage}`)
       }
@@ -2505,10 +2504,10 @@ JSON формат:
             </motion.div>
 
             <h2 className="text-2xl font-bold mb-2">
-              {error ? 'Възникна грешка' : 'AI Анализ в ход'}
+              {error ? 'Възникна грешка' : 'Анализ в ход'}
             </h2>
             <p className={`mb-8 ${error ? 'text-destructive' : 'text-muted-foreground'}`}>
-              {error ? 'Прочетете детайлите и следвайте инструкциите по-долу' : 'Анализираме вашите ириси с изкуствен интелект'}
+              {error ? 'Прочетете детайлите и следвайте инструкциите по-долу' : 'Обработваме снимките и подготвяме вашия доклад'}
             </p>
 
             {!error && (
@@ -2676,7 +2675,7 @@ JSON формат:
                 <Card className="p-4 bg-muted/50">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkle size={20} className="text-primary" />
-                    <h3 className="text-sm font-semibold">AI Диагностика - Какво Вижда Моделът</h3>
+                    <h3 className="text-sm font-semibold">Диагностика — какво вижда моделът</h3>
                   </div>
                   <div className="space-y-4 text-left">
                     {diagnosticResponses.left && (
