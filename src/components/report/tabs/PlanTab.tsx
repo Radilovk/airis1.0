@@ -74,7 +74,7 @@ export default function PlanTab({ report }: PlanTabProps) {
           <Card className="p-5 bg-gradient-to-br from-primary/10 to-accent/10">
             <h3 className="font-semibold text-base mb-2 flex items-center gap-2">
               <Lightbulb size={20} weight="duotone" className="text-primary" />
-              План за Действие
+              План за действие
             </h3>
             <p className="text-sm leading-relaxed text-foreground/90">
               {motivationalSummary}
@@ -93,7 +93,7 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'general',
-                title: 'Общи Препоръки',
+                title: 'Общи препоръки',
                 icon: Lightbulb,
                 content: showFullPlan
                   ? detailedPlan.generalRecommendations
@@ -137,7 +137,7 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'psychological',
-                title: 'Психологически Препоръки',
+                title: 'Психологически препоръки',
                 icon: Brain,
                 content: showFullPlan
                   ? detailedPlan.psychologicalRecommendations
@@ -156,7 +156,7 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'special',
-                title: 'Специални (Индивидуални) Препоръки',
+                title: 'Индивидуални препоръки',
                 icon: Leaf,
                 content: showFullPlan
                   ? detailedPlan.specialRecommendations
@@ -175,7 +175,7 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'tests',
-                title: 'Препоръчителни Конкретни Изследвания',
+                title: 'Препоръчителни изследвания',
                 icon: Flask,
                 content: showFullPlan
                   ? detailedPlan.recommendedTests
@@ -338,7 +338,7 @@ function FoodRecommendationsSection({
               <AppleLogo size={22} weight="duotone" className="text-white" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <h4 className="font-bold text-base">Хранителни Препоръки</h4>
+              <h4 className="font-bold text-base">Хранителни препоръки</h4>
               <p className="text-xs text-muted-foreground">Пълен списък с препоръчителни и забранени храни</p>
             </div>
           </div>
@@ -365,7 +365,7 @@ function FoodRecommendationsSection({
                     <CheckCircle size={20} weight="fill" className="text-white" />
                   </div>
                   <div>
-                    <h5 className="font-bold text-base text-green-900">Препоръчителни Храни</h5>
+                    <h5 className="font-bold text-base text-green-900">Препоръчителни храни</h5>
                     <p className="text-xs text-green-700">Включете ги редовно в храненето си</p>
                   </div>
                   <Badge variant="outline" className="ml-auto text-green-700 border-green-300 bg-green-50">
@@ -403,7 +403,7 @@ function FoodRecommendationsSection({
                     <XCircle size={20} weight="fill" className="text-white" />
                   </div>
                   <div>
-                    <h5 className="font-bold text-base text-red-900">Храни за Избягване</h5>
+                    <h5 className="font-bold text-base text-red-900">Храни за избягване</h5>
                     <p className="text-xs text-red-700">Ограничете или елиминирайте от диетата</p>
                   </div>
                   <Badge variant="outline" className="ml-auto text-red-700 border-red-300 bg-red-50">

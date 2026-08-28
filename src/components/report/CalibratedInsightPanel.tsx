@@ -250,7 +250,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
           <Scales size={18} weight="duotone" className="mt-0.5 shrink-0 text-amber-700" />
           <p className="text-xs leading-relaxed text-amber-900">
             Този анализ <strong>не е медицинска диагностика</strong> и не замества преглед
-            или лечение. Използва се като ориентир за хранителен и начин на живот план.
+            или лечение. Използва се като ориентир за план за хранене и начин на живот.
             При оплаквания се обърнете към лекар.
           </p>
         </div>

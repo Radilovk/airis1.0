@@ -87,7 +87,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
       
       const printWindow = window.open('', '_blank')
       if (!printWindow) {
-        toast.error('Моля, разрешете pop-up прозорците')
+        toast.error('Моля, разрешете изскачащите прозорци в браузъра')
         return
       }
       
@@ -108,7 +108,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
     
     if (navigator.share) {
       navigator.share({
-        title: 'Иридологичен Анализ',
+        title: 'Иридологичен анализ',
         text: shareText,
       }).then(() => {
         toast.success('Споделено успешно')
@@ -136,7 +136,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
               </motion.div>
               <div className="min-w-0 flex-1">
                 <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  Иридологичен Доклад
+                  Иридологичен доклад
                 </h1>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>{report.questionnaireData.name}</span>
@@ -183,7 +183,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                   title="Експорт в HTML/PDF"
                 >
                   <Download size={18} />
-                  <span className="hidden sm:inline">Експорт HTML</span>
+                  <span className="hidden sm:inline">Експорт като уеб страница</span>
                 </Button>
               </motion.div>
               {onReanalyze && (
@@ -233,7 +233,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                 <p className="text-sm font-medium text-muted-foreground">Общ резултат /100</p>
                 {summary && (
                   <p className="mt-2 text-xs text-muted-foreground max-w-md mx-auto">
-                    {summary.planRelevant} значими находки · {summary.sectorsAffected} сектора
+                    {summary.planRelevant} зони в плана · {summary.sectorsAffected} сектора
                   </p>
                 )}
               </>

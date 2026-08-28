@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Slider } from '@/components/ui/slider'
 import {
   ArrowClockwise,
   CheckCircle,
@@ -15,6 +16,7 @@ import {
 import { analyseIrisQuality, type QualityReport } from '@/lib/iris-quality'
 import { detectIrisGeometry, concentricGeometry, type IrisGeometry } from '@/lib/iris-geometry'
 import { unwrapIris } from '@/lib/iris-unwrap'
+import { CALIBRATION } from '@/lib/ui-copy'
 import type { IrisGeometrySnapshot } from '@/types'
 
 /**
@@ -39,6 +41,7 @@ interface IrisCalibratorProps {
 }
 
 type Handle = 'pupil' | 'limbus' | null
+type CalStep = 'center' | 'outer' | 'inner'
 
 const VIEW = 460
 
@@ -63,6 +66,8 @@ export default function IrisCalibrator({
   const [showStrip, setShowStrip] = useState(false)
   /** Дял четима площ в лентата — това е, което моделът реално получава. */
   const [coverage, setCoverage] = useState<number | null>(null)
+  const [calStep, setCalStep] = useState<CalStep>('center')
+  const [showGrid, setShowGrid] = useState(false)
   // Естествените размери се държат в state, а не се четат от ref-а: промяна на
   // ref не предизвиква повторно изчисление и наслагването изоставаше с един кадър.
   const [natural, setNatural] = useState({ w: 0, h: 0 })
@@ -173,6 +178,8 @@ export default function IrisCalibrator({
   )
 
   const onPointerDown = (handle: Exclude<Handle, null>) => (e: React.PointerEvent) => {
+    if (handle === 'pupil' && calStep !== 'inner') return
+    if (handle === 'limbus' && calStep !== 'outer') return
     e.preventDefault()
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
@@ -217,6 +224,7 @@ export default function IrisCalibrator({
 
   /** Влачене на центъра — премества и двата кръга заедно. */
   const onStagePointerDown = (e: React.PointerEvent) => {
+    if (calStep !== 'center') return
     if (drag || !geo) return
     const p = pointFromEvent(e.clientX, e.clientY)
     if (!p) return
@@ -265,7 +273,33 @@ export default function IrisCalibrator({
     setReport(q)
     setGeo(concentricGeometry(q.geometry))
     setTouched(false)
+    setCalStep('center')
     rebuildStrip(q.geometry)
+  }
+
+  const adjustRadius = (which: 'pupil' | 'limbus', delta: number) => {
+    setTouched(true)
+    setGeo(prev => {
+      if (!prev) return prev
+      const cx = prev.limbus.cx
+      const cy = prev.limbus.cy
+      if (which === 'pupil') {
+        const nr = Math.max(4, Math.min(prev.limbus.r * 0.7, prev.pupil.r + delta))
+        return concentricGeometry({
+          ...prev,
+          pupil: { cx, cy, r: nr },
+          manual: true,
+          pupilConfidence: 1,
+        })
+      }
+      const nr = Math.max(prev.pupil.r * 1.5, prev.limbus.r + delta)
+      return concentricGeometry({
+        ...prev,
+        limbus: { ...prev.limbus, cx, cy, r: nr },
+        manual: true,
+        limbusConfidence: 1,
+      })
+    })
   }
 
   /* ── решение ──────────────────────────────────────────────────────────── */
@@ -313,6 +347,21 @@ export default function IrisCalibrator({
   }
 
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
+  const stepHint =
+    calStep === 'center'
+      ? CALIBRATION.hintCenter
+      : calStep === 'outer'
+        ? CALIBRATION.hintOuter
+        : CALIBRATION.hintInner
+
+  const pupilSliderMax = geo ? Math.round(geo.limbus.r * 0.7) : 100
+  const limbusSliderMax = geo
+    ? Math.min(
+        geo.imageWidth / 2,
+        geo.imageHeight / 2,
+        Math.round(geo.pupil.r * 4)
+      )
+    : 200
 
   /* ── изглед ───────────────────────────────────────────────────────────── */
   return (
@@ -336,11 +385,9 @@ export default function IrisCalibrator({
             </div>
             <div>
               <h3 className="text-lg font-semibold leading-tight">
-                Калибриране · {sideLabel} ирис
+                {CALIBRATION.title(side)}
               </h3>
-              <p className="text-xs text-slate-400">
-                Проверка на снимката и настройка на координатната система
-              </p>
+              <p className="text-xs text-slate-400">{CALIBRATION.subtitle}</p>
             </div>
           </div>
           <Button
@@ -352,6 +399,32 @@ export default function IrisCalibrator({
           >
             <XCircle size={24} />
           </Button>
+        </div>
+
+        {/* Стъпки */}
+        <div className="flex flex-wrap gap-2 border-b border-white/10 px-5 py-3">
+          {(
+            [
+              ['center', CALIBRATION.stepCenter],
+              ['outer', CALIBRATION.stepOuter],
+              ['inner', CALIBRATION.stepInner],
+            ] as const
+          ).map(([id, label]) => (
+            <Button
+              key={id}
+              type="button"
+              size="sm"
+              variant={calStep === id ? 'default' : 'ghost'}
+              onClick={() => setCalStep(id)}
+              className={
+                calStep === id
+                  ? 'bg-sky-500 text-white hover:bg-sky-400'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+              }
+            >
+              {label}
+            </Button>
+          ))}
         </div>
 
         <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,460px)_1fr]">
@@ -396,7 +469,7 @@ export default function IrisCalibrator({
                       transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
                     />
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-slate-900/85 px-4 py-1.5 text-xs font-medium text-sky-300 ring-1 ring-sky-400/30">
-                      Измерване на зеницата и лимбуса…
+                      {CALIBRATION.measuring}
                     </div>
                   </motion.div>
                 )}
@@ -426,21 +499,22 @@ export default function IrisCalibrator({
                     })
                     return (
                       <>
-                        {/* междинни пръстени — показват реалната мрежа */}
-                        {rings.map((r, i) => (
-                          <circle
-                            key={i}
-                            cx={r.cx}
-                            cy={r.cy}
-                            r={r.r}
-                            fill="none"
-                            stroke="rgba(125,211,252,0.22)"
-                            strokeWidth={1}
-                          />
-                        ))}
+                        {/* междинни пръстени — по избор */}
+                        {showGrid &&
+                          rings.map((r, i) => (
+                            <circle
+                              key={i}
+                              cx={r.cx}
+                              cy={r.cy}
+                              r={r.r}
+                              fill="none"
+                              stroke="rgba(125,211,252,0.22)"
+                              strokeWidth={1}
+                            />
+                          ))}
 
-                        {/* 12-те сектора */}
-                        {Array.from({ length: 12 }, (_, i) => {
+                        {showGrid &&
+                          Array.from({ length: 12 }, (_, i) => {
                           const a = (i * 30 * Math.PI) / 180
                           const sin = Math.sin(a)
                           const cos = Math.cos(a)
@@ -457,49 +531,73 @@ export default function IrisCalibrator({
                           )
                         })}
 
-                        {/* лимбус */}
+                        {/* център — стъпка 1 */}
+                        {(calStep === 'center' || showGrid) && (
+                          <>
+                            <circle cx={c.x} cy={c.y} r={6} fill="#38bdf8" stroke="#fff" strokeWidth={2} />
+                            <line x1={c.x - 14} y1={c.y} x2={c.x + 14} y2={c.y} stroke="#38bdf8" strokeWidth={2} />
+                            <line x1={c.x} y1={c.y - 14} x2={c.x} y2={c.y + 14} stroke="#38bdf8" strokeWidth={2} />
+                          </>
+                        )}
+
+                        {/* лимбус — стъпка 2 */}
+                        {(calStep === 'outer' || calStep === 'center' || showGrid) && (
+                          <>
                         <circle
                           cx={c.x}
                           cy={c.y}
                           r={lr}
                           fill="none"
                           stroke="#fbbf24"
-                          strokeWidth={2.5}
+                          strokeWidth={calStep === 'outer' ? 3 : 2}
                           strokeDasharray="10 6"
+                          opacity={calStep === 'inner' ? 0.35 : 1}
                         />
+                        {calStep === 'outer' && (
                         <circle
                           cx={c.x}
                           cy={c.y - lr}
-                          r={10}
+                          r={14}
                           fill="#fbbf24"
                           stroke="#0f172a"
                           strokeWidth={2}
                           style={{ cursor: 'ns-resize' }}
                           onPointerDown={onPointerDown('limbus')}
                         />
+                        )}
+                          </>
+                        )}
 
-                        {/* зеница */}
-                        <circle cx={c.x} cy={c.y} r={pr * 1.35} fill="url(#pupilGlow)" />
+                        {/* зеница — стъпка 3 */}
+                        {(calStep === 'inner' || calStep === 'center' || showGrid) && (
+                          <>
+                        <circle cx={c.x} cy={c.y} r={pr * 1.35} fill="url(#pupilGlow)" opacity={calStep === 'outer' ? 0.2 : 0.6} />
                         <circle
                           cx={c.x}
                           cy={c.y}
                           r={pr}
                           fill="none"
                           stroke="#38bdf8"
-                          strokeWidth={2.5}
+                          strokeWidth={calStep === 'inner' ? 3 : 2}
+                          opacity={calStep === 'outer' ? 0.35 : 1}
                         />
+                        {calStep === 'inner' && (
                         <circle
                           cx={c.x}
                           cy={c.y - pr}
-                          r={10}
+                          r={14}
                           fill="#38bdf8"
                           stroke="#0f172a"
                           strokeWidth={2}
                           style={{ cursor: 'ns-resize' }}
                           onPointerDown={onPointerDown('pupil')}
                         />
+                        )}
+                          </>
+                        )}
 
                         {/* маркер 12:00 */}
+                        {showGrid && (
                         <text
                           x={c.x}
                           y={c.y - lr - 14}
@@ -510,6 +608,7 @@ export default function IrisCalibrator({
                         >
                           12:00
                         </text>
+                        )}
                       </>
                     )
                   })()}
@@ -520,27 +619,104 @@ export default function IrisCalibrator({
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-3 text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> зеница
+                  <span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> {CALIBRATION.pupilLabel}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> лимбус
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> {CALIBRATION.outerLabel}
                 </span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={reset}
-                disabled={!loaded || analysing}
-                className="h-8 gap-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-              >
-                <ArrowClockwise size={15} />
-                Автоматично
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowGrid(v => !v)}
+                  className="h-8 text-slate-300 hover:bg-white/10 hover:text-white"
+                >
+                  {showGrid ? CALIBRATION.hideGrid : CALIBRATION.showGrid}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={reset}
+                  disabled={!loaded || analysing}
+                  className="h-8 gap-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+                >
+                  <ArrowClockwise size={15} />
+                  {CALIBRATION.autoReset}
+                </Button>
+              </div>
             </div>
-            <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">
-              Влачете точките, за да нагласите кръговете точно по ръба на зеницата и
-              на цветната част. Центърът се мести с влачене от средата.
-            </p>
+            <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">{stepHint}</p>
+
+            {geo && calStep === 'outer' && (
+              <div className="mt-3 space-y-2 rounded-xl bg-white/[0.04] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-400">{CALIBRATION.outerLabel}</span>
+                  <div className="flex gap-1">
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('limbus', -2)}>
+                      {CALIBRATION.smaller}
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('limbus', 2)}>
+                      {CALIBRATION.larger}
+                    </Button>
+                  </div>
+                </div>
+                <Slider
+                  value={[Math.round(geo.limbus.r)]}
+                  min={Math.round(geo.pupil.r * 1.5)}
+                  max={limbusSliderMax}
+                  step={1}
+                  onValueChange={([v]) => {
+                    setTouched(true)
+                    setGeo(prev =>
+                      prev
+                        ? concentricGeometry({
+                            ...prev,
+                            limbus: { ...prev.limbus, r: v },
+                            manual: true,
+                            limbusConfidence: 1,
+                          })
+                        : prev
+                    )
+                  }}
+                />
+              </div>
+            )}
+
+            {geo && calStep === 'inner' && (
+              <div className="mt-3 space-y-2 rounded-xl bg-white/[0.04] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-400">{CALIBRATION.pupilLabel}</span>
+                  <div className="flex gap-1">
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('pupil', -2)}>
+                      {CALIBRATION.smaller}
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('pupil', 2)}>
+                      {CALIBRATION.larger}
+                    </Button>
+                  </div>
+                </div>
+                <Slider
+                  value={[Math.round(geo.pupil.r)]}
+                  min={4}
+                  max={pupilSliderMax}
+                  step={1}
+                  onValueChange={([v]) => {
+                    setTouched(true)
+                    setGeo(prev =>
+                      prev
+                        ? concentricGeometry({
+                            ...prev,
+                            pupil: { ...prev.pupil, r: v },
+                            manual: true,
+                            pupilConfidence: 1,
+                          })
+                        : prev
+                    )
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* ── Панел с оценка ──────────────────────────────────────────── */}
@@ -589,16 +765,20 @@ export default function IrisCalibrator({
                 </div>
                 <div className="min-w-0">
                   <p className="text-base font-semibold">
-                    {analysing ? 'Проверяваме снимката…' : cannotConfirm ? 'Нужна е нова снимка' : (report?.headline ?? '')}
+                    {analysing
+                      ? 'Проверяваме снимката…'
+                      : cannotConfirm
+                        ? CALIBRATION.needsRetake
+                        : (report?.headline ?? '')}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-400">
                     {analysing
-                      ? 'Измерваме зеницата, лимбуса, резкостта и отблясъците.'
+                      ? 'Проверяваме резкостта, осветеността и видимата зона на ириса.'
                       : cannotConfirm
-                        ? 'Снимката не отговаря на условията — направете нова или коригирайте кръговете.'
+                        ? CALIBRATION.needsRetakeHint
                         : touched
-                          ? 'Калибрирано ръчно — координатната система е сигурна.'
-                          : 'Координатната система е поставена автоматично.'}
+                          ? CALIBRATION.manualOk
+                          : CALIBRATION.autoOk}
                   </p>
                 </div>
               </div>
@@ -607,13 +787,13 @@ export default function IrisCalibrator({
               {report && !analysing && (
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {[
-                    { label: 'Резкост', value: report.metrics.sharpness },
-                    { label: 'Зеница', value: touched ? 1 : report.geometry.pupilConfidence },
+                    { label: CALIBRATION.metricSharpness, value: report.metrics.sharpness },
+                    { label: CALIBRATION.metricPupil, value: touched ? 1 : report.geometry.pupilConfidence },
                     {
-                      label: 'Четима карта',
+                      label: CALIBRATION.metricCoverage,
                       value: coverage ?? report.metrics.frameCoverage,
                     },
-                    { label: 'Без блясък', value: 1 - Math.min(1, report.metrics.glare / 0.12) },
+                    { label: CALIBRATION.metricGlare, value: 1 - Math.min(1, report.metrics.glare / 0.12) },
                   ].map(m => (
                     <div key={m.label} className="rounded-xl bg-white/[0.04] p-2">
                       <div className="mb-1.5 text-[10px] uppercase tracking-wide text-slate-500">
@@ -665,7 +845,7 @@ export default function IrisCalibrator({
               >
                 <span className="flex items-center gap-2 text-sm font-medium">
                   <Sparkle size={16} weight="fill" className="text-sky-400" />
-                  Какво вижда анализът
+                  {CALIBRATION.stripTitle}
                 </span>
                 <Badge variant="outline" className="border-white/15 text-[10px] text-slate-400">
                   {showStrip ? 'скрий' : 'покажи'}
@@ -683,18 +863,14 @@ export default function IrisCalibrator({
                       {/* min-w държи лентата над прага на четимост — при тесен
                           екран контейнерът скролва хоризонтално вместо да я свива. */}
                       {strip ? (
-                        <img src={strip} alt="Разгъната ирисова карта" className="min-w-[880px]" />
+                        <img src={strip} alt="Разгъната карта на ириса" className="min-w-[880px]" />
                       ) : (
                         <div className="flex h-24 items-center justify-center text-xs text-slate-500">
                           Изчисляване…
                         </div>
                       )}
                     </div>
-                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                      Ирисът е разгънат в правоъгълник: 12 колони (сектори по часовника)
-                      и 12 реда (от ръба на зеницата до външния ръб). Защрихованото е
-                      закрито от клепач или отблясък и се пропуска.
-                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{CALIBRATION.stripHint}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -710,7 +886,7 @@ export default function IrisCalibrator({
             className="gap-2 text-slate-300 hover:bg-white/10 hover:text-white"
           >
             <ImageIcon size={18} />
-            Друга снимка
+            {CALIBRATION.retake}
           </Button>
           <Button
             onClick={confirm}
@@ -718,7 +894,11 @@ export default function IrisCalibrator({
             className="gap-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-white hover:from-sky-400 hover:to-indigo-400 disabled:opacity-40"
           >
             <Eye size={18} weight="bold" />
-            {cannotConfirm ? 'Нужна е нова снимка' : warnings.length > 0 ? 'Потвърди с предупреждения' : 'Потвърди и продължи'}
+            {cannotConfirm
+              ? CALIBRATION.needsRetake
+              : warnings.length > 0
+                ? CALIBRATION.confirmWarn
+                : CALIBRATION.confirm}
           </Button>
         </div>
       </motion.div>

@@ -57,7 +57,7 @@ export function findingLocationLabel(
   const band = ringBand(f.ring)
   const parts: string[] = [`${band.label} (${band.pct[0]}–${band.pct[1]}%)`]
   if (isCircumferentialFinding(f.type)) {
-    parts.unshift('околообхватен пръsten')
+    parts.unshift('околообхватен пръстен')
   } else if (sectorLabel) {
     parts.push(sectorLabel)
   }

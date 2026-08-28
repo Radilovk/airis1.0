@@ -25,22 +25,22 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
   const features = [
     {
       icon: Eye,
-      title: 'AI Анализ на Ириси',
-      description: 'Използваме изкуствен интелект за детайлен анализ на иридологични зони'
+      title: 'Анализ на ириси',
+      description: 'Детайлен преглед на ирисовите зони с помощта на изкуствен интелект'
     },
     {
       icon: Activity,
-      title: 'Здравна Оценка',
-      description: 'Оценка на различни органни системи според топографски шаблон'
+      title: 'Здравна оценка',
+      description: 'Преглед на органните системи според ирисовата карта'
     },
     {
       icon: FileText,
-      title: 'Подробен Доклад',
-      description: 'Получете детайлен доклад с находки, диаграми и обяснения'
+      title: 'Подробен доклад',
+      description: 'Ясен отчет с находки, графики и обяснения'
     },
     {
       icon: Sparkle,
-      title: 'Персонализирани Препоръки',
+      title: 'Персонални препоръки',
       description: 'Индивидуални препоръки за хранене и хранителни добавки'
     }
   ]
@@ -58,10 +58,10 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
             <Eye size={40} weight="duotone" className="text-primary-foreground" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
-            Иридологичен Анализ
+            Иридологичен анализ
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Открийте здравословното си състояние чрез модерен AI анализ на ириси
+            Разберете по-добре здравето си чрез модерен анализ на ириса
           </p>
         </motion.div>
 
@@ -131,7 +131,7 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
               onClick={onStart}
               className="px-8 py-6 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
             >
-              Започни Анализ
+              Започни анализ
             </Button>
             {questionnaireData && (
               <Button
