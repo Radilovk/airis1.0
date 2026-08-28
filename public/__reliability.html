@@ -1,0 +1,246 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Finding reliability test</title>
+</head>
+<body style="background:#0b0b0e;color:#ddd;font:13px/1.6 ui-monospace,monospace;padding:16px">
+<pre id="out">работи…</pre>
+<script type="module">
+/**
+ * Тест за достоверност на находки — синтетичен benchmark без LLM.
+ *
+ * A. NORMALIZATION GUARD — отхвърля халюцинации (невалиден тип, пръsten, confidence)
+ * B. LOCATION RECALL/PRECISION — ground truth маркери → normalizeFindings
+ * C. PARTIAL CELL DISCRIMINATION — unreadable клетки → отхвърляне
+ * D. SEAM TEST–RETEST — два прочита, location-first merge
+ * E. STRIP VISIBILITY — синтетичен маркер се вижда на правилната клетка в лентата
+ */
+import { normalizeFindings } from '/src/lib/iris-scoring.ts'
+import {
+  evaluateLocationRecall,
+  evaluateLocationPrecision,
+  evaluateRejectionGuard,
+  evaluateSeamTestRetest,
+  formatReliabilityReport,
+  evaluateReliabilitySuite,
+} from '/src/lib/finding-reliability.ts'
+import { unwrapIris, stripSectorToPhysical } from '/src/lib/iris-unwrap.ts'
+import { FINDING_TYPES } from '/src/lib/iris-map.ts'
+
+const L = []
+let ok = true
+const fail = (msg) => { ok = false; L.push('FAIL: ' + msg) }
+const pass = (msg) => L.push('PASS: ' + msg)
+
+// ── A. Normalization guard ─────────────────────────────────────────────────
+{
+  const raw = [
+    { type: 'pigment_orange', sector: 5, ring: 4, confidence: 0.85, size: 'm' },
+    { type: 'pigment_orange', sector: 5, ring: 99, confidence: 0.9, size: 'm' },
+    { type: 'made_up_sign', sector: 3, ring: 3, confidence: 0.9, size: 'm' },
+    { type: 'nerve_rings', sector: 7, ring: 0, confidence: 0.9, size: 'm' },
+    { type: 'fiber_defect', sector: 5, ring: 4, confidence: 0.2, size: 'm' },
+    { type: 'sodium_ring', sector: 1, ring: 10, confidence: 0.75, size: 's' },
+  ]
+  const accepted = normalizeFindings(raw, 'right')
+  const rej = evaluateRejectionGuard(raw.length, accepted.length)
+  if (accepted.length !== 2) fail(`normalization: expected 2 accepted, got ${accepted.length}`)
+  else pass(`normalization guard: ${rej.rejected}/${raw.length} invalid rejected`)
+  if (rej.rejectionRate < 0.5) fail('normalization rejection rate too low')
+}
+
+// ── B. Location recall / precision (ground truth) ────────────────────────
+const GROUND_TRUTH = [
+  { sector: 5, ring: 4, type: 'pigment_orange' },
+  { sector: 9, ring: 6, type: 'fiber_defect' },
+  { sector: 3, ring: 9, type: 'lymphatic_rosary' },
+  { sector: 12, ring: 2, type: 'radial_furrow' },
+  { sector: 7, ring: 10, type: 'sodium_ring' },
+]
+
+const validRaw = [
+  ...GROUND_TRUTH.map(g => ({ ...g, confidence: 0.82, size: 'm' })),
+  { type: 'pigment_brown', sector: 11, ring: 5, confidence: 0.7, size: 's' },
+]
+
+const detected = normalizeFindings(validRaw, 'right')
+const recall = evaluateLocationRecall(detected, GROUND_TRUTH)
+const precision = evaluateLocationPrecision(detected, GROUND_TRUTH)
+
+if (recall.recall < 0.9) fail(`location recall ${(recall.recall * 100).toFixed(0)}%`)
+else pass(`location recall ${recall.matched}/${recall.total}`)
+
+if (precision.precision < 0.8) fail(`location precision ${(precision.precision * 100).toFixed(0)}%`)
+else pass(`location precision ${precision.truePositives}/${precision.truePositives + precision.falsePositives}`)
+
+// ── C. Partial / unreadable cell discrimination ────────────────────────
+{
+  const readability = Array.from({ length: 12 }, () => Array(12).fill(0.95))
+  readability[4][4] = 0.3
+  const cells = {
+    readability,
+    partialCells: [{ sector: 6, ring: 5 }],
+  }
+  const raw = [
+    { type: 'pigment_orange', sector: 5, ring: 4, confidence: 0.85, size: 'm' },
+    { type: 'pigment_orange', sector: 5, ring: 4, confidence: 0.85, size: 'm' },
+    { type: 'pigment_orange', sector: 6, ring: 5, confidence: 0.85, size: 'm' },
+  ]
+  const out = normalizeFindings(raw, 'right', cells)
+  if (out.length !== 1) fail(`partial cell: expected 1 finding, got ${out.length}`)
+  else pass('partial/unreadable cells rejected')
+}
+
+// ── D. Seam test–retest (location-first) ───────────────────────────────────
+{
+  const mk = (sector, ring, type, conf = 0.8) => ({
+    side: 'right',
+    type,
+    sector,
+    ring,
+    size: 'm',
+    confidence: conf,
+    priorityZones: [],
+    load: 0.5,
+  })
+
+  const readA = [
+    mk(5, 4, 'pigment_orange'),
+    mk(9, 6, 'fiber_defect'),
+    mk(3, 9, 'lymphatic_rosary'),
+  ]
+  const readB = [
+    mk(6, 4, 'fiber_defect'),
+    mk(9, 5, 'fiber_thinning'),
+    mk(4, 9, 'lymphatic_rosary'),
+    mk(11, 3, 'pigment_brown'),
+  ]
+
+  const seam = evaluateSeamTestRetest(readA, readB)
+  if (seam.locationAgreement < 0.65) {
+    fail(`seam agreement ${(seam.locationAgreement * 100).toFixed(0)}%`)
+  } else {
+    pass(`seam test–retest: ${(seam.locationAgreement * 100).toFixed(0)}% location agreement, type stability ${(seam.typeStability * 100).toFixed(0)}% (informational)`)
+  }
+  if (seam.merge.findings.filter(f => f.confirmations === 2).length < 2) {
+    fail('seam merge: expected ≥2 confirmed pairs')
+  }
+}
+
+// ── E. Strip marker visibility (synthetic iris) ──────────────────────────
+{
+  const SIZE = 1200, CX = 600, CY = 600, RP = 120, RI = 380
+  const markers = [
+    { sector: 5, ring: 4 },
+    { sector: 9, ring: 6 },
+  ]
+
+  function cellCentre(sector, ring) {
+    const minute = (sector - 1) * 5 + 2.5
+    const theta = (minute / 60) * 2 * Math.PI
+    const r = RP + (RI - RP) * ((ring + 0.5) / 12)
+    return { x: CX + r * Math.sin(theta), y: CY - r * Math.cos(theta) }
+  }
+
+  const c = document.createElement('canvas')
+  c.width = c.height = SIZE
+  const x = c.getContext('2d')
+  x.fillStyle = '#e9e6e0'
+  x.fillRect(0, 0, SIZE, SIZE)
+  x.save()
+  x.beginPath()
+  x.arc(CX, CY, RI, 0, 7)
+  x.clip()
+  x.fillStyle = '#9a8352'
+  x.fillRect(0, 0, SIZE, SIZE)
+  for (let i = 0; i < 240; i++) {
+    const a0 = (i / 240) * 2 * Math.PI - Math.PI / 2
+    const a1 = ((i + 0.62) / 240) * 2 * Math.PI - Math.PI / 2
+    x.fillStyle = i % 3 ? 'rgba(220,200,150,0.42)' : 'rgba(90,70,40,0.38)'
+    x.beginPath()
+    x.moveTo(CX, CY)
+    x.arc(CX, CY, RI, a0, a1)
+    x.fill()
+  }
+  x.restore()
+  x.fillStyle = '#0a0a0c'
+  x.beginPath()
+  x.arc(CX, CY, RP, 0, 7)
+  x.fill()
+  for (const m of markers) {
+    const { x: mx, y: my } = cellCentre(m.sector, m.ring)
+    x.fillStyle = 'rgb(60,120,230)'
+    x.beginPath()
+    x.arc(mx, my, 14, 0, 7)
+    x.fill()
+  }
+
+  const geo = {
+    pupil: { cx: CX, cy: CY, r: RP },
+    limbus: { cx: CX, cy: CY, r: RI },
+    imageWidth: SIZE,
+    imageHeight: SIZE,
+  }
+  const img = new Image()
+  await new Promise(r => { img.onload = r; img.src = c.toDataURL('image/jpeg', 0.92) })
+
+  const strip = unwrapIris(img, geo, 'right', { layer: 'structure', rotationSectors: 0 })
+  const im = new Image()
+  await new Promise(r => { im.onload = r; im.src = strip.dataUrl })
+  const sc = document.createElement('canvas')
+  sc.width = im.naturalWidth
+  sc.height = im.naturalHeight
+  const sx = sc.getContext('2d')
+  sx.drawImage(im, 0, 0)
+  const d = sx.getImageData(0, 0, sc.width, sc.height).data
+  const PW = 1440, PH = 720
+  const padL = sc.width - PW - 96
+  const padT = sc.height - PH - 116
+  const cw = PW / 12, ch = PH / 12
+
+  let visible = 0
+  for (const m of markers) {
+    const col = m.sector - 1
+    const row = m.ring
+    let hits = 0
+    for (let dy = 0; dy < ch; dy += 4) {
+      for (let dx = 0; dx < cw; dx += 4) {
+        const px = Math.floor(padL + col * cw + dx)
+        const py = Math.floor(padT + row * ch + dy)
+        const i = (py * sc.width + px) * 4
+        if (d[i + 2] > 40 && d[i + 2] > d[i] * 1.8 && d[i + 2] > d[i + 1] * 1.35) hits++
+      }
+    }
+    if (hits > 2) visible++
+  }
+  if (visible < markers.length) {
+    L.push(`WARN: strip visibility ${visible}/${markers.length} (see coordinate-truth for full grid test)`)
+  } else {
+    pass(`strip visibility ${visible}/${markers.length} markers in expected cells`)
+  }
+}
+
+// ── Summary ──────────────────────────────────────────────────────────────
+const suite = evaluateReliabilitySuite({
+  detected,
+  truth: GROUND_TRUTH,
+  rawSubmitted: validRaw.length,
+  rawAccepted: detected.length,
+  thresholds: { minLocationPrecision: 0.75 },
+})
+
+L.push('')
+L.push('─── RELIABILITY SUMMARY ───')
+L.push(formatReliabilityReport(suite))
+L.push('')
+L.push(`FINDING TYPES IN ATLAS: ${FINDING_TYPES.length}`)
+L.push('NOTE: Validates pipeline consistency, not clinical diagnostic accuracy.')
+L.push('      (cf. NHMRC 2024 — manual iridology ≈ chance as diagnosis)')
+
+window.__done = L.join('\n')
+window.__ok = ok && suite.pass
+document.getElementById('out').textContent = window.__done
+</script>
+</body>
+</html>
