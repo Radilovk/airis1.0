@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "excerpt": [
+    "[0.0s] Model: gemini-3.6-flash",
+    "[9.4s]   Pass A: 4 findings",
+    "[18.2s]   Pass A: 3 findings",
+    "[18.2s] ─── DETECTED (merged seams, pass A) ───",
+    "[18.2s] LOCATION RECALL vs injected: 3/3 (100%)",
+    "[18.2s] LOCATION PRECISION: 43% (3 TP, 4 FP)",
+    "[18.2s] DUAL-SEAM agreement: 75% · type stability 100%",
+    "LOCATION RECALL:    3/3 (100.0%)",
+    "LOCATION PRECISION: 3/7 (42.9%)",
+    "SEAM AGREEMENT:    75.0% location · 100.0% type stability"
+  ]
+}
