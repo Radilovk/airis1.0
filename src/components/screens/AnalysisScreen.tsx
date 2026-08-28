@@ -17,6 +17,7 @@ import { FINDINGS } from '@/lib/iris-map'
 import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
+import { RECOMMENDED_GEMINI_MODEL } from '@/lib/ai-models'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -66,8 +67,8 @@ export default function AnalysisScreen({
   const rightUnwrapRef = useRef<IrisUnwrapResult | null>(null)
   
   const [aiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
-    provider: 'openai',
-    model: 'gpt-4o',
+    provider: 'gemini',
+    model: RECOMMENDED_GEMINI_MODEL,
     apiKey: '',
     useCustomKey: false,
     requestDelay: 2000,
@@ -943,8 +944,8 @@ ${response}
     try {
       const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
       const finalConfig = storedConfig || aiConfig || {
-        provider: 'openai',
-        model: 'gpt-4o',
+        provider: 'gemini',
+        model: RECOMMENDED_GEMINI_MODEL,
         apiKey: '',
         useCustomKey: false,
         requestDelay: 2000,

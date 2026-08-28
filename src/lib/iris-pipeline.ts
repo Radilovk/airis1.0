@@ -498,7 +498,7 @@ export async function detectEye(
     await Promise.all(jobs.map(([layer, idx, progress]) => runDetection(layer, idx, progress)))
   }
 
-  // Един прочит на око — structure + pigment; без втори шев.
+  // Два шева на око (12:00 + 6:00) — structure + pigment; mergeSeamReadings потвърждава координатите.
   const merged =
     perReading.length >= 2
       ? mergeSeamReadings(perReading[0] ?? [], perReading[1] ?? [])

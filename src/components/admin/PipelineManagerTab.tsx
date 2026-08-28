@@ -38,23 +38,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import type { GitHubAdminConfig, PipelineConfig, PipelineStepConfig, PipelinePreset } from '@/types'
 import { getGitHubApiService, initializeGitHubApiService, DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
+import { GEMINI_MODELS, geminiModelLabel } from '@/lib/ai-models'
 
 const OPENAI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
-const GEMINI_MODELS = [
-  // Псевдонимите с „-latest" не остаряват: Google ги пренасочва към текущия
-  // модел. Изброените преди това пет (gemini-1.5-*, gemini-2.0-flash-exp)
-  // вече не съществуват — проверено срещу API-то; всеки анализ с тях връщаше 404.
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-latest',
-  'gemini-pro-latest',
-  'gemini-flash-lite-latest',
-  'gemini-3-flash-preview',
-  // gemini-2.5-* връща 404 за нови API ключове (авг. 2026)
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-2.5-flash-lite',
-]
 
 export default function PipelineManagerTab() {
   // GitHub Config state
@@ -898,7 +884,7 @@ export default function PipelineManagerTab() {
                                       <SelectContent>
                                         {step.modelSettings.provider === 'openai' 
                                           ? OPENAI_MODELS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)
-                                          : GEMINI_MODELS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)
+                                          : GEMINI_MODELS.map(m => <SelectItem key={m} value={m}>{geminiModelLabel(m)}</SelectItem>)
                                         }
                                       </SelectContent>
                                     </Select>

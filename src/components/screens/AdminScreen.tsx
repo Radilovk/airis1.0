@@ -25,6 +25,7 @@ import {
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AIModelConfig } from '@/types'
+import { GEMINI_MODELS, RECOMMENDED_GEMINI_MODEL, geminiModelLabel } from '@/lib/ai-models'
 import QuestionnaireManager from '@/components/admin/QuestionnaireManager'
 import ChangelogTab from '@/components/admin/ChangelogTab'
 import ProjectExportTab from '@/components/admin/ProjectExportTab'
@@ -41,8 +42,8 @@ const DEFAULT_REQUEST_DELAY_MS = 5000
 
 export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [aiConfig, setAiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
-    provider: 'openai',
-    model: 'gpt-4o',
+    provider: 'gemini',
+    model: RECOMMENDED_GEMINI_MODEL,
     apiKey: '',
     useCustomKey: false,
     requestDelay: DEFAULT_REQUEST_DELAY_MS,
@@ -50,8 +51,8 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
     useCalibratedPipeline: true
   })
   
-  const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'openai')
-  const [model, setModel] = useState(aiConfig?.model || 'gpt-4o')
+  const [provider, setProvider] = useState<'openai' | 'gemini'>(aiConfig?.provider || 'gemini')
+  const [model, setModel] = useState(aiConfig?.model || RECOMMENDED_GEMINI_MODEL)
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
   const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || DEFAULT_REQUEST_DELAY_MS)
@@ -173,21 +174,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   }
 
   const openaiModels = ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'gpt-4-turbo', 'gpt-4']
-  const geminiModels = [
-  // Псевдонимите с „-latest" не остаряват: Google ги пренасочва към текущия
-  // модел. Изброените преди това пет (gemini-1.5-*, gemini-2.0-flash-exp)
-  // вече не съществуват — проверено срещу API-то; всеки анализ с тях връщаше 404.
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-latest',
-  'gemini-pro-latest',
-  'gemini-flash-lite-latest',
-  'gemini-3-flash-preview',
-  // gemini-2.5-* връща 404 за нови API ключове (авг. 2026)
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-2.5-flash-lite',
-]
+  const geminiModels = [...GEMINI_MODELS]
 
   return (
     <div className="min-h-screen bg-background">
@@ -372,7 +359,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                         <>
                           {geminiModels.map((m) => (
                             <SelectItem key={m} value={m}>
-                              {m}
+                              {geminiModelLabel(m)}
                             </SelectItem>
                           ))}
                         </>

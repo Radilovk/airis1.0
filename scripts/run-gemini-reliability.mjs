@@ -13,7 +13,7 @@ if (!apiKey) {
   process.exit(1)
 }
 
-const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash'
 const base = process.env.TEST_BASE || 'http://127.0.0.1:5199'
 const port = new URL(base).port || '5199'
 

@@ -56,7 +56,7 @@ Detected merged: pigment_orange S5/S3, pigment_brown S9 — matches ground truth
 1. **Coordinate pipeline is reliable** (96/96) — location addressing works.
 2. **Gemini finds injected pigment** at correct ring bands (100% recall on synthetic benchmark).
 3. **Hallucinations exist** — ~4 FP per run (e.g. scurf_rim on clean synthetic iris); guards + agreement weighting are necessary.
-4. **Dual-seam helps** — 3.6-flash shows 75% cross-seam agreement vs 40% for 2.5-flash on this run; production should re-enable `[0, 6]` readings.
+4. **Dual-seam helps** — 3.6-flash shows 75% cross-seam agreement vs 40% for 2.5-flash on this run; production uses `[0, 6]` readings (dual-read enabled).
 5. **Type labels unstable** — expected; scoring must stay location-first.
 
 ## Commands

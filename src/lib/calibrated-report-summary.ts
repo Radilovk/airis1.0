@@ -3,7 +3,7 @@
  * в разбираемо обобщение за клиента.
  */
 import type { CalibratedAnalysisPayload } from '@/types'
-import { ringBand, isCircumferentialFinding, boundaryRingNote } from '@/lib/iris-map'
+import { ringBand, isCircumferentialFinding, boundaryRingNote, sectorsFor } from '@/lib/iris-map'
 
 export type CalibratedVerdict = 'stable' | 'mild' | 'focus'
 
@@ -96,7 +96,7 @@ export function summarizeCalibratedReport(
   const lead =
     opts?.briefSummary?.trim() ||
     (topSystem
-      ? `Основен фокус: ${topSystem.label.toLowerCase()} (${topSystem.score}/100). ${explanation.split('. ')[0]}.`
+      ? `Основен фокус: ${topSystem.label.toLowerCase()} (${topSystem.score}/100). ${planRelevant > 0 ? `${planRelevant} зони с ясен сигнал насочват препоръките.` : 'Планът се базира главно на вашите отговори и цели.'}`
       : explanation.split('. ').slice(0, 2).join('. ') + '.')
 
   if (opts?.avgHealth !== undefined && opts.avgHealth >= 75 && verdict === 'stable') {
@@ -137,9 +137,10 @@ export function getTopClientInsights(
   for (const f of topFindings) {
     if (out.length >= limit) break
     if (out.some(i => i.title.includes(f.label))) continue
+    const sector = sectorsFor(f.side)[f.sector - 1]
     out.push({
       title: f.label,
-      body: `${f.side === 'left' ? 'Ляв' : 'Десен'} ирис · сектор ${f.sector}`,
+      body: `${f.side === 'left' ? 'Ляв' : 'Десен'} ирис · ${findingLocationLabel(f, sector?.label)}`,
     })
   }
 
