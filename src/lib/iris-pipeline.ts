@@ -86,15 +86,30 @@ import {
  * Ограничението е на ниво МОДУЛ, а не на ниво цикъл, за да важи независимо от
  * това как извикващият е решил да паралелизира.
  */
-const MAX_CONCURRENT_LLM = 2
+const MAX_CONCURRENT_LLM = 3
 let inFlight = 0
 const waiting: Array<() => void> = []
+
+/**
+ * Минимален интервал между СТАРТОВЕТЕ на две заявки (защита от rate limit).
+ * Преди паузата от настройките правеше целия анализ последователен — 13 заявки
+ * една след друга, всяка с пауза. Сега паузата само разрежда стартовете, а
+ * заявките се застъпват: времето е ≈ max(13 × пауза, реалната латентност).
+ */
+let minStartGapMs = 0
+let nextStartAt = 0
 
 async function withLlmSlot<T>(fn: () => Promise<T>): Promise<T> {
   if (inFlight >= MAX_CONCURRENT_LLM) {
     await new Promise<void>(resolve => waiting.push(resolve))
   }
   inFlight++
+  if (minStartGapMs > 0) {
+    const now = Date.now()
+    const startAt = Math.max(now, nextStartAt)
+    nextStartAt = startAt + minStartGapMs
+    if (startAt > now) await sleep(startAt - now)
+  }
   try {
     return await fn()
   } finally {
@@ -615,7 +630,12 @@ export interface RunPipelineOptions {
 
 export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPipelineResult> {
   const { leftIris, rightIris, questionnaire, callLLM, addLog, onProgress } = opts
-  const delay = opts.requestDelay ?? 0
+  // Паузата от настройките вече не прави анализа последователен — тя само
+  // разрежда стартовете в `withLlmSlot`. Затова всички стъпки вървят по
+  // паралелния път (`delay = 0`).
+  minStartGapMs = Math.max(0, opts.requestDelay ?? 0)
+  nextStartAt = 0
+  const delay = 0
 
   // ── 1. подготовка (паралелно, само код) ────────────────────────────────
   onProgress('Подготовка на изображенията', 5)

@@ -38,7 +38,7 @@ interface AdminScreenProps {
 }
 
 // Default configuration constants
-const DEFAULT_REQUEST_DELAY_MS = 5000
+const DEFAULT_REQUEST_DELAY_MS = 1000
 
 export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [aiConfig, setAiConfig] = useKVWithFallback<AIModelConfig>('ai-model-config', {
@@ -55,7 +55,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
   const [model, setModel] = useState(aiConfig?.model || RECOMMENDED_GEMINI_MODEL)
   const [apiKey, setApiKey] = useState(aiConfig?.apiKey || '')
   const [useCustomKey, setUseCustomKey] = useState(aiConfig?.useCustomKey || false)
-  const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay || DEFAULT_REQUEST_DELAY_MS)
+  const [requestDelay, setRequestDelay] = useState(aiConfig?.requestDelay ?? DEFAULT_REQUEST_DELAY_MS)
   const [enableDiagnostics, setEnableDiagnostics] = useState(aiConfig?.enableDiagnostics ?? true)
   const [useCalibratedPipeline, setUseCalibratedPipeline] = useState(
     aiConfig?.useCalibratedPipeline ?? true
@@ -80,7 +80,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
       setModel(aiConfig.model)
       setApiKey(aiConfig.apiKey)
       setUseCustomKey(aiConfig.useCustomKey)
-      setRequestDelay(aiConfig.requestDelay || 60000)
+      setRequestDelay(aiConfig.requestDelay ?? DEFAULT_REQUEST_DELAY_MS)
       setEnableDiagnostics(aiConfig.enableDiagnostics ?? true)
       setUseCalibratedPipeline(aiConfig.useCalibratedPipeline ?? true)
     }
@@ -291,7 +291,7 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Забавяне: {aiConfig.requestDelay || DEFAULT_REQUEST_DELAY_MS}ms между заявки | 
+                    Забавяне: {aiConfig.requestDelay ?? DEFAULT_REQUEST_DELAY_MS}ms между заявки | 
                     Брой стъпки се определя от Pipeline конфигурацията
                   </p>
                 </div>
@@ -374,19 +374,19 @@ export default function AdminScreen({ onBack }: AdminScreenProps) {
                   <div>
                     <Label htmlFor="request-delay" className="text-base">Забавяне между заявки (ms)</Label>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Време за изчакване между последователни AI заявки
+                      Минимален интервал между началата на AI заявките. Заявките вече вървят едновременно, паузата само ги разрежда.
                     </p>
                     <Input 
                       id="request-delay"
                       type="number"
                       value={requestDelay}
-                      onChange={(e) => setRequestDelay(parseInt(e.target.value) || DEFAULT_REQUEST_DELAY_MS)}
-                      min={1000}
+                      onChange={(e) => { const v = parseInt(e.target.value); setRequestDelay(Number.isFinite(v) ? Math.max(0, v) : DEFAULT_REQUEST_DELAY_MS) }}
+                      min={0}
                       max={120000}
                       step={1000}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Препоръчително: 5000-10000ms (5-10 сек) за API заявки
+                      Платен ключ: 0. Безплатен ключ: около 6000 ms (до ~10 заявки в минута).
                     </p>
                   </div>
                   
