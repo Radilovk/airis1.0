@@ -1,6 +1,9 @@
 import type { AnalysisReport } from '@/types'
 import CalibratedReportSummary from '@/components/report/CalibratedReportSummary'
-import CalibratedIrisEyes from '@/components/report/CalibratedIrisEyes'
+import IrisExplorer from '@/components/report/IrisExplorer'
+import EyeHealthCard from '@/components/report/EyeHealthCard'
+import ConstitutionCard from '@/components/report/ConstitutionCard'
+import { referralRank } from '@/lib/eye-health'
 import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
 import CalibratedSystemsChart from '@/components/report/CalibratedSystemsChart'
 import { Card } from '@/components/ui/card'
@@ -31,23 +34,29 @@ function GoalsCard({ report }: { report: AnalysisReport }) {
 }
 
 /**
- * Таб „Обобщение“ — интерпретация, системи, драйвери, методика.
- * Без снимки (те са в отделен таб).
+ * Таб „Обобщение“ — какво е важно сега, системи, насоки, методика.
+ * Водещият извод и резултатът са в героя над табовете, затова тук не се повтарят.
+ * Очният скрининг излиза най-горе само когато изисква преглед скоро.
  */
-export function CalibratedSummaryReport({ report }: Props) {
+export function CalibratedSummaryReport({ report, withLead }: Props & { withLead?: boolean }) {
   const cal = report.calibrated!
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
+  const eyeUrgent = !!cal.eyeHealth && referralRank(cal.eyeHealth.referral) >= 2
 
   return (
     <div className="space-y-8">
+      {eyeUrgent && <EyeHealthCard report={cal.eyeHealth} compact />}
+
       <GoalsCard report={report} />
 
-      <CalibratedReportSummary
-        data={cal}
-        avgHealth={avgHealth}
-        briefSummary={report.briefSummary}
-        hideScore
-      />
+      {withLead && (
+        <CalibratedReportSummary
+          data={cal}
+          avgHealth={avgHealth}
+          briefSummary={report.briefSummary}
+          hideScore
+        />
+      )}
 
       <CalibratedSystemsChart systems={cal.systems} />
 
@@ -57,12 +66,15 @@ export function CalibratedSummaryReport({ report }: Props) {
 }
 
 /**
- * Таб „Ирис“ — маркери върху реалните снимки и списък на находките.
+ * Таб „Ирис и очи“ — интерактивният ирис, теренът и очният скрининг.
  */
 export function CalibratedIrisReport({ report }: Props) {
+  const cal = report.calibrated
   return (
     <div className="space-y-6">
-      <CalibratedIrisEyes report={report} />
+      <IrisExplorer report={report} />
+      {cal && <ConstitutionCard data={cal} />}
+      {cal?.eyeHealth && <EyeHealthCard report={cal.eyeHealth} />}
     </div>
   )
 }
@@ -71,7 +83,7 @@ export function CalibratedIrisReport({ report }: Props) {
 export default function CalibratedClientReport({ report }: Props) {
   return (
     <div className="space-y-8">
-      <CalibratedSummaryReport report={report} />
+      <CalibratedSummaryReport report={report} withLead />
       <CalibratedIrisReport report={report} />
     </div>
   )

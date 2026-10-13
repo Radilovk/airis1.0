@@ -397,6 +397,22 @@ function App() {
     }
   }
 
+  const handleViewDemo = async () => {
+    try {
+      const { buildDemoReport } = await import('@/lib/demo-report')
+      setAnalysisReport(buildDemoReport())
+      setTimeout(() => setCurrentScreen('report'), 50)
+    } catch (error) {
+      console.error('Грешка при примерния доклад:', error)
+      toast.error('Примерният доклад не можа да се зареди')
+    }
+  }
+
+  const handleStartFromReport = () => {
+    setAnalysisReport(null)
+    setTimeout(() => setCurrentScreen('questionnaire'), 50)
+  }
+
   const handleViewReport = (report: AnalysisReport) => {
     try {
       setAnalysisReport(report)
@@ -479,7 +495,7 @@ function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} onTestStart={handleTestStart} onAbout={handleAboutAccess} onDiagnostics={handleDiagnosticsAccess} />
+            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} onTestStart={handleTestStart} onAbout={handleAboutAccess} onDiagnostics={handleDiagnosticsAccess} onDemo={handleViewDemo} />
           </motion.div>
         )}
         {currentScreen === 'questionnaire' && (
@@ -534,7 +550,12 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <ReportScreen report={analysisReport} onRestart={handleRestart} onReanalyze={handleReanalyze} />
+              <ReportScreen
+                report={analysisReport}
+                onRestart={handleRestart}
+                onReanalyze={analysisReport.demo ? undefined : handleReanalyze}
+                onStartAnalysis={handleStartFromReport}
+              />
             </Suspense>
           </motion.div>
         )}

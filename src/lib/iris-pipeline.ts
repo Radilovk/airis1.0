@@ -24,7 +24,14 @@
  * въпросника.
  */
 
-import type { IrisImage, QuestionnaireData } from '@/types'
+import type { EyeHealthReport, FiberDensity, IrisImage, QuestionnaireData } from '@/types'
+import {
+  assessEyeHealth,
+  buildEyeHealthPrompt,
+  parseEyeHealthResponse,
+  sampleIrisColor,
+  type PhotoScreen,
+} from './eye-health'
 import type { IrisGeometry } from './iris-geometry'
 import {
   analyseIrisQualityFromDataUrl,
@@ -125,6 +132,8 @@ export interface EyeDetection {
   side: Side
   findings: NormalizedFinding[]
   constitution: Constitution
+  /** Плътност на влакната от паса за конституция. */
+  density: FiberDensity
   /** Колко LLM паса са успели (0–5: 2 слоя × 2 шева + конституция). */
   passesOk: number
   rejectedCount: number
@@ -149,6 +158,8 @@ export interface IrisPipelineResult {
   /** Средна повторяемост на двата прочита с различен шев, 0–1. */
   agreement: number
   confirmedCount: number
+  /** Офталмологичен скрининг: видими знаци за насочване към очен лекар. */
+  eyeHealth: EyeHealthReport
 }
 
 export interface InterpretationOutput {
@@ -516,6 +527,7 @@ export async function detectEye(
 
   // Конституция — кратък пас върху базовия слой.
   let constitution: Constitution = 'unclear'
+  let density: FiberDensity = 'unclear'
   try {
     if (delayBetweenCalls > 0) await sleep(delayBetweenCalls)
     onProgress(`Конституция (${sideName})`, 65)
@@ -523,6 +535,13 @@ export async function detectEye(
       callLLM(buildConstitutionPrompt(prep.side), true, 1, prep.strips.base.dataUrl)
     )
     const parsed = parseJsonResponse(response) as Record<string, unknown>
+    if (
+      parsed.density === 'dense' ||
+      parsed.density === 'medium' ||
+      parsed.density === 'loose'
+    ) {
+      density = parsed.density
+    }
     if (isConstitution(parsed.constitution)) {
       constitution = parsed.constitution
       passesOk++
@@ -569,6 +588,7 @@ export async function detectEye(
     side: prep.side,
     findings,
     constitution,
+    density,
     passesOk,
     rejectedCount: rejected,
     agreement: merged.agreement,
@@ -628,6 +648,35 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
   // Двете очи също са независими помежду си.
   let left: EyeDetection
   let right: EyeDetection
+
+  // Офталмологичният пас гледа ЦЕЛИЯ кадър (склера, ръб на роговицата, зеница),
+  // който разгънатите ленти изрязват. Независим е от детекцията — при липса на
+  // ограничение на честотата върви паралелно с нея. Провалът му не спира анализа.
+  const screenEye = async (img: IrisImage, side: 'left' | 'right'): Promise<PhotoScreen | null> => {
+    if (!img.dataUrl) return null
+    const sideName = side === 'left' ? 'ляв' : 'десен'
+    try {
+      const response = await withLlmSlot(() => callLLM(buildEyeHealthPrompt(side), true, 1, img.dataUrl))
+      const screen = parseEyeHealthResponse(parseJsonResponse(response), side)
+      addLog(
+        'info',
+        `[Очно здраве ${sideName}] ${screen.signs.length ? screen.signs.map(s => s.key).join(', ') : 'без видими знаци'}`
+      )
+      return screen
+    } catch (e) {
+      addLog('warning', `[Очно здраве ${sideName}] скринингът не бе направен: ${e instanceof Error ? e.message : String(e)}`)
+      return null
+    }
+  }
+  const colorFor = (img: IrisImage, prep: EyePreparation) =>
+    sampleIrisColor(img.dataUrl, img.geometry ?? prep.geometry).catch(() => null)
+
+  let screens: [PhotoScreen | null, PhotoScreen | null] = [null, null]
+  let screensPromise: Promise<[PhotoScreen | null, PhotoScreen | null]> | null = null
+  if (delay === 0) {
+    screensPromise = Promise.all([screenEye(leftIris, 'left'), screenEye(rightIris, 'right')])
+  }
+
   if (delay > 0) {
     onProgress('Анализ на ляв ирис', 15)
     left = await detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay)
@@ -641,6 +690,20 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay),
     ])
   }
+
+  if (screensPromise) {
+    screens = await screensPromise
+  } else {
+    onProgress('Очен скрининг', 62)
+    await sleep(delay)
+    const l = await screenEye(leftIris, 'left')
+    await sleep(delay)
+    screens = [l, await screenEye(rightIris, 'right')]
+  }
+  const [leftColor, rightColor] = await Promise.all([
+    colorFor(leftIris, leftPrep),
+    colorFor(rightIris, rightPrep),
+  ])
 
   const allFindings = [...left.findings, ...right.findings]
   const passTotal = left.passesOk + right.passesOk
@@ -673,6 +736,24 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
   addLog('info', `Фокус: ${scoring.focus.join(' → ')}`)
   addLog('info', `${scoring.drivers.length} хранителни драйвера`)
 
+  const eyeHealth = assessEyeHealth({
+    photo: { left: screens[0], right: screens[1] },
+    geometry: {
+      left: leftIris.geometry ?? leftPrep.geometry,
+      right: rightIris.geometry ?? rightPrep.geometry,
+    },
+    flash: { left: leftPrep.flash, right: rightPrep.flash },
+    irisColor: { left: leftColor, right: rightColor },
+    findings: allFindings.map(f => ({ side: f.side, type: f.type, confidence: f.confidence })),
+    age: questionnaire.age,
+  })
+  if (eyeHealth.signs.length > 0) {
+    addLog(
+      'warning',
+      `Очно здраве: ${eyeHealth.signs.map(s => s.title).join('; ')} → насочване: ${eyeHealth.referral}`
+    )
+  }
+
   // ── 4. интерпретация ────────────────────────────────────────────────────
   onProgress('Изготвяне на плана', 75)
   if (delay > 0) await sleep(delay)
@@ -692,6 +773,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       questionnaire,
       constitution,
       imageQuality,
+      eyeHealth,
     })
     const response = await withLlmSlot(() => callLLM(prompt, true, 2))
     interpretation = parseJsonResponse(response) as InterpretationOutput
@@ -712,6 +794,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     stripCoverage,
     agreement,
     confirmedCount: left.confirmedCount + right.confirmedCount,
+    eyeHealth,
   }
 }
 

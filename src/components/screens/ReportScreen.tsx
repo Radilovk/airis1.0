@@ -28,11 +28,14 @@ import { ErrorBoundary } from 'react-error-boundary'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
 import { summarizeCalibratedReport } from '@/lib/calibrated-report-summary'
+import ReportHero from '@/components/report/ReportHero'
 
 interface ReportScreenProps {
   report: AnalysisReport
   onRestart: () => void
   onReanalyze?: () => void
+  /** Нов анализ направо от доклада (ползва се от примерния доклад). */
+  onStartAnalysis?: () => void
 }
 
 function ErrorFallback({ error }: { error: Error }) {
@@ -56,7 +59,7 @@ function ErrorFallback({ error }: { error: Error }) {
   )
 }
 
-export default function ReportScreen({ report, onRestart, onReanalyze }: ReportScreenProps) {
+export default function ReportScreen({ report, onRestart, onReanalyze, onStartAnalysis }: ReportScreenProps) {
   const isCalibrated = !!report.calibrated
   const [activeTab, setActiveTab] = useState(isCalibrated ? 'summary' : 'overview')
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
@@ -69,6 +72,10 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
   
   const handleSaveToHistory = () => {
+    if (report.demo) {
+      toast.info('Това е примерен доклад — направете собствен анализ, за да го запазите')
+      return
+    }
     setHistory((current) => {
       const existing = (current || []).find((r) => r.id === report.id)
       if (existing) {
@@ -135,11 +142,11 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                 <FileText size={24} weight="duotone" className="text-primary-foreground" />
               </motion.div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                <h1 className="truncate text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                   Иридологичен доклад
                 </h1>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{report.questionnaireData.name}</span>
+                <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
+                  <span className="truncate">{report.questionnaireData.name}</span>
                   <span>•</span>
                   <span>
                     {new Date(report.timestamp).toLocaleDateString('bg-BG', { 
@@ -217,6 +224,23 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
       </div>
 
       <div className="container max-w-5xl mx-auto px-4 py-8">
+        {report.demo && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+            <span>
+              <strong>Примерен доклад с демо данни.</strong>{' '}
+              <span className="text-muted-foreground">Така ще изглежда вашият — с вашите снимки и отговори.</span>
+            </span>
+            <Button size="sm" onClick={onStartAnalysis ?? onRestart} className="rounded-full">
+              Започни своя анализ
+            </Button>
+          </div>
+        )}
+
+        {isCalibrated ? (
+          <div className="mb-8">
+            <ReportHero report={report} onOpenIris={() => setActiveTab('iris')} />
+          </div>
+        ) : (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -247,6 +271,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
             )}
           </div>
         </motion.div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList
@@ -277,7 +302,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze }: ReportS
                     className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
                   >
                     <Eye size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Ирис</span>
+                    <span className="text-xs font-semibold">Ирис и очи</span>
                   </TabsTrigger>
                 </>
               ) : (
