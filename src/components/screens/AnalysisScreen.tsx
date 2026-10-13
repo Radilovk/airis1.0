@@ -18,7 +18,7 @@ import { FINDINGS } from '@/lib/iris-map'
 import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
-import { RECOMMENDED_GEMINI_MODEL } from '@/lib/ai-models'
+import { RECOMMENDED_GEMINI_MODEL, geminiThinkingConfig, resolveGeminiModel } from '@/lib/ai-models'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 interface AnalysisScreenProps {
@@ -201,22 +201,36 @@ export default function AnalysisScreen({
           : prompt
       })
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: parts
-          }],
-          generationConfig: {
-            temperature: temperature,
-            maxOutputTokens: Math.min(maxTokens, 16384),
-            topP: topP
-          }
+      const thinkingConfig = geminiThinkingConfig(model)
+      const send = (withThinking: boolean) =>
+        fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: parts
+            }],
+            generationConfig: {
+              temperature: temperature,
+              // Мисленето се брои в този лимит — затова таванът не е по-нисък.
+              maxOutputTokens: Math.min(Math.max(maxTokens, 8192), 16384),
+              topP: topP,
+              ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+              ...(withThinking && thinkingConfig ? { thinkingConfig } : {}),
+            }
+          })
         })
-      })
+
+      let response = await send(true)
+      if (!response.ok && response.status === 400 && thinkingConfig) {
+        // Модел, който не познава това ниво на мислене — опит без настройката.
+        const errorText = await response.text()
+        if (!/thinking/i.test(errorText)) throw new Error(`Gemini API грешка 400: ${errorText}`)
+        addLog('warning', `${model} не прие ниво на мислене — заявка без него`)
+        response = await send(false)
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -224,7 +238,9 @@ export default function AnalysisScreen({
       }
 
       const data = await response.json()
-      return data.candidates[0].content.parts[0].text
+      // Взимаме текста на отговора, не евентуални части с мисли (`thought: true`).
+      const outParts: Array<{ text?: string; thought?: boolean }> = data.candidates?.[0]?.content?.parts ?? []
+      return outParts.filter(p => !p.thought && p.text).map(p => p.text).join('')
     }
   }
 
@@ -255,7 +271,10 @@ export default function AnalysisScreen({
     }
     
     const provider = finalConfig.provider
-    const configuredModel = finalConfig.model
+    const configuredModel = provider === 'gemini' ? resolveGeminiModel(finalConfig.model) : finalConfig.model
+    if (configuredModel !== finalConfig.model) {
+      addLog('info', `Моделът ${finalConfig.model} е остарял — използва се ${configuredModel}`)
+    }
     const requestDelay = finalConfig.requestDelay ?? 2000
     const apiKey = finalConfig.apiKey || ''
     
