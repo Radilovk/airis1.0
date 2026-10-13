@@ -1058,15 +1058,15 @@ const STEPS = ['Ляво око', 'Дясно око', 'Анализ']
 
 function UploadStepper({ step }: { step: number }) {
   return (
-    <ol className="mb-5 flex items-center justify-center gap-2 text-sm">
+    <ol className="mb-5 flex items-center justify-center gap-1.5 text-xs sm:gap-2 sm:text-sm">
       {STEPS.map((label, i) => {
         const done = i < step
         const current = i === step
         return (
           <li key={label} className="flex items-center gap-2">
-            {i > 0 && <span className={`h-px w-6 sm:w-10 ${done || current ? 'bg-primary' : 'bg-border'}`} />}
+            {i > 0 && <span className={`h-px w-3 sm:w-10 ${done || current ? 'bg-primary' : 'bg-border'}`} />}
             <span
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-medium transition-colors ${
+              className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 font-medium transition-colors sm:px-3 ${
                 current ? 'bg-primary text-primary-foreground shadow' : done ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
               }`}
             >
