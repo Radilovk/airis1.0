@@ -39,7 +39,7 @@ import {
   type NormalizedFinding,
 } from './iris-scoring'
 import { safetyToPromptBlock } from './safety-profile'
-import type { QuestionnaireData } from '@/types'
+import type { EyeHealthReport, QuestionnaireData } from '@/types'
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * ПАС 1 — ДЕТЕКЦИЯ
@@ -298,6 +298,18 @@ export interface InterpretationContext {
   constitution?: string
   /** 0..100 средно качество на снимките. */
   imageQuality: number
+  /** Офталмологичният скрининг — само за да не му противоречи текстът. */
+  eyeHealth?: EyeHealthReport
+}
+
+function eyeHealthBlock(report?: EyeHealthReport): string {
+  if (!report || report.signs.length === 0) return ''
+  return `
+═══ ОЧЕН СКРИНИНГ (вече показан отделно в отчета) ═══
+${report.signs.map(s => `• ${s.title} → ${s.action}`).join('\n')}
+Не тълкувай тези знаци иридологично и не ги повтаряй подробно. Ако споменаваш,
+само насочи към очен лекар. В suggestedChecks НЕ добавяй очен преглед — добавя се автоматично.
+`
 }
 
 function questionnaireBlock(q: QuestionnaireData): string {
@@ -409,7 +421,7 @@ ${driversToPromptBlock(scoring)}
 ПРИЕТИ ИРИСОВИ НАХОДКИ (S=сектор 1–12, R=пръстен 0–11):
 ${findingsToPromptBlock(ctx.findings)}
 ${ctx.constitution ? `\nКОНСТИТУЦИЯ: ${ctx.constitution}` : ''}
-
+${eyeHealthBlock(ctx.eyeHealth)}
 ═══ ДАННИ ЗА ЧОВЕКА ═══
 ${questionnaireBlock(ctx.questionnaire)}
 

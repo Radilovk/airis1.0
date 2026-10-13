@@ -11,6 +11,7 @@ import { motion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
+import { eyeHealthChecks } from '@/lib/eye-health'
 import { runIrisPipeline, toIrisAnalysis } from '@/lib/iris-pipeline'
 import { IrisQualityRejectedError } from '@/lib/iris-quality'
 import { FINDINGS } from '@/lib/iris-map'
@@ -888,6 +889,8 @@ ${response}
       constitution:
         result.left.constitution !== 'unclear' ? result.left.constitution : result.right.constitution,
       notices: result.scoring.notices,
+      density: { left: result.left.density, right: result.right.density },
+      eyeHealth: result.eyeHealth,
     }
 
     setProgress(100)
@@ -924,7 +927,11 @@ ${response}
         ],
         // Секцията е озаглавена „Препоръчителни Конкретни Изследвания“, затова тук
         // влизат имена на изследвания, а не бележки за проследяване (както беше).
-        recommendedTests: plan?.suggestedChecks ?? [],
+        // Очният преглед се добавя детерминистично от офталмологичния скрининг —
+        // не зависи от това дали моделът се е сетил за него.
+        recommendedTests: Array.from(
+          new Set([...eyeHealthChecks(result.eyeHealth), ...(plan?.suggestedChecks ?? [])])
+        ),
       },
       calibrated,
     }

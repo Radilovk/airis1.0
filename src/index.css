@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 
 @layer base {
+  /* Tailwind v4 оставя border-color = currentColor; без това всяка карта получава
+     черна рамка вместо меката --border. */
+  *, ::after, ::before, ::backdrop {
+    border-color: var(--color-border, currentColor);
+  }
+
   body {
     font-family: 'Inter', sans-serif;
   }
@@ -70,4 +76,15 @@
   --radius-xl: calc(var(--radius) * 2);
   --radius-2xl: calc(var(--radius) * 3);
   --radius-full: 9999px;
+}
+/* ── ирисови анимации (начален екран, доклад) ─────────────────────────── */
+@keyframes iris-spin { to { transform: rotate(360deg); } }
+@keyframes iris-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.86); } }
+@keyframes iris-pulse { 0% { transform: scale(0.7); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
+.iris-spin { animation: iris-spin 60s linear infinite; transform-box: fill-box; transform-origin: center; }
+.iris-spin-fast { animation: iris-spin 7s linear infinite; transform-box: fill-box; transform-origin: center; }
+.iris-breathe { animation: iris-breathe 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.iris-pulse { animation: iris-pulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) {
+  .iris-spin, .iris-spin-fast, .iris-breathe, .iris-pulse { animation: none; }
 }

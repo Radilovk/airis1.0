@@ -172,6 +172,8 @@ export interface AnalysisReport {
    * направени с калибрирания pipeline.
    */
   calibrated?: CalibratedAnalysisPayload
+  /** Примерен доклад с демо данни — не се записва в историята. */
+  demo?: boolean
 }
 
 /** Резултатът от калибрирания анализ, запазен в отчета. */
@@ -236,6 +238,63 @@ export interface CalibratedAnalysisPayload {
    * съвети липсват или изглеждат различно.
    */
   notices?: Array<{ level: 'critical' | 'caution'; title: string; body: string }>
+  /**
+   * Плътност на влакната по око (класически иридологичен показател за
+   * „конституционна сила“). Идва от паса за конституция.
+   */
+  density?: { left?: FiberDensity; right?: FiberDensity }
+  /**
+   * Офталмологичен скрининг по снимката: видими признаци, при които е разумно
+   * човек да се покаже на очен лекар (arcus, помътняване в зеницата, анизокория…).
+   * Не е диагноза — само насочване.
+   */
+  eyeHealth?: EyeHealthReport
+}
+
+export type FiberDensity = 'dense' | 'medium' | 'loose' | 'unclear'
+
+/** Колко спешно е да се види очен лекар. Подредени по тежест. */
+export type EyeReferral = 'none' | 'routine' | 'soon' | 'urgent'
+
+export type EyeSignKey =
+  | 'arcus'
+  | 'lens_opacity'
+  | 'scleral_yellow'
+  | 'scleral_red'
+  | 'limbal_ring'
+  | 'iris_nevus'
+  | 'pupil_irregular'
+  | 'pterygium'
+  | 'anisocoria'
+  | 'heterochromia'
+
+export interface EyeSign {
+  key: EyeSignKey
+  side: 'left' | 'right' | 'both'
+  /** Откъде идва: видяно на снимката, измерено с код или изведено от ирисова находка. */
+  source: 'photo' | 'measurement' | 'iridology'
+  confidence: number
+  referral: EyeReferral
+  title: string
+  /** Какво се вижда. */
+  what: string
+  /** Защо има значение. */
+  why: string
+  /** Какво да направи човекът. */
+  action: string
+  /** Кратка бележка от модела/измерването (напр. „ляво 0.31 · дясно 0.40“). */
+  detail?: string
+}
+
+export interface EyeHealthReport {
+  /** Дали изобщо е направен скрининг (поне един пас или измерване). */
+  ran: boolean
+  referral: EyeReferral
+  signs: EyeSign[]
+  /** Какво е проверено — показва се като списък, за да е ясно, че „чисто“ е резултат. */
+  checked: string[]
+  /** Съотношение зеница/ирис по око — за прозрачност. */
+  pupilRatio?: { left?: number; right?: number }
 }
 
 /** Three independent filtered views of the unwrapped iris image */

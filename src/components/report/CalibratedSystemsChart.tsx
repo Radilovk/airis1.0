@@ -1,4 +1,4 @@
-import { PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { Card } from '@/components/ui/card'
 import type { CalibratedAnalysisPayload } from '@/types'
 
@@ -31,11 +31,12 @@ export default function CalibratedSystemsChart({ systems }: Props) {
               dataKey="system"
               tick={{ fill: 'currentColor', fontSize: 10 }}
             />
+            <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
             <Radar
               name="Оценка"
               dataKey="score"
-              stroke="oklch(0.55 0.15 230)"
-              fill="oklch(0.55 0.15 230)"
+              stroke="#0284c7"
+              fill="#0ea5e9"
               fillOpacity={0.35}
               strokeWidth={2}
             />
