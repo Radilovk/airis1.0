@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Camera, Upload, CheckCircle, ArrowRight, X, Crop, Crosshair } from '@phosphor-icons/react'
+import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import IrisCropEditor from '@/components/iris/IrisCropEditor'
 import IrisCalibrator from '@/components/iris/IrisCalibrator'
+import { autoFrameIris } from '@/lib/iris-autoframe'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
 import type { QualityReport } from '@/lib/iris-quality'
@@ -35,7 +35,7 @@ interface ImageUploadScreenProps {
 export default function ImageUploadScreen({ onComplete, initialLeft = null, initialRight = null, isReanalysis = false }: ImageUploadScreenProps) {
   const leftImageRef = useRef<IrisImage | null>(initialLeft)
   const rightImageRef = useRef<IrisImage | null>(initialRight)
-  const [imagesVersion, setImagesVersion] = useState(0)
+  const [, setImagesVersion] = useState(0)
   const [editingSide, setEditingSide] = useState<'left' | 'right' | null>(null)
   /**
    * ОПАШКА ЗА ВТОРАТА СНИМКА.
@@ -47,7 +47,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
    *
    * Сега втората изчаква тук и се отваря сама, щом първата приключи.
    */
-  const pendingCropRef = useRef<{ side: 'left' | 'right'; dataUrl: string } | null>(null)
+  const pendingCropRef = useRef<{ side: 'left' | 'right'; dataUrl: string; auto?: boolean } | null>(null)
   // `handleFileSelect` е async и не вижда актуалния state, затова огледални ref-ове.
   const editingSideRef = useRef<'left' | 'right' | null>(null)
   const calibratingRef = useRef<unknown>(null)
@@ -65,9 +65,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     const next = pendingCropRef.current
     if (!next) return
     pendingCropRef.current = null
+    if (next.auto) {
+      void handleCropSaveRef.current?.(next.dataUrl, next.side)
+      return
+    }
     setTempImageData(next.dataUrl)
     setEditingSide(next.side)
   }, [editingSide, calibrating])
+  // Ефектът по-горе е деклариран преди `handleCropSave`; достъпва го през ref.
+  const handleCropSaveRef = useRef<((d: string, s: 'left' | 'right') => Promise<void>) | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const isMountedRef = useRef(true)
@@ -335,14 +341,32 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           imageSizeKB: Math.round(compressedDataUrl.length / 1024)
         })
         console.log(`✅ [UPLOAD] Изображението е готово за crop редактиране`)
+        // Окото се търси автоматично. При уверено откриване снимката се
+        // центрира сама и ръчният редактор се прескача.
+        const framed = await autoFrameIris(compressedDataUrl).catch(() => null)
+        uploadDiagnostics.log('AUTO_FRAME', framed ? 'success' : 'info', {
+          side,
+          confidence: framed?.confidence ?? 0,
+        })
+
         if (editingSideRef.current || calibratingRef.current) {
           // Другото око е в процес — това изчаква реда си, вместо да го изтрие.
-          pendingCropRef.current = { side, dataUrl: compressedDataUrl }
+          pendingCropRef.current = framed
+            ? { side, dataUrl: framed.dataUrl, auto: true }
+            : { side, dataUrl: compressedDataUrl }
           uploadDiagnostics.log('CROP_QUEUED', 'info', { side })
           toast.info(
             `${side === 'left' ? 'Лявата' : 'Дясната'} снимка е приета — ще се отвори веднага след другата.`
           )
           setIsProcessing(false)
+          return
+        }
+        if (framed) {
+          setIsProcessing(false)
+          toast.success(`${side === 'left' ? 'Лявото' : 'Дясното'} око е намерено и центрирано`, {
+            description: 'Проверете кръговете и потвърдете.',
+          })
+          await handleCropSave(framed.dataUrl, side)
           return
         }
         setTempImageData(compressedDataUrl)
@@ -395,12 +419,14 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }
 
-  const handleCropSave = async (croppedDataUrl: string) => {
+  const handleCropSave = async (croppedDataUrl: string, sideOverride?: 'left' | 'right') => {
+    // При автоматично центриране няма отворен редактор и `editingSide` е null.
+    const activeSide = sideOverride ?? editingSide
     uploadDiagnostics.log('CROP_SAVE_START', 'start', {
       croppedDataUrlType: typeof croppedDataUrl,
       croppedDataUrlLength: croppedDataUrl?.length || 0,
       croppedDataUrlSizeKB: Math.round((croppedDataUrl?.length || 0) / 1024),
-      editingSide,
+      activeSide,
       isMounted: isMountedRef.current
     })
     
@@ -408,15 +434,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     console.log(`📊 [UPLOAD] croppedDataUrl type: ${typeof croppedDataUrl}`)
     console.log(`📊 [UPLOAD] croppedDataUrl length: ${croppedDataUrl?.length || 0}`)
     console.log(`📊 [UPLOAD] croppedDataUrl first 50 chars: ${croppedDataUrl?.substring(0, 50)}`)
-    console.log(`📊 [UPLOAD] editingSide: ${editingSide}`)
+    console.log(`📊 [UPLOAD] activeSide: ${activeSide}`)
     console.log(`📊 [UPLOAD] isMounted: ${isMountedRef.current}`)
     
-    if (!editingSide) {
+    if (!activeSide) {
       uploadDiagnostics.log('CROP_SAVE_ERROR_NO_SIDE', 'error', {
         croppedDataUrlLength: croppedDataUrl?.length || 0
       })
-      console.error('❌ [UPLOAD] CRITICAL: editingSide is null!')
-      errorLogger.error('UPLOAD_CROP_SAVE', 'CRITICAL: editingSide is null!', undefined, {
+      console.error('❌ [UPLOAD] CRITICAL: activeSide is null!')
+      errorLogger.error('UPLOAD_CROP_SAVE', 'CRITICAL: activeSide is null!', undefined, {
         croppedDataUrlLength: croppedDataUrl?.length || 0,
         isMounted: isMountedRef.current
       })
@@ -428,13 +454,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       uploadDiagnostics.log('CROP_SAVE_ERROR_INVALID_DATA', 'error', {
         hasCroppedDataUrl: !!croppedDataUrl,
         type: typeof croppedDataUrl,
-        editingSide
+        activeSide
       })
       console.error('❌ [UPLOAD] CRITICAL: Invalid croppedDataUrl!')
       errorLogger.error('UPLOAD_CROP_SAVE', 'CRITICAL: Invalid croppedDataUrl!', undefined, {
         croppedDataUrl: !!croppedDataUrl,
         type: typeof croppedDataUrl,
-        editingSide
+        activeSide
       })
       toast.error('Грешка: Невалидни данни от crop редактора')
       return
@@ -469,7 +495,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         sizeBefore: Math.round(croppedDataUrl.length / 1024)
       })
       // First pass: High quality at IRIS_MAX_DIMENSION – preserves iris detail for AI analysis
-      let finalImage = await compressImage(croppedDataUrl, IRIS_MAX_DIMENSION, 0.92)
+      const finalImage = await compressImage(croppedDataUrl, IRIS_MAX_DIMENSION, 0.92)
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_SUCCESS', 'success', {
         sizeAfter: Math.round(finalImage.length / 1024)
       })
@@ -484,7 +510,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         console.error('❌ [UPLOAD] Image too large even after high-quality compression!')
         errorLogger.error('UPLOAD_CROP_SAVE', 'Image too large after compression', undefined, {
           finalSize: Math.round(finalImage.length / 1024),
-          editingSide
+          activeSide
         })
         toast.error(`Изображението е твърде голямо (${Math.round(finalImage.length / 1024)} KB). Моля, опитайте с по-малка снимка или по-ниска резолюция.`)
         setIsProcessing(false)
@@ -500,13 +526,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       }
       
       uploadDiagnostics.log('CREATE_IRIS_IMAGE_OBJECT', 'start', {
-        side: editingSide,
+        side: activeSide,
         dataUrlLength: finalImage.length
       })
       
       const image: IrisImage = { 
         dataUrl: finalImage, 
-        side: editingSide 
+        side: activeSide 
       }
       
       uploadDiagnostics.log('CREATE_IRIS_IMAGE_OBJECT_SUCCESS', 'success', {
@@ -522,7 +548,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         dataUrlStartsWith: image.dataUrl.substring(0, 20)
       })
       
-      const savedSide = editingSide
+      const savedSide = activeSide
       
       console.log(`💾 [UPLOAD] Saving ${savedSide} iris (final size: ${Math.round(finalImage.length / 1024)} KB)...`)
       console.log('🧹 [UPLOAD] Clearing temp data before saving to ref...')
@@ -592,14 +618,14 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       setCalibrating({ side: savedSide, dataUrl: image.dataUrl })
     } catch (error) {
       uploadDiagnostics.log('CROP_SAVE_ERROR', 'error', {
-        editingSide,
+        activeSide,
         isMounted: isMountedRef.current,
         croppedDataUrlLength: croppedDataUrl?.length || 0,
         error: error instanceof Error ? error.message : String(error)
       }, error as Error)
       console.error('❌ [UPLOAD] ERROR in handleCropSave:', error)
       errorLogger.error('UPLOAD_CROP_SAVE', 'Error in handleCropSave', error as Error, {
-        editingSide,
+        activeSide,
         isMounted: isMountedRef.current,
         croppedDataUrlLength: croppedDataUrl?.length || 0
       })
@@ -609,6 +635,8 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       setTempImageData(null)
     }
   }
+
+  handleCropSaveRef.current = handleCropSave
 
   const handleCropCancel = () => {
     setEditingSide(null)
@@ -867,6 +895,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     setImagesVersion(v => v + 1)
   }
 
+  const left = leftImageRef.current
+  const right = rightImageRef.current
+  const leftReady = !!left?.geometry
+  const rightReady = !!right?.geometry
+  // Следващата стъпка е винаги една: първо лявото око, после дясното, после анализ.
+  const step = !leftReady ? 0 : !rightReady ? 1 : 2
+
   return (
     <>
       <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
@@ -874,219 +909,84 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
+            className="text-center mb-6"
           >
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-              <Camera size={32} weight="duotone" className="text-primary" />
-            </div>
             <h2 className="text-3xl font-bold mb-2">
-              {isReanalysis ? 'Качване на снимки за повторен анализ' : 'Качване на снимки'}
+              {isReanalysis ? 'Нови снимки за повторен анализ' : 'Снимки на двата ириса'}
             </h2>
             <p className="text-muted-foreground">
-              {isReanalysis 
-                ? 'Качете нови снимки на левия и десния си ирис за повторен анализ'
-                : 'Качете ясни снимки на левия и десния си ирис'
-              }
+              {isReanalysis
+                ? 'Ще използваме предишните ви отговори от въпросника.'
+                : 'Окото се намира и центрира само. Вие само проверявате кръговете.'}
             </p>
           </motion.div>
 
-          {isReanalysis && (
-            <Card className="p-4 mb-6 bg-blue-500/10 border-blue-500/20">
-              <div className="flex items-center gap-3">
-                <div className="text-blue-500">ℹ️</div>
-                <p className="text-sm font-medium">
-                  Ще използваме вашите предишни данни от въпросника за повторен анализ с новите изображения.
-                </p>
-              </div>
-            </Card>
-          )}
+          <UploadStepper step={step} />
 
-          <Card className="p-6 mb-6 bg-secondary/30">
-            <h3 className="font-semibold mb-3">📋 Инструкции за качествени снимки:</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• <strong>Снимайте със светкавица</strong> на ръка, на рязко, с отворено око</li>
-              <li>• <strong>Зеницата трябва да се вижда ясно</strong> — от нея започва картата на ириса</li>
-              <li>• Заснемете отблизо — ирисът да заема поне една трета от кадъра</li>
-              <li>• Докоснете екрана за фокус върху ириса преди снимката</li>
-              <li>• Отворете окото широко — клепачът не трябва да закрива ириса</li>
-              <li>• Избягвайте огледални отражения (прозорец, лампа) върху ириса</li>
-              <li>• След качване <strong>настройте окото</strong>: подредете кръговете и потвърдете, ако снимката е добра</li>
+          <details className="group mb-6 rounded-2xl border bg-secondary/30 px-4 py-3 text-sm">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-semibold">
+              <span className="flex items-center gap-2">
+                <Lightbulb size={18} weight="duotone" className="text-primary" />
+                Как да снимате, за да стане ясно
+              </span>
+              <CaretDown size={16} className="text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <ul className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
+              <li><strong className="text-foreground">Задната камера</strong> и светкавица, отблизо и на фокус.</li>
+              <li><strong className="text-foreground">Без огледално селфи</strong>: обърнатата снимка разменя страните на картата.</li>
+              <li>Окото широко отворено, клепачът не закрива ириса.</li>
+              <li>Ирисът да заема поне една трета от кадъра, без отблясък от прозорец.</li>
             </ul>
-          </Card>
+          </details>
 
           {isProcessing && (
             <Card className="p-4 mb-6 bg-primary/10">
               <div className="flex items-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
-                <p className="text-sm font-medium">Обработка на изображението...</p>
+                <p className="text-sm font-medium">Търсим окото и го центрираме…</p>
               </div>
             </Card>
           )}
 
           <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              key={`left-${imagesVersion}`}
-            >
-              <Card className="p-6">
-                <Label className="text-lg font-semibold mb-4 block">Ляв ирис</Label>
-                
-                {!leftImageRef.current ? (
-                  <div
-                    className={`border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors ${
-                      isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:bg-muted/50'
-                    }`}
-                    onDrop={(e) => !isProcessing && handleDrop('left', e)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onClick={() => !isProcessing && leftInputRef.current?.click()}
-                  >
-                    <Upload size={48} weight="duotone" className="mx-auto mb-4 text-muted-foreground" />
-                    <p className="font-medium mb-2">Кликнете или пуснете снимка</p>
-                    <p className="text-sm text-muted-foreground">PNG, JPG до 10MB</p>
-                    <input
-                      ref={leftInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={isProcessing}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleFileSelect('left', file)
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="relative group">
-                    <img
-                      src={leftImageRef.current.dataUrl}
-                      alt="Ляв ирис"
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleEditImage('left')}
-                        className="gap-2"
-                      >
-                        <Crop size={16} />
-                        Редактирай
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => removeImage('left')}
-                        className="gap-2"
-                      >
-                        <X size={16} />
-                        Премахни
-                      </Button>
-                    </div>
-                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-2">
-                      <CheckCircle size={20} weight="fill" />
-                    </div>
-                  </div>
-                )}
-
-                <CalibrationStatus
-                  image={leftImageRef.current}
-                  onOpen={() => openCalibrator('left')}
+            {(['left', 'right'] as const).map((side, i) => (
+              <motion.div
+                key={side}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + i * 0.08 }}
+              >
+                <EyeSlot
+                  side={side}
+                  image={side === 'left' ? left : right}
+                  active={step === i}
+                  disabled={isProcessing}
+                  galleryRef={side === 'left' ? leftInputRef : rightInputRef}
+                  onFile={file => handleFileSelect(side, file)}
+                  onDrop={e => !isProcessing && handleDrop(side, e)}
+                  onCalibrate={() => openCalibrator(side)}
+                  onCrop={() => handleEditImage(side)}
+                  onRemove={() => removeImage(side)}
                 />
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              key={`right-${imagesVersion}`}
-            >
-              <Card className="p-6">
-                <Label className="text-lg font-semibold mb-4 block">Десен ирис</Label>
-                
-                {!rightImageRef.current ? (
-                  <div
-                    className={`border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors ${
-                      isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:bg-muted/50'
-                    }`}
-                    onDrop={(e) => !isProcessing && handleDrop('right', e)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onClick={() => !isProcessing && rightInputRef.current?.click()}
-                  >
-                    <Upload size={48} weight="duotone" className="mx-auto mb-4 text-muted-foreground" />
-                    <p className="font-medium mb-2">Кликнете или пуснете снимка</p>
-                    <p className="text-sm text-muted-foreground">PNG, JPG до 10MB</p>
-                    <input
-                      ref={rightInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={isProcessing}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleFileSelect('right', file)
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="relative group">
-                    <img
-                      src={rightImageRef.current.dataUrl}
-                      alt="Десен ирис"
-                      className="w-full h-64 object-cover rounded-lg"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleEditImage('right')}
-                        className="gap-2"
-                      >
-                        <Crop size={16} />
-                        Редактирай
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => removeImage('right')}
-                        className="gap-2"
-                      >
-                        <X size={16} />
-                        Премахни
-                      </Button>
-                    </div>
-                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-2">
-                      <CheckCircle size={20} weight="fill" />
-                    </div>
-                  </div>
-                )}
-
-                <CalibrationStatus
-                  image={rightImageRef.current}
-                  onOpen={() => openCalibrator('right')}
-                />
-              </Card>
-            </motion.div>
+              </motion.div>
+            ))}
           </div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="flex justify-end"
+            className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end"
           >
+            {left && right && (!leftReady || !rightReady) && (
+              <p className="text-sm text-muted-foreground sm:mr-auto">
+                Потвърдете кръговете на {!leftReady ? 'лявото' : 'дясното'} око, за да е точен анализът.
+              </p>
+            )}
             <Button
               size="lg"
               onClick={handleNext}
-              disabled={!leftImageRef.current || !rightImageRef.current || isProcessing || editingSide !== null || isSaving}
+              disabled={!left || !right || isProcessing || editingSide !== null || isSaving}
               className="gap-2"
             >
               {isSaving ? 'Запазване...' : 'Започни анализ'}
@@ -1146,15 +1046,123 @@ function CalibrationStatus({
     <button
       type="button"
       onClick={onOpen}
-      className={`mt-3 flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors hover:brightness-[0.97] ${tone}`}
+      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors hover:brightness-[0.97] ${tone}`}
     >
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <Crosshair size={16} weight="bold" />
-        {calibrated ? 'Настроено' : 'Нужна настройка'}
-      </span>
-      <span className="text-xs font-semibold tabular-nums">
-        {calibrated && q ? `${q.score}/100` : 'отвори →'}
-      </span>
+      {calibrated ? <CheckCircle size={14} weight="fill" /> : <Crosshair size={14} weight="bold" />}
+      {calibrated ? `Готово${q ? ` · ${q.score}/100` : ''}` : 'Провери кръговете'}
     </button>
+  )
+}
+
+const STEPS = ['Ляво око', 'Дясно око', 'Анализ']
+
+function UploadStepper({ step }: { step: number }) {
+  return (
+    <ol className="mb-5 flex items-center justify-center gap-1.5 text-xs sm:gap-2 sm:text-sm">
+      {STEPS.map((label, i) => {
+        const done = i < step
+        const current = i === step
+        return (
+          <li key={label} className="flex items-center gap-2">
+            {i > 0 && <span className={`h-px w-3 sm:w-10 ${done || current ? 'bg-primary' : 'bg-border'}`} />}
+            <span
+              className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 font-medium transition-colors sm:px-3 ${
+                current ? 'bg-primary text-primary-foreground shadow' : done ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {done ? <CheckCircle size={16} weight="fill" /> : <span className="tabular-nums">{i + 1}</span>}
+              {label}
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/**
+ * Едно око: празно — два ясни бутона (снимай / от галерията) и място за
+ * пускане на файл; заредено — снимката с винаги видими действия.
+ */
+function EyeSlot({
+  side,
+  image,
+  active,
+  disabled,
+  galleryRef,
+  onFile,
+  onDrop,
+  onCalibrate,
+  onCrop,
+  onRemove,
+}: {
+  side: 'left' | 'right'
+  image: IrisImage | null
+  active: boolean
+  disabled: boolean
+  galleryRef: React.RefObject<HTMLInputElement | null>
+  onFile: (file: File) => void
+  onDrop: (e: React.DragEvent) => void
+  onCalibrate: () => void
+  onCrop: () => void
+  onRemove: () => void
+}) {
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const label = side === 'left' ? 'Ляво око' : 'Дясно око'
+  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) onFile(file)
+    e.target.value = ''
+  }
+
+  return (
+    <Card
+      className={`p-5 transition-shadow ${active ? 'ring-2 ring-primary shadow-lg shadow-primary/10' : ''}`}
+      onDrop={onDrop}
+      onDragOver={e => e.preventDefault()}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{label}</h3>
+        {image && <CalibrationStatus image={image} onOpen={onCalibrate} />}
+      </div>
+
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={disabled} onChange={pick} />
+      <input ref={galleryRef} type="file" accept="image/*" className="hidden" disabled={disabled} onChange={pick} />
+
+      {!image ? (
+        <div className="rounded-2xl border-2 border-dashed border-border p-5 text-center">
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <Eye size={34} weight="duotone" className="text-primary" />
+          </div>
+          <p className="mb-4 text-sm text-muted-foreground">Снимайте сега или изберете готова снимка.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button size="lg" className="gap-2" disabled={disabled} onClick={() => cameraRef.current?.click()}>
+              <Camera size={20} weight="bold" /> Снимай
+            </Button>
+            <Button size="lg" variant="outline" className="gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
+              <ImageSquare size={20} weight="bold" /> От галерията
+            </Button>
+          </div>
+          <p className="mt-3 hidden text-xs text-muted-foreground md:block">или пуснете файла тук</p>
+        </div>
+      ) : (
+        <>
+          <button type="button" onClick={onCalibrate} className="block w-full overflow-hidden rounded-2xl bg-black">
+            <img src={image.dataUrl} alt={label} className="mx-auto h-60 w-full object-contain" />
+          </button>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <Button variant={image.geometry ? 'outline' : 'default'} className="gap-1.5" onClick={onCalibrate}>
+              <Crosshair size={16} weight="bold" /> Настрой
+            </Button>
+            <Button variant="outline" className="gap-1.5" onClick={onCrop}>
+              <Crop size={16} weight="bold" /> Изрежи
+            </Button>
+            <Button variant="outline" className="gap-1.5 text-rose-600 hover:text-rose-700" onClick={onRemove}>
+              <X size={16} weight="bold" /> Премахни
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>
   )
 }
