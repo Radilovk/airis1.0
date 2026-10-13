@@ -40,8 +40,7 @@ interface IrisCalibratorProps {
   onCancel: () => void
 }
 
-type Handle = 'pupil' | 'limbus' | null
-type CalStep = 'center' | 'outer' | 'inner'
+type Handle = 'pupil' | 'limbus' | 'move' | null
 
 const VIEW = 460
 
@@ -66,7 +65,10 @@ export default function IrisCalibrator({
   const [showStrip, setShowStrip] = useState(false)
   /** Дял четима площ в лентата — това е, което моделът реално получава. */
   const [coverage, setCoverage] = useState<number | null>(null)
-  const [calStep, setCalStep] = useState<CalStep>('center')
+  /** Точка под пръста (в координати на изгледа) — за лупата. */
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
+  const [fineOpen, setFineOpen] = useState(false)
+  const moveStartRef = useRef<{ p: { x: number; y: number }; cx: number; cy: number } | null>(null)
   const [showGrid, setShowGrid] = useState(false)
   // Естествените размери се държат в state, а не се четат от ref-а: промяна на
   // ref не предизвиква повторно изчисление и наслагването изоставаше с един кадър.
@@ -177,32 +179,71 @@ export default function IrisCalibrator({
     [offset, scale]
   )
 
-  const onPointerDown = (handle: Exclude<Handle, null>) => (e: React.PointerEvent) => {
-    if (handle === 'pupil' && calStep !== 'inner') return
-    if (handle === 'limbus' && calStep !== 'outer') return
+  /** Точка в изгледа (0..VIEW) — за лупата и за избора на хват. */
+  const viewPointFromEvent = useCallback((clientX: number, clientY: number) => {
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return { x: ((clientX - rect.left) / rect.width) * VIEW, y: ((clientY - rect.top) / rect.height) * VIEW }
+  }, [])
+
+  /**
+   * Един жест за всичко: натиск близо до жълтия кръг го оразмерява, близо до
+   * синия — зеницата, навсякъде другаде вътре в окото — мести двата кръга.
+   * Без стъпки и без режими: човек хваща това, което вижда.
+   */
+  const onStagePointerDown = (e: React.PointerEvent) => {
+    if (!geo || !loaded) return
+    const p = pointFromEvent(e.clientX, e.clientY)
+    const v = viewPointFromEvent(e.clientX, e.clientY)
+    if (!p || !v) return
+    const d = Math.hypot(p.x - geo.limbus.cx, p.y - geo.limbus.cy)
+    const tol = 22 / scale
+    let handle: Exclude<Handle, null> | null = null
+    if (Math.abs(d - geo.limbus.r) <= tol) handle = 'limbus'
+    else if (Math.abs(d - geo.pupil.r) <= Math.max(tol * 0.8, 6)) handle = 'pupil'
+    else if (d <= geo.limbus.r * 1.05) handle = 'move'
+    if (!handle) return
     e.preventDefault()
-    e.stopPropagation()
-    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+    if (handle === 'move') moveStartRef.current = { p, cx: geo.limbus.cx, cy: geo.limbus.cy }
     setDrag(handle)
+    setPointer(v)
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag || !geo) return
     const p = pointFromEvent(e.clientX, e.clientY)
+    const v = viewPointFromEvent(e.clientX, e.clientY)
     if (!p) return
-    const centre = drag === 'pupil' ? geo.pupil : geo.limbus
-    const r = Math.hypot(p.x - centre.cx, p.y - centre.cy)
+    if (v) setPointer(v)
     setTouched(true)
+    if (drag === 'move') {
+      const start = moveStartRef.current
+      if (!start) return
+      const cx = start.cx + (p.x - start.p.x)
+      const cy = start.cy + (p.y - start.p.y)
+      setGeo(prev =>
+        prev
+          ? concentricGeometry({
+              ...prev,
+              pupil: { ...prev.pupil, cx, cy },
+              limbus: { ...prev.limbus, cx, cy },
+              manual: true,
+            })
+          : prev
+      )
+      return
+    }
     setGeo(prev => {
       if (!prev) return prev
       const cx = prev.limbus.cx
       const cy = prev.limbus.cy
+      const r = Math.hypot(p.x - cx, p.y - cy)
       if (drag === 'pupil') {
         const nr = Math.max(4, Math.min(prev.limbus.r * 0.7, r))
         return concentricGeometry({
           ...prev,
           pupil: { cx, cy, r: nr },
-          limbus: { ...prev.limbus, cx, cy },
           manual: true,
           pupilConfidence: 1,
         })
@@ -219,51 +260,25 @@ export default function IrisCalibrator({
 
   const onPointerUp = () => {
     if (drag && geo) rebuildStrip(geo)
+    moveStartRef.current = null
     setDrag(null)
+    setPointer(null)
   }
 
-  /** Влачене на центъра — премества и двата кръга заедно. */
-  const onStagePointerDown = (e: React.PointerEvent) => {
-    if (calStep !== 'center') return
-    if (drag || !geo) return
-    const p = pointFromEvent(e.clientX, e.clientY)
-    if (!p) return
-    const dLimbus = Math.hypot(p.x - geo.limbus.cx, p.y - geo.limbus.cy)
-    if (dLimbus > geo.limbus.r * 1.02) return
-    e.preventDefault()
-    ;(e.target as Element).setPointerCapture?.(e.pointerId)
-    setDrag(null)
-    const startPupil = { ...geo.pupil }
-    const startLimbus = { ...geo.limbus }
-    const start = p
-
-    const move = (ev: PointerEvent) => {
-      const q = pointFromEvent(ev.clientX, ev.clientY)
-      if (!q) return
-      const dx = q.x - start.x
-      const dy = q.y - start.y
-      setTouched(true)
-      setGeo(prev =>
-        prev
-          ? concentricGeometry({
-              ...prev,
-              pupil: { ...prev.pupil, cx: startPupil.cx + dx, cy: startPupil.cy + dy },
-              limbus: { ...prev.limbus, cx: startLimbus.cx + dx, cy: startLimbus.cy + dy },
-              manual: true,
-            })
-          : prev
-      )
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      setGeo(g => {
-        if (g) rebuildStrip(g)
-        return g
-      })
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
+  /** Фино преместване със стрелки — за случаите, когато пръстът закрива окото. */
+  const nudge = (dx: number, dy: number) => {
+    setTouched(true)
+    const step = 2 / scale
+    setGeo(prev =>
+      prev
+        ? concentricGeometry({
+            ...prev,
+            pupil: { ...prev.pupil, cx: prev.pupil.cx + dx * step, cy: prev.pupil.cy + dy * step },
+            limbus: { ...prev.limbus, cx: prev.limbus.cx + dx * step, cy: prev.limbus.cy + dy * step },
+            manual: true,
+          })
+        : prev
+    )
   }
 
   const reset = () => {
@@ -273,7 +288,6 @@ export default function IrisCalibrator({
     setReport(q)
     setGeo(concentricGeometry(q.geometry))
     setTouched(false)
-    setCalStep('center')
     rebuildStrip(q.geometry)
   }
 
@@ -347,13 +361,6 @@ export default function IrisCalibrator({
   }
 
   const sideLabel = side === 'left' ? 'Ляв' : 'Десен'
-  const stepHint =
-    calStep === 'center'
-      ? CALIBRATION.hintCenter
-      : calStep === 'outer'
-        ? CALIBRATION.hintOuter
-        : CALIBRATION.hintInner
-
   const pupilSliderMax = geo ? Math.round(geo.limbus.r * 0.7) : 100
   const limbusSliderMax = geo
     ? Math.min(
@@ -401,30 +408,15 @@ export default function IrisCalibrator({
           </Button>
         </div>
 
-        {/* Стъпки */}
-        <div className="flex flex-wrap gap-2 border-b border-white/10 px-5 py-3">
-          {(
-            [
-              ['center', CALIBRATION.stepCenter],
-              ['outer', CALIBRATION.stepOuter],
-              ['inner', CALIBRATION.stepInner],
-            ] as const
-          ).map(([id, label]) => (
-            <Button
-              key={id}
-              type="button"
-              size="sm"
-              variant={calStep === id ? 'default' : 'ghost'}
-              onClick={() => setCalStep(id)}
-              className={
-                calStep === id
-                  ? 'bg-sky-500 text-white hover:bg-sky-400'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }
-            >
-              {label}
-            </Button>
-          ))}
+        {/* Една ясна инструкция вместо три стъпки */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-white/10 px-5 py-3 text-xs text-slate-300">
+          <span className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full border-2 border-amber-400" /> {CALIBRATION.legendOuter}
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full border-2 border-sky-400" /> {CALIBRATION.legendInner}
+          </span>
+          <span className="text-slate-400">{CALIBRATION.gestureHint}</span>
         </div>
 
         <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,460px)_1fr]">
@@ -531,70 +523,39 @@ export default function IrisCalibrator({
                           )
                         })}
 
-                        {/* център — стъпка 1 */}
-                        {(calStep === 'center' || showGrid) && (
-                          <>
-                            <circle cx={c.x} cy={c.y} r={6} fill="#38bdf8" stroke="#fff" strokeWidth={2} />
-                            <line x1={c.x - 14} y1={c.y} x2={c.x + 14} y2={c.y} stroke="#38bdf8" strokeWidth={2} />
-                            <line x1={c.x} y1={c.y - 14} x2={c.x} y2={c.y + 14} stroke="#38bdf8" strokeWidth={2} />
-                          </>
-                        )}
+                        {/* център */}
+                        <circle cx={c.x} cy={c.y} r={4} fill="#38bdf8" stroke="#fff" strokeWidth={1.5} />
+                        <line x1={c.x - 10} y1={c.y} x2={c.x + 10} y2={c.y} stroke="rgba(255,255,255,0.7)" strokeWidth={1.2} />
+                        <line x1={c.x} y1={c.y - 10} x2={c.x} y2={c.y + 10} stroke="rgba(255,255,255,0.7)" strokeWidth={1.2} />
 
-                        {/* лимбус — стъпка 2 */}
-                        {(calStep === 'outer' || calStep === 'center' || showGrid) && (
-                          <>
+                        {/* лимбус — жълт */}
+                        <circle cx={c.x} cy={c.y} r={lr} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth={5} />
                         <circle
                           cx={c.x}
                           cy={c.y}
                           r={lr}
                           fill="none"
                           stroke="#fbbf24"
-                          strokeWidth={calStep === 'outer' ? 3 : 2}
-                          strokeDasharray="10 6"
-                          opacity={calStep === 'inner' ? 0.35 : 1}
+                          strokeWidth={drag === 'limbus' ? 3.5 : 2.5}
+                          strokeDasharray={drag === 'limbus' ? undefined : '10 6'}
                         />
-                        {calStep === 'outer' && (
-                        <circle
-                          cx={c.x}
-                          cy={c.y - lr}
-                          r={14}
-                          fill="#fbbf24"
-                          stroke="#0f172a"
-                          strokeWidth={2}
-                          style={{ cursor: 'ns-resize' }}
-                          onPointerDown={onPointerDown('limbus')}
-                        />
-                        )}
-                          </>
-                        )}
+                        {[0, 90, 180, 270].map(deg => {
+                          const a = (deg * Math.PI) / 180
+                          return (
+                            <circle key={`lh${deg}`} cx={c.x + lr * Math.sin(a)} cy={c.y - lr * Math.cos(a)} r={drag === 'limbus' ? 9 : 7} fill="#fbbf24" stroke="#0f172a" strokeWidth={2} />
+                          )
+                        })}
 
-                        {/* зеница — стъпка 3 */}
-                        {(calStep === 'inner' || calStep === 'center' || showGrid) && (
-                          <>
-                        <circle cx={c.x} cy={c.y} r={pr * 1.35} fill="url(#pupilGlow)" opacity={calStep === 'outer' ? 0.2 : 0.6} />
-                        <circle
-                          cx={c.x}
-                          cy={c.y}
-                          r={pr}
-                          fill="none"
-                          stroke="#38bdf8"
-                          strokeWidth={calStep === 'inner' ? 3 : 2}
-                          opacity={calStep === 'outer' ? 0.35 : 1}
-                        />
-                        {calStep === 'inner' && (
-                        <circle
-                          cx={c.x}
-                          cy={c.y - pr}
-                          r={14}
-                          fill="#38bdf8"
-                          stroke="#0f172a"
-                          strokeWidth={2}
-                          style={{ cursor: 'ns-resize' }}
-                          onPointerDown={onPointerDown('pupil')}
-                        />
-                        )}
-                          </>
-                        )}
+                        {/* зеница — синя */}
+                        <circle cx={c.x} cy={c.y} r={pr * 1.35} fill="url(#pupilGlow)" opacity={0.5} />
+                        <circle cx={c.x} cy={c.y} r={pr} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth={5} />
+                        <circle cx={c.x} cy={c.y} r={pr} fill="none" stroke="#38bdf8" strokeWidth={drag === 'pupil' ? 3.5 : 2.5} />
+                        {[45, 225].map(deg => {
+                          const a = (deg * Math.PI) / 180
+                          return (
+                            <circle key={`ph${deg}`} cx={c.x + pr * Math.sin(a)} cy={c.y - pr * Math.cos(a)} r={drag === 'pupil' ? 8 : 6} fill="#38bdf8" stroke="#0f172a" strokeWidth={2} />
+                          )
+                        })}
 
                         {/* маркер 12:00 */}
                         {showGrid && (
@@ -614,17 +575,30 @@ export default function IrisCalibrator({
                   })()}
                 </svg>
               )}
+
+              {/* Лупа: докато влачите, пръстът закрива окото — тук се вижда увеличено. */}
+              {drag && pointer && geo && natural.w > 0 && (() => {
+                const z = 60
+                const c = toView(geo.limbus.cx, geo.limbus.cy)
+                const pr = geo.pupil.r * scale
+                const lr = geo.limbus.r * scale
+                const left = pointer.x < VIEW / 2
+                return (
+                  <div
+                    className={`pointer-events-none absolute top-3 h-32 w-32 overflow-hidden rounded-full border-2 border-white shadow-2xl ${left ? 'right-3' : 'left-3'}`}
+                  >
+                    <svg viewBox={`${pointer.x - z / 2} ${pointer.y - z / 2} ${z} ${z}`} className="h-full w-full bg-black">
+                      <image href={imageDataUrl} x={offset.x} y={offset.y} width={natural.w * scale} height={natural.h * scale} />
+                      <circle cx={c.x} cy={c.y} r={lr} fill="none" stroke="#fbbf24" strokeWidth={0.6} />
+                      <circle cx={c.x} cy={c.y} r={pr} fill="none" stroke="#38bdf8" strokeWidth={0.6} />
+                      <circle cx={pointer.x} cy={pointer.y} r={0.9} fill="#fff" />
+                    </svg>
+                  </div>
+                )
+              })()}
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-3 text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> {CALIBRATION.pupilLabel}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> {CALIBRATION.outerLabel}
-                </span>
-              </div>
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2 text-xs">
               <div className="flex gap-1">
                 <Button
                   variant="ghost"
@@ -646,75 +620,58 @@ export default function IrisCalibrator({
                 </Button>
               </div>
             </div>
-            <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">{stepHint}</p>
 
-            {geo && calStep === 'outer' && (
-              <div className="mt-3 space-y-2 rounded-xl bg-white/[0.04] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-400">{CALIBRATION.outerLabel}</span>
-                  <div className="flex gap-1">
-                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('limbus', -2)}>
-                      {CALIBRATION.smaller}
-                    </Button>
-                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('limbus', 2)}>
-                      {CALIBRATION.larger}
-                    </Button>
+            {geo && (
+              <div className="mt-3 rounded-xl bg-white/[0.04]">
+                <button
+                  type="button"
+                  onClick={() => setFineOpen(v => !v)}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium text-slate-300"
+                >
+                  {CALIBRATION.fineTune}
+                  <span className="text-slate-500">{fineOpen ? '−' : '+'}</span>
+                </button>
+                {fineOpen && (
+                  <div className="grid gap-4 px-3 pb-3 sm:grid-cols-[auto_1fr]">
+                    <div className="grid grid-cols-3 gap-1 self-center justify-self-center">
+                      <span />
+                      <NudgeButton label="↑" onClick={() => nudge(0, -1)} />
+                      <span />
+                      <NudgeButton label="←" onClick={() => nudge(-1, 0)} />
+                      <span className="flex items-center justify-center text-[10px] text-slate-500">център</span>
+                      <NudgeButton label="→" onClick={() => nudge(1, 0)} />
+                      <span />
+                      <NudgeButton label="↓" onClick={() => nudge(0, 1)} />
+                      <span />
+                    </div>
+                    <div className="space-y-3">
+                      <RadiusRow
+                        label={CALIBRATION.outerLabel}
+                        color="bg-amber-400"
+                        value={Math.round(geo.limbus.r)}
+                        min={Math.round(geo.pupil.r * 1.5)}
+                        max={limbusSliderMax}
+                        onStep={d => adjustRadius('limbus', d)}
+                        onChange={v => {
+                          setTouched(true)
+                          setGeo(prev => (prev ? concentricGeometry({ ...prev, limbus: { ...prev.limbus, r: v }, manual: true, limbusConfidence: 1 }) : prev))
+                        }}
+                      />
+                      <RadiusRow
+                        label={CALIBRATION.pupilLabel}
+                        color="bg-sky-400"
+                        value={Math.round(geo.pupil.r)}
+                        min={4}
+                        max={pupilSliderMax}
+                        onStep={d => adjustRadius('pupil', d)}
+                        onChange={v => {
+                          setTouched(true)
+                          setGeo(prev => (prev ? concentricGeometry({ ...prev, pupil: { ...prev.pupil, r: v }, manual: true, pupilConfidence: 1 }) : prev))
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-                <Slider
-                  value={[Math.round(geo.limbus.r)]}
-                  min={Math.round(geo.pupil.r * 1.5)}
-                  max={limbusSliderMax}
-                  step={1}
-                  onValueChange={([v]) => {
-                    setTouched(true)
-                    setGeo(prev =>
-                      prev
-                        ? concentricGeometry({
-                            ...prev,
-                            limbus: { ...prev.limbus, r: v },
-                            manual: true,
-                            limbusConfidence: 1,
-                          })
-                        : prev
-                    )
-                  }}
-                />
-              </div>
-            )}
-
-            {geo && calStep === 'inner' && (
-              <div className="mt-3 space-y-2 rounded-xl bg-white/[0.04] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-400">{CALIBRATION.pupilLabel}</span>
-                  <div className="flex gap-1">
-                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('pupil', -2)}>
-                      {CALIBRATION.smaller}
-                    </Button>
-                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => adjustRadius('pupil', 2)}>
-                      {CALIBRATION.larger}
-                    </Button>
-                  </div>
-                </div>
-                <Slider
-                  value={[Math.round(geo.pupil.r)]}
-                  min={4}
-                  max={pupilSliderMax}
-                  step={1}
-                  onValueChange={([v]) => {
-                    setTouched(true)
-                    setGeo(prev =>
-                      prev
-                        ? concentricGeometry({
-                            ...prev,
-                            pupil: { ...prev.pupil, r: v },
-                            manual: true,
-                            pupilConfidence: 1,
-                          })
-                        : prev
-                    )
-                  }}
-                />
+                )}
               </div>
             )}
           </div>
@@ -937,6 +894,51 @@ function IssueRow({
         <p className="text-sm font-medium leading-snug">{title}</p>
         <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{body}</p>
       </div>
+    </div>
+  )
+}
+
+function NudgeButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-slate-100 transition hover:bg-white/20 active:scale-95"
+    >
+      {label}
+    </button>
+  )
+}
+
+function RadiusRow({
+  label,
+  color,
+  value,
+  min,
+  max,
+  onStep,
+  onChange,
+}: {
+  label: string
+  color: string
+  value: number
+  min: number
+  max: number
+  onStep: (delta: number) => void
+  onChange: (v: number) => void
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-xs text-slate-400">
+          <span className={`h-2.5 w-2.5 rounded-full ${color}`} /> {label}
+        </span>
+        <div className="flex gap-1">
+          <NudgeButton label="−" onClick={() => onStep(-2)} />
+          <NudgeButton label="+" onClick={() => onStep(2)} />
+        </div>
+      </div>
+      <Slider value={[value]} min={min} max={max} step={1} onValueChange={([v]) => onChange(v)} />
     </div>
   )
 }
