@@ -27,8 +27,8 @@ const VERDICT_STYLE = {
   },
   focus: {
     icon: Warning,
-    badge: 'bg-rose-100 text-rose-900 border-rose-200',
-    ring: 'from-rose-500/20 to-red-500/10',
+    badge: 'bg-orange-100 text-orange-900 border-orange-200',
+    ring: 'from-orange-500/20 to-amber-500/10',
   },
 } as const
 

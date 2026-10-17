@@ -29,6 +29,7 @@ import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
 import { summarizeCalibratedReport } from '@/lib/calibrated-report-summary'
 import ReportHero from '@/components/report/ReportHero'
+import UrgentEyeGate from '@/components/report/UrgentEyeGate'
 
 interface ReportScreenProps {
   report: AnalysisReport
@@ -70,6 +71,16 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
       })
     : null
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
+  const eyeHealth = report.calibrated?.eyeHealth
+  const ackKey = `urgent-eye-ack:${report.id}`
+  const [urgentAcked, setUrgentAcked] = useState(() => {
+    try {
+      return sessionStorage.getItem(ackKey) === '1'
+    } catch {
+      return false
+    }
+  })
+  const showUrgentGate = !report.demo && eyeHealth?.ran === true && eyeHealth.referral === 'urgent' && !urgentAcked
   
   const handleSaveToHistory = () => {
     if (report.demo) {
@@ -128,6 +139,23 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
     }
   }
 
+  if (showUrgentGate && eyeHealth) {
+    return (
+      <UrgentEyeGate
+        report={eyeHealth}
+        onContinue={() => {
+          try {
+            sessionStorage.setItem(ackKey, '1')
+          } catch {
+            // без памет екранът просто ще се покаже пак при следващо отваряне
+          }
+          setUrgentAcked(true)
+          setActiveTab('iris')
+        }}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-20">
       <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
@@ -135,7 +163,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <motion.div 
-                className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center flex-shrink-0 shadow-lg"
+                className="hidden sm:flex w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent items-center justify-center flex-shrink-0 shadow-lg"
                 whileHover={{ scale: 1.05, rotate: 5 }}
                 transition={{ type: "spring", stiffness: 400 }}
               >
@@ -158,14 +186,15 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-1 sm:gap-2 flex-shrink-0">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={handleSaveToHistory} 
-                  className="h-9 w-9 p-0 hover:bg-green-500/10 hover:text-green-600 transition-colors"
+                  className="h-11 w-11 p-0 hover:bg-green-500/10 hover:text-green-600 transition-colors"
                   title="Запази в историята"
+                  aria-label="Запази в историята"
                 >
                   <FloppyDisk size={18} />
                 </Button>
@@ -175,8 +204,9 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                   variant="ghost" 
                   size="sm" 
                   onClick={handleShare} 
-                  className="h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
+                  className="h-11 w-11 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
                   title="Сподели"
+                  aria-label="Сподели"
                 >
                   <Share size={18} />
                 </Button>
@@ -186,7 +216,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                   variant="outline" 
                   size="sm" 
                   onClick={handleExport} 
-                  className="gap-2 hover:bg-accent/10 hover:text-accent hover:border-accent transition-colors"
+                  className="h-11 min-w-11 gap-2 hover:bg-accent/10 hover:text-accent hover:border-accent transition-colors"
                   title="Експорт в HTML/PDF"
                 >
                   <Download size={18} />
@@ -199,7 +229,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                     variant="outline" 
                     size="sm" 
                     onClick={onReanalyze} 
-                    className="gap-2 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500 transition-colors"
+                    className="h-11 min-w-11 gap-2 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500 transition-colors"
                     title="Повторен анализ"
                   >
                     <ArrowsClockwise size={18} />
@@ -212,8 +242,9 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                   variant="ghost" 
                   size="sm" 
                   onClick={onRestart} 
-                  className="h-9 w-9 p-0 hover:bg-muted transition-colors"
+                  className="h-11 w-11 p-0 hover:bg-muted transition-colors"
                   title="Започни отново"
+                  aria-label="Започни отново"
                 >
                   <ArrowClockwise size={18} />
                 </Button>

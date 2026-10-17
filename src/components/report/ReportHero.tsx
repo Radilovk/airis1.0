@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { animate, motion } from 'framer-motion'
-import { Eye, Fingerprint, ShieldCheck, Target } from '@phosphor-icons/react'
+import { CheckCircle, Eye, Fingerprint, ShieldCheck, Target, Warning, WarningOctagon } from '@phosphor-icons/react'
 import { summarizeCalibratedReport, topPrioritySystems } from '@/lib/calibrated-report-summary'
 import { constitutionKey } from '@/lib/iris-reading'
 import { eyeReferralChip } from '@/lib/eye-health'
@@ -9,7 +9,7 @@ import type { AnalysisReport, EyeReferral } from '@/types'
 const VERDICT_GRADIENT = {
   stable: ['#10b981', '#14b8a6'],
   mild: ['#0ea5e9', '#f59e0b'],
-  focus: ['#f97316', '#e11d48'],
+  focus: ['#f59e0b', '#ea580c'],
 } as const
 
 const CONSTITUTION_SHORT: Record<string, string> = {
@@ -23,6 +23,13 @@ const EYE_CHIP_STYLE: Record<EyeReferral, string> = {
   routine: 'bg-sky-500/15 text-sky-900 ring-sky-500/30',
   soon: 'bg-amber-500/20 text-amber-950 ring-amber-500/40',
   urgent: 'bg-rose-500/20 text-rose-950 ring-rose-500/40',
+}
+
+const EYE_CHIP_ICON: Record<EyeReferral, typeof Eye> = {
+  none: CheckCircle,
+  routine: Eye,
+  soon: Warning,
+  urgent: WarningOctagon,
 }
 
 function CountUp({ to }: { to: number }) {
@@ -133,16 +140,20 @@ export default function ReportHero({
           <button
             type="button"
             onClick={onOpenIris}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition hover:scale-[1.03] active:scale-95 ${EYE_CHIP_STYLE[eye.referral]}`}
+            className={`inline-flex items-center gap-1.5 min-h-11 rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition hover:scale-[1.03] active:scale-95 ${EYE_CHIP_STYLE[eye.referral]}`}
           >
-            <Eye size={14} weight="bold" /> Очи: {eyeReferralChip(eye.referral)}
+            {(() => {
+              const EyeIcon = EYE_CHIP_ICON[eye.referral]
+              return <EyeIcon size={16} weight="bold" aria-hidden />
+            })()}
+            Очи: {eyeReferralChip(eye.referral)}
           </button>
         )}
         {cKey && (
           <button
             type="button"
             onClick={onOpenIris}
-            className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-foreground/80 ring-1 ring-border transition hover:scale-[1.03] active:scale-95"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-sm font-semibold text-foreground/80 ring-1 ring-border transition hover:scale-[1.03] active:scale-95"
           >
             <Fingerprint size={14} weight="bold" /> {CONSTITUTION_SHORT[cKey]}
           </button>
@@ -150,7 +161,7 @@ export default function ReportHero({
         <button
           type="button"
           onClick={onOpenIris}
-          className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-foreground/80 ring-1 ring-border transition hover:scale-[1.03] active:scale-95"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-sm font-semibold text-foreground/80 ring-1 ring-border transition hover:scale-[1.03] active:scale-95"
         >
           <ShieldCheck size={14} weight="bold" /> {relevant} знака в плана
           {confirmed > 0 ? ` · ${confirmed} потвърдени двойно` : ''}
