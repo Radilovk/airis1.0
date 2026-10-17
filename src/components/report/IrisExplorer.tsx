@@ -25,7 +25,7 @@ type Finding = CalibratedAnalysisPayload['findings'][number]
 type Side = 'left' | 'right'
 
 const STRENGTH_STYLE: Record<SignalStrength, { dot: string; fill: string; text: string }> = {
-  clear: { dot: '#f43f5e', fill: 'rgba(244,63,94,0.42)', text: 'text-rose-700' },
+  clear: { dot: '#ea580c', fill: 'rgba(234,88,12,0.42)', text: 'text-orange-700' },
   moderate: { dot: '#f59e0b', fill: 'rgba(245,158,11,0.38)', text: 'text-amber-700' },
   faint: { dot: '#facc15', fill: 'rgba(250,204,21,0.3)', text: 'text-yellow-700' },
 }
@@ -174,7 +174,8 @@ function EyeStage({
           {showMarks &&
             findings.map((f, i) => {
               const p = markerPoint(f, geometry)
-              const s = STRENGTH_STYLE[readFinding(f).strength]
+              const strength = readFinding(f).strength
+              const s = STRENGTH_STYLE[strength]
               const on = active === i
               return (
                 <g
@@ -189,6 +190,10 @@ function EyeStage({
                 >
                   {on && (
                     <circle cx={p.x} cy={p.y} r={14} fill="none" stroke="#fff" strokeWidth={1.5} className="iris-pulse" />
+                  )}
+                  {/* Ясният знак носи и външен пръстен — силата не се чете само по цвета. */}
+                  {strength === 'clear' && (
+                    <circle cx={p.x} cy={p.y} r={on ? 13 : 11} fill="none" stroke={s.dot} strokeWidth={1.8} />
                   )}
                   <circle cx={p.x} cy={p.y} r={on ? 10.5 : 8.5} fill={s.dot} stroke="#fff" strokeWidth={1.6} className="transition-all duration-200" />
                   <text x={p.x} y={p.y + 3.4} textAnchor="middle" fontSize={on ? 10.5 : 9.5} fontWeight={800} fill="#fff" className="pointer-events-none">
@@ -455,10 +460,16 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
             <Toggle on={showMarks} onClick={() => setShowMarks(v => !v)} icon={<Crosshair size={14} />} label="Знаци" />
             <Toggle on={showZones} onClick={() => setShowZones(v => !v)} icon={<MapTrifold size={14} />} label="Карта на зоните" />
           </div>
-          <div className="mt-3 flex justify-center gap-4 text-[11px] text-muted-foreground">
+          <div className="mt-3 flex justify-center gap-4 text-xs text-muted-foreground">
             {(['clear', 'moderate'] as const).map(k => (
               <span key={k} className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: STRENGTH_STYLE[k].dot }} />
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    background: STRENGTH_STYLE[k].dot,
+                    boxShadow: k === 'clear' ? `0 0 0 1.5px var(--background, #fff), 0 0 0 3px ${STRENGTH_STYLE[k].dot}` : undefined,
+                  }}
+                />
                 {k === 'clear' ? 'ясен знак' : 'умерен знак'}
               </span>
             ))}

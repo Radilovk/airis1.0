@@ -332,7 +332,7 @@ function FoodRecommendationsSection({
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="overflow-hidden transition-all border-2">
-        <CollapsibleTrigger className="w-full p-5 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors bg-gradient-to-r from-green-50/50 to-red-50/50">
+        <CollapsibleTrigger className="w-full p-5 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors bg-gradient-to-r from-green-50/50 to-amber-50/50">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg">
               <AppleLogo size={22} weight="duotone" className="text-white" />
@@ -398,15 +398,15 @@ function FoodRecommendationsSection({
             
             {allAvoid.length > 0 && (
               <div>
-                <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-red-200">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-amber-200">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-md">
                     <XCircle size={20} weight="fill" className="text-white" />
                   </div>
                   <div>
-                    <h5 className="font-bold text-base text-red-900">Храни за избягване</h5>
-                    <p className="text-xs text-red-700">Ограничете или елиминирайте от диетата</p>
+                    <h5 className="font-bold text-base text-amber-900">Храни за избягване</h5>
+                    <p className="text-xs text-amber-700">Ограничете или елиминирайте от диетата</p>
                   </div>
-                  <Badge variant="outline" className="ml-auto text-red-700 border-red-300 bg-red-50">
+                  <Badge variant="outline" className="ml-auto text-amber-700 border-amber-300 bg-amber-50">
                     {allAvoid.length} храни
                   </Badge>
                 </div>
@@ -417,15 +417,15 @@ function FoodRecommendationsSection({
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.03, duration: 0.2 }}
-                      className="group flex items-start gap-3 p-3.5 bg-gradient-to-r from-red-50 to-rose-50/50 rounded-xl border border-red-200 hover:border-red-300 hover:shadow-md transition-all"
+                      className="group flex items-start gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-xl border border-amber-200 hover:border-amber-300 hover:shadow-md transition-all"
                     >
-                      <div className="w-6 h-6 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform">
+                      <div className="w-6 h-6 rounded-lg bg-amber-600 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform">
                         <XCircle size={16} weight="fill" className="text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-red-900 leading-relaxed block break-words">{food}</span>
+                        <span className="text-sm font-medium text-amber-900 leading-relaxed block break-words">{food}</span>
                       </div>
-                      <div className="text-xs font-semibold text-red-600 flex-shrink-0 px-2 py-0.5 bg-red-100 rounded-full">
+                      <div className="text-xs font-semibold text-amber-800 flex-shrink-0 px-2 py-0.5 bg-amber-100 rounded-full">
                         #{idx + 1}
                       </div>
                     </motion.div>
