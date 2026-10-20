@@ -28,8 +28,9 @@ export default function ConstitutionCard({ data }: { data: CalibratedAnalysisPay
             <motion.div
               className="relative h-16 w-16 shrink-0 rounded-full shadow-inner ring-4 ring-background"
               style={{ background: SWATCH[key ?? 'mixed'] }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4 }}
             >
               <span className="absolute inset-[34%] rounded-full bg-slate-950" />
             </motion.div>

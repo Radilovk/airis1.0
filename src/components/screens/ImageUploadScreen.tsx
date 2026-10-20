@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
+import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import IrisCropEditor from '@/components/iris/IrisCropEditor'
@@ -923,20 +924,22 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
 
           <UploadStepper step={step} />
 
-          <details className="group mb-6 rounded-2xl border bg-secondary/30 px-4 py-3 text-sm">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-semibold">
+          {/* Отворено, докато няма снимки — указанията трябват ПРЕДИ снимането. */}
+          <details
+            key={left || right ? 'has-photo' : 'empty'}
+            open={!left && !right}
+            className="group mb-6 rounded-2xl border bg-card px-4 py-3"
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-semibold">
               <span className="flex items-center gap-2">
                 <Lightbulb size={18} weight="duotone" className="text-primary" />
-                Как да снимате, за да стане ясно
+                Как да снимате окото
               </span>
               <CaretDown size={16} className="text-muted-foreground transition-transform group-open:rotate-180" />
             </summary>
-            <ul className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
-              <li><strong className="text-foreground">Задната камера</strong> и светкавица, отблизо и на фокус.</li>
-              <li><strong className="text-foreground">Без огледално селфи</strong>: обърнатата снимка разменя страните на картата.</li>
-              <li>Окото широко отворено, клепачът не закрива ириса.</li>
-              <li>Ирисът да заема поне една трета от кадъра, без отблясък от прозорец.</li>
-            </ul>
+            <div className="mt-3 pb-1">
+              <PhotoGuide />
+            </div>
           </details>
 
           {isProcessing && (

@@ -1,627 +1,297 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Eye, Brain, ChartLine, ShieldCheck, CaretDown } from '@phosphor-icons/react'
-import { motion } from 'framer-motion'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { useState } from 'react'
+  ArrowLeft,
+  ArrowSquareOut,
+  BookOpen,
+  Calculator,
+  CaretDown,
+  ClipboardText,
+  Eye,
+  Flask,
+  GridFour,
+  MagnifyingGlass,
+  PencilSimpleLine,
+  ShieldCheck,
+  Target,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
+import { motion } from 'framer-motion'
+import { FINDINGS, FINDING_TYPES, SYSTEMS } from '@/lib/iris-map'
 
 interface AboutAirisScreenProps {
   onBack: () => void
 }
 
-export default function AboutAirisScreen({ onBack }: AboutAirisScreenProps) {
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({})
+/**
+ * „Как работи анализът“. Описва реалния pipeline (`iris-pipeline.ts`), не
+ * намеренията. Списъкът със знаци и системи се чете от `iris-map.ts`, за да не
+ * се разминава с кода.
+ */
+const STEPS: Array<{ icon: Icon; title: string; body: string }> = [
+  {
+    icon: Target,
+    title: 'Намиране на окото',
+    body: 'В телефона, без AI: кодът намира зеницата, ръба на ириса и клепачите. Вие проверявате кръговете и ги нагласяте, ако трябва.',
+  },
+  {
+    icon: MagnifyingGlass,
+    title: 'Проверка на снимката',
+    body: 'Острота, размер на ириса, отблясъци, закрити от клепача зони. Неизползваема снимка се връща с конкретен съвет.',
+  },
+  {
+    icon: GridFour,
+    title: 'Разгъване в карта',
+    body: 'Кръгът на ириса се разгъва в правоъгълна карта: 12 сектора по часовника × 12 пръстена от зеницата навън, с отпечатани номера. Прави се в два варианта — за влакната и за цвета.',
+  },
+  {
+    icon: Eye,
+    title: 'Разчитане от AI модел',
+    body: 'Моделът получава картата и връща само „какъв знак, в коя клетка“ от затворен списък. Всяко око се чете два пъти, срязано на различно място — знак, видян и в двата прочита, тежи повече.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Проверка в кода',
+    body: 'Отхвърля се знак на невъзможно място, в закрита клетка или с ниска сигурност. Цвят по цялата обиколка се брои за естествения цвят на ириса, не за знак.',
+  },
+  {
+    icon: Calculator,
+    title: 'Оценки по системи',
+    body: 'Смятат се с формули в кода, не от AI: от знаците в ириса и от въпросника. Колкото по-слаба е снимката, толкова по-малко тежи ирисът.',
+  },
+  {
+    icon: PencilSimpleLine,
+    title: 'Текст и план',
+    body: 'AI модел пише обяснението и плана по вече изчислените приоритети — не може да ги пренарежда. Ограниченията от въпросника (бременност, бъбреци, лекарства, непоносимости) са твърди забрани.',
+  },
+]
 
-  const toggleSection = (id: string) => {
-    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }))
-  }
+const EYE_SIGNS = [
+  'Светъл пръстен по ръба на роговицата (arcus)',
+  'Помътняване в зеницата',
+  'Жълтеникав оттенък на бялото на окото',
+  'Зачервено бяло на окото',
+  'Кафеникаво-златист пръстен по периферията на ириса',
+  'Тъмно петно (невус) върху ириса',
+  'Неправилна форма на зеницата',
+  'Израстък от ъгъла на окото към роговицата',
+  'Различна големина на зениците',
+  'Различен цвят на двата ириса',
+]
+
+const pubmed = (q: string) => `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(q)}`
+
+const SOURCES: Array<{ cite: string; note: string; url: string }> = [
+  {
+    cite: 'Simon A, Worthen DM, Mitas JA. An evaluation of iridology. JAMA. 1979;242(13):1385–1389.',
+    note: 'Трима иридолози не разпознават бъбречно заболяване по снимки на ириса по-добре от случайност.',
+    url: pubmed('Simon Worthen Mitas evaluation of iridology'),
+  },
+  {
+    cite: 'Knipschild P. Looking for gall bladder disease in the patient’s iris. BMJ. 1988;297:1578–1581.',
+    note: 'Пет иридолози не различават хора с възпаление на жлъчката от здрави.',
+    url: pubmed('Knipschild gall bladder disease iris'),
+  },
+  {
+    cite: 'Ernst E. Iridology: not useful and potentially harmful. Arch Ophthalmol. 2000;118(1):120–121.',
+    note: 'Систематичен преглед на контролираните проучвания — без потвърдена диагностична стойност.',
+    url: pubmed('Ernst iridology not useful and potentially harmful'),
+  },
+  {
+    cite: 'Münstedt K et al. Can iridology detect susceptibility to cancer? J Altern Complement Med. 2005;11(3):515–519.',
+    note: 'Проспективно проучване: иридологията не открива рак по-добре от случайност.',
+    url: pubmed('Münstedt iridology cancer susceptibility'),
+  },
+  {
+    cite: 'Australian Government. Natural Therapies Review 2024 — Iridology evidence evaluation.',
+    note: 'Най-новият преглед на доказателствата: точността на иридологичната диагноза е около нивото на случайността.',
+    url: 'https://www.health.gov.au/sites/default/files/2025-03/natural-therapies-review-2024-iridology-evidence-evaluation.pdf',
+  },
+  {
+    cite: 'Daugman J. How iris recognition works. IEEE Trans Circuits Syst Video Technol. 2004;14(1):21–30.',
+    note: 'Методът, по който кодът намира ръбовете на зеницата и ириса и разгъва ириса в карта.',
+    url: 'https://scholar.google.com/scholar?q=Daugman+How+iris+recognition+works',
+  },
+]
+
+function Section({ id, title, icon: I, open, onToggle, children }: {
+  id: string
+  title: string
+  icon: Icon
+  open: boolean
+  onToggle: (id: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={() => onToggle(id)}>
+      <Card className="gap-0 overflow-hidden py-0">
+        <CollapsibleTrigger className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-muted/50">
+          <span className="flex items-center gap-3">
+            <I size={20} weight="duotone" className="shrink-0 text-primary" />
+            <span className="font-semibold">{title}</span>
+          </span>
+          <CaretDown size={18} className={`shrink-0 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-3 px-4 pb-4 text-[15px] leading-relaxed text-muted-foreground">{children}</div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  )
+}
+
+export default function AboutAirisScreen({ onBack }: AboutAirisScreenProps) {
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const toggle = (id: string) => setOpen(prev => ({ ...prev, [id]: !prev[id] }))
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="mb-6 gap-2"
-          >
-            <ArrowLeft size={20} />
-            Назад
-          </Button>
-        </motion.div>
+      <div className="mx-auto max-w-2xl px-4 pb-12 pt-4">
+        <Button variant="ghost" onClick={onBack} className="-ml-2 mb-4 min-h-11 gap-2">
+          <ArrowLeft size={20} />
+          Назад
+        </Button>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="mb-8"
-        >
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Eye size={32} weight="duotone" className="text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold">airis</h1>
-              <p className="text-lg text-muted-foreground">
-                конституционен здравен профил от окото ти
-              </p>
-            </div>
-          </div>
+        <h1 className="text-[28px] font-extrabold leading-tight tracking-tight">Как работи анализът</h1>
+        <p className="mt-2 text-[16px] leading-relaxed text-muted-foreground">
+          Две снимки и въпросник дават три отделни неща — с различна степен на доказаност.
+        </p>
 
-          <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
-            <p className="text-lg leading-relaxed">
-              <strong>airis</strong> комбинира изкуствен интелект, клинични очни маркери и ирисова
-              топография, за да изгради цялостна картина на тялото ти от една снимка на окото и
-              кратък здравен въпросник.
-            </p>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="space-y-6 mb-8"
-        >
-          <h2 className="text-2xl font-bold mb-4">Как работи airis?</h2>
-          
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card className="p-5">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <Eye size={24} weight="duotone" className="text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Разпознава очни сигнали</h3>
-              <p className="text-sm text-muted-foreground">
-                Доказани очни маркери за системно натоварване – липиди, възпаление, анемия,
-                чернодробен стрес и др.
-              </p>
-            </Card>
-
-            <Card className="p-5">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <Brain size={24} weight="duotone" className="text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Анализира структурата на ириса</h3>
-              <p className="text-sm text-muted-foreground">
-                Тъканна устойчивост, нервен тонус, метаболитни „следи" и конституционни слаби места.
-              </p>
-            </Card>
-
-            <Card className="p-5">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <ChartLine size={24} weight="duotone" className="text-primary" />
-              </div>
-              <h3 className="font-semibold mb-2">Съпоставя данните</h3>
-              <p className="text-sm text-muted-foreground">
-                Възраст, пол, тегло, хранене, стрес, сън, активност и заболявания за пълна картина.
-              </p>
-            </Card>
-          </div>
-
-          <Card className="p-6 border-accent/30 bg-accent/5">
-            <div className="flex items-start gap-3">
-              <ShieldCheck size={24} weight="duotone" className="text-accent flex-shrink-0 mt-1" />
+        <div className="mt-5 grid gap-2">
+          {[
+            { icon: GridFour, t: 'Карта на ириса', b: 'Знаците в ириса по иридологичната карта. Помощен сигнал.' },
+            { icon: Eye, t: 'Очен скрининг', b: 'Видими знаци, при които е добре да се покажете на очен лекар.' },
+            { icon: ClipboardText, t: 'План за хранене и навици', b: 'Стъпва основно на въпросника.' },
+          ].map(x => (
+            <div key={x.t} className="flex items-start gap-3 rounded-2xl bg-muted/40 p-3.5">
+              <x.icon size={22} weight="duotone" className="mt-0.5 shrink-0 text-primary" />
               <div>
-                <p className="font-medium mb-2">
-                  Резултатът не е диагноза, а ясна карта на силните и уязвимите зони в организма
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Получавате приоритети за режим, превенция и оптимизация на начина на живот –
-                  конкретно за твоето тяло, не по общи шаблони.
-                </p>
+                <p className="font-semibold">{x.t}</p>
+                <p className="text-sm text-muted-foreground">{x.b}</p>
               </div>
             </div>
-          </Card>
-        </motion.div>
+          ))}
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-          className="space-y-4"
-        >
-          <h2 className="text-2xl font-bold mb-4">Подробно обяснение</h2>
+        <h2 className="mt-8 text-[21px] font-bold">Стъпките</h2>
+        <ol className="mt-3 space-y-3">
+          {STEPS.map((s, i) => (
+            <motion.li
+              key={s.title}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.2 }}
+              className="flex items-start gap-3"
+            >
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <s.icon size={20} weight="duotone" />
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                  {i + 1}
+                </span>
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold leading-snug">{s.title}</p>
+                <p className="text-[15px] leading-relaxed text-muted-foreground">{s.body}</p>
+              </div>
+            </motion.li>
+          ))}
+        </ol>
 
-          <Collapsible
-            open={openSections['approach']}
-            onOpenChange={() => toggleSection('approach')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">
-                  1. Два подхода към окото – и къде стои airis
-                </h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['approach'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <p>
-                    Исторически анализът на окото се е развил в две посоки:
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>
-                      <strong>Клинична офталмология и вътрешни болести</strong> – търси конкретни,
-                      доказани очни признаци, които са пряко свързани със заболявания (черен дроб,
-                      кръв, обмяна на веществата, съдове).
-                    </li>
-                    <li>
-                      <strong>Холистична иридология</strong> – използва карта на ириса, за да оцени
-                      конституционалната сила, слабите места и функционалните дисбаланси в организма.
-                    </li>
-                  </ul>
-                  <p className="font-medium text-foreground">
-                    airis комбинира тези два подхода: използва научно признатите очни маркери като
-                    твърда основа, върху тях надгражда конституционен анализ по ирисова карта.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+        <h2 className="mt-8 text-[21px] font-bold">Подробно</h2>
+        <div className="mt-3 space-y-2">
+          <Section id="signs" title={`Кои знаци се търсят в ириса (${FINDING_TYPES.length})`} icon={GridFour} open={!!open.signs} onToggle={toggle}>
+            <p>Затворен списък — моделът не може да върне друго. Значението е по иридологичната традиция:</p>
+            <ul className="space-y-1.5">
+              {FINDING_TYPES.map(t => (
+                <li key={t}>
+                  <strong className="font-semibold text-foreground">{FINDINGS[t].label}</strong> — {FINDINGS[t].meaning}
+                </li>
+              ))}
+            </ul>
+            <p>
+              Всеки знак се свързва със системи по сектора и пръстена, в които лежи. Оценките са за{' '}
+              {SYSTEMS.length} системи: {SYSTEMS.map(s => s.label.toLowerCase()).join(', ')}.
+            </p>
+          </Section>
 
-          <Collapsible
-            open={openSections['biology']}
-            onOpenChange={() => toggleSection('biology')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">
-                  2. Биологична основа: защо ирисът има значение
-                </h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['biology'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <p>
-                    Ирисът е директно свързан с нервната и съединителната тъкан:
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>
-                      Част от слоевете и мускулите, които управляват зеницата, произлизат от същия
-                      зародишен слой, от който се развиват мозъкът и ретината.
-                    </li>
-                    <li>
-                      Стромата на ириса (видимите влакна, „пукнатини" и релеф) се формира от клетки,
-                      които участват в изграждането на периферната нервна система и съединителната
-                      тъкан.
-                    </li>
-                    <li>
-                      Ирисът се управлява от вегетативната нервна система – същата, която регулира
-                      реакциите на стрес и почивка, съдовия тонус и работата на вътрешните органи.
-                    </li>
-                  </ul>
-                  <p className="font-medium text-foreground">
-                    Затова в модела ирисът се използва като концентрирана карта на конституцията –
-                    място, където са „събрани" следи за структурата на тъканите, характера на нервния
-                    тонус и натрупаното във времето натоварване.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+          <Section id="eye" title="Очен скрининг" icon={Eye} open={!!open.eye} onToggle={toggle}>
+            <p>
+              Отделен от иридологията. AI моделът гледа целия кадър — бялото на окото, ръба на роговицата, зеницата — и
+              търси видими знаци, които лекарите също оценяват при преглед:
+            </p>
+            <ul className="list-disc space-y-1 pl-5">
+              {EYE_SIGNS.map(s => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+            <p>
+              Изходът е само насочване: няма нужда, профилактичен преглед, преглед в близките седмици или веднага.
+              Възрастта се отчита — например arcus под 50 години е причина за липиден профил.
+            </p>
+            <p>Снимката не заменя преглед с биомикроскоп. Може да пропусне знак и може да види знак, който го няма.</p>
+          </Section>
 
-          <Collapsible
-            open={openSections['markers']}
-            onOpenChange={() => toggleSection('markers')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">
-                  3. Какво разпознава airis от клиничната медицина
-                </h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['markers'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <p>
-                    airis е обучен да открива редица научно признати очни маркери, които в медицината
-                    се свързват със системни състояния:
-                  </p>
-                  <div className="space-y-3">
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">Arcus senilis (липиден пръстен)</h4>
-                      <p className="text-sm">
-                        Сиво-белезникав пръстен по периферията на ириса. Традиционно се свързва с
-                        нарушения в мастния профил (липиди, холестерол) и повишен сърдечно-съдов риск
-                        при определени възрастови групи.
-                      </p>
-                    </div>
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">Пожълтяване на склерата (иктер)</h4>
-                      <p className="text-sm">
-                        Жълто оцветяване на „бялото" на окото – класически сигнал за повишен билирубин
-                        и натоварване в черен дроб, жлъчка или кръвотворна система.
-                      </p>
-                    </div>
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">Бледост на конюнктивата</h4>
-                      <p className="text-sm">
-                        Бледа вътрешна повърхност на долния клепач – белег, който в клиничната практика
-                        насочва към нисък хемоглобин и анемични състояния.
-                      </p>
-                    </div>
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">
-                        Конюнктивална хиперемия (зачервени съдове)
-                      </h4>
-                      <p className="text-sm">
-                        Разширени, напрегнати съдове – знак за локално възпаление, раздразнение,
-                        хронична сухота и/или по-системно натоварване (включително артериално налягане).
-                      </p>
-                    </div>
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">Пръстени на Кайзер–Флайшер</h4>
-                      <p className="text-sm">
-                        Кафеникаво-зелени пръстени по периферията на ириса, класически свързвани с
-                        нарушения в обмяната на медта.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+          <Section id="evidence" title="Научна основа — какво е доказано и какво не" icon={Flask} open={!!open.evidence} onToggle={toggle}>
+            <p>
+              <strong className="font-semibold text-foreground">Очните знаци</strong> от скрининга са част от
+              обикновения очен и общ преглед. Те насочват към преглед, не поставят диагноза.
+            </p>
+            <p>
+              <strong className="font-semibold text-foreground">Иридологичната карта</strong> — връзката между зона в
+              ириса и орган — не е потвърдена в контролирани проучвания. Когато иридолози гледат снимки, без да знаят
+              кой е болен, разпознават болните колкото при случаен избор (източниците са по-долу).
+            </p>
+            <p>Затова в airis:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>ирисът е помощен сигнал с ограничена тежест в оценките; основата на плана е въпросникът;</li>
+              <li>текстът не назовава заболявания и не тълкува изследвания;</li>
+              <li>картата показва къде да обърнете внимание, а не какво „имате“.</li>
+            </ul>
+          </Section>
 
-          <Collapsible
-            open={openSections['constitutional']}
-            onOpenChange={() => toggleSection('constitutional')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">
-                  4. Конституционен ирисов анализ: сила, слабости, тенденции
-                </h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['constitutional'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-4 text-muted-foreground">
-                  <p>
-                    Над клиничния слой airis прилага ирисова топографска карта – модел, който разглежда
-                    ириса като карта на вродената сила на тъканите, натрупаното във времето натоварване,
-                    конституционните „слаби места" и взаимодействието между стрес, нервна система,
-                    храносмилане, обмяна и др.
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">4.1. Тъканна структура</h4>
-                      <p className="text-sm mb-2">
-                        <strong>Какво се разглежда:</strong> плътност, равномерност и „стегнатост" на
-                        видимите влакна в ириса.
-                      </p>
-                      <p className="text-sm">
-                        <strong>Как се тълкува:</strong> плътна, стегната структура → висок вроден
-                        резерв на съединителната тъкан, добра устойчивост; рехава, разкъсана структура
-                        → по-лесно изчерпване при стрес, по-голяма податливост към хронични оплаквания.
-                      </p>
-                    </div>
+          <Section id="measured" title="Какво е измерено в самото приложение" icon={Calculator} open={!!open.measured} onToggle={toggle}>
+            <p>Тестове върху изкуствен ирис с известни знаци — проверяват веригата, не медицинската стойност:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Координати: знак, поставен в клетка, стига до същата клетка на картата — 96 от 96.</li>
+              <li>
+                AI разчитане (тест с Gemini, август 2026): намира 3 от 3 нарисувани петна, но добавя и фалшиви — затова
+                двойното четене и проверките в кода.
+              </li>
+              <li>Повторяемост между двата прочита на едно око: около 75 % съвпадение по място.</li>
+              <li>Видът на знака (крипта или бразда) се повтаря по-слабо от мястото — затова оценките стъпват на мястото.</li>
+            </ul>
+            <p>Проверка срещу реални диагнози не е правена.</p>
+          </Section>
 
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">4.2. Нервен и вегетативен тонус</h4>
-                      <p className="text-sm mb-2">
-                        <strong>Какво се разглежда:</strong> концентрични „нервни пръстени" в ириса.
-                      </p>
-                      <p className="text-sm">
-                        <strong>Как се тълкува:</strong> изразени пръстени → склонност към вътрешно
-                        напрежение, спазми, трудно отпускане и „изключване"; гладка картина → по-лесно
-                        преминаване към покой и възстановяване.
-                      </p>
-                    </div>
+          <Section id="limits" title="Какво airis не прави" icon={ShieldCheck} open={!!open.limits} onToggle={toggle}>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>не поставя диагнози и не назначава лечение;</li>
+              <li>не заменя лекар, нито очен преглед;</li>
+              <li>не е за остри и спешни състояния — при тях 112 или лекар.</li>
+            </ul>
+          </Section>
 
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">4.3. Метаболитни следи</h4>
-                      <p className="text-sm mb-2">
-                        <strong>Какво се разглежда:</strong> пигментни натрупвания (цвят, форма,
-                        разположение).
-                      </p>
-                      <p className="text-sm">
-                        <strong>Как се тълкува:</strong> като „памет" за дългогодишно натоварване на
-                        системите за очистване и възпалителния фон – насочване към черен дроб,
-                        храносмилане, общо метаболитно поведение, хранителни навици, сън, стрес.
-                      </p>
-                    </div>
-
-                    <div className="bg-background p-4 rounded-lg border">
-                      <h4 className="font-semibold text-foreground mb-2">4.4. Локални уязвимости</h4>
-                      <p className="text-sm mb-2">
-                        <strong>Какво се разглежда:</strong> лакуни, крипти и по-светли „дупки" в тъканта.
-                      </p>
-                      <p className="text-sm">
-                        <strong>Как се тълкува:</strong> като конституционни зони с по-нисък ресурс. В
-                        топографската карта тези зони се свързват с определени области – храносмилателна
-                        система, гръбначен стълб, нервна система, сърдечно-съдова система и др.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible
-            open={openSections['questionnaire']}
-            onOpenChange={() => toggleSection('questionnaire')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">
-                  5. Ролята на въпросника: картина на реалния живот
-                </h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['questionnaire'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <p>
-                    Снимката на окото сама по себе си дава само конституционната „карта". Затова airis
-                    задължително я комбинира с детайлен въпросник, който обхваща:
-                  </p>
-                  <ul className="list-disc pl-5 space-y-1.5">
-                    <li>възраст, пол, ръст, тегло</li>
-                    <li>тип хранене и хранителни навици</li>
-                    <li>ниво и характер на стреса</li>
-                    <li>сън – продължителност и качество</li>
-                    <li>хидратация</li>
-                    <li>двигателна активност – честота, интензивност, вид натоварване</li>
-                    <li>настоящи и прекарани заболявания</li>
-                    <li>фамилна обремененост</li>
-                  </ul>
-                  <p className="font-medium text-foreground">
-                    Така се изграждат две карти: ирисът → как е „сглобено" тялото и къде носи
-                    потенциални слабости; въпросникът → как живеете и с какво реално натоварвате тялото.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible
-            open={openSections['process']}
-            onOpenChange={() => toggleSection('process')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">
-                  6. Как работи airis – стъпка по стъпка
-                </h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['process'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <div className="space-y-3">
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                        1
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">Снимка на окото</h4>
-                        <p className="text-sm">
-                          Извличат се клинични маркери (пръстени, оцветяване, съдове) и ирисовата структура.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                        2
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">Ирисов конституционен анализ</h4>
-                        <p className="text-sm">
-                          Оценяват се тъканна плътност, нервни пръстени, пигменти, лакуни, позицията им
-                          по топографската карта.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                        3
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">Обработка на въпросника</h4>
-                        <p className="text-sm">
-                          Структуриране на данните за хранене, сън, стрес, активност, заболявания,
-                          фамилна обремененост.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                        4
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">Съпоставяне на двете нива</h4>
-                        <p className="text-sm">
-                          Търсят се съвпадения между конституционна слабост в дадена зона и реален стрес
-                          върху същата система.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                        5
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1">Извеждане на здравен профил</h4>
-                        <p className="text-sm">
-                          Изгражда се карта на силните страни, уязвимите зони и приоритети за корекция
-                          на режим, хранене, активност и възстановяване.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible
-            open={openSections['limitations']}
-            onOpenChange={() => toggleSection('limitations')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">7. Какво airis не прави</h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['limitations'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>не поставя медицински диагнози</li>
-                    <li>не назначава лечение и не отменя лекарски преглед</li>
-                    <li>не се използва при остри, спешни състояния</li>
-                  </ul>
-                  <p className="font-medium text-foreground">
-                    Ролята на airis е конституционен и превантивен анализ – да покаже къде тялото ви има
-                    резерв, къде е по-уязвимо и как ежедневните ви навици се вписват в тази картина.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible
-            open={openSections['results']}
-            onOpenChange={() => toggleSection('results')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">8. Какво получавате накрая</h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['results'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-3 text-muted-foreground">
-                  <p>Резултатът от airis включва:</p>
-                  <ul className="list-disc pl-5 space-y-2">
-                    <li>
-                      <strong>Конституционен профил</strong> – силни и слаби места на тъканите, нервната
-                      система и метаболитния фон
-                    </li>
-                    <li>
-                      <strong>Карта на рисковете</strong> – системи и зони, които изискват по-внимателна грижа
-                    </li>
-                    <li>
-                      <strong>Карта на ресурсите</strong> – области, където сте по-устойчиви и по-адаптивни
-                    </li>
-                    <li>
-                      <strong>Конкретни насоки</strong> – храни, навици, вид движение, сън и управление на
-                      стреса, подредени по приоритет според вашия профил
-                    </li>
-                    <li>
-                      <strong>При наличие на клинично значими сигнали</strong> – препоръка да ги обсъдите с лекар
-                    </li>
-                  </ul>
-                  <p className="font-medium text-foreground">
-                    Целта не е „етикет" и диагноза, а ясен, структуриран план къде си струва да вложите
-                    най-много внимание, за да пазите и развивате здравето си в дългосрочен план.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible
-            open={openSections['bibliography']}
-            onOpenChange={() => toggleSection('bibliography')}
-          >
-            <Card className="overflow-hidden">
-              <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold text-lg text-left">9. Библиографска справка</h3>
-                <CaretDown
-                  size={20}
-                  className={`transition-transform ${openSections['bibliography'] ? 'rotate-180' : ''}`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="px-5 pb-5 space-y-4 text-muted-foreground">
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-2">
-                      Класически и съвременни трудове по ирисов анализ и холистична медицина:
-                    </h4>
-                    <ul className="list-disc pl-5 space-y-1 text-sm">
-                      <li>Bernard Jensen – The Science and Practice of Iridology, Vol. 1 & 2</li>
-                      <li>Farida Sharan – Iridology: A Complete Guide</li>
-                      <li>Ellen Tart-Jensen – Techniques in Iris Analysis</li>
-                      <li>John Andrews – Iris & Pupillary Signs; Immunology & Iridology</li>
-                      <li>Dorothy Hall – Iridology: How the Eyes Reveal Your Health and Personality</li>
-                      <li>Bill Caradonna – The Evolving Science of Iridology</li>
-                      <li>Daniele Lo Rito – The Time Risk in the Iris</li>
-                      <li>Ignatz von Peczely – Discoveries in the Realm of Nature and the Art of Healing</li>
-                      <li>Henry Lindlahr – Nature Cure</li>
-                      <li>John R. Christopher – School of Natural Healing</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-2">
-                      Медицински контекст (очни маркери и системно здраве):
-                    </h4>
-                    <p className="text-sm mb-2">
-                      Съвременни учебници по офталмология и вътрешни болести, разглеждащи очните прояви
-                      на системни заболявания (липидни отлагания, анемии, чернодробни и жлъчни заболявания,
-                      нарушения в обмяната на медта, съдови промени).
-                    </p>
-                    <p className="text-sm">
-                      Научни статии и клинични ръководства, посветени на: arcus senilis и връзката му с
-                      липидния профил; scleral icterus и чернодробни/жлъчни заболявания; conjunctival
-                      pallor като клиничен белег на анемия; Kaiser–Fleischer rings при нарушения в обмяната
-                      на медта; очни съдови промени при хипертония и системни възпалителни процеси.
-                    </p>
-                  </div>
-                  <p className="text-sm font-medium text-foreground">
-                    Върху този фундамент airis изгражда собствена, формализирана система за анализ, която
-                    комбинира знанията от класическите школи с изчислителната мощ на изкуствения интелект,
-                    за да превърне погледа към окото в практичен инструмент за конституционен и превантивен
-                    здравен профил.
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-          className="mt-8 text-center"
-        >
-          <Button
-            onClick={onBack}
-            size="lg"
-            className="px-8"
-          >
-            Започнете вашия анализ
-          </Button>
-        </motion.div>
+          <Section id="sources" title="Източници" icon={BookOpen} open={!!open.sources} onToggle={toggle}>
+            <ul className="space-y-3">
+              {SOURCES.map(s => (
+                <li key={s.cite}>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-start gap-1 font-medium text-foreground underline-offset-2 hover:underline"
+                  >
+                    {s.cite}
+                    <ArrowSquareOut size={14} className="mt-1 shrink-0" />
+                  </a>
+                  <p className="text-sm">{s.note}</p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
       </div>
     </div>
   )
