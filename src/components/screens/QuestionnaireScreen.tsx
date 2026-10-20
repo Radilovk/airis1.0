@@ -473,7 +473,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
           </div>
         )
 
-      case 'slider':
+      case 'slider': {
         const sliderValue = value !== undefined && value !== '' ? Number(value) : sliderStart(question)
         return (
           <div className="space-y-6 pt-4">
@@ -496,6 +496,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
             </div>
           </div>
         )
+      }
 
       case 'file':
         return (
