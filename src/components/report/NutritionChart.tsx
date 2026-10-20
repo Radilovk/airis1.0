@@ -104,7 +104,7 @@ export default function NutritionChart({ report }: NutritionChartProps) {
                         stroke="rgba(100, 116, 139, 0.3)"
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar 
+                      <Bar isAnimationActive={false} 
                         dataKey="count" 
                         radius={[8, 8, 0, 0]}
                         onClick={(data) => setSelectedFood(data.name)}
@@ -156,7 +156,7 @@ export default function NutritionChart({ report }: NutritionChartProps) {
                         stroke="rgba(100, 116, 139, 0.3)"
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar 
+                      <Bar isAnimationActive={false} 
                         dataKey="count" 
                         radius={[8, 8, 0, 0]}
                         onClick={(data) => setSelectedFood(data.name)}

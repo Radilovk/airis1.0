@@ -116,7 +116,7 @@ export default function SystemComparisonChart({ leftScores, rightScores }: Syste
           <Legend 
             wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
           />
-          <Bar 
+          <Bar isAnimationActive={false} 
             dataKey="left" 
             fill="oklch(0.55 0.15 230)"
             name="Ляв ирис"
@@ -131,7 +131,7 @@ export default function SystemComparisonChart({ leftScores, rightScores }: Syste
               />
             ))}
           </Bar>
-          <Bar 
+          <Bar isAnimationActive={false} 
             dataKey="right" 
             fill="oklch(0.70 0.18 45)"
             name="Десен ирис"

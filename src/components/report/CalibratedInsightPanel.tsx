@@ -105,7 +105,7 @@ export default function CalibratedInsightPanel({ data }: Props) {
                     <div className="min-w-0">
                       <p className="font-semibold leading-tight">{s.label}</p>
                       {rank === 0 && (
-                        <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
+                        <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
                           <Fire size={12} weight="fill" /> основен фокус
                         </span>
                       )}
@@ -201,19 +201,20 @@ export default function CalibratedInsightPanel({ data }: Props) {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: Math.min(i * 0.04, 0.4) }}
               >
-                <Card className="p-4">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                      {i + 1}
-                    </span>
+                <Card className="flex-row gap-3 p-4">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold leading-snug">{d.observation}</p>
+                    <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{d.action}</p>
+                    {/* Червеното е само за спешно — приоритетът е кехлибарен и с текст. */}
                     {d.strength === 'high' && (
-                      <Badge variant="outline" className="border-rose-200 bg-rose-50 text-[10px] text-rose-800">
-                        Висок приоритет
+                      <Badge variant="outline" className="mt-2 border-amber-300 bg-amber-50 text-[11px] text-amber-900">
+                        Първо това
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm font-medium leading-snug">{d.observation}</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{d.action}</p>
                 </Card>
               </motion.div>
             ))}

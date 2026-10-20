@@ -135,12 +135,12 @@ export default function ReportHero({
         </div>
       </div>
 
-      <div className="relative mt-5 flex flex-wrap justify-center gap-2 border-t pt-4 md:justify-start">
+      <div className="relative mt-5 grid gap-2 border-t pt-4 md:flex md:flex-wrap">
         {eye?.ran && (
           <button
             type="button"
             onClick={onOpenIris}
-            className={`inline-flex items-center gap-1.5 min-h-11 rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition hover:scale-[1.03] active:scale-95 ${EYE_CHIP_STYLE[eye.referral]}`}
+            className={`inline-flex items-center gap-2 min-h-11 rounded-2xl px-4 py-2 text-left text-sm font-semibold ring-1 transition active:scale-[0.98] md:rounded-full ${EYE_CHIP_STYLE[eye.referral]}`}
           >
             {(() => {
               const EyeIcon = EYE_CHIP_ICON[eye.referral]
@@ -153,18 +153,18 @@ export default function ReportHero({
           <button
             type="button"
             onClick={onOpenIris}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-sm font-semibold text-foreground/80 ring-1 ring-border transition hover:scale-[1.03] active:scale-95"
+            className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground/80 ring-1 ring-border transition active:scale-[0.98] md:rounded-full"
           >
-            <Fingerprint size={14} weight="bold" /> {CONSTITUTION_SHORT[cKey]}
+            <Fingerprint size={16} weight="bold" /> {CONSTITUTION_SHORT[cKey]}
           </button>
         )}
         <button
           type="button"
           onClick={onOpenIris}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-sm font-semibold text-foreground/80 ring-1 ring-border transition hover:scale-[1.03] active:scale-95"
+          className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground/80 ring-1 ring-border transition active:scale-[0.98] md:rounded-full"
         >
-          <ShieldCheck size={14} weight="bold" /> {relevant} знака в плана
-          {confirmed > 0 ? ` · ${confirmed} потвърдени двойно` : ''}
+          <ShieldCheck size={16} weight="bold" /> {relevant} знака в плана
+          {confirmed > 0 ? ` · ${confirmed} двойно потвърдени` : ''}
         </button>
       </div>
     </motion.section>

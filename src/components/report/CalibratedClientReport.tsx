@@ -3,7 +3,6 @@ import CalibratedReportSummary from '@/components/report/CalibratedReportSummary
 import IrisExplorer from '@/components/report/IrisExplorer'
 import EyeHealthCard from '@/components/report/EyeHealthCard'
 import ConstitutionCard from '@/components/report/ConstitutionCard'
-import { referralRank } from '@/lib/eye-health'
 import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
 import CalibratedSystemsChart from '@/components/report/CalibratedSystemsChart'
 import { Card } from '@/components/ui/card'
@@ -36,17 +35,14 @@ function GoalsCard({ report }: { report: AnalysisReport }) {
 /**
  * Таб „Обобщение“ — какво е важно сега, системи, насоки, методика.
  * Водещият извод и резултатът са в героя над табовете, затова тук не се повтарят.
- * Очният скрининг излиза най-горе само когато изисква преглед скоро.
+ * Очният скрининг е в героя (бутон към таб „Ирис и очи“) — тук не се повтаря.
  */
 export function CalibratedSummaryReport({ report, withLead }: Props & { withLead?: boolean }) {
   const cal = report.calibrated!
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
-  const eyeUrgent = !!cal.eyeHealth && referralRank(cal.eyeHealth.referral) >= 2
 
   return (
     <div className="space-y-8">
-      {eyeUrgent && <EyeHealthCard report={cal.eyeHealth} compact />}
-
       <GoalsCard report={report} />
 
       {withLead && (

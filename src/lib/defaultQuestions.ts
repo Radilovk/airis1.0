@@ -148,7 +148,7 @@ export const defaultQuestions: QuestionConfig[] = [
     id: 'sleepQuality',
     type: 'radio',
     question: 'Как оценявате съня си?',
-    description: 'Показва се при недостатъчен сън или ако сте посочили сън като цел',
+    description: 'Колко отпочинали се събуждате',
     required: true,
     options: [
       { value: 'poor', label: 'Лош' },

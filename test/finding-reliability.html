@@ -194,9 +194,11 @@ else pass(`location precision ${precision.truePositives}/${precision.truePositiv
   const sx = sc.getContext('2d')
   sx.drawImage(im, 0, 0)
   const d = sx.getImageData(0, 0, sc.width, sc.height).data
-  const PW = 1440, PH = 720
+  // Височината на тъканта се смята от геометрията — извежда се от лентата.
+  const PW = 1440
   const padL = sc.width - PW - 96
-  const padT = sc.height - PH - 116
+  const padT = 140
+  const PH = sc.height - padT - 116
   const cw = PW / 12, ch = PH / 12
 
   let visible = 0
