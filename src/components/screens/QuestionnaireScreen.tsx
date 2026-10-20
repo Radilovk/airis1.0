@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import type { QuestionnaireData, QuestionConfig, QuestionnaireConfig, UploadedDocument } from '@/types'
 import { defaultQuestions } from '@/lib/defaultQuestions'
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
 import {
   getVisibleQuestions,
   getFilteredOptions,
@@ -36,6 +37,30 @@ import {
 interface QuestionnaireScreenProps {
   onComplete: (data: QuestionnaireData) => void
   initialData: QuestionnaireData | null
+}
+
+/**
+ * Начална позиция на плъзгачите. Преди започваха от минимума (3 ч сън, 0 чаши)
+ * — числото изглеждаше избрано, а „Напред“ връщаше „задължително поле“.
+ * Сега плъзгачът стои на обичайна стойност и тя се приема, ако човекът не я
+ * промени.
+ */
+const SLIDER_START: Record<string, number> = { sleepHours: 7, hydration: 6 }
+const SLIDER_STEP: Record<string, number> = { sleepHours: 0.5, hydration: 1 }
+
+function sliderStart(q: QuestionConfig): number {
+  const min = q.validation?.min ?? 0
+  const max = q.validation?.max ?? 100
+  return SLIDER_START[q.id] ?? Math.round((min + max) / 2)
+}
+
+/** Тегло може да е с десетична запетая; възраст и ръст — само цели числа. */
+const DECIMAL_FIELDS = new Set(['weight'])
+
+/** Изчаква клавиатурата да се отвори и показва полето в средата на видимата част. */
+function revealOnFocus(e: React.FocusEvent<HTMLElement>) {
+  const el = e.currentTarget
+  window.setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
 }
 
 export default function QuestionnaireScreen({ onComplete, initialData }: QuestionnaireScreenProps) {
@@ -76,6 +101,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   const progress = visibleQuestions.length
     ? ((currentQuestionIndex + 1) / visibleQuestions.length) * 100
     : 0
+
+  const keyboardInset = useKeyboardInset()
 
   const setAnswersSanitized = useCallback(
     (next: Record<string, any>) => {
@@ -129,6 +156,11 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       return false
     }
 
+    if (question.type === 'number' && question.required && !Number.isFinite(Number(value))) {
+      toast.error('Въведете число')
+      return false
+    }
+
     if (question.type === 'number' && question.validation) {
       const numValue = Number(value)
       if (question.validation.min !== undefined && numValue < question.validation.min) {
@@ -153,7 +185,11 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   }
 
   const handleNext = () => {
-    const answer = answers[currentQuestion.id]
+    let answer = answers[currentQuestion.id]
+    if (currentQuestion.type === 'slider' && (answer === undefined || answer === '')) {
+      answer = sliderStart(currentQuestion)
+      setAnswersSanitized({ ...answers, [currentQuestion.id]: answer })
+    }
     
     if (!validateAnswer(currentQuestion, answer)) {
       return
@@ -295,6 +331,10 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               onChange={(e) => setAnswersSanitized({ ...answers, [question.id]: e.target.value })}
               className="text-lg h-12"
               autoFocus
+              autoComplete={question.id === 'name' ? 'given-name' : 'off'}
+              enterKeyHint="next"
+              onFocus={revealOnFocus}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNext() } }}
             />
           </div>
         )
@@ -302,16 +342,24 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       case 'number':
         return (
           <div className="space-y-2">
+            {/* type="text" + inputMode: цифрова клавиатура без стрелките на
+                type="number", а запетаята („72,5“) не изтрива стойността. */}
             <Input
               id={question.id}
-              type="number"
+              type="text"
+              inputMode={DECIMAL_FIELDS.has(question.id) ? 'decimal' : 'numeric'}
+              pattern={DECIMAL_FIELDS.has(question.id) ? undefined : '[0-9]*'}
               placeholder="Въведете число..."
-              value={value || ''}
-              onChange={(e) => setAnswersSanitized({ ...answers, [question.id]: e.target.value })}
+              value={value ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value.replace(',', '.').replace(DECIMAL_FIELDS.has(question.id) ? /[^0-9.]/g : /[^0-9]/g, '')
+                setAnswersSanitized({ ...answers, [question.id]: raw })
+              }}
               className="text-lg h-12"
               autoFocus
-              min={question.validation?.min}
-              max={question.validation?.max}
+              enterKeyHint="next"
+              onFocus={revealOnFocus}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNext() } }}
             />
           </div>
         )
@@ -324,8 +372,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               placeholder="Въведете отговор..."
               value={value || ''}
               onChange={(e) => setAnswersSanitized({ ...answers, [question.id]: e.target.value })}
-              className="min-h-[150px] text-base resize-none"
-              autoFocus
+              className="min-h-[120px] text-base resize-none"
+              onFocus={revealOnFocus}
             />
           </div>
         )
@@ -414,7 +462,9 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
                       placeholder="Опишете..."
                       value={otherValues[question.id] || ''}
                       onChange={(e) => setOtherValues({ ...otherValues, [question.id]: e.target.value })}
-                      className="mt-2"
+                      className="mt-2 h-11"
+                      enterKeyHint="done"
+                      onFocus={revealOnFocus}
                     />
                   </motion.div>
                 )}
@@ -424,7 +474,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
         )
 
       case 'slider':
-        const sliderValue = value !== undefined ? Number(value) : (question.validation?.min || 0)
+        const sliderValue = value !== undefined && value !== '' ? Number(value) : sliderStart(question)
         return (
           <div className="space-y-6 pt-4">
             <div className="flex items-center justify-center">
@@ -437,7 +487,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               onValueChange={(val) => setAnswersSanitized({ ...answers, [question.id]: val[0] })}
               min={question.validation?.min || 0}
               max={question.validation?.max || 100}
-              step={0.5}
+              step={SLIDER_STEP[question.id] ?? 0.5}
               className="py-4"
             />
             <div className="flex justify-between text-sm text-muted-foreground">
@@ -520,7 +570,11 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background to-muted/20 pb-28">
+    <div
+      className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background to-muted/20 pb-28"
+      // При отворена клавиатура съдържанието трябва да може да се превърти над нея и над лентата с бутоните.
+      style={keyboardInset ? { paddingBottom: keyboardInset + 112 } : undefined}
+    >
       <div className="flex-1 flex items-start justify-center p-4 pt-6 md:p-8 md:pt-10">
       <div className="max-w-lg w-full">
         <motion.div
@@ -577,7 +631,13 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur-lg px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* Лентата се вдига над клавиатурата — иначе „Напред“ е скрит зад нея. */}
+      <div
+        className={`fixed inset-x-0 z-40 border-t bg-background/95 backdrop-blur-lg px-4 ${
+          keyboardInset ? 'py-2' : 'py-4 pb-[max(1rem,env(safe-area-inset-bottom))]'
+        }`}
+        style={{ bottom: keyboardInset }}
+      >
         <div className="mx-auto flex max-w-lg items-center gap-3">
           {currentQuestionIndex > 0 ? (
             <Button variant="outline" onClick={handleBack} className="gap-2 shrink-0" size="lg">
