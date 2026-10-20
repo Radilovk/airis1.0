@@ -6,7 +6,7 @@ interface Props {
   systems: CalibratedAnalysisPayload['systems']
 }
 
-/** Радарна диаграма на системните оценки — mobile-first. */
+/** Радарна диаграма на системните оценки. Числата са в картите под нея — тук не се повтарят. */
 export default function CalibratedSystemsChart({ systems }: Props) {
   if (!systems?.length) return null
 
@@ -19,17 +19,17 @@ export default function CalibratedSystemsChart({ systems }: Props) {
 
   return (
     <Card className="overflow-hidden border-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-6">
-      <h3 className="mb-1 text-base font-semibold md:text-lg">Баланс на системите</h3>
+      <h3 className="mb-1 text-base font-semibold md:text-lg">Оценки по системи</h3>
       <p className="mb-4 text-xs text-muted-foreground md:text-sm">
         Колкото по-голяма е областта, толкова по-добра е оценката на системата.
       </p>
       <div className="mx-auto w-full max-w-md">
         <ResponsiveContainer width="100%" height={280}>
-          <RadarChart data={data} cx="50%" cy="50%" outerRadius="72%">
+          <RadarChart data={data} cx="50%" cy="50%" outerRadius="58%" margin={{ top: 8, right: 24, bottom: 8, left: 24 }}>
             <PolarGrid stroke="rgba(100, 116, 139, 0.25)" />
             <PolarAngleAxis
               dataKey="system"
-              tick={{ fill: 'currentColor', fontSize: 10 }}
+              tick={{ fill: 'currentColor', fontSize: 12 }}
             />
             <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
             <Radar
@@ -39,6 +39,8 @@ export default function CalibratedSystemsChart({ systems }: Props) {
               fill="#0ea5e9"
               fillOpacity={0.35}
               strokeWidth={2}
+              // Анимацията на recharts 2 под React 19 оставя полигона празен.
+              isAnimationActive={false}
             />
             <Tooltip
               formatter={(value: number) => [`${value}/100`, 'Оценка']}
@@ -54,19 +56,6 @@ export default function CalibratedSystemsChart({ systems }: Props) {
             />
           </RadarChart>
         </ResponsiveContainer>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-        {systems.map(s => (
-          <div
-            key={s.key}
-            className={`rounded-xl px-3 py-2.5 ring-1 ${
-              s.priority ? 'bg-primary/5 ring-primary/20' : 'bg-muted/30 ring-border/60'
-            }`}
-          >
-            <p className="truncate text-[11px] text-muted-foreground">{s.label}</p>
-            <p className="text-lg font-bold tabular-nums text-primary">{s.score}</p>
-          </div>
-        ))}
       </div>
     </Card>
   )

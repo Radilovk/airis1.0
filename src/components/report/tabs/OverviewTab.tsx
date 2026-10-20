@@ -363,7 +363,7 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
               </div>
             ))}
             {supportingFactors.length === 0 && (
-              <p className="text-sm text-muted-foreground">Няма идентифицирани подкрепящи фактори</p>
+              <p className="text-sm text-muted-foreground">Няма открити благоприятни фактори</p>
             )}
           </div>
         </Card>
@@ -453,7 +453,7 @@ function getSupportingFactors(report: AnalysisReport): string[] {
   if (report.questionnaireData.sleepHours >= 7 && 
      (report.questionnaireData.sleepQuality === 'good' || report.questionnaireData.sleepQuality === 'excellent') &&
      nervousSystemScore >= 65) {
-    factors.push('Добро качество на съня подкрепено от здрава нервна система')
+    factors.push('Добър сън и спокойна нервна система')
   }
 
   const detoxSystemScore = [...report.leftIris.systemScores, ...report.rightIris.systemScores]
@@ -600,7 +600,7 @@ function getLimitingFactors(report: AnalysisReport): string[] {
   if (report.calibrated) {
     const s = summarizeCalibratedReport(report.calibrated)
     if (s.planRelevant >= 4) {
-      factors.push(`${s.planRelevant} ясни ирисови акцента насочват допълнителна подкрепа в плана`)
+      factors.push(`${s.planRelevant} ясни знака в ириса са отразени в плана`)
     }
   } else if (attentionZones > 5) {
     factors.push(`${attentionZones} зони изискващи внимание според иридологичния анализ`)
