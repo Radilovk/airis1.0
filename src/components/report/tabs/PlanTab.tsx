@@ -21,6 +21,7 @@ import {
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AnalysisReport, SupplementRecommendation } from '@/types'
+import { useBiocodeProducts, formatPrice } from '@/lib/biocode-products'
 import { cn } from '@/lib/utils'
 
 interface PlanTabProps {
@@ -122,9 +123,10 @@ export default function PlanTab({ report }: PlanTabProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
-            <SupplementsSection supplements={
-              showFullPlan ? detailedPlan.supplements : detailedPlan.supplements.slice(0, 3)
-            } />
+            <SupplementsSection
+              supplements={showFullPlan ? detailedPlan.supplements : detailedPlan.supplements.slice(0, 3)}
+              questionnaire={report.questionnaireData}
+            />
           </motion.div>
         )}
 
@@ -189,8 +191,10 @@ export default function PlanTab({ report }: PlanTabProps) {
   )
 }
 
-function SupplementsSection({ supplements }: { supplements: SupplementRecommendation[] }) {
+function SupplementsSection({ supplements, questionnaire }: { supplements: SupplementRecommendation[]; questionnaire?: AnalysisReport['questionnaireData'] }) {
   const [isOpen, setIsOpen] = useState(false)
+  const products = useBiocodeProducts(supplements, questionnaire)
+  const anyProducts = Object.values(products).some(list => list.length > 0)
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -251,10 +255,49 @@ function SupplementsSection({ supplements }: { supplements: SupplementRecommenda
                         </div>
                       )}
                     </div>
+                    {(products[supp.name] || []).length > 0 && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {products[supp.name].map(p => (
+                          <a
+                            key={p.group_id}
+                            href={p.url}
+                            target="_blank"
+                            rel="noopener sponsored"
+                            className="grid grid-cols-[56px_1fr] items-center gap-3 rounded-xl border border-primary/15 bg-background p-2.5 transition-colors hover:border-primary/40"
+                          >
+                            {p.image ? (
+                              <img src={p.image} alt="" loading="lazy" className="h-14 w-14 rounded-lg bg-white object-contain" />
+                            ) : (
+                              <span className="h-14 w-14 rounded-lg bg-muted" />
+                            )}
+                            <span className="min-w-0">
+                              <span className="line-clamp-2 block text-sm font-semibold leading-snug">{p.name}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {p.brand}{p.packs[0] ? ` · ${p.packs[0]}` : ''}
+                              </span>
+                              <span className="block text-sm font-bold">
+                                {p.price ? `от ${formatPrice(p.price)}` : ''}
+                                {p.promo && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-800">Промо</span>}
+                              </span>
+                              <span className="block text-xs font-bold text-primary">Виж в BIOCODE →</span>
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
             ))}
+            {anyProducts && (
+              <p className="text-xs text-muted-foreground">
+                Налични продукти от{' '}
+                <a href="https://biocode-bg.com/?utm_source=airis&utm_medium=supplements" target="_blank" rel="noopener sponsored" className="font-semibold text-primary">
+                  BIOCODE · biocode-bg.com
+                </a>
+                , подбрани по съставка и форма; наличността се обновява на 6 часа. Продукт, неподходящ при посочените лекарства, не се показва.
+              </p>
+            )}
           </div>
         </CollapsibleContent>
       </Card>
