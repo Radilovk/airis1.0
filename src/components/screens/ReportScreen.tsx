@@ -30,6 +30,8 @@ import { Card } from '@/components/ui/card'
 import { summarizeCalibratedReport } from '@/lib/calibrated-report-summary'
 import ReportHero from '@/components/report/ReportHero'
 import UrgentEyeGate from '@/components/report/UrgentEyeGate'
+import NutriPlanCta from '@/components/report/NutriPlanCta'
+import { cameFromNutriPlan } from '@/lib/nutriplan-handoff'
 
 interface ReportScreenProps {
   report: AnalysisReport
@@ -267,6 +269,12 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
           </div>
         )}
 
+        {cameFromNutriPlan() && (
+          <div className="mb-6">
+            <NutriPlanCta report={report} />
+          </div>
+        )}
+
         {isCalibrated ? (
           <div className="mb-8">
             <ReportHero report={report} onOpenIris={() => setActiveTab('iris')} />
@@ -389,6 +397,10 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
               </ErrorBoundary>
             </TabsContent>
           </Tabs>
+
+        <div className="mt-8">
+          <NutriPlanCta report={report} />
+        </div>
       </div>
     </div>
   )
