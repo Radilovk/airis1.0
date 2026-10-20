@@ -57,6 +57,15 @@ function sliderStart(q: QuestionConfig): number {
 /** Тегло може да е с десетична запетая; възраст и ръст — само цели числа. */
 const DECIMAL_FIELDS = new Set(['weight'])
 
+const NUMBER_PLACEHOLDER: Record<string, string> = {
+  age: 'напр. 42',
+  weight: 'напр. 68,5',
+  height: 'напр. 168',
+}
+
+/** Показват се заедно, когато и трите са във въпросника. */
+const BODY_GROUP = ['age', 'weight', 'height']
+
 /** Изчаква клавиатурата да се отвори и показва полето в средата на видимата част. */
 function revealOnFocus(e: React.FocusEvent<HTMLElement>) {
   const el = e.currentTarget
@@ -97,10 +106,39 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     [allQuestions, answers]
   )
 
-  const currentQuestion = visibleQuestions[currentQuestionIndex]
-  const progress = visibleQuestions.length
-    ? ((currentQuestionIndex + 1) / visibleQuestions.length) * 100
-    : 0
+  // Стъпки = екрани. Възраст, тегло и ръст са един екран: три кратки числа с
+  // една и съща клавиатура, вместо три отделни стъпки.
+  const steps = useMemo(() => {
+    const ids = new Set(visibleQuestions.map(q => q.id))
+    const grouped = BODY_GROUP.every(id => ids.has(id))
+    const out: QuestionConfig[][] = []
+    for (const q of visibleQuestions) {
+      if (grouped && q.id === BODY_GROUP[0]) {
+        out.push(BODY_GROUP.map(id => visibleQuestions.find(v => v.id === id)!))
+      } else if (!(grouped && BODY_GROUP.includes(q.id))) {
+        out.push([q])
+      }
+    }
+    return out
+  }, [visibleQuestions])
+
+  const currentStep = steps[currentQuestionIndex] ?? []
+  const currentQuestion = currentStep[0]
+  // Видимите въпроси се отключват с отговорите: неотговореният „Пол“ е последен
+  // видим, но не и последен въпрос. Последна е стъпката само ако е отговорена
+  // или е по избор — иначе бутонът казваше „Към снимките“ на третия въпрос.
+  const currentAnswered = currentStep.every(q => {
+    const v = answers[q.id]
+    return v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
+  })
+  const isLastStep =
+    currentQuestionIndex === steps.length - 1 && (currentAnswered || !currentQuestion?.required)
+  // Напредъкът е по позицията в ПЪЛНИЯ списък. Броят на видимите въпроси расте,
+  // докато човекът отговаря, и „Стъпка 2 от 5“ после ставаше „Стъпка 6 от 17“ —
+  // лентата скачаше назад.
+  const progress = !currentQuestion
+    ? 0
+    : Math.max(4, ((allQuestions.findIndex(q => q.id === currentQuestion.id) + 1) / allQuestions.length) * 100)
 
   const keyboardInset = useKeyboardInset()
 
@@ -136,10 +174,10 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   ])
 
   useEffect(() => {
-    if (currentQuestionIndex >= visibleQuestions.length && visibleQuestions.length > 0) {
-      setCurrentQuestionIndex(Math.max(0, visibleQuestions.length - 1))
+    if (currentQuestionIndex >= steps.length && steps.length > 0) {
+      setCurrentQuestionIndex(Math.max(0, steps.length - 1))
     }
-  }, [currentQuestionIndex, visibleQuestions.length])
+  }, [currentQuestionIndex, steps.length])
 
   const validateAnswer = (question: QuestionConfig, value: any): boolean => {
     if (question.type === 'file') {
@@ -185,6 +223,16 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
   }
 
   const handleNext = () => {
+    if (currentStep.length > 1) {
+      for (const q of currentStep) {
+        if (!validateAnswer(q, answers[q.id])) {
+          document.getElementById(q.id)?.focus()
+          return
+        }
+      }
+      advanceQuestion()
+      return
+    }
     let answer = answers[currentQuestion.id]
     if (currentQuestion.type === 'slider' && (answer === undefined || answer === '')) {
       answer = sliderStart(currentQuestion)
@@ -216,7 +264,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       }
     }
 
-    if (currentQuestionIndex < visibleQuestions.length - 1) {
+    if (currentQuestionIndex < steps.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1)
     } else {
       completeQuestionnaire()
@@ -314,7 +362,61 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
+  const renderNumberInput = (
+    question: QuestionConfig,
+    opts: { autoFocus?: boolean; onEnter?: () => void } = {}
+  ) => {
+    const decimal = DECIMAL_FIELDS.has(question.id)
+    const value = answers[question.id]
+    return (
+      // type="text" + inputMode: цифрова клавиатура без стрелките на
+      // type="number", а запетаята („72,5“) не изтрива стойността.
+      <Input
+        id={question.id}
+        type="text"
+        inputMode={decimal ? 'decimal' : 'numeric'}
+        pattern={decimal ? undefined : '[0-9]*'}
+        placeholder={NUMBER_PLACEHOLDER[question.id] ?? 'Въведете число...'}
+        value={value ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value.replace(',', '.').replace(decimal ? /[^0-9.]/g : /[^0-9]/g, '')
+          setAnswersSanitized({ ...answers, [question.id]: raw })
+        }}
+        className="text-lg h-12"
+        autoFocus={opts.autoFocus}
+        enterKeyHint="next"
+        onFocus={revealOnFocus}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          ;(opts.onEnter ?? handleNext)()
+        }}
+      />
+    )
+  }
+
+  /** Възраст, тегло и ръст на един екран; Enter минава към следващото поле. */
+  const renderBodyGroup = () => (
+    <div className="space-y-4">
+      {currentStep.map((q, i) => (
+        <div key={q.id} className="space-y-1.5">
+          <Label htmlFor={q.id} className="text-[15px] font-medium">
+            {q.question}
+          </Label>
+          {renderNumberInput(q, {
+            autoFocus: i === 0,
+            onEnter:
+              i < currentStep.length - 1
+                ? () => document.getElementById(currentStep[i + 1].id)?.focus()
+                : handleNext,
+          })}
+        </div>
+      ))}
+    </div>
+  )
+
   const renderQuestion = () => {
+    if (currentStep.length > 1) return renderBodyGroup()
     const question = currentQuestion
     const value = answers[question.id]
     const options = getFilteredOptions(question, answers)
@@ -340,29 +442,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
         )
 
       case 'number':
-        return (
-          <div className="space-y-2">
-            {/* type="text" + inputMode: цифрова клавиатура без стрелките на
-                type="number", а запетаята („72,5“) не изтрива стойността. */}
-            <Input
-              id={question.id}
-              type="text"
-              inputMode={DECIMAL_FIELDS.has(question.id) ? 'decimal' : 'numeric'}
-              pattern={DECIMAL_FIELDS.has(question.id) ? undefined : '[0-9]*'}
-              placeholder="Въведете число..."
-              value={value ?? ''}
-              onChange={(e) => {
-                const raw = e.target.value.replace(',', '.').replace(DECIMAL_FIELDS.has(question.id) ? /[^0-9.]/g : /[^0-9]/g, '')
-                setAnswersSanitized({ ...answers, [question.id]: raw })
-              }}
-              className="text-lg h-12"
-              autoFocus
-              enterKeyHint="next"
-              onFocus={revealOnFocus}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNext() } }}
-            />
-          </div>
-        )
+        return <div className="space-y-2">{renderNumberInput(question, { autoFocus: true })}</div>
 
       case 'textarea':
         return (
@@ -583,15 +663,12 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
           animate={{ opacity: 1, y: 0 }}
           className="mb-5"
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">
-              Стъпка {currentQuestionIndex + 1} от {visibleQuestions.length}
+              {getQuestionSectionLabel(currentQuestion.id) ?? 'Въпросник'}
             </p>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {Math.round(progress)}%
-            </span>
           </div>
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="h-1.5 [&>*]:transition-transform [&>*]:duration-300" />
         </motion.div>
 
         <Card className="border-0 shadow-lg shadow-primary/5 p-5 md:p-8">
@@ -605,18 +682,18 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               className="space-y-6"
             >
               <div className="space-y-2">
-                {getQuestionSectionLabel(currentQuestion.id) && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">
-                    {getQuestionSectionLabel(currentQuestion.id)}
-                  </p>
-                )}
                 <h2 className="text-xl md:text-2xl font-bold leading-snug tracking-tight">
-                  {currentQuestion.question}
+                  {currentStep.length > 1 ? 'Възраст, тегло и ръст' : currentQuestion.question}
                   {currentQuestion.required && (
                     <span className="text-destructive ml-0.5" aria-hidden>*</span>
                   )}
                 </h2>
-                {currentQuestion.description && (
+                {currentStep.length > 1 && (
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Нужни са за плана — количества, вода, движение.
+                  </p>
+                )}
+                {currentStep.length === 1 && currentQuestion.description && (
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {currentQuestion.description}
                   </p>
@@ -656,7 +733,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
           )}
 
           <Button onClick={handleNext} className="gap-2 ml-auto flex-1 sm:flex-none" size="lg">
-            {currentQuestionIndex === visibleQuestions.length - 1 ? (
+            {isLastStep ? (
               <>
                 Към снимките
                 <CheckCircle size={18} weight="bold" />
