@@ -122,9 +122,10 @@ export default function PlanTab({ report }: PlanTabProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
-            <SupplementsSection supplements={
-              showFullPlan ? detailedPlan.supplements : detailedPlan.supplements.slice(0, 3)
-            } />
+            <SupplementsSection
+              supplements={showFullPlan ? detailedPlan.supplements : detailedPlan.supplements.slice(0, 3)}
+              questionnaire={report.questionnaireData}
+            />
           </motion.div>
         )}
 
@@ -189,8 +190,12 @@ export default function PlanTab({ report }: PlanTabProps) {
   )
 }
 
-function SupplementsSection({ supplements }: { supplements: SupplementRecommendation[] }) {
+function SupplementsSection({ supplements, questionnaire }: { supplements: SupplementRecommendation[]; questionnaire?: AnalysisReport['questionnaireData'] }) {
   const [isOpen, setIsOpen] = useState(false)
+  const vegan = (questionnaire?.dietaryProfile || []).includes('Веган')
+  // Само търсеща дума: наличните продукти се подбират на biocode-bg.com при клика.
+  const pickUrl = (name: string) =>
+    `https://biocode-bg.com/pick.html?q=${encodeURIComponent(name.slice(0, 80))}${vegan ? '&vegan=1' : ''}&utm_source=airis&utm_medium=supplement`
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -234,7 +239,11 @@ function SupplementsSection({ supplements }: { supplements: SupplementRecommenda
                     <Pill size={18} weight="duotone" className="text-primary-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h5 className="font-bold text-base mb-2 text-primary break-words">{supp.name}</h5>
+                    <h5 className="font-bold text-base mb-2 text-primary break-words">
+                      <a href={pickUrl(supp.name)} target="_blank" rel="noopener sponsored" className="underline underline-offset-4 hover:text-primary/80">
+                        {supp.name}
+                      </a>
+                    </h5>
                     <div className="space-y-2 text-sm">
                       <div className="flex items-start gap-2 p-2 bg-background/80 rounded-lg">
                         <span className="font-semibold text-foreground min-w-[80px] flex-shrink-0">• Дозировка:</span>
@@ -255,6 +264,9 @@ function SupplementsSection({ supplements }: { supplements: SupplementRecommenda
                 </div>
               </motion.div>
             ))}
+            <p className="text-xs text-muted-foreground">
+              Името на добавката води към наличните в момента продукти в BIOCODE · biocode-bg.com.
+            </p>
           </div>
         </CollapsibleContent>
       </Card>
