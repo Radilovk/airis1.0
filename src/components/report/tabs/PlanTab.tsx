@@ -21,7 +21,6 @@ import {
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AnalysisReport, SupplementRecommendation } from '@/types'
-import { useBiocodeProducts, formatPrice } from '@/lib/biocode-products'
 import { cn } from '@/lib/utils'
 
 interface PlanTabProps {
@@ -193,8 +192,10 @@ export default function PlanTab({ report }: PlanTabProps) {
 
 function SupplementsSection({ supplements, questionnaire }: { supplements: SupplementRecommendation[]; questionnaire?: AnalysisReport['questionnaireData'] }) {
   const [isOpen, setIsOpen] = useState(false)
-  const products = useBiocodeProducts(supplements, questionnaire)
-  const anyProducts = Object.values(products).some(list => list.length > 0)
+  const vegan = (questionnaire?.dietaryProfile || []).includes('Веган')
+  // Само търсеща дума: наличните продукти се подбират на biocode-bg.com при клика.
+  const pickUrl = (name: string) =>
+    `https://biocode-bg.com/pick.html?q=${encodeURIComponent(name.slice(0, 80))}${vegan ? '&vegan=1' : ''}&utm_source=airis&utm_medium=supplement`
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -238,7 +239,11 @@ function SupplementsSection({ supplements, questionnaire }: { supplements: Suppl
                     <Pill size={18} weight="duotone" className="text-primary-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h5 className="font-bold text-base mb-2 text-primary break-words">{supp.name}</h5>
+                    <h5 className="font-bold text-base mb-2 text-primary break-words">
+                      <a href={pickUrl(supp.name)} target="_blank" rel="noopener sponsored" className="underline underline-offset-4 hover:text-primary/80">
+                        {supp.name}
+                      </a>
+                    </h5>
                     <div className="space-y-2 text-sm">
                       <div className="flex items-start gap-2 p-2 bg-background/80 rounded-lg">
                         <span className="font-semibold text-foreground min-w-[80px] flex-shrink-0">• Дозировка:</span>
@@ -255,49 +260,13 @@ function SupplementsSection({ supplements, questionnaire }: { supplements: Suppl
                         </div>
                       )}
                     </div>
-                    {(products[supp.name] || []).length > 0 && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {products[supp.name].map(p => (
-                          <a
-                            key={p.group_id}
-                            href={p.url}
-                            target="_blank"
-                            rel="noopener sponsored"
-                            className="grid grid-cols-[56px_1fr] items-center gap-3 rounded-xl border border-primary/15 bg-background p-2.5 transition-colors hover:border-primary/40"
-                          >
-                            {p.image ? (
-                              <img src={p.image} alt="" loading="lazy" className="h-14 w-14 rounded-lg bg-white object-contain" />
-                            ) : (
-                              <span className="h-14 w-14 rounded-lg bg-muted" />
-                            )}
-                            <span className="min-w-0">
-                              <span className="line-clamp-2 block text-sm font-semibold leading-snug">{p.name}</span>
-                              <span className="block text-xs text-muted-foreground">
-                                {p.brand}{p.packs[0] ? ` · ${p.packs[0]}` : ''}
-                              </span>
-                              <span className="block text-sm font-bold">
-                                {p.price ? `от ${formatPrice(p.price)}` : ''}
-                                {p.promo && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-800">Промо</span>}
-                              </span>
-                              <span className="block text-xs font-bold text-primary">Виж в BIOCODE →</span>
-                            </span>
-                          </a>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
               </motion.div>
             ))}
-            {anyProducts && (
-              <p className="text-xs text-muted-foreground">
-                Налични продукти от{' '}
-                <a href="https://biocode-bg.com/?utm_source=airis&utm_medium=supplements" target="_blank" rel="noopener sponsored" className="font-semibold text-primary">
-                  BIOCODE · biocode-bg.com
-                </a>
-                , подбрани по съставка и форма; наличността се обновява на 6 часа. Продукт, неподходящ при посочените лекарства, не се показва.
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              Името на добавката води към наличните в момента продукти в BIOCODE · biocode-bg.com.
+            </p>
           </div>
         </CollapsibleContent>
       </Card>
