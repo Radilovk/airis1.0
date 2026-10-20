@@ -439,7 +439,7 @@ export function analyseIrisQuality(
       code: 'too_dark',
       level: 'error',
       message: 'Снимката е твърде тъмна.',
-      fix: 'Включете светкавицата или снимайте на повече светлина.',
+      fix: 'Включете светкавицата. Допълнителна лампа или прозорец не помагат — дават отражения върху ириса.',
     })
   } else if (brightness > 0.82) {
     issues.push({
