@@ -69,6 +69,11 @@ export interface NormalizedFinding {
    * Виж `mergeSeamReadings`.
    */
   confirmations?: number
+  /**
+   * 'circumferential' — знакът обикаля целия пояс (напр. цвят около
+   * коларетата). Секторът му е само котва за показване, не посока към орган.
+   */
+  spread?: 'circumferential'
 }
 
 export interface SystemResult {
@@ -314,7 +319,10 @@ export function irisLoadBySystem(findings: NormalizedFinding[]): Record<SystemKe
 
     // събиране на теглата от трите източника
     const weights = emptyLoad()
-    for (const [k, v] of Object.entries(sectorDef.systems)) weights[k as SystemKey] += v
+    // Знак по цялата обиколка не сочи към органа на сектора, в който е закотвен.
+    if (f.spread !== 'circumferential') {
+      for (const [k, v] of Object.entries(sectorDef.systems)) weights[k as SystemKey] += v
+    }
     for (const [k, v] of Object.entries(band.systems)) weights[k as SystemKey] += v * 0.7
     for (const [k, v] of Object.entries(def.systems))
       weights[k as SystemKey] += v * TYPE_DIRECTION_WEIGHT
@@ -329,6 +337,62 @@ export function irisLoadBySystem(findings: NormalizedFinding[]): Record<SystemKe
   }
 
   return load
+}
+
+/**
+ * ПИГМЕНТ ПО ЦЯЛАТА ОБИКОЛКА = ЦВЕТ НА ИРИСА.
+ *
+ * Зелено-лешниковите ириси имат оранжево-кафяв пръстен около коларетата по
+ * цялата обиколка (централна хетерохромия). Моделът го докладваше като
+ * отделни петна в 5–9 сектора, а всяко носи „кръвно-захарна натовареност" с
+ * тежест 0.9 — така почти всяко зелено око излизаше с проблемен метаболизъм.
+ *
+ * Правило: пигмент (какъвто и етикет да е дал моделът — той ги разменя) в един
+ * и същ пръстенен пояс в WIDESPREAD_SECTORS или повече различни сектора се
+ * слива в ЕДНА находка „дифузен пигмент" по обиколката, с малка тежест и без
+ * посока към органа на сектора. Същото важи, ако моделът сам я е обявил с
+ * бележка „обиколка".
+ */
+const PIGMENT_TYPES = new Set(['pigment_orange', 'pigment_brown', 'pigment_yellow', 'pigment_diffuse'])
+const WIDESPREAD_SECTORS = 5
+const WIDESPREAD_LOAD = 0.35
+
+export function collapseWidespreadPigment(findings: NormalizedFinding[]): {
+  findings: NormalizedFinding[]
+  collapsed: number
+} {
+  const groups = new Map<string, NormalizedFinding[]>()
+  for (const f of findings) {
+    if (!PIGMENT_TYPES.has(f.type)) continue
+    const k = `${f.side}:${ringBand(f.ring).key}`
+    const list = groups.get(k)
+    if (list) list.push(f)
+    else groups.set(k, [f])
+  }
+
+  const drop = new Set<NormalizedFinding>()
+  const add: NormalizedFinding[] = []
+  for (const list of groups.values()) {
+    const sectors = new Set(list.map(f => f.sector))
+    const declared = list.some(f => /обиколк|circum/i.test(f.note ?? ''))
+    if (sectors.size < WIDESPREAD_SECTORS && !declared) continue
+    const anchor = list.reduce((a, b) => (b.load > a.load ? b : a))
+    for (const f of list) drop.add(f)
+    add.push({
+      ...anchor,
+      type: 'pigment_diffuse',
+      note: 'по обиколката — естествен цвят на ириса',
+      load: anchor.load * WIDESPREAD_LOAD,
+      spread: 'circumferential',
+      confirmations: Math.max(...list.map(f => f.confirmations ?? 1)),
+    })
+  }
+
+  if (drop.size === 0) return { findings, collapsed: 0 }
+  return {
+    findings: [...findings.filter(f => !drop.has(f)), ...add],
+    collapsed: drop.size,
+  }
 }
 
 /**

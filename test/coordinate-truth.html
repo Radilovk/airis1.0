@@ -72,12 +72,14 @@ async function blueByCell(dataUrl) {
   const x = c.getContext('2d'); x.drawImage(im, 0, 0)
   const d = x.getImageData(0, 0, c.width, c.height).data
 
-  // Полетата идват от `iris-unwrap.ts`: PAD_RIGHT 96, PAD_BOTTOM 116,
-  // тъканта е 1440×720.
-  const PW = 1440, PH = 720
+  // Полетата идват от `iris-unwrap.ts`: PAD 136/140/96/116. Ширината на тъканта
+  // е 1440; височината се смята от геометрията (виж `autoPlotHeight`), затова
+  // се извежда от размера на лентата.
+  const PW = 1440
   const padL = c.width - PW - 96
-  const padT = c.height - PH - 116
-  if (padL !== 136 || padT !== 140) throw new Error(`полетата се разминават: ${padL}/${padT}`)
+  const padT = 140
+  const PH = c.height - padT - 116
+  if (padL !== 136 || PH < 432 || PH > 720) throw new Error(`полетата се разминават: ${padL}/${PH}`)
 
   const cw = PW / 12, ch = PH / 12
   const hits = Array.from({ length: 12 }, () => new Array(12).fill(0))

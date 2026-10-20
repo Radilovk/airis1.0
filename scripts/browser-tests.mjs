@@ -79,7 +79,16 @@ allOk = (await runFlashEyeTest(page)) && allOk
 if (apiKey) {
   const q = new URLSearchParams({ key: apiKey, model, flash: '1' })
   if (full) q.set('full', '1')
-  allOk = (await runPage(page, `${base}/__gemini-live.html?${q}`, 'Gemini live')) && allOk
+  // Страницата на живо не печата „КООРДИНАТИ x/x“ — `runPage` винаги би я
+  // отчел като FAIL. Успех е: заявката е минала и няма грешка.
+  console.log('\n=== Gemini live ===')
+  await page.goto(`${base}/__gemini-live.html?${q}`, { waitUntil: 'networkidle', timeout: 120000 })
+  await page.waitForFunction(() => window.__done, null, { timeout: 300000 })
+  const text = await page.evaluate(() => window.__done)
+  const ok = !/ГРЕШКА/.test(text) && /Vision OK|Pipeline готов/.test(text)
+  console.log(text)
+  console.log(`RESULT: ${ok ? 'PASS' : 'FAIL'}`)
+  allOk = ok && allOk
 } else {
   console.log('\n=== Gemini live ===\nSKIP: GEMINI_API_KEY not set')
 }
