@@ -487,7 +487,8 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" />
-      <QuickDebugPanel />
+      {/* Бутонът за диагностика стои над съдържанието — показва се само в служебните екрани. */}
+      {(currentScreen === 'settings' || currentScreen === 'diagnostics') && <QuickDebugPanel />}
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (
           <motion.div

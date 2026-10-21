@@ -320,7 +320,7 @@ export function analyseIrisQuality(
       code: 'pupil_not_found',
       level: 'error',
       message: 'Зеницата не се разпознава на снимката.',
-      fix: 'Снимайте отблизо, така че окото да заема почти целия кадър, и погледнете право в камерата.',
+      fix: 'Приближете камерата, докато окото е още остро, и погледнете право в нея.',
     })
   } else if (geometry.pupilConfidence < 0.35) {
     issues.push({
@@ -439,7 +439,7 @@ export function analyseIrisQuality(
       code: 'too_dark',
       level: 'error',
       message: 'Снимката е твърде тъмна.',
-      fix: 'Снимайте на дневна светлина или добавете разсеяно осветление отстрани.',
+      fix: 'Включете светкавицата. Допълнителна лампа или прозорец не помагат — дават отражения върху ириса.',
     })
   } else if (brightness > 0.82) {
     issues.push({
@@ -459,7 +459,7 @@ export function analyseIrisQuality(
       code: 'iris_too_small',
       level: 'error',
       message: 'Ирисът заема твърде малка част от кадъра.',
-      fix: 'Приближете камерата или изрежете снимката така, че окото да запълва кадъра.',
+      fix: 'Приближете камерата, докато окото е още остро, или изрежете снимката около окото.',
     })
   } else if (irisFill < 0.3) {
     issues.push({

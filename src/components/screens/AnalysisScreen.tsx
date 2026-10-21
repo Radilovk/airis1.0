@@ -6,8 +6,8 @@ import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
-import { motion } from 'framer-motion'
+import { Sparkle, Warning, Bug, Check } from '@phosphor-icons/react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
@@ -20,6 +20,26 @@ import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-promp
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 import { RECOMMENDED_GEMINI_MODEL, geminiThinkingConfig, resolveGeminiModel } from '@/lib/ai-models'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
+
+/** Таван за една LLM заявка. Детекцията е ~10–20 s, планът — до минута. */
+const LLM_TIMEOUT_MS = 120_000
+
+/** Етапите, които вижда човекът — праговете съвпадат с прогреса на pipeline-а. */
+const ANALYSIS_STAGES = [
+  { from: 0, label: 'Подготовка на снимките' },
+  { from: 15, label: 'Разчитане на двата ириса' },
+  { from: 65, label: 'Оценки и очен скрининг' },
+  { from: 75, label: 'Вашият личен план' },
+] as const
+
+/** Превежда стъпката на pipeline-а на разбираем за човека език. */
+function plainStatus(step: string): string {
+  if (step.startsWith('Подготовка')) return 'Подготвяме снимките'
+  if (/^(Детекция|Анализ на|Конституция)/.test(step)) return 'Разчитаме знаците в двата ириса'
+  if (step.startsWith('Изчисляване')) return 'Изчисляваме оценките'
+  if (step.startsWith('Изготвяне')) return 'Пишем вашия план — това е най-дългата стъпка'
+  return step
+}
 
 interface AnalysisScreenProps {
   questionnaireData: QuestionnaireData
@@ -45,6 +65,7 @@ export default function AnalysisScreen({
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const reduceMotion = useReducedMotion()
   const [analysisStarted, setAnalysisStarted] = useState(false)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [loadedConfig, setLoadedConfig] = useState<AIModelConfig | null>(null)
@@ -161,6 +182,7 @@ export default function AnalysisScreen({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         body: JSON.stringify({
           model: model,
           messages: [{ role: 'user', content: imageDataUrl ? content : prompt }],
@@ -208,6 +230,8 @@ export default function AnalysisScreen({
           headers: {
             'Content-Type': 'application/json'
           },
+          // Увиснала заявка иначе държи слот и целия анализ без край.
+          signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
           body: JSON.stringify({
             contents: [{
               parts: parts
@@ -293,12 +317,6 @@ export default function AnalysisScreen({
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        if (attempt > 1) {
-          const waitTime = 20000
-          addLog('warning', `Изчакване ${(waitTime / 1000).toFixed(0)}s преди опит ${attempt}/${maxRetries}...`)
-          await sleep(waitTime)
-        }
-        
         addLog('info', `LLM заявка (опит ${attempt}/${maxRetries}) към ${provider}/${configuredModel}...`)
         console.log(`🤖 [LLM] Заявка ${attempt}/${maxRetries} към ${provider} с модел ${configuredModel}`)
         
@@ -328,8 +346,10 @@ export default function AnalysisScreen({
         if (errorMsg.includes('429') || errorMsg.includes('Too many requests') || errorMsg.includes('rate limit')) {
           addLog('error', `⏱️ Rate limit достигнат - твърде много заявки!`)
           if (attempt < maxRetries) {
-            const backoffTime = 30000
-            addLog('warning', `⏳ Изчакване ${(backoffTime / 60000).toFixed(1)} минути преди повторен опит...`)
+            // Една пауза на опит. Преди тук се трупаха 30 s + още 20 s в началото
+            // на следващия опит — една отказана заявка струваше близо минута.
+            const backoffTime = 12000
+            addLog('warning', `⏳ Изчакване ${backoffTime / 1000} s преди повторен опит...`)
             await sleep(backoffTime)
             continue
           } else {
@@ -338,7 +358,7 @@ export default function AnalysisScreen({
         } else {
           addLog('error', `LLM грешка (опит ${attempt}): ${errorMsg}`)
           if (attempt < maxRetries) {
-            await sleep(8000)
+            await sleep(2500)
             continue
           }
         }
@@ -752,8 +772,10 @@ ${response}
         callLLMWithRetry(prompt, jsonMode, retries, imageDataUrl),
       addLog,
       onProgress: (step, pct) => {
-        setStatus(step)
-        setProgress(Math.max(2, Math.min(98, pct)))
+        // Двете очи вървят паралелно и докладват различни проценти — лентата
+        // само расте. Техническите стъпки (слой, шев) остават в логовете.
+        setStatus(plainStatus(step))
+        setProgress(prev => Math.max(prev, Math.max(2, Math.min(98, pct))))
       },
       requestDelay,
     })
@@ -2507,14 +2529,12 @@ JSON формат:
         >
           <Card className="p-8 md:p-12">
             <motion.div
-              animate={{
-                rotate: error ? 0 : [0, 360],
-                scale: error ? 1 : [1, 1.1, 1]
-              }}
+              // Спокоен пулс вместо безкрайно въртене; без движение при „намалено движение".
+              animate={error || reduceMotion ? { scale: 1 } : { scale: [1, 1.06, 1] }}
               transition={{
-                duration: 2,
-                repeat: error ? 0 : Infinity,
-                ease: "easeInOut"
+                duration: 2.4,
+                repeat: error || reduceMotion ? 0 : Infinity,
+                ease: 'easeInOut'
               }}
               className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${
                 error 
@@ -2542,36 +2562,37 @@ JSON формат:
                   <Progress value={progress} className="h-3" />
                   <p className="text-sm font-medium text-center">{status}</p>
                   <p className="text-xs text-muted-foreground text-center">
-                    {progress}% завършено
+                    {Math.round(progress)}% завършено
                   </p>
                 </div>
 
-                <div className="mt-8 space-y-2 text-left">
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${progress >= 10 ? 'bg-primary' : 'bg-muted'}`} />
-                    <span className={progress >= 10 ? 'text-foreground' : 'text-muted-foreground'}>
-                      Анализ на структура
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${progress >= 40 ? 'bg-primary' : 'bg-muted'}`} />
-                    <span className={progress >= 40 ? 'text-foreground' : 'text-muted-foreground'}>
-                      Картографиране на зони
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${progress >= 70 ? 'bg-primary' : 'bg-muted'}`} />
-                    <span className={progress >= 70 ? 'text-foreground' : 'text-muted-foreground'}>
-                      Генериране на препоръки
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${progress >= 90 ? 'bg-primary' : 'bg-muted'}`} />
-                    <span className={progress >= 90 ? 'text-foreground' : 'text-muted-foreground'}>
-                      Финализиране на доклад
-                    </span>
-                  </div>
-                  <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                <ol className="mt-8 space-y-3 text-left">
+                  {ANALYSIS_STAGES.map((stage, i) => {
+                    const next = ANALYSIS_STAGES[i + 1]?.from ?? 100
+                    const done = progress >= next
+                    const active = !done && progress >= stage.from
+                    return (
+                      <li key={stage.label} className="flex items-center gap-3 text-[15px]">
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
+                            done
+                              ? 'bg-primary text-primary-foreground'
+                              : active
+                                ? 'bg-primary/15 text-primary ring-2 ring-primary/40'
+                                : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {done ? <Check size={14} weight="bold" /> : <span className="text-xs font-semibold">{i + 1}</span>}
+                        </span>
+                        <span className={done || active ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                          {stage.label}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ol>
+                <div className="mt-6 space-y-2 text-left">
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Обикновено отнема 1–2 минути. Моля, не затваряйте приложението.
                     </p>

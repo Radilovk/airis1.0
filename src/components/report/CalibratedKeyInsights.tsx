@@ -61,7 +61,7 @@ export function CalibratedPriorityStrip({
     <div>
       <h3 className="mb-3 flex items-center gap-2 text-base font-semibold">
         <Leaf size={20} weight="duotone" className="text-primary" />
-        Фокус на подкрепата
+        Къде да започнете
       </h3>
       <div className="grid gap-2 sm:grid-cols-3">
         {systems.map(s => (

@@ -34,7 +34,7 @@ export default function SystemScoresChart({ leftScores, rightScores }: SystemSco
             dataKey="system" 
             tick={{ fill: 'currentColor', fontSize: 12 }}
           />
-          <Radar
+          <Radar isAnimationActive={false}
             name="Ляв ирис"
             dataKey="left"
             stroke="oklch(0.55 0.15 230)"
@@ -42,7 +42,7 @@ export default function SystemScoresChart({ leftScores, rightScores }: SystemSco
             fillOpacity={0.3}
             strokeWidth={2}
           />
-          <Radar
+          <Radar isAnimationActive={false}
             name="Десен ирис"
             dataKey="right"
             stroke="oklch(0.70 0.18 45)"

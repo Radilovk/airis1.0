@@ -838,7 +838,7 @@ export function generateReportHTML(report: AnalysisReport): string {
             ${report.detailedPlan.recommendedFoods && report.detailedPlan.recommendedFoods.length > 0 ? `
               <div class="food-section">
                 <div class="food-section-title">✅ Препоръчителни храни</div>
-                <div class="food-section-desc">Включете тези храни редовно в ежедневното си хранене за оптимална подкрепа на здравето.</div>
+                <div class="food-section-desc">Включете тези храни редовно в менюто си.</div>
                 <div class="food-list">
                   ${report.detailedPlan.recommendedFoods.map(food => 
                     food ? `<div class="food-item recommended">• ${food}</div>` : ''

@@ -52,6 +52,7 @@ import {
   buildInterpretationPrompt,
 } from './analysis-prompts'
 import {
+  collapseWidespreadPigment,
   computeScores,
   mergeSeamReadings,
   normalizeFindings,
@@ -462,6 +463,7 @@ export async function detectEye(
       partialCells: strip.partialCells,
       qualityScore: prep.qualityScore,
       flash: prep.flash,
+      stretch: strip.stretch,
     })
 
     try {
@@ -534,7 +536,15 @@ export async function detectEye(
           total: perReading[0]?.length ?? 0,
           agreement: 1,
         }
-  const collected = merged.findings
+  // Пигмент по цялата обиколка е цветът на ириса, не петно в определен орган.
+  const widespread = collapseWidespreadPigment(merged.findings)
+  if (widespread.collapsed > 0) {
+    addLog(
+      'info',
+      `[Детекция ${sideName}] ${widespread.collapsed} пигментни находки по обиколката са слети в една — цвят на ириса`
+    )
+  }
+  const collected = widespread.findings
   addLog(
     'success',
     `[Детекция ${sideName}] ${collected.length} приети находки от structure и pigment слоевете`

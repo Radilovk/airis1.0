@@ -1,8 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   ArrowRight,
-  Bug,
   Camera,
   ClipboardText,
   ClockClockwise,
@@ -10,16 +9,13 @@ import {
   FileText,
   Flask,
   Gear,
-  Info,
   Key,
-  MapTrifold,
   Play,
-  Sparkle,
-  Star,
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
-import type { AIModelConfig, QuestionnaireData } from '@/types'
+import PhotoGuide from '@/components/PhotoGuide'
+import type { AIModelConfig, AnalysisReport, QuestionnaireData } from '@/types'
 
 interface WelcomeScreenProps {
   onStart: () => void
@@ -27,12 +23,17 @@ interface WelcomeScreenProps {
   onAdmin: () => void
   onTestStart: () => void
   onAbout: () => void
-  onDiagnostics: () => void
+  /** Вече не е в началния екран (диагностиката е в настройките); оставено за съвместимост. */
+  onDiagnostics?: () => void
   /** Примерен доклад с демо данни. */
   onDemo?: () => void
 }
 
-/** Живо, бавно въртящо се око — визитката на приложението. */
+/**
+ * Окото — визитката на приложението. Нищо в него не се върти: истинският
+ * ирис не се върти, а въртящата се „сканираща“ дъга изглеждаше като зареждане,
+ * което никога не свършва. Остава само бавното „дишане“ на зеницата.
+ */
 function IrisArt() {
   const fibers = useMemo(() => {
     let s = 17
@@ -74,14 +75,10 @@ function IrisArt() {
             <stop offset="86%" stopColor="#2e6a8a" />
             <stop offset="100%" stopColor="#14283a" />
           </radialGradient>
-          <linearGradient id="w-scan" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0" />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
-          </linearGradient>
         </defs>
 
         {/* външна скала — 12 часа */}
-        <g className="iris-spin" style={{ animationDuration: '120s' }}>
+        <g>
           {Array.from({ length: 60 }, (_, i) => {
             const a = (i / 60) * Math.PI * 2
             const long = i % 5 === 0
@@ -102,7 +99,7 @@ function IrisArt() {
         </g>
 
         <circle cx="200" cy="200" r="152" fill="url(#w-iris)" />
-        <g className="iris-spin">
+        <g>
           {fibers.map((f, i) => (
             <line key={i} x1={f.x1} y1={f.y1} x2={f.x2} y2={f.y2} stroke={f.light ? 'rgba(230,240,235,0.16)' : 'rgba(10,20,25,0.2)'} strokeWidth={f.w} />
           ))}
@@ -116,11 +113,6 @@ function IrisArt() {
         </g>
         <ellipse cx="220" cy="180" rx="13" ry="9" fill="rgba(255,255,255,0.9)" transform="rotate(-35 220 180)" />
 
-        {/* сканираща дъга */}
-        <g className="iris-spin-fast">
-          <path d="M200 30 A170 170 0 0 1 347 115" fill="none" stroke="url(#w-scan)" strokeWidth="3" strokeLinecap="round" />
-        </g>
-
         {/* знаци */}
         {[
           [262, 268],
@@ -129,7 +121,7 @@ function IrisArt() {
         ].map(([x, y], i) => (
           <g key={i}>
             <circle cx={x} cy={y} r="9" fill="none" stroke="#fff" strokeWidth="1.5" className="iris-pulse" style={{ animationDelay: `${i * 0.5}s` }} />
-            <circle cx={x} cy={y} r="5.5" fill={i === 1 ? '#f59e0b' : '#f43f5e'} stroke="#fff" strokeWidth="1.5" />
+            <circle cx={x} cy={y} r="5.5" fill="#f59e0b" stroke="#fff" strokeWidth="1.5" />
           </g>
         ))}
       </svg>
@@ -155,18 +147,24 @@ function IrisArt() {
 
 const STEPS = [
   { icon: ClipboardText, title: 'Кратък въпросник', body: 'Цели, сън, хранене — около 3 минути.' },
-  { icon: Camera, title: 'Две снимки на очите', body: 'Отблизо, на дневна светлина, с калибрация.' },
-  { icon: FileText, title: 'Доклад и план', body: 'Карта на ириса, очно здраве, меню и стъпки.' },
+  { icon: Camera, title: 'Две снимки на очите', body: 'Със задната камера и светкавица, отблизо.' },
+  { icon: FileText, title: 'Доклад и план', body: 'Карта на ириса, проверка на очите, меню и първи стъпки.' },
 ]
 
-const FEATURES = [
-  { icon: MapTrifold, title: 'Иридологична карта', body: '12 зони × 6 пояса, всеки знак разчетен и проверен в два независими прочита.' },
-  { icon: Eye, title: 'Очно здраве', body: 'Скрининг за arcus, помътняване в зеницата, анизокория и др. — със съвет кога към офталмолог.' },
-  { icon: Sparkle, title: 'Персонален план', body: 'Хранене и навици, съобразени с вашите цели, непоносимости и ограничения.' },
-]
+/** Задържане на логото — скрит вход към настройките (за администратора). */
+const ADMIN_HOLD_MS = 800
 
-export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart, onAbout, onDiagnostics, onDemo }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestStart, onAbout, onDemo }: WelcomeScreenProps) {
   const [questionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
+  const [history] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
+  const holdTimer = useRef<number | null>(null)
+  const startHold = () => {
+    holdTimer.current = window.setTimeout(onAdmin, ADMIN_HOLD_MS)
+  }
+  const cancelHold = () => {
+    if (holdTimer.current) window.clearTimeout(holdTimer.current)
+    holdTimer.current = null
+  }
 
   // Проверката за API ключ беше чак в AnalysisScreen — потребителят изминаваше
   // 21 въпроса, две снимки и две калибрации и чак тогава научаваше, че нищо
@@ -174,52 +172,46 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
   const [aiConfig] = useKVWithFallback<AIModelConfig | null>('ai-model-config', null)
   const hasApiKey = !!aiConfig?.apiKey && aiConfig.apiKey.trim().length > 0
 
-  const navItems = [
-    { icon: ClockClockwise, label: 'История', onClick: onViewHistory },
-    { icon: Info, label: 'Как работи', onClick: onAbout },
-    { icon: Gear, label: 'Настройки', onClick: onAdmin },
-    { icon: Bug, label: 'Диагностика', onClick: onDiagnostics },
-  ]
 
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,oklch(0.9_0.06_230/.7),transparent_55%),radial-gradient(ellipse_at_bottom_left,oklch(0.92_0.07_45/.5),transparent_50%)]" />
 
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-8">
-        <div className="flex items-center gap-2">
+        {/* Задържане на логото отваря настройките — не е нужно на обикновения потребител. */}
+        <div
+          className="flex select-none items-center gap-2"
+          onPointerDown={startHold}
+          onPointerUp={cancelHold}
+          onPointerLeave={cancelHold}
+          onContextMenu={e => e.preventDefault()}
+        >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-md">
             <Eye size={20} weight="duotone" className="text-white" />
           </span>
           <span className="text-lg font-extrabold tracking-tight">airis</span>
         </div>
-        <nav className="flex items-center gap-1">
-          {navItems.map(n => (
-            <button
-              key={n.label}
-              type="button"
-              onClick={n.onClick}
-              title={n.label}
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:bg-background/80 hover:text-foreground"
-            >
-              <n.icon size={18} weight="duotone" />
-              <span className="hidden lg:inline">{n.label}</span>
-            </button>
-          ))}
-        </nav>
+        {(history?.length ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={onViewHistory}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground transition hover:bg-background/80 hover:text-foreground active:scale-95"
+          >
+            <ClockClockwise size={18} weight="duotone" />
+            Моите анализи
+          </button>
+        )}
       </header>
 
       <main className="relative mx-auto max-w-6xl px-4 pb-12 md:px-8">
         <section className="grid items-center gap-8 pt-2 md:grid-cols-[1.1fr_1fr] md:gap-10 md:pt-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="order-2 text-center md:order-1 md:text-left">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
-              <Sparkle size={14} weight="fill" /> Иридология + офталмологичен скрининг
-            </span>
-            <h1 className="mt-4 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
+            <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
               Какво разказват{' '}
               <span className="bg-gradient-to-r from-primary via-sky-500 to-accent bg-clip-text text-transparent">очите ви</span>
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground md:mx-0">
-              Две снимки и кратък въпросник — и получавате карта на ириса, проверка за видими очни знаци и личен план за хранене и навици.
+              Две снимки и кратък въпросник — карта на ириса, проверка за видими знаци по очите и личен план за хранене.
             </p>
 
             <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row md:items-start">
@@ -304,33 +296,19 @@ export default function WelcomeScreen({ onStart, onViewHistory, onAdmin, onTestS
           ))}
         </section>
 
-        <section className="mt-3 grid gap-3 md:grid-cols-3">
-          {FEATURES.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 + i * 0.1 }}
-              whileHover={{ y: -3 }}
-              className="rounded-2xl bg-gradient-to-br from-card to-muted/40 p-5 shadow-sm ring-1 ring-border transition-shadow hover:shadow-lg"
-            >
-              <f.icon size={26} weight="duotone" className="text-primary" />
-              <p className="mt-3 font-bold">{f.title}</p>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{f.body}</p>
-            </motion.div>
-          ))}
+        <section className="mt-3 rounded-2xl bg-background/70 p-4 ring-1 ring-border backdrop-blur md:p-5">
+          <p className="mb-2 flex items-center gap-2 font-semibold">
+            <Camera size={18} weight="duotone" className="text-primary" /> За снимките ви трябва
+          </p>
+          <PhotoGuide compact />
         </section>
 
         <footer className="mt-10 flex flex-col items-center gap-4 text-center">
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
             Иридологията е допълващ подход, а не медицинска диагностика. Очният скрининг само насочва кога да се покажете на офталмолог.
           </p>
-          <button
-            type="button"
-            onClick={() => { window.location.href = `${import.meta.env.BASE_URL}learn.html` }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-400/30 transition hover:bg-violet-500/20"
-          >
-            <Star size={14} weight="duotone" /> Звездичко — Домашна работа
+          <button type="button" onClick={onAbout} className="min-h-11 px-3 text-sm font-medium text-primary hover:underline">
+            Как работи анализът
           </button>
         </footer>
       </main>

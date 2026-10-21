@@ -83,7 +83,7 @@ export default function HealthProgressChart({ report }: HealthProgressChartProps
             wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
             iconType="line"
           />
-          <Line
+          <Line isAnimationActive={false}
             type="monotone"
             dataKey="health"
             stroke="oklch(0.55 0.15 230)"
@@ -92,7 +92,7 @@ export default function HealthProgressChart({ report }: HealthProgressChartProps
             dot={{ r: 5, fill: 'oklch(0.55 0.15 230)' }}
             activeDot={{ r: 7, onMouseEnter: () => setHoveredPoint(0) }}
           />
-          <Line
+          <Line isAnimationActive={false}
             type="monotone"
             dataKey="projected"
             stroke="oklch(0.70 0.18 45)"

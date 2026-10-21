@@ -53,7 +53,10 @@ export interface UnwrapOptions {
   layer?: StripLayer
   /** Ширина на полето с ирисова тъкан, px. По подразбиране 1440. */
   plotWidth?: number
-  /** Височина на полето с ирисова тъкан, px. По подразбиране 720. */
+  /**
+   * Височина на полето с ирисова тъкан, px. По подразбиране се смята от
+   * геометрията (виж `autoPlotHeight`), за да не се разтягат формите.
+   */
   plotHeight?: number
   /** JPEG качество на изхода. */
   quality?: number
@@ -105,6 +108,12 @@ export interface UnwrapResult {
   rotationSectors: number
   /** Кои пръстени показва лентата (включително двата края). */
   ringRange: [number, number]
+  /**
+   * Колко пъти лентата е разтеглена по височина спрямо ширината — във
+   * вътрешния (R1), средния (R6) и външния (R10) пръстен. 1 = без изкривяване;
+   * 2 = кръгла дупка изглежда два пъти по-висока, отколкото е широка.
+   */
+  stretch: { inner: number; middle: number; outer: number }
 }
 
 const SECTORS = 12
@@ -150,6 +159,113 @@ function bilinear(src: Src, x: number, y: number, out: [number, number, number])
     out[k] = a * (1 - fy) + b * fy
   }
   return true
+}
+
+/* ── пропорции на лентата ─────────────────────────────────────────────────── */
+
+/**
+ * ЗАЩО ВИСОЧИНАТА НЕ Е ФИКСИРАНА.
+ *
+ * Тъканта между зеницата и лимбуса е тясна — на реална снимка от телефон около
+ * 130 px. При фиксирани 720 px височина тя се разтягаше ~5.5×, а обиколката
+ * по ширина — само ~2×. Кръгла крипта излизаше 3–4 пъти по-висока, отколкото
+ * е широка, и всяка тъмна точка ставаше „вертикална ивица". Точно по тази
+ * разлика (компактна срещу издължена) промптът различава дефект от бразда.
+ *
+ * Сега височината се избира така, че в средния пръстен лентата да е разтеглена
+ * най-много ~1.6×. Долната граница пази редовете четими (≥ 36 px на ред).
+ */
+const MAX_MID_STRETCH = 1.6
+const MIN_PLOT_HEIGHT = 432
+const MAX_PLOT_HEIGHT = 720
+
+function meanLimbusRadius(geo: IrisGeometry): number {
+  return geo.limbus.ry === undefined ? geo.limbus.r : (geo.limbus.r + geo.limbus.ry) / 2
+}
+
+function autoPlotHeight(geo: IrisGeometry, plotWidth: number): number {
+  const thickness = meanLimbusRadius(geo) - geo.pupil.r
+  if (!(thickness > 0)) return MAX_PLOT_HEIGHT
+  const rMid = geo.pupil.r + thickness / 2
+  const isotropic = (plotWidth * thickness) / (2 * Math.PI * rMid)
+  return Math.round(Math.max(MIN_PLOT_HEIGHT, Math.min(MAX_PLOT_HEIGHT, isotropic * MAX_MID_STRETCH)))
+}
+
+/** Вертикално / хоризонтално мащабиране в даден пръстен (виж `UnwrapResult.stretch`). */
+function stretchAt(geo: IrisGeometry, ring: number, plotWidth: number, plotHeight: number, ringCount: number) {
+  const thickness = meanLimbusRadius(geo) - geo.pupil.r
+  if (!(thickness > 0)) return 1
+  const r = geo.pupil.r + (thickness * (ring + 0.5)) / RINGS
+  const vertical = plotHeight / ringCount / (thickness / RINGS)
+  const horizontal = plotWidth / (2 * Math.PI * r)
+  return Math.round((vertical / horizontal) * 10) / 10
+}
+
+/**
+ * РЪБЪТ НА ЗЕНИЦАТА ПО ВСЕКИ ЛЪЧ.
+ *
+ * Калибраторът държи зеницата и лимбуса на общ център (иначе мрежата в него
+ * изглежда изместена), а реалната зеница почти винаги е леко отместена и не
+ * съвсем кръгла. На реална снимка това вкарваше тъмносин клин от зеницата в
+ * пояс R0 на два-три сектора — готова фалшива „сплесната зеница" или дефект.
+ *
+ * Тук по всеки лъч се търси най-силният преход тъмно → светло около
+ * номиналния радиус (0.75–1.35×), после резултатът се изглажда с плъзгаща
+ * медиана по ъгъла, за да не го отклонят отделни влакна или отблясък.
+ * Ако преходът е слаб, остава номиналният радиус.
+ */
+function pupilEdgeByColumn(src: Src, geo: IrisGeometry, plotWidth: number, rotationTurns: number): Float32Array {
+  const rp = geo.pupil.r
+  const raw = new Float32Array(plotWidth)
+  const buf: [number, number, number] = [0, 0, 0]
+  const lo = rp * 0.75
+  const hi = rp * 1.35
+  const step = Math.max(0.5, rp / 80)
+  const n = Math.max(8, Math.floor((hi - lo) / step))
+  const prof = new Float32Array(n)
+  const gap = Math.max(2, Math.round(n / 25))
+  for (let col = 0; col < plotWidth; col++) {
+    const theta = ((col + 0.5) / plotWidth + rotationTurns) * Math.PI * 2
+    const sin = Math.sin(theta)
+    const cos = Math.cos(theta)
+    let ok = true
+    for (let k = 0; k < n; k++) {
+      const r = lo + k * step
+      if (!bilinear(src, geo.pupil.cx + r * sin, geo.pupil.cy - r * cos, buf)) { ok = false; break }
+      prof[k] = luma(buf[0], buf[1], buf[2])
+    }
+    raw[col] = rp
+    if (!ok) continue
+    let best = 0
+    let bestK = -1
+    for (let k = gap; k < n - gap; k++) {
+      const g = prof[k + gap] - prof[k - gap]
+      if (g > best) { best = g; bestK = k }
+    }
+    // Под ~12 нива яркост няма ясен ръб — по-добре номиналът, отколкото шум.
+    if (bestK >= 0 && best > 12) raw[col] = lo + bestK * step
+  }
+  const win = Math.max(3, Math.round(plotWidth / 48))
+  const out = new Float32Array(plotWidth)
+  const tmp: number[] = []
+  for (let col = 0; col < plotWidth; col++) {
+    tmp.length = 0
+    for (let d = -win; d <= win; d += 2) tmp.push(raw[(col + d + plotWidth) % plotWidth])
+    tmp.sort((a, b) => a - b)
+    out[col] = Math.max(rp * 0.8, Math.min(rp * 1.3, tmp[tmp.length >> 1]))
+  }
+  // Медианата пак може да скача между две стойности на съседни колони, а всеки
+  // скок мести цялата колона по радиуса — в лентата това са тънки вертикални
+  // резки. Плъзгащата средна го прави плавна крива.
+  const smooth = new Float32Array(plotWidth)
+  const avgWin = Math.max(4, Math.round(plotWidth / 36))
+  let acc = 0
+  for (let d = -avgWin; d <= avgWin; d++) acc += out[(d + plotWidth) % plotWidth]
+  for (let col = 0; col < plotWidth; col++) {
+    smooth[col] = acc / (avgWin * 2 + 1)
+    acc += out[(col + avgWin + 1) % plotWidth] - out[(col - avgWin + plotWidth) % plotWidth]
+  }
+  return smooth
 }
 
 /* ── филтри ───────────────────────────────────────────────────────────────── */
@@ -235,8 +351,12 @@ function applyStructure(px: Float32Array, w: number, h: number, valid: Uint8Arra
   applyBase(px, w, h, valid)
   const L = new Float32Array(w * h)
   for (let i = 0; i < w * h; i++) L[i] = luma(px[i * 3], px[i * 3 + 1], px[i * 3 + 2])
-  const blurred = boxBlur(L, w, h, 3)
-  const amount = 1.25
+  // Лентата е семплирана 2–3× по-гъсто от реалните пиксели, затова радиус 3
+  // изостряше интерполацията, а силата 1.25 пращаше всяка сянка в чисто черно —
+  // криптите се сливаха в еднакви черни ивици. По-широкият радиус хваща
+  // влакната, по-ниската сила запазва степените на тъмнината.
+  const blurred = boxBlur(L, w, h, 5)
+  const amount = 0.85
   for (let i = 0; i < w * h; i++) {
     const sharp = L[i] + (L[i] - blurred[i]) * amount
     const ratio = L[i] > 1 ? Math.max(0, Math.min(255, sharp)) / L[i] : 1
@@ -250,20 +370,42 @@ function applyStructure(px: Float32Array, w: number, h: number, valid: Uint8Arra
 }
 
 /**
- * PIGMENT — усилване на насищането при запазена яркост. Жълто-оранжевите и
- * ръждивите петна изпъкват и в тъмни ириси, където иначе са невидими.
+ * PIGMENT — усилва ОТКЛОНЕНИЕТО на цвета от средния цвят на самия ирис.
+ *
+ * Преди насищането се вдигаше 1.9× за всеки пиксел. Така се усилваше и общият
+ * оттенък на снимката (баланс на бялото, топъл отблясък от кожата): на реален
+ * зелено-лешников ирис цялата лента ставаше жълто-оранжева и моделът нямаше
+ * как да различи петно от фон. Сега средният цвят остава какъвто е, а се
+ * усилва само разликата от него — петното изпъква, фонът не.
  */
 function applyPigment(px: Float32Array, w: number, h: number, valid: Uint8Array) {
   applyBase(px, w, h, valid)
-  const boost = 1.9
+  let mr = 0
+  let mg = 0
+  let mb = 0
+  let n = 0
+  for (let i = 0; i < w * h; i += 3) {
+    if (!valid[i]) continue
+    const l = luma(px[i * 3], px[i * 3 + 1], px[i * 3 + 2])
+    mr += px[i * 3] - l
+    mg += px[i * 3 + 1] - l
+    mb += px[i * 3 + 2] - l
+    n++
+  }
+  if (n) {
+    mr /= n
+    mg /= n
+    mb /= n
+  }
+  const boost = 2.4
   for (let i = 0; i < w * h; i++) {
     const r = px[i * 3]
     const g = px[i * 3 + 1]
     const b = px[i * 3 + 2]
     const l = luma(r, g, b)
-    px[i * 3] = Math.max(0, Math.min(255, l + (r - l) * boost))
-    px[i * 3 + 1] = Math.max(0, Math.min(255, l + (g - l) * boost))
-    px[i * 3 + 2] = Math.max(0, Math.min(255, l + (b - l) * boost))
+    px[i * 3] = Math.max(0, Math.min(255, l + mr + (r - l - mr) * boost))
+    px[i * 3 + 1] = Math.max(0, Math.min(255, l + mg + (g - l - mg) * boost))
+    px[i * 3 + 2] = Math.max(0, Math.min(255, l + mb + (b - l - mb) * boost))
   }
 }
 
@@ -285,10 +427,12 @@ export function unwrapIris(
   const ring1 = Math.max(ring0, Math.min(RINGS - 1, Math.round(options.ringRange?.[1] ?? RINGS - 1)))
   const ringCount = ring1 - ring0 + 1
   const PW = options.plotWidth ?? 1440
-  const PH = options.plotHeight ?? 720
+  // Увеличеният прочит (по-малко пръстени) нарочно разтяга — там важи старото 720.
+  const PH = options.plotHeight ?? (ringCount === RINGS ? autoPlotHeight(geo, PW) : MAX_PLOT_HEIGHT)
   const quality = options.quality ?? 0.93
 
   const src = loadSource(img)
+  const pupilEdge = pupilEdgeByColumn(src, geo, PW, rotationTurns)
 
   const px = new Float32Array(PW * PH * 3)
   const valid = new Uint8Array(PW * PH)
@@ -312,7 +456,7 @@ export function unwrapIris(
       const sin = Math.sin(theta)
       const cos = Math.cos(theta)
       // радиусът на зеницата и на лимбуса по този лъч, спрямо съответния център
-      const rIn = pupil.r
+      const rIn = pupilEdge[col]
       // Елиптичен лимбус: радиусът зависи от ъгъла. При поглед встрани ирисът се
       // проектира като елипса и единичен радиус вкарва склера в най-външните
       // пръстени.
@@ -507,6 +651,11 @@ export function unwrapIris(
     layer,
     rotationSectors,
     ringRange: [ring0, ring1],
+    stretch: {
+      inner: stretchAt(geo, Math.max(ring0, 1), PW, PH, ringCount),
+      middle: stretchAt(geo, Math.min(Math.max(ring0, 6), ring1), PW, PH, ringCount),
+      outer: stretchAt(geo, Math.min(ring1, 10), PW, PH, ringCount),
+    },
   }
 }
 
@@ -724,7 +873,7 @@ function drawCalibrationGrid(
       ctx.lineWidth = 1
       ctx.strokeRect(x, y, wBand, cellH)
       ctx.fillStyle = '#1e1b4b'
-      ctx.font = 'bold 30px "Arial", sans-serif'
+      ctx.font = `bold ${Math.round(Math.min(30, cellH * 0.62))}px "Arial", sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(`R${r}`, x + wBand / 2, y + cellH / 2)
