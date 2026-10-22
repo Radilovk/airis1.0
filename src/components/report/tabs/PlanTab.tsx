@@ -22,6 +22,7 @@ import {
 import { motion } from 'framer-motion'
 import type { AnalysisReport, SupplementRecommendation } from '@/types'
 import { cn } from '@/lib/utils'
+import { interactionsFor, applySupplementInteractions } from '@/lib/drug-interactions'
 
 interface PlanTabProps {
   report: AnalysisReport
@@ -194,8 +195,17 @@ function SupplementsSection({ supplements, questionnaire }: { supplements: Suppl
   const [isOpen, setIsOpen] = useState(false)
   const vegan = (questionnaire?.dietaryProfile || []).includes('Веган')
   // Само търсеща дума: наличните продукти се подбират на biocode-bg.com при клика.
+  // Array.from — за да не се среже символ на две (емоджи и др.).
   const pickUrl = (name: string) =>
-    `https://biocode-bg.com/pick.html?q=${encodeURIComponent(name.slice(0, 80))}${vegan ? '&vegan=1' : ''}&utm_source=airis&utm_medium=supplement`
+    `https://biocode-bg.com/pick.html?q=${encodeURIComponent(Array.from(name).slice(0, 80).join(''))}${vegan ? '&vegan=1' : ''}&utm_source=airis&utm_medium=supplement`
+  // Същата таблица за лекарства като в NutriPlan: неподходящата при посоченото
+  // лекарство добавка остава с предупреждение и без линк към магазина.
+  const meds = String(questionnaire?.medications || '').trim()
+  const ix = interactionsFor({ medications: meds, medicationsDetails: '' })
+  const blocked = new Map<string, string>(
+    applySupplementInteractions(supplements.map(s => ({ name: String(s?.name ?? ''), dosage: s?.dosage })), ix).dropped
+      .map((d: { name: string; because: string }) => [d.name, d.because]),
+  )
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -240,10 +250,22 @@ function SupplementsSection({ supplements, questionnaire }: { supplements: Suppl
                   </div>
                   <div className="flex-1 min-w-0">
                     <h5 className="font-bold text-base mb-2 text-primary break-words">
-                      <a href={pickUrl(supp.name)} target="_blank" rel="noopener sponsored" className="underline underline-offset-4 hover:text-primary/80">
-                        {supp.name}
-                      </a>
+                      {(() => {
+                        const name = String(supp?.name ?? '').trim()
+                        if (!name || blocked.has(name)) return name
+                        return (
+                          <a href={pickUrl(name)} target="_blank" rel="noopener sponsored" className="underline underline-offset-4 hover:text-primary/80">
+                            {name}
+                          </a>
+                        )
+                      })()}
                     </h5>
+                    {blocked.has(String(supp?.name ?? '').trim()) && (
+                      <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 p-2.5 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                        <WarningCircle size={18} weight="fill" className="mt-0.5 flex-shrink-0" />
+                        <span>Не се препоръчва при приема на {blocked.get(String(supp?.name ?? '').trim())} — обсъдете с лекаря си, преди да я приемате.</span>
+                      </div>
+                    )}
                     <div className="space-y-2 text-sm">
                       <div className="flex items-start gap-2 p-2 bg-background/80 rounded-lg">
                         <span className="font-semibold text-foreground min-w-[80px] flex-shrink-0">• Дозировка:</span>

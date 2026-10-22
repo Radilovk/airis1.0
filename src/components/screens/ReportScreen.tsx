@@ -398,9 +398,12 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
             </TabsContent>
           </Tabs>
 
-        <div className="mt-8">
-          <NutriPlanCta report={report} />
-        </div>
+        {/* Дошлите от NutriPlan виждат бутона горе — тук не се повтаря. */}
+        {!cameFromNutriPlan() && (
+          <div className="mt-8">
+            <NutriPlanCta report={report} />
+          </div>
+        )}
       </div>
     </div>
   )

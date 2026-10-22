@@ -9,6 +9,9 @@ import { cameFromNutriPlan, createNutriPlanLink } from '@/lib/nutriplan-handoff'
  * Към NutriPlan: насоките от анализа като седмично меню с количества и
  * проследяване. Изпраща се обобщението на анализа и въпросника — без снимките.
  */
+// Един линк за един доклад — повторно натискане не създава нова пратка.
+const linkCache = new Map<string, { url: string; withData: boolean }>()
+
 export default function NutriPlanCta({ report }: { report: AnalysisReport }) {
   const [busy, setBusy] = useState(false)
   const returning = cameFromNutriPlan()
@@ -18,10 +21,14 @@ export default function NutriPlanCta({ report }: { report: AnalysisReport }) {
     setBusy(true)
     // Прозорецът се отваря веднага (в отговор на натискането), иначе браузърът го блокира.
     const popup = returning ? null : window.open('', '_blank')
-    const { url, withData } = await createNutriPlanLink(report)
-    if (!withData) toast.info('Няма връзка с NutriPlan — отваряме въпросника без данните от анализа')
-    if (popup) popup.location.href = url
-    else window.location.assign(url)
+    const key = String(report.id || report.timestamp || '')
+    const link = linkCache.get(key) || await createNutriPlanLink(report)
+    if (link.withData && key) linkCache.set(key, link)
+    // Съобщението се вижда само ако остава в този раздел (новият раздел е отпред).
+    const usePopup = popup && !popup.closed
+    if (!link.withData && !usePopup) toast.info('Няма връзка с NutriPlan — отваряме въпросника без данните от анализа')
+    if (usePopup) popup.location.href = link.url
+    else window.location.assign(link.url)
     setBusy(false)
   }
 

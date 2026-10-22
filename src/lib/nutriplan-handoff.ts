@@ -72,6 +72,7 @@ export function buildNutriPlanHandoff(report: AnalysisReport) {
       medications: q.medications,
       medicalConditions: q.medicalConditions,
       complaints: [q.complaints, q.familyHistory ? `Фамилна обремененост: ${q.familyHistory}` : ''].filter(Boolean).join('. '),
+      healthStatus: list(q.healthStatus, 10),
     },
     analysis: {
       constitution: constitutionLabel(c?.constitution),
@@ -82,7 +83,10 @@ export function buildNutriPlanHandoff(report: AnalysisReport) {
       eatLess: list(plan?.avoidFoods, 15),
       supplements: (plan?.supplements || []).slice(0, 8).map(s => ({ name: s.name, dosage: s.dosage })),
       recommendedTests: list(plan?.recommendedTests, 10),
-      notices: (c?.notices || []).map(n => ({ level: n.level, title: n.title, body: n.body })),
+      // NutriPlan приема до 6 — критичните (напр. варфарин) първи, за да не отпаднат.
+      notices: [...(c?.notices || [])]
+        .sort((a, b) => Number(b.level === 'critical') - Number(a.level === 'critical'))
+        .map(n => ({ level: n.level, title: n.title, body: n.body })),
       eyeReferral: c?.eyeHealth?.referral || 'none',
     },
   }
@@ -95,6 +99,8 @@ export function buildNutriPlanHandoff(report: AnalysisReport) {
 export async function createNutriPlanLink(report: AnalysisReport): Promise<{ url: string; withData: boolean }> {
   try {
     const res = await fetch(NUTRIPLAN_HANDOFF_URL, {
+      // Без отговор до 8 s — към въпросника без пратка, вместо празен раздел.
+      signal: AbortSignal.timeout(8000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildNutriPlanHandoff(report)),
