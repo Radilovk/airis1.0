@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>AIRIS — Персонален протокол по ириса</title>
+  <meta name="description" content="Две снимки на очите и 3 минути въпроси. Хранене, добавки и режим, подредени по вашия ирис." />
+  <meta name="theme-color" content="#0E1A22" />
+  <meta property="og:title" content="Ирисът ви е уникален. Планът ви — също." />
+  <meta property="og:description" content="Персонален протокол за хранене, добавки и режим — по вашия ирис." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0E1A22;
+      --ink-2: #16262F;
+      --paper: #F5F1EA;
+      --card: #FFFFFF;
+      --text: #14212B;
+      --muted: #5B6770;
+      --line: #E4DDD1;
+      --teal: #2E6A8A;
+      --amber: #E3A23B;
+      --amber-deep: #B9771A;
+      --radius: 20px;
+      --pad: 20px;
+      --tap: 56px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--paper);
+      color: var(--text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .serif { font-family: 'Lora', Georgia, serif; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 0 var(--pad); }
+    section { padding: 64px 0; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--amber-deep);
+    }
+    .eyebrow::before { content: ''; width: 18px; height: 2px; background: currentColor; border-radius: 2px; }
+    h2 { font-family: 'Lora', Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1.15; letter-spacing: -.01em; margin-top: 12px; }
+    .lead { margin-top: 14px; font-size: 17px; color: var(--muted); }
+
+    /* ---------- бутони ---------- */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: var(--tap); width: 100%; padding: 0 24px;
+      border-radius: 16px; border: 0; cursor: pointer; text-decoration: none;
+      font: 800 17px/1 'Manrope', sans-serif; letter-spacing: .01em;
+      transition: transform .15s ease, box-shadow .2s ease;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: linear-gradient(135deg, #F0B550, var(--amber)); color: #1B1205; box-shadow: 0 10px 30px rgba(227,162,59,.35); }
+    .btn-ghost { background: transparent; color: #E9EEF1; border: 1.5px solid rgba(233,238,241,.25); font-weight: 700; font-size: 16px; }
+    .btn svg { width: 20px; height: 20px; }
+    .micro { margin-top: 12px; font-size: 13px; color: rgba(233,238,241,.7); text-align: center; }
+
+    /* ---------- герой ---------- */
+    .hero {
+      background:
+        radial-gradient(120% 60% at 50% 0%, rgba(46,106,138,.45), transparent 60%),
+        radial-gradient(80% 40% at 100% 100%, rgba(227,162,59,.15), transparent 60%),
+        var(--ink);
+      color: #F2F5F7;
+      padding: 18px 0 44px;
+      overflow: hidden;
+    }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 44px; }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; letter-spacing: -.01em; color: #F2F5F7; text-decoration: none; }
+    .logo i { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle, #05080b 30%, var(--teal) 32%, #8a6a34 70%, #14283a 100%); box-shadow: 0 0 0 2px rgba(255,255,255,.12); }
+    .nav a.small { color: rgba(242,245,247,.75); font-size: 14px; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+    .iris-wrap { position: relative; width: 78%; max-width: 330px; margin: 20px auto 6px; aspect-ratio: 1; }
+    .iris-wrap::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle, rgba(46,106,138,.55), transparent 70%); filter: blur(28px); }
+    #iris { position: relative; width: 100%; height: 100%; }
+    .tag {
+      position: absolute; font-size: 11px; font-weight: 700; white-space: nowrap;
+      padding: 6px 10px; border-radius: 999px;
+      background: rgba(14,26,34,.82); color: #F2F5F7; border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      opacity: 0; transform: translateY(6px); animation: tagIn .6s ease forwards;
+    }
+    .tag b { color: var(--amber); font-weight: 800; }
+    .tag.t1 { left: -6%; top: 24%; animation-delay: .9s; }
+    .tag.t2 { right: -8%; top: 8%; animation-delay: 1.2s; }
+    .tag.t3 { right: -4%; bottom: 14%; animation-delay: 1.5s; }
+    @keyframes tagIn { to { opacity: 1; transform: none; } }
+    .hero h1 {
+      font-family: 'Lora', Georgia, serif; font-weight: 600;
+      font-size: clamp(34px, 9.6vw, 46px); line-height: 1.06; letter-spacing: -.015em;
+      text-align: center; margin-top: 18px;
+    }
+    .hero h1 em { font-style: italic; color: var(--amber); }
+    .hero .sub { margin: 16px auto 0; max-width: 30em; text-align: center; font-size: 17px; color: rgba(242,245,247,.8); }
+    .hero .ctas { display: grid; gap: 12px; margin-top: 26px; }
+    .proof-row { display: flex; justify-content: center; gap: 18px; margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.1); }
+    .proof-row div { text-align: center; }
+    .proof-row strong { display: block; font-family: 'Lora', serif; font-size: 22px; color: #fff; }
+    .proof-row span { font-size: 12px; color: rgba(242,245,247,.62); }
+
+    /* ---------- проблем ---------- */
+    .versus { margin-top: 26px; display: grid; gap: 12px; }
+    .vrow { display: grid; grid-template-columns: 1fr 1fr; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--card); }
+    .vrow > div { padding: 14px; font-size: 14px; line-height: 1.4; }
+    .vrow .no { color: var(--muted); background: #FAF7F2; text-decoration: line-through; text-decoration-color: rgba(91,103,112,.4); }
+    .vrow .yes { font-weight: 700; }
+    .vhead { display: grid; grid-template-columns: 1fr 1fr; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 14px; }
+    .vhead span:last-child { color: var(--teal); }
+
+    /* ---------- механизъм ---------- */
+    .dark { background: var(--ink); color: #EEF2F4; }
+    .dark .lead { color: rgba(238,242,244,.72); }
+    .dark .eyebrow { color: var(--amber); }
+    .layers { margin-top: 28px; display: grid; gap: 10px; }
+    .layer { display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; padding: 16px; border-radius: 16px; background: var(--ink-2); border: 1px solid rgba(255,255,255,.07); }
+    .layer .n { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-family: 'Lora', serif; font-size: 18px; color: var(--amber); border: 1.5px solid rgba(227,162,59,.4); }
+    .layer h3 { font-size: 16px; font-weight: 800; }
+    .layer p { font-size: 14px; color: rgba(238,242,244,.68); margin-top: 2px; }
+    .equation { margin-top: 26px; padding: 18px; border-radius: 16px; text-align: center; background: linear-gradient(135deg, rgba(46,106,138,.35), rgba(227,162,59,.18)); border: 1px solid rgba(255,255,255,.1); font-weight: 700; font-size: 15px; line-height: 1.7; }
+    .equation .op { color: var(--amber); padding: 0 6px; }
+
+    /* ---------- протоколът ---------- */
+    .doc { margin-top: 28px; background: var(--card); border-radius: 22px; border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(14,26,34,.12); overflow: hidden; }
+    .doc-head { padding: 18px 18px 14px; border-bottom: 1px dashed var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .doc-head .t { font-family: 'Lora', serif; font-size: 18px; font-weight: 600; }
+    .doc-head .id { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+    .doc-head .stamp { flex-shrink: 0; font-size: 11px; font-weight: 800; color: var(--teal); border: 1.5px solid var(--teal); border-radius: 8px; padding: 4px 8px; transform: rotate(-4deg); }
+    .block { padding: 16px 18px; border-bottom: 1px solid #F0EBE2; }
+    .block:last-child { border-bottom: 0; }
+    .block h4 { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; }
+    .block h4 .ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: #F2EEE6; font-size: 16px; }
+    .block p { margin-top: 6px; font-size: 14px; color: var(--muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chip { font-size: 12.5px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: #EEF4F7; color: var(--teal); }
+    .chip.less { background: #FBF1E2; color: var(--amber-deep); }
+    .blur { filter: blur(4.5px); user-select: none; }
+    .lock { margin-top: 10px; font-size: 12.5px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+    /* ---------- стъпки ---------- */
+    .steps { margin-top: 26px; display: grid; gap: 0; position: relative; }
+    .step { display: grid; grid-template-columns: 40px 1fr; gap: 14px; padding-bottom: 22px; position: relative; }
+    .step:not(:last-child)::after { content: ''; position: absolute; left: 19px; top: 42px; bottom: 4px; width: 2px; background: var(--line); }
+    .step .dot { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--amber); font-weight: 800; }
+    .step h3 { font-size: 16px; font-weight: 800; padding-top: 8px; }
+    .step p { font-size: 14.5px; color: var(--muted); margin-top: 2px; }
+    .step .time { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--teal); }
+
+    /* ---------- доверие ---------- */
+    .trust { display: grid; gap: 12px; margin-top: 26px; }
+    .trust-item { display: grid; grid-template-columns: 36px 1fr; gap: 12px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+    .trust-item .ic { font-size: 22px; line-height: 36px; text-align: center; }
+    .trust-item h3 { font-size: 15px; font-weight: 800; }
+    .trust-item p { font-size: 14px; color: var(--muted); margin-top: 2px; }
+
+    /* ---------- въпроси ---------- */
+    details { border-bottom: 1px solid var(--line); }
+    summary { list-style: none; cursor: pointer; min-height: var(--tap); display: flex; align-items: center; justify-content: space-between; gap: 16px; font-weight: 700; font-size: 16px; padding: 14px 0; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: '+'; font-size: 22px; font-weight: 500; color: var(--teal); transition: transform .2s; flex-shrink: 0; }
+    details[open] summary::after { transform: rotate(45deg); }
+    details p { padding: 0 0 16px; font-size: 15px; color: var(--muted); }
+
+    /* ---------- финал ---------- */
+    .final { text-align: center; padding-bottom: 120px; }
+    .final h2 { font-size: 32px; }
+    .final h2 em { color: var(--amber); }
+    .final .ctas { margin-top: 26px; }
+    .final .micro { color: rgba(238,242,244,.6); }
+    .foot { margin-top: 40px; font-size: 12px; color: rgba(238,242,244,.45); line-height: 1.6; }
+
+    /* ---------- лепкав бутон ---------- */
+    .sticky {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      padding: 10px var(--pad) calc(10px + var(--safe-b));
+      background: rgba(245,241,234,.92); border-top: 1px solid var(--line);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      transform: translateY(110%); transition: transform .3s ease;
+    }
+    .sticky.on { transform: none; }
+    .sticky .btn { max-width: 520px; margin: 0 auto; }
+
+    .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .tag { opacity: 1; transform: none; transition: none; animation: none; }
+      .breathe { animation: none !important; }
+    }
+    .breathe { transform-origin: 200px 200px; animation: breathe 6s ease-in-out infinite; }
+    @keyframes breathe { 50% { transform: scale(1.08); } }
+    .pulse { transform-box: fill-box; transform-origin: center; animation: pulse 2.4s ease-out infinite; }
+    @keyframes pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(2.4); } }
+    @media (min-width: 720px) { section { padding: 88px 0; } h2 { font-size: 36px; } }
+  </style>
+</head>
+<body>
+
+<!-- 1. ГЕРОЙ: едно обещание, едно действие -->
+<header class="hero">
+  <div class="wrap">
+    <nav class="nav">
+      <a class="logo" href="#"><i></i>airis</a>
+      <a class="small" href="#protocol">Какво получавам</a>
+    </nav>
+
+    <div class="iris-wrap" aria-hidden="true">
+      <svg id="iris" viewBox="0 0 400 400"></svg>
+      <span class="tag t1">Конституция</span>
+      <span class="tag t2">Храносмилане · <b>фокус</b></span>
+      <span class="tag t3">Стресов пръстен</span>
+    </div>
+
+    <p class="eyebrow" style="display:flex;justify-content:center;color:var(--amber)">Персонален протокол по ириса</p>
+    <h1>Ирисът ви е уникален.<br><em>Планът ви — също.</em></h1>
+    <p class="sub">Две снимки на очите и няколко въпроса. Получавате протокол за хранене, добавки и режим, съставен само за вас.</p>
+
+    <div class="ctas">
+      <a class="btn btn-primary" href="./" data-cta="hero">
+        Започни своя протокол
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-ghost" href="#protocol">Виж как изглежда протоколът</a>
+    </div>
+    <p class="micro">≈ 7 минути · само с телефона · резултат веднага</p>
+
+    <div class="proof-row">
+      <div><strong>2</strong><span>снимки</span></div>
+      <div><strong>4</strong><span>слоя анализ</span></div>
+      <div><strong>1</strong><span>протокол за вас</span></div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- 2. ПРОБЛЕМЪТ: защо досега не е проработило -->
+  <section>
+    <div class="wrap reveal">
+      <p class="eyebrow">Защо общите диети не работят</p>
+      <h2>Един и същ план.<br>Различни хора.<br>Различни резултати.</h2>
+      <p class="lead">Повечето диети са написани за „средния човек“. Него го няма. Има вас — с вашето храносмилане, вашия стрес, вашия сън.</p>
+
+      <div class="versus">
+        <div class="vhead"><span>Общ план</span><span>Вашият протокол</span></div>
+        <div class="vrow"><div class="no">Същото меню за всички</div><div class="yes">Храни според вашите слаби места</div></div>
+        <div class="vrow"><div class="no">Добавки „за всеки случай“</div><div class="yes">Само нужните — и защо точно те</div></div>
+        <div class="vrow"><div class="no">Гадаете какво да смените</div><div class="yes">Ясни първи стъпки за 14 дни</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. МЕХАНИЗЪМЪТ: защо точно ирисът -->
+  <section class="dark">
+    <div class="wrap reveal">
+      <p class="eyebrow">Защо ирисът</p>
+      <h2>Окото ви носи подпис, който няма никой друг.</h2>
+      <p class="lead">Рисунъкът на ириса е толкова индивидуален, че се ползва като биометричен ключ. Иридологията го чете като карта — и AIRIS я разчита слой по слой.</p>
+
+      <div class="layers">
+        <div class="layer"><span class="n">1</span><div><h3>Конституция</h3><p>Цветът и плътността на влакната — вашата основа и как реагира тялото ви.</p></div></div>
+        <div class="layer"><span class="n">2</span><div><h3>Структура</h3><p>Крипти, лакуни и разреждания — зоните, които искат повече внимание.</p></div></div>
+        <div class="layer"><span class="n">3</span><div><h3>Пигменти</h3><p>Петна и оттенъци, свързани с натоварване на отделни системи.</p></div></div>
+        <div class="layer"><span class="n">4</span><div><h3>Пръстени и коларета</h3><p>Знаци за стрес, храносмилане и обмяна.</p></div></div>
+      </div>
+
+      <div class="equation">
+        Картата на ириса <span class="op">+</span> вашите отговори<br>
+        <span class="op">=</span> насоки, които пасват само на вас
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. РЕЗУЛТАТЪТ: материален, конкретен, с любопитство -->
+  <section id="protocol">
+    <div class="wrap reveal">
+      <p class="eyebrow">Какво получавате</p>
+      <h2>Не доклад за четене. Протокол за действие.</h2>
+      <p class="lead">Всяка насока е свързана с това, което се вижда в ириса ви. Знаете не само какво — а и защо.</p>
+
+      <div class="doc">
+        <div class="doc-head">
+          <div><div class="t">Личен протокол</div><div class="id">Пример · ляв и десен ирис</div></div>
+          <span class="stamp">САМО ЗА ВАС</span>
+        </div>
+
+        <div class="block">
+          <h4><span class="ic">🥗</span>Хранене</h4>
+          <p>Какво да увеличите и какво да ограничите — според зоните във фокус.</p>
+          <div class="chips">
+            <span class="chip">+ ферментирали храни</span>
+            <span class="chip">+ горчиви зеленчуци</span>
+            <span class="chip less">− рафинирана захар</span>
+            <span class="chip blur">+ скрито за вас</span>
+          </div>
+        </div>
+
+        <div class="block">
+          <h4><span class="ic">💊</span>Хранителни добавки</h4>
+          <p>Кои, кога и защо — без излишни флакони.</p>
+          <div class="chips">
+            <span class="chip">Магнезий · вечер</span>
+            <span class="chip blur">Скрито · сутрин</span>
+            <span class="chip blur">Скрито · с храна</span>
+          </div>
+        </div>
+
+        <div class="block">
+          <h4><span class="ic">🌙</span>Режим</h4>
+          <p>Сън, вода, движение и стрес — малки промени с голям ефект.</p>
+        </div>
+
+        <div class="block">
+          <h4><span class="ic">🗓️</span>Първите 14 дни</h4>
+          <p>Стъпка по стъпка — откъде да започнете още утре.</p>
+          <div class="lock">🔒 Пълният протокол се отключва след вашия анализ</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. КАК: ниско усилие -->
+  <section style="padding-top:8px">
+    <div class="wrap reveal">
+      <p class="eyebrow">Как става</p>
+      <h2>Три стъпки. Само с телефона.</h2>
+      <div class="steps">
+        <div class="step"><span class="dot">1</span><div><h3>Отговаряте на няколко въпроса</h3><p>Цели, сън, хранене, самочувствие.</p><span class="time">≈ 3 минути</span></div></div>
+        <div class="step"><span class="dot">2</span><div><h3>Снимате двете си очи</h3><p>Със задната камера, отблизо. Ще ви водим кадър по кадър.</p><span class="time">≈ 2 минути</span></div></div>
+        <div class="step"><span class="dot">3</span><div><h3>Получавате протокола</h3><p>Карта на ириса, насоки и план за първите две седмици.</p><span class="time">веднага</span></div></div>
+      </div>
+      <a class="btn btn-primary" href="./" data-cta="steps" style="margin-top:8px">Започни своя протокол</a>
+    </div>
+  </section>
+
+  <!-- 6. ДОВЕРИЕ: честност = сила -->
+  <section>
+    <div class="wrap reveal">
+      <p class="eyebrow">Спокойно и честно</p>
+      <h2>Даваме посока. Не поставяме диагнози.</h2>
+      <div class="trust">
+        <div class="trust-item"><span class="ic">👁️</span><div><h3>Първо — вашите очи</h3><p>Ако на снимката се вижда нещо за очен лекар, ще ви го кажем веднага и преди всичко друго.</p></div></div>
+        <div class="trust-item"><span class="ic">🩺</span><div><h3>Допълва лекаря, не го заменя</h3><p>Протоколът е за хранене и начин на живот. При заболяване или лекарства — първо се консултирайте.</p></div></div>
+        <div class="trust-item"><span class="ic">🔐</span><div><h3>Вашите данни остават ваши</h3><p>Историята на анализите се пази на вашето устройство.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. ВЪЗРАЖЕНИЯ -->
+  <section style="padding-top:8px">
+    <div class="wrap reveal">
+      <p class="eyebrow">Въпроси</p>
+      <h2>Преди да започнете</h2>
+      <div style="margin-top:16px">
+        <details><summary>Наистина ли ирисът „показва“ нещо?</summary><p>Иридологията е традиционен метод, който чете ириса като карта на тялото. Тя не е медицинска диагностика — затова я съчетаваме с вашите отговори и даваме насоки за хранене и режим, не лечение.</p></details>
+        <details><summary>Трябва ли ми специална камера?</summary><p>Не. Достатъчна е задната камера на телефона. Приложението ви води кадър по кадър и проверява дали снимката е достатъчно ясна.</p></details>
+        <details><summary>С какво е различно от онлайн диета?</summary><p>Онлайн диетата е еднаква за всички. Протоколът се подрежда по вашия ирис и вашите отговори — и всяка насока идва с обяснение защо е там.</p></details>
+        <details><summary>Мога ли да го ползвам, ако пия лекарства?</summary><p>Да, но преди да започнете нови добавки, покажете протокола на вашия лекар.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. ФИНАЛ -->
+  <section class="dark final">
+    <div class="wrap reveal">
+      <p class="eyebrow" style="justify-content:center;display:flex">Готови ли сте</p>
+      <h2>Спрете да следвате<br>чужди планове.<br><em>Започнете своя.</em></h2>
+      <div class="ctas"><a class="btn btn-primary" href="./" data-cta="final">Започни своя протокол</a></div>
+      <p class="micro">≈ 7 минути · само с телефона · резултат веднага</p>
+      <p class="foot">AIRIS предлага насоки за хранене и начин на живот, основани на иридологичен анализ. Не е медицинско изделие и не замества консултация с лекар.</p>
+    </div>
+  </section>
+</main>
+
+<div class="sticky" id="sticky"><a class="btn btn-primary" href="./" data-cta="sticky">Започни своя протокол</a></div>
+
+<script>
+  // Ирисът: същият рисунък като в приложението — детерминиран, за да е „един и същ подпис“ при всяко зареждане.
+  (function drawIris() {
+    const svg = document.getElementById('iris')
+    const NS = 'http://www.w3.org/2000/svg'
+    let s = 17
+    const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296)
+    const el = (tag, attrs, parent = svg) => {
+      const n = document.createElementNS(NS, tag)
+      for (const k in attrs) n.setAttribute(k, attrs[k])
+      parent.appendChild(n)
+      return n
+    }
+    const defs = el('defs', {})
+    const g = el('radialGradient', { id: 'ig', cx: '50%', cy: '50%', r: '50%' }, defs)
+    ;[['0%', '#7c4a1e'], ['34%', '#8a6a34'], ['48%', '#3f7f86'], ['86%', '#2e6a8a'], ['100%', '#14283a']]
+      .forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, g))
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * Math.PI * 2, long = i % 5 === 0, r0 = long ? 176 : 181
+      el('line', { x1: 200 + Math.cos(a) * r0, y1: 200 + Math.sin(a) * r0, x2: 200 + Math.cos(a) * 188, y2: 200 + Math.sin(a) * 188,
+        stroke: long ? 'rgba(227,162,59,.6)' : 'rgba(255,255,255,.18)', 'stroke-width': long ? 2 : 1 })
+    }
+    el('circle', { cx: 200, cy: 200, r: 152, fill: 'url(#ig)' })
+    for (let i = 0; i < 150; i++) {
+      const a = (i / 150) * Math.PI * 2 + rnd() * 0.03, r0 = 54 + rnd() * 10, r1 = 118 + rnd() * 32, d = (rnd() - 0.5) * 0.06
+      el('line', { x1: 200 + Math.cos(a) * r0, y1: 200 + Math.sin(a) * r0, x2: 200 + Math.cos(a + d) * r1, y2: 200 + Math.sin(a + d) * r1,
+        stroke: rnd() > 0.5 ? 'rgba(230,240,235,.16)' : 'rgba(10,20,25,.2)', 'stroke-width': 0.6 + rnd() * 1.3 })
+    }
+    const pts = []
+    for (let d = 0; d <= 360; d += 4) {
+      const a = (d * Math.PI) / 180, r = 84 + Math.sin(a * 9) * 4
+      pts.push((200 + Math.cos(a) * r).toFixed(1) + ',' + (200 + Math.sin(a) * r).toFixed(1))
+    }
+    el('path', { d: 'M' + pts.join(' L') + ' Z', fill: 'none', stroke: 'rgba(230,190,120,.65)', 'stroke-width': 2.5 })
+    el('circle', { cx: 200, cy: 200, r: 152, fill: 'none', stroke: '#0b1620', 'stroke-width': 4 })
+    el('circle', { cx: 200, cy: 200, r: 54, fill: '#05080b', class: 'breathe' })
+    el('ellipse', { cx: 220, cy: 180, rx: 13, ry: 9, fill: 'rgba(255,255,255,.9)', transform: 'rotate(-35 220 180)' })
+    ;[[262, 268], [128, 150], [292, 168]].forEach(([x, y], i) => {
+      el('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: '#fff', 'stroke-width': 1.5, class: 'pulse', style: `animation-delay:${i * 0.5}s` })
+      el('circle', { cx: x, cy: y, r: 5.5, fill: '#E3A23B', stroke: '#fff', 'stroke-width': 1.5 })
+    })
+  })()
+
+  // Секциите се показват при скрол; лепкавият бутон — щом основният излезе от екрана.
+  const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('in')), { threshold: 0.12 })
+  document.querySelectorAll('.reveal').forEach(n => io.observe(n))
+
+  const sticky = document.getElementById('sticky')
+  const heroCta = document.querySelector('[data-cta="hero"]')
+  const finalCta = document.querySelector('[data-cta="final"]')
+  let heroGone = false, finalVisible = false
+  const sync = () => sticky.classList.toggle('on', heroGone && !finalVisible)
+  new IntersectionObserver(([e]) => { heroGone = !e.isIntersecting && e.boundingClientRect.top < 0; sync() }).observe(heroCta)
+  new IntersectionObserver(([e]) => { finalVisible = e.isIntersecting; sync() }).observe(finalCta)
+</script>
+</body>
+</html>
