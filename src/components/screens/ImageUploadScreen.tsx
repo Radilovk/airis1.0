@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
+import { CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
 import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -1160,7 +1160,6 @@ function EyeSlot({
   onCrop: () => void
   onRemove: () => void
 }) {
-  const cameraRef = useRef<HTMLInputElement>(null)
   const label = side === 'left' ? 'Ляво око' : 'Дясно око'
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1179,7 +1178,9 @@ function EyeSlot({
         {image && <CalibrationStatus image={image} onOpen={onCalibrate} />}
       </div>
 
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={disabled} onChange={pick} />
+      {/* Без `capture`: той отваря опростения режим на камерата (на много
+          Android телефони — по-ниска резолюция и без обработката на телефона).
+          Без него телефонът предлага галерия или камера по избор. */}
       <input ref={galleryRef} type="file" accept="image/*" className="hidden" disabled={disabled} onChange={pick} />
 
       {!image ? (
@@ -1187,12 +1188,11 @@ function EyeSlot({
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <Eye size={34} weight="duotone" className="text-primary" />
           </div>
-          <p className="mb-4 text-sm text-muted-foreground">Окото се намира и изрязва само. Може и една снимка на двете очи.</p>
-          <Button size="lg" className="h-12 w-full gap-2" disabled={disabled} onClick={() => cameraRef.current?.click()}>
-            <Camera size={20} weight="bold" /> Снимай
-          </Button>
-          <Button variant="outline" className="mt-2 w-full gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
-            <ImageSquare size={18} weight="bold" /> От галерията
+          <p className="mb-4 text-sm text-muted-foreground">
+            Снимайте окото с <strong className="text-foreground">обичайната камера</strong> на телефона, после изберете снимката тук. Окото се намира и изрязва само.
+          </p>
+          <Button size="lg" className="h-12 w-full gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
+            <ImageSquare size={20} weight="bold" /> Избери снимка
           </Button>
           <p className="mt-3 hidden text-xs text-muted-foreground md:block">или пуснете файла тук</p>
         </div>

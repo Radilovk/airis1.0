@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster } from '@/components/ui/sonner'
 import { shrinkDataUrlToLimit, MAX_EYE_IMAGE_BYTES } from '@/lib/image-utils'
 import { toast } from 'sonner'
-import WelcomeScreen from '@/components/screens/WelcomeScreen'
 import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
@@ -33,30 +32,38 @@ const LoadingScreen = () => (
   </div>
 )
 
-type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'settings' | 'about' | 'diagnostics'
+type Screen = 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'settings' | 'about' | 'diagnostics'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 /**
- * Вход от лендинг страницата: `?start=analysis` отваря направо въпросника.
- * Лендингът вече е убедил човека — втори начален екран с бутон „Започни“
- * само го спира. Параметърът се маха от адреса, за да не стартира пак при
- * презареждане.
+ * Входната страница е лендингът (`index.html`); приложението (`app.html`)
+ * няма собствен начален екран. Лендингът казва в адреса откъде да започне:
+ *   ?start=analysis — въпросникът (по подразбиране)
+ *   ?start=demo     — примерен доклад
+ *   ?view=history | settings | about | diagnostics
+ * Параметрите се махат от адреса, за да не се повтарят при презареждане.
  */
-function initialScreen(): Screen {
+const ENTRY = (() => {
+  const views: Screen[] = ['history', 'settings', 'about', 'diagnostics']
   try {
     const url = new URL(window.location.href)
-    if (url.searchParams.get('start') !== 'analysis') return 'welcome'
+    const view = url.searchParams.get('view') as Screen | null
+    const demo = url.searchParams.get('start') === 'demo'
     url.searchParams.delete('start')
+    url.searchParams.delete('view')
     window.history.replaceState(null, '', url.pathname + url.search + url.hash)
-    return 'questionnaire'
+    return { screen: view && views.includes(view) ? view : ('questionnaire' as Screen), demo }
   } catch {
-    return 'welcome'
+    return { screen: 'questionnaire' as Screen, demo: false }
   }
-}
+})()
+
+/** „Начало“ е лендинг страницата. */
+const goHome = () => window.location.assign(import.meta.env.BASE_URL)
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>(initialScreen)
+  const [currentScreen, setCurrentScreen] = useState<Screen>(ENTRY.screen)
   const [questionnaireData, setQuestionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
   const leftIrisRef = useRef<IrisImage | null>(null)
   const rightIrisRef = useRef<IrisImage | null>(null)
@@ -100,38 +107,6 @@ function App() {
       errorLogger.info('APP_UNMOUNT', 'Application unmounting')
     }
   }, [])
-
-  const handleStartAnalysis = () => {
-    setCurrentScreen('questionnaire')
-  }
-
-  const handleViewHistory = () => {
-    setCurrentScreen('history')
-  }
-
-  const handleAdminAccess = () => {
-    console.log('🔓 [APP] Admin access requested - granting access to settings panel')
-    console.log('🔓 [APP] No ownership checks - all users can access settings')
-    setCurrentScreen('settings')
-    toast.success('Отваряне на настройките...', {
-      description: 'Достъпът е разрешен за всички потребители',
-      duration: 2000
-    })
-  }
-
-  const handleAboutAccess = () => {
-    setCurrentScreen('about')
-  }
-
-  const handleDiagnosticsAccess = () => {
-    setCurrentScreen('diagnostics')
-  }
-
-  const handleTestStart = () => {
-    if (questionnaireData) {
-      setCurrentScreen('upload')
-    }
-  }
 
   const handleQuestionnaireComplete = (data: QuestionnaireData) => {
     setQuestionnaireData(() => data)
@@ -428,6 +403,12 @@ function App() {
     }
   }
 
+  // Вход „примерен доклад“ от лендинга.
+  useEffect(() => {
+    if (ENTRY.demo) void handleViewDemo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleStartFromReport = () => {
     setAnalysisReport(null)
     setTimeout(() => setCurrentScreen('questionnaire'), 50)
@@ -450,7 +431,7 @@ function App() {
     rightIrisRef.current = null
     setImagesReady(false)
     setAnalysisReport(null)
-    setTimeout(() => setCurrentScreen('welcome'), 50)
+    setTimeout(goHome, 50)
   }
 
   const handleReanalyze = (report?: AnalysisReport) => {
@@ -508,17 +489,6 @@ function App() {
       {/* Бутонът за диагностика стои над съдържанието — показва се само в служебните екрани. */}
       {(currentScreen === 'settings' || currentScreen === 'diagnostics') && <QuickDebugPanel />}
       <AnimatePresence mode="wait">
-        {currentScreen === 'welcome' && (
-          <motion.div
-            key="welcome"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <WelcomeScreen onStart={handleStartAnalysis} onViewHistory={handleViewHistory} onAdmin={handleAdminAccess} onTestStart={handleTestStart} onAbout={handleAboutAccess} onDiagnostics={handleDiagnosticsAccess} onDemo={handleViewDemo} />
-          </motion.div>
-        )}
         {currentScreen === 'questionnaire' && (
           <motion.div
             key="questionnaire"
@@ -589,7 +559,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <HistoryScreen onViewReport={handleViewReport} onBack={() => setCurrentScreen('welcome')} onReanalyze={handleReanalyze} />
+              <HistoryScreen onViewReport={handleViewReport} onBack={goHome} onReanalyze={handleReanalyze} />
             </Suspense>
           </motion.div>
         )}
@@ -602,7 +572,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <AdminScreen onBack={() => setCurrentScreen('welcome')} />
+              <AdminScreen onBack={goHome} />
             </Suspense>
           </motion.div>
         )}
@@ -615,7 +585,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <AboutAirisScreen onBack={() => setCurrentScreen('welcome')} />
+              <AboutAirisScreen onBack={goHome} />
             </Suspense>
           </motion.div>
         )}
@@ -628,7 +598,7 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             <Suspense fallback={<LoadingScreen />}>
-              <DiagnosticScreen onBack={() => setCurrentScreen('welcome')} />
+              <DiagnosticScreen onBack={goHome} />
             </Suspense>
           </motion.div>
         )}
