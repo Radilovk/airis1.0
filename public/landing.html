@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>AIRIS — Персонален протокол по ириса</title>
-  <meta name="description" content="Две снимки на очите и 3 минути въпроси. Хранене, добавки и режим, подредени по вашия ирис." />
+  <title>AIRIS — Личен протокол по ирисите</title>
+  <meta name="description" content="Няма двама души с еднакви очи. По снимка на двата ви ириса съставяме личен протокол за хранене, добавки и режим." />
   <meta name="theme-color" content="#0E1A22" />
-  <meta property="og:title" content="Ирисът ви е уникален. Планът ви — също." />
-  <meta property="og:description" content="Персонален протокол за хранене, добавки и режим — по вашия ирис." />
+  <meta property="og:title" content="Няма двама души с еднакви очи. Защо тогава всички да се хранят еднакво?" />
+  <meta property="og:description" content="Личен протокол за хранене, добавки и режим — по двата ви ириса." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -77,9 +77,11 @@
     .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; letter-spacing: -.01em; color: #F2F5F7; text-decoration: none; }
     .logo i { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle, #05080b 30%, var(--teal) 32%, #8a6a34 70%, #14283a 100%); box-shadow: 0 0 0 2px rgba(255,255,255,.12); }
     .nav a.small { color: rgba(242,245,247,.75); font-size: 14px; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
-    .iris-wrap { position: relative; width: 78%; max-width: 330px; margin: 20px auto 6px; aspect-ratio: 1; }
-    .iris-wrap::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle, rgba(46,106,138,.55), transparent 70%); filter: blur(28px); }
-    #iris { position: relative; width: 100%; height: 100%; }
+    .eyes { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6%; width: 92%; max-width: 380px; margin: 26px auto 48px; }
+    .eye { position: relative; aspect-ratio: 1; }
+    .eye::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle, rgba(46,106,138,.55), transparent 70%); filter: blur(22px); }
+    .eye svg { position: relative; width: 100%; height: 100%; }
+    .eye .side { position: absolute; left: 0; right: 0; bottom: -24px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: rgba(242,245,247,.55); }
     .tag {
       position: absolute; font-size: 11px; font-weight: 700; white-space: nowrap;
       padding: 6px 10px; border-radius: 999px;
@@ -88,9 +90,9 @@
       opacity: 0; transform: translateY(6px); animation: tagIn .6s ease forwards;
     }
     .tag b { color: var(--amber); font-weight: 800; }
-    .tag.t1 { left: -6%; top: 24%; animation-delay: .9s; }
-    .tag.t2 { right: -8%; top: 8%; animation-delay: 1.2s; }
-    .tag.t3 { right: -4%; bottom: 14%; animation-delay: 1.5s; }
+    .tag.t1 { left: -2%; top: -6%; animation-delay: .9s; }
+    .tag.t2 { right: -2%; top: -6%; animation-delay: 1.2s; }
+    .tag.t3 { left: 50%; bottom: 8%; margin-left: -58px; animation-delay: 1.5s; }
     @keyframes tagIn { to { opacity: 1; transform: none; } }
     .hero h1 {
       font-family: 'Lora', Georgia, serif; font-weight: 600;
@@ -209,30 +211,31 @@
       <a class="small" href="#protocol">Какво получавам</a>
     </nav>
 
-    <div class="iris-wrap" aria-hidden="true">
-      <svg id="iris" viewBox="0 0 400 400"></svg>
+    <div class="eyes" aria-hidden="true">
+      <div class="eye"><svg id="iris-r" viewBox="0 0 400 400"></svg><span class="side">десен</span></div>
+      <div class="eye"><svg id="iris-l" viewBox="0 0 400 400"></svg><span class="side">ляв</span></div>
       <span class="tag t1">Конституция</span>
       <span class="tag t2">Храносмилане · <b>фокус</b></span>
       <span class="tag t3">Стресов пръстен</span>
     </div>
 
-    <p class="eyebrow" style="display:flex;justify-content:center;color:var(--amber)">Персонален протокол по ириса</p>
-    <h1>Ирисът ви е уникален.<br><em>Планът ви — също.</em></h1>
-    <p class="sub">Две снимки на очите и няколко въпроса. Получавате протокол за хранене, добавки и режим, съставен само за вас.</p>
+    <p class="eyebrow" style="display:flex;justify-content:center;color:var(--amber)">Ирисов анализ · личен протокол</p>
+    <h1>Няма двама души с еднакви очи.<br><em>Защо тогава всички да се хранят еднакво?</em></h1>
+    <p class="sub">По снимка на двата ви ириса и няколко въпроса съставяме вашия личен протокол — какво да ядете, кои добавки да приемате и какво да промените в режима си.</p>
 
     <div class="ctas">
       <a class="btn btn-primary" href="./" data-cta="hero">
-        Започни своя протокол
+        Искам своя протокол
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>
       <a class="btn btn-ghost" href="#protocol">Виж как изглежда протоколът</a>
     </div>
-    <p class="micro">≈ 7 минути · само с телефона · резултат веднага</p>
+    <p class="micro">около 7 минути · само с телефон · резултатът е веднага</p>
 
     <div class="proof-row">
-      <div><strong>2</strong><span>снимки</span></div>
+      <div><strong>2</strong><span>ириса</span></div>
       <div><strong>4</strong><span>слоя анализ</span></div>
-      <div><strong>1</strong><span>протокол за вас</span></div>
+      <div><strong>1</strong><span>личен протокол</span></div>
     </div>
   </div>
 </header>
@@ -244,13 +247,13 @@
     <div class="wrap reveal">
       <p class="eyebrow">Защо общите диети не работят</p>
       <h2>Един и същ план.<br>Различни хора.<br>Различни резултати.</h2>
-      <p class="lead">Повечето диети са написани за „средния човек“. Него го няма. Има вас — с вашето храносмилане, вашия стрес, вашия сън.</p>
+      <p class="lead">Повечето диети са написани за „средния човек“. Такъв човек не съществува. Има вас — с вашето храносмилане, вашия сън и вашия стрес.</p>
 
       <div class="versus">
         <div class="vhead"><span>Общ план</span><span>Вашият протокол</span></div>
-        <div class="vrow"><div class="no">Същото меню за всички</div><div class="yes">Храни според вашите слаби места</div></div>
-        <div class="vrow"><div class="no">Добавки „за всеки случай“</div><div class="yes">Само нужните — и защо точно те</div></div>
-        <div class="vrow"><div class="no">Гадаете какво да смените</div><div class="yes">Ясни първи стъпки за 14 дни</div></div>
+        <div class="vrow"><div class="no">Същото меню за всички</div><div class="yes">Храни, подбрани за вашето тяло</div></div>
+        <div class="vrow"><div class="no">Добавки „за всеки случай“</div><div class="yes">Само нужните и защо точно те</div></div>
+        <div class="vrow"><div class="no">Сами гадаете откъде да започнете</div><div class="yes">Ясни първи стъпки за 14 дни</div></div>
       </div>
     </div>
   </section>
@@ -259,19 +262,19 @@
   <section class="dark">
     <div class="wrap reveal">
       <p class="eyebrow">Защо ирисът</p>
-      <h2>Окото ви носи подпис, който няма никой друг.</h2>
-      <p class="lead">Рисунъкът на ириса е толкова индивидуален, че се ползва като биометричен ключ. Иридологията го чете като карта — и AIRIS я разчита слой по слой.</p>
+      <h2>Два ириса.<br>Две карти на тялото.</h2>
+      <p class="lead">В иридологията всеки ирис е карта: десният отразява дясната половина на тялото, левият — лявата. Затова снимаме и двата. Рисунъкът им е толкова личен, че се използва дори за биометрична идентификация.</p>
 
       <div class="layers">
-        <div class="layer"><span class="n">1</span><div><h3>Конституция</h3><p>Цветът и плътността на влакната — вашата основа и как реагира тялото ви.</p></div></div>
+        <div class="layer"><span class="n">1</span><div><h3>Конституция</h3><p>Цветът и плътността на влакната показват вашия тип и как реагира организмът ви.</p></div></div>
         <div class="layer"><span class="n">2</span><div><h3>Структура</h3><p>Крипти, лакуни и разреждания — зоните, които искат повече внимание.</p></div></div>
-        <div class="layer"><span class="n">3</span><div><h3>Пигменти</h3><p>Петна и оттенъци, свързани с натоварване на отделни системи.</p></div></div>
+        <div class="layer"><span class="n">3</span><div><h3>Пигменти</h3><p>Петна и оттенъци, свързвани с натоварване на отделни системи.</p></div></div>
         <div class="layer"><span class="n">4</span><div><h3>Пръстени и коларета</h3><p>Знаци за стрес, храносмилане и обмяна.</p></div></div>
       </div>
 
       <div class="equation">
-        Картата на ириса <span class="op">+</span> вашите отговори<br>
-        <span class="op">=</span> насоки, които пасват само на вас
+        Какво показват ирисите <span class="op">+</span> какво ни казвате вие<br>
+        <span class="op">=</span> протокол, направен само за вас
       </div>
     </div>
   </section>
@@ -280,18 +283,18 @@
   <section id="protocol">
     <div class="wrap reveal">
       <p class="eyebrow">Какво получавате</p>
-      <h2>Не доклад за четене. Протокол за действие.</h2>
-      <p class="lead">Всяка насока е свързана с това, което се вижда в ириса ви. Знаете не само какво — а и защо.</p>
+      <h2>Не просто анализ.<br>Ясен план какво да правите.</h2>
+      <p class="lead">Всяка насока е свързана с нещо, което се вижда в ирисите ви. Ще знаете не само какво да правите, но и защо.</p>
 
       <div class="doc">
         <div class="doc-head">
           <div><div class="t">Личен протокол</div><div class="id">Пример · ляв и десен ирис</div></div>
-          <span class="stamp">САМО ЗА ВАС</span>
+          <span class="stamp">ЛИЧЕН</span>
         </div>
 
         <div class="block">
           <h4><span class="ic">🥗</span>Хранене</h4>
-          <p>Какво да увеличите и какво да ограничите — според зоните във фокус.</p>
+          <p>Какво да ядете повече и какво — по-малко.</p>
           <div class="chips">
             <span class="chip">+ ферментирали храни</span>
             <span class="chip">+ горчиви зеленчуци</span>
@@ -302,7 +305,7 @@
 
         <div class="block">
           <h4><span class="ic">💊</span>Хранителни добавки</h4>
-          <p>Кои, кога и защо — без излишни флакони.</p>
+          <p>Само нужните — кога и как да ги приемате.</p>
           <div class="chips">
             <span class="chip">Магнезий · вечер</span>
             <span class="chip blur">Скрито · сутрин</span>
@@ -312,12 +315,12 @@
 
         <div class="block">
           <h4><span class="ic">🌙</span>Режим</h4>
-          <p>Сън, вода, движение и стрес — малки промени с голям ефект.</p>
+          <p>Сън, вода, движение, стрес — малки промени, които се усещат.</p>
         </div>
 
         <div class="block">
           <h4><span class="ic">🗓️</span>Първите 14 дни</h4>
-          <p>Стъпка по стъпка — откъде да започнете още утре.</p>
+          <p>Ден по ден — откъде да започнете още утре.</p>
           <div class="lock">🔒 Пълният протокол се отключва след вашия анализ</div>
         </div>
       </div>
@@ -328,13 +331,13 @@
   <section style="padding-top:8px">
     <div class="wrap reveal">
       <p class="eyebrow">Как става</p>
-      <h2>Три стъпки. Само с телефона.</h2>
+      <h2>Три стъпки.<br>Нужен ви е само телефонът.</h2>
       <div class="steps">
-        <div class="step"><span class="dot">1</span><div><h3>Отговаряте на няколко въпроса</h3><p>Цели, сън, хранене, самочувствие.</p><span class="time">≈ 3 минути</span></div></div>
-        <div class="step"><span class="dot">2</span><div><h3>Снимате двете си очи</h3><p>Със задната камера, отблизо. Ще ви водим кадър по кадър.</p><span class="time">≈ 2 минути</span></div></div>
-        <div class="step"><span class="dot">3</span><div><h3>Получавате протокола</h3><p>Карта на ириса, насоки и план за първите две седмици.</p><span class="time">веднага</span></div></div>
+        <div class="step"><span class="dot">1</span><div><h3>Отговаряте на няколко въпроса</h3><p>За целите, съня, храненето и как се чувствате.</p><span class="time">≈ 3 минути</span></div></div>
+        <div class="step"><span class="dot">2</span><div><h3>Снимате двете си очи</h3><p>Отблизо, със задната камера. Приложението ви напътства на всяка стъпка.</p><span class="time">≈ 2 минути</span></div></div>
+        <div class="step"><span class="dot">3</span><div><h3>Получавате протокола</h3><p>Картата на двата ириса, насоките и плана за първите две седмици.</p><span class="time">веднага</span></div></div>
       </div>
-      <a class="btn btn-primary" href="./" data-cta="steps" style="margin-top:8px">Започни своя протокол</a>
+      <a class="btn btn-primary" href="./" data-cta="steps" style="margin-top:8px">Искам своя протокол</a>
     </div>
   </section>
 
@@ -344,8 +347,8 @@
       <p class="eyebrow">Спокойно и честно</p>
       <h2>Даваме посока. Не поставяме диагнози.</h2>
       <div class="trust">
-        <div class="trust-item"><span class="ic">👁️</span><div><h3>Първо — вашите очи</h3><p>Ако на снимката се вижда нещо за очен лекар, ще ви го кажем веднага и преди всичко друго.</p></div></div>
-        <div class="trust-item"><span class="ic">🩺</span><div><h3>Допълва лекаря, не го заменя</h3><p>Протоколът е за хранене и начин на живот. При заболяване или лекарства — първо се консултирайте.</p></div></div>
+        <div class="trust-item"><span class="ic">👁️</span><div><h3>Първо проверяваме очите</h3><p>Ако на снимките се вижда нещо, с което трябва да отидете при очен лекар, ще ви кажем веднага.</p></div></div>
+        <div class="trust-item"><span class="ic">🩺</span><div><h3>Допълва лекаря, не го заменя</h3><p>Протоколът е за хранене и начин на живот. Ако имате заболяване или пиете лекарства, първо се посъветвайте с лекар.</p></div></div>
         <div class="trust-item"><span class="ic">🔐</span><div><h3>Вашите данни остават ваши</h3><p>Историята на анализите се пази на вашето устройство.</p></div></div>
       </div>
     </div>
@@ -357,9 +360,9 @@
       <p class="eyebrow">Въпроси</p>
       <h2>Преди да започнете</h2>
       <div style="margin-top:16px">
-        <details><summary>Наистина ли ирисът „показва“ нещо?</summary><p>Иридологията е традиционен метод, който чете ириса като карта на тялото. Тя не е медицинска диагностика — затова я съчетаваме с вашите отговори и даваме насоки за хранене и режим, не лечение.</p></details>
+        <details><summary>Наистина ли по очите се вижда нещо?</summary><p>Иридологията е традиционен метод, който чете ирисите като карта на тялото. Тя не е медицинска диагностика — затова я съчетаваме с вашите отговори и даваме насоки за хранене и режим, не лечение.</p></details>
         <details><summary>Трябва ли ми специална камера?</summary><p>Не. Достатъчна е задната камера на телефона. Приложението ви води кадър по кадър и проверява дали снимката е достатъчно ясна.</p></details>
-        <details><summary>С какво е различно от онлайн диета?</summary><p>Онлайн диетата е еднаква за всички. Протоколът се подрежда по вашия ирис и вашите отговори — и всяка насока идва с обяснение защо е там.</p></details>
+        <details><summary>С какво е различно от онлайн диета?</summary><p>Онлайн диетата е еднаква за всички. Протоколът се съставя по вашите ириси и вашите отговори, а до всяка насока пише защо е там.</p></details>
         <details><summary>Мога ли да го ползвам, ако пия лекарства?</summary><p>Да, но преди да започнете нови добавки, покажете протокола на вашия лекар.</p></details>
       </div>
     </div>
@@ -369,22 +372,22 @@
   <section class="dark final">
     <div class="wrap reveal">
       <p class="eyebrow" style="justify-content:center;display:flex">Готови ли сте</p>
-      <h2>Спрете да следвате<br>чужди планове.<br><em>Започнете своя.</em></h2>
-      <div class="ctas"><a class="btn btn-primary" href="./" data-cta="final">Започни своя протокол</a></div>
-      <p class="micro">≈ 7 минути · само с телефона · резултат веднага</p>
+      <h2>Стига сте следвали<br>чужди планове.<br><em>Вижте какъв е вашият.</em></h2>
+      <div class="ctas"><a class="btn btn-primary" href="./" data-cta="final">Искам своя протокол</a></div>
+      <p class="micro">около 7 минути · само с телефон · резултатът е веднага</p>
       <p class="foot">AIRIS предлага насоки за хранене и начин на живот, основани на иридологичен анализ. Не е медицинско изделие и не замества консултация с лекар.</p>
     </div>
   </section>
 </main>
 
-<div class="sticky" id="sticky"><a class="btn btn-primary" href="./" data-cta="sticky">Започни своя протокол</a></div>
+<div class="sticky" id="sticky"><a class="btn btn-primary" href="./" data-cta="sticky">Искам своя протокол</a></div>
 
 <script>
-  // Ирисът: същият рисунък като в приложението — детерминиран, за да е „един и същ подпис“ при всяко зареждане.
-  (function drawIris() {
-    const svg = document.getElementById('iris')
+  // Двата ириса: рисунъкът е като в приложението, но с различно зърно — десният и левият не са еднакви.
+  function drawIris(svg, seed, marks) {
     const NS = 'http://www.w3.org/2000/svg'
-    let s = 17
+    const id = 'ig' + seed
+    let s = seed
     const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296)
     const el = (tag, attrs, parent = svg) => {
       const n = document.createElementNS(NS, tag)
@@ -393,7 +396,7 @@
       return n
     }
     const defs = el('defs', {})
-    const g = el('radialGradient', { id: 'ig', cx: '50%', cy: '50%', r: '50%' }, defs)
+    const g = el('radialGradient', { id, cx: '50%', cy: '50%', r: '50%' }, defs)
     ;[['0%', '#7c4a1e'], ['34%', '#8a6a34'], ['48%', '#3f7f86'], ['86%', '#2e6a8a'], ['100%', '#14283a']]
       .forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, g))
     for (let i = 0; i < 60; i++) {
@@ -401,7 +404,7 @@
       el('line', { x1: 200 + Math.cos(a) * r0, y1: 200 + Math.sin(a) * r0, x2: 200 + Math.cos(a) * 188, y2: 200 + Math.sin(a) * 188,
         stroke: long ? 'rgba(227,162,59,.6)' : 'rgba(255,255,255,.18)', 'stroke-width': long ? 2 : 1 })
     }
-    el('circle', { cx: 200, cy: 200, r: 152, fill: 'url(#ig)' })
+    el('circle', { cx: 200, cy: 200, r: 152, fill: `url(#${id})` })
     for (let i = 0; i < 150; i++) {
       const a = (i / 150) * Math.PI * 2 + rnd() * 0.03, r0 = 54 + rnd() * 10, r1 = 118 + rnd() * 32, d = (rnd() - 0.5) * 0.06
       el('line', { x1: 200 + Math.cos(a) * r0, y1: 200 + Math.sin(a) * r0, x2: 200 + Math.cos(a + d) * r1, y2: 200 + Math.sin(a + d) * r1,
@@ -416,11 +419,13 @@
     el('circle', { cx: 200, cy: 200, r: 152, fill: 'none', stroke: '#0b1620', 'stroke-width': 4 })
     el('circle', { cx: 200, cy: 200, r: 54, fill: '#05080b', class: 'breathe' })
     el('ellipse', { cx: 220, cy: 180, rx: 13, ry: 9, fill: 'rgba(255,255,255,.9)', transform: 'rotate(-35 220 180)' })
-    ;[[262, 268], [128, 150], [292, 168]].forEach(([x, y], i) => {
+    marks.forEach(([x, y], i) => {
       el('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: '#fff', 'stroke-width': 1.5, class: 'pulse', style: `animation-delay:${i * 0.5}s` })
       el('circle', { cx: x, cy: y, r: 5.5, fill: '#E3A23B', stroke: '#fff', 'stroke-width': 1.5 })
     })
-  })()
+  }
+  drawIris(document.getElementById('iris-r'), 17, [[128, 150], [262, 268]])
+  drawIris(document.getElementById('iris-l'), 41, [[292, 168], [150, 280]])
 
   // Секциите се показват при скрол; лепкавият бутон — щом основният излезе от екрана.
   const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('in')), { threshold: 0.12 })
