@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown, Aperture } from '@phosphor-icons/react'
+import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
 import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import IrisCropEditor from '@/components/iris/IrisCropEditor'
 import IrisCalibrator from '@/components/iris/IrisCalibrator'
-import LiveIrisCamera, { type LiveCapture } from '@/components/iris/LiveIrisCamera'
 import { loadFaceTracker } from '@/lib/face-tracker'
+import { cropEyesFromPhoto } from '@/lib/eye-crop'
 import { autoFrameIris } from '@/lib/iris-autoframe'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -182,6 +182,14 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     })
   }
 
+  /**
+   * Опашка за снимки, които чакат реда си: другото око от снимка на двете очи.
+   * `handleFileSelect` прекъсва предишното четене, затова следващата тръгва,
+   * щом текущата излезе от обработка — оттам нататък опашката на калибратора
+   * я поема.
+   */
+  const photoQueueRef = useRef<{ side: 'left' | 'right'; file: File }[]>([])
+
   const handleFileSelect = async (side: 'left' | 'right', file: File) => {
     uploadDiagnostics.log('FILE_SELECT_START', 'start', {
       side,
@@ -205,13 +213,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       return
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    // Снимка от камерата на телефона в пълна резолюция е 3–15 MB; окото се
+    // изрязва от нея, а не се качва цялата.
+    if (file.size > 40 * 1024 * 1024) {
       uploadDiagnostics.log('FILE_SELECT_ERROR', 'error', {
         reason: 'File too large',
         fileSize: file.size,
-        maxSize: 10 * 1024 * 1024
+        maxSize: 40 * 1024 * 1024
       })
-      toast.error('Файлът е твърде голям. Максимум 10MB.')
+      toast.error('Файлът е твърде голям. Максимум 40MB.')
       return
     }
 
@@ -273,6 +283,32 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           dataUrlSizeKB: Math.round(dataUrl.length / 1024)
         })
 
+        // AI: на снимката е лицето или двете очи → всяко око се изрязва от
+        // оригинала в пълна резолюция; другото око отива в своето място.
+        let source = dataUrl
+        const eyes = await cropEyesFromPhoto(dataUrl).catch(() => null)
+        if (eyes) {
+          uploadDiagnostics.log('AI_EYES_FOUND', 'success', { side, eyes: eyes.map(e => ({ side: e.side, irisPx: e.irisPx })) })
+          const mine = eyes.find(e => e.side === side)
+          const others = eyes.filter(e => e.side !== side && !(e.side === 'left' ? leftImageRef.current : rightImageRef.current))
+          photoQueueRef.current.push(...others.map(e => ({ side: e.side, file: e.file })))
+          if (others.length && mine) toast.info('На снимката са и двете очи — изрязахме всяко поотделно.')
+          const smallest = Math.min(...eyes.map(e => e.irisPx))
+          if (smallest < 300) {
+            toast.warning('Окото е дребно на снимката', {
+              description: 'Анализът ще види по-малко детайли. Снимайте едно око отблизо — вижте „Как да снимате“.',
+              duration: 8000,
+            })
+          }
+          if (!mine) {
+            // Вижда се само другото око — то отива на своето място.
+            setIsProcessing(false)
+            setImagesVersion(v => v + 1)
+            return
+          }
+          source = mine.dataUrl
+        }
+
         const originalSizeKB = Math.round(dataUrl.length / 1024)
         console.log(`📸 [UPLOAD] Оригинален размер на изображението: ${originalSizeKB} KB`)
         console.log(`📸 [UPLOAD] Оригинален файл: ${file.name}, тип: ${file.type}, размер: ${Math.round(file.size / 1024)} KB`)
@@ -285,7 +321,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           side
         })
         // First pass: High quality at max IRIS_MAX_DIMENSION – preserves iris detail for AI analysis
-        let compressedDataUrl = await compressImage(dataUrl, IRIS_MAX_DIMENSION, 0.92)
+        let compressedDataUrl = await compressImage(source, IRIS_MAX_DIMENSION, 0.92)
         const afterFirstPassKB = Math.round(compressedDataUrl.length / 1024)
         uploadDiagnostics.log('COMPRESS_END_1ST_PASS', 'success', {
           compressedSizeKB: afterFirstPassKB,
@@ -345,8 +381,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         })
         console.log(`✅ [UPLOAD] Изображението е готово за crop редактиране`)
         // Окото се търси автоматично. При уверено откриване снимката се
-        // центрира сама и ръчният редактор се прескача.
-        const framed = await autoFrameIris(compressedDataUrl).catch(() => null)
+        // центрира сама и ръчният редактор се прескача. Търси се в ПЪЛНАТА
+        // резолюция: смалена до 1600 px снимка губи по-голямата част от
+        // пикселите на ириса, ако окото не е запълвало кадъра.
+        const framed = await autoFrameIris(source).catch(() => null)
         uploadDiagnostics.log('AUTO_FRAME', framed ? 'success' : 'info', {
           side,
           confidence: framed?.confidence ?? 0,
@@ -898,27 +936,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     setImagesVersion(v => v + 1)
   }
 
-  /**
-   * Живата камера връща една или две снимки наведнъж. `handleFileSelect`
-   * прекъсва предишното четене, затова втората чака, докато първата излезе
-   * от обработка — оттам нататък опашката на калибратора я поема.
-   */
-  const liveQueueRef = useRef<LiveCapture[]>([])
-  // AI моделът (~4 MB) се тегли още тук, за да е готов, когато човек натисне „Снимай“.
+  useEffect(() => {
+    if (isProcessing || photoQueueRef.current.length === 0) return
+    const next = photoQueueRef.current.shift()!
+    void handleFileSelect(next.side, next.file)
+  })
+  // AI моделът (~4 MB) се тегли още тук, за да е готов, когато дойде снимката.
   useEffect(() => {
     void loadFaceTracker()
   }, [])
-  const [liveSide, setLiveSide] = useState<'left' | 'right' | null>(null)
-  useEffect(() => {
-    if (isProcessing || liveQueueRef.current.length === 0) return
-    const next = liveQueueRef.current.shift()!
-    void handleFileSelect(next.side, next.file)
-  })
-  const handleLiveDone = (captures: LiveCapture[]) => {
-    setLiveSide(null)
-    liveQueueRef.current.push(...captures)
-    setImagesVersion(v => v + 1)
-  }
 
   const left = leftImageRef.current
   const right = rightImageRef.current
@@ -990,7 +1016,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                   disabled={isProcessing}
                   galleryRef={side === 'left' ? leftInputRef : rightInputRef}
                   onFile={file => handleFileSelect(side, file)}
-                  onLive={() => setLiveSide(side)}
                   onDrop={e => !isProcessing && handleDrop(side, e)}
                   onCalibrate={() => openCalibrator(side)}
                   onCrop={() => handleEditImage(side)}
@@ -1030,15 +1055,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           side={editingSide}
           onSave={handleCropSave}
           onCancel={handleCropCancel}
-        />
-      )}
-
-      {liveSide && (
-        <LiveIrisCamera
-          startSide={liveSide}
-          missing={[liveSide, ...(['left', 'right'] as const).filter(s => s !== liveSide && !(s === 'left' ? left : right))]}
-          onDone={handleLiveDone}
-          onClose={() => setLiveSide(null)}
         />
       )}
 
@@ -1128,7 +1144,6 @@ function EyeSlot({
   disabled,
   galleryRef,
   onFile,
-  onLive,
   onDrop,
   onCalibrate,
   onCrop,
@@ -1140,7 +1155,6 @@ function EyeSlot({
   disabled: boolean
   galleryRef: React.RefObject<HTMLInputElement | null>
   onFile: (file: File) => void
-  onLive: () => void
   onDrop: (e: React.DragEvent) => void
   onCalibrate: () => void
   onCrop: () => void
@@ -1173,18 +1187,13 @@ function EyeSlot({
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <Eye size={34} weight="duotone" className="text-primary" />
           </div>
-          <p className="mb-4 text-sm text-muted-foreground">Телефонът сам улавя момента, в който окото е рязко, и снима.</p>
-          <Button size="lg" className="h-12 w-full gap-2" disabled={disabled} onClick={onLive}>
-            <Aperture size={20} weight="bold" /> Снимай автоматично
+          <p className="mb-4 text-sm text-muted-foreground">Окото се намира и изрязва само. Може и една снимка на двете очи.</p>
+          <Button size="lg" className="h-12 w-full gap-2" disabled={disabled} onClick={() => cameraRef.current?.click()}>
+            <Camera size={20} weight="bold" /> Снимай
           </Button>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button variant="outline" className="gap-2" disabled={disabled} onClick={() => cameraRef.current?.click()}>
-              <Camera size={18} weight="bold" /> Камерата
-            </Button>
-            <Button variant="outline" className="gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
-              <ImageSquare size={18} weight="bold" /> От галерията
-            </Button>
-          </div>
+          <Button variant="outline" className="mt-2 w-full gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
+            <ImageSquare size={18} weight="bold" /> От галерията
+          </Button>
           <p className="mt-3 hidden text-xs text-muted-foreground md:block">или пуснете файла тук</p>
         </div>
       ) : (
