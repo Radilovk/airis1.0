@@ -1,30 +1,36 @@
 /**
  * live-capture.ts — кога камерата да снима сама.
  *
- * Човек често не вижда екрана: държи задната камера към окото си или снима
+ * Човек често не вижда екрана: държи задната камера към лицето си или снима
  * пред огледало. Затова решението „сега“ се взема от кадрите, а не от бутон.
- * Всеки анализиран кадър дава едно `FrameReading`; `CaptureGate` го сравнява
- * с предишните и казва колко сме близо до добра снимка и какво да се поправи.
+ * Всеки кадър дава по едно `FrameReading` за всяко око; `CaptureGate` го
+ * сравнява с предишните и казва колко сме близо до добра снимка и какво да
+ * се поправи.
  *
- * Добра снимка = ирисът е намерен уверено, достатъчно е голям, в центъра е,
+ * Добра снимка = окото е намерено, отворено, достатъчно едро, в кадъра,
  * телефонът е неподвижен и рязкостта е близо до най-добрата от последните
  * секунди. Последното е относително нарочно: абсолютният праг зависи от
  * телефона и светлината, а „по-рязко от това няма да стане“ работи навсякъде.
+ *
+ * РАЗМЕРЪТ. Камерата на телефона не фокусира по-близо от ~8–10 cm. Оттам
+ * кадърът е широк ~12–15 cm, а ирисът (12 mm) заема 7–10 % от ширината.
+ * По-едър ирис не може да се иска — човекът ще се приближава, а образът
+ * ще става все по-размазан. Детайлите идват от пълната резолюция на сензора
+ * при самата снимка, не от по-близкото снимане.
  */
 
-export type CaptureHint = 'search' | 'closer' | 'farther' | 'center' | 'hold' | 'focus' | 'ready'
+export type CaptureHint = 'search' | 'closer' | 'farther' | 'center' | 'open' | 'hold' | 'focus' | 'ready'
 
 export interface FrameReading {
-  /** Ирис, намерен в анализирания квадрат; координатите са в пиксели на квадрата. */
   found: boolean
+  /** Пиксели на видеото. */
   cx: number
   cy: number
   r: number
-  /** Страна на анализирания квадрат. */
-  side: number
-  /** Увереност за зеницата и за лимбуса, 0..1. */
-  pupilConfidence: number
-  limbusConfidence: number
+  frameW: number
+  frameH: number
+  /** Разстояние между клепачите / диаметър на ириса; undefined, ако не е измерено. */
+  openness?: number
   /** Дисперсия на Лапласиана в пръстена на ириса — виж `irisSharpness`. */
   sharpness: number
   /** Скорост на въртене на телефона, °/s; undefined, ако няма жироскоп. */
@@ -39,34 +45,43 @@ export interface CaptureState {
   ready: boolean
 }
 
+export interface GateTarget {
+  /** Диаметър на ириса като дял от късата страна на кадъра. */
+  minDiameter: number
+  maxDiameter: number
+  /** Центърът на ириса да е поне толкова навътре от ръба (дял от страната). */
+  edgeMargin: number
+}
+
+/** Двете очи наведнъж: и двете трябва да влязат, затова ирисът е по-малък. */
+export const TARGET_BOTH: GateTarget = { minDiameter: 0.06, maxDiameter: 0.2, edgeMargin: 0.1 }
+/** По едно око: може малко по-близо, окото да е по-скоро в средата. */
+export const TARGET_SINGLE: GateTarget = { minDiameter: 0.085, maxDiameter: 0.4, edgeMargin: 0.2 }
+
 export const LIVE_CAPTURE = {
-  /**
-   * Зеницата се открива уверено (рязък тъмен ръб), лимбусът — не: мекият
-   * преход ирис→склера дава 0.15–0.45 и при добри снимки. Затова различни
-   * прагове; 0.15 е и прагът на `iris-quality` за „лимбусът не е намерен“.
-   */
-  minPupilConfidence: 0.5,
-  minLimbusConfidence: 0.15,
-  /** Радиус на ириса спрямо квадрата: под това е далеч, над това — твърде близо. */
-  minRadius: 0.17,
-  maxRadius: 0.42,
-  /** Допустимо отместване на центъра от средата, дял от квадрата. */
-  maxOffset: 0.14,
+  /** Под това окото е притворено и клепачът крие горната част на ириса. */
+  minOpenness: 0.58,
   /** Допустимо преместване между два кадъра, дял от радиуса. */
-  maxShift: 0.08,
-  maxRadiusChange: 0.07,
-  maxRotation: 15,
+  maxShift: 0.12,
+  maxRadiusChange: 0.1,
+  maxRotation: 20,
   /** Под това кадърът е размазан, колкото и да е „най-добрият“. */
-  sharpnessFloor: 40,
+  sharpnessFloor: 25,
+  /**
+   * Отвореността и абсолютният праг за рязкост зависят от човека, телефона и
+   * светлината. Ако всичко друго е наред толкова време, двете се пропускат и
+   * се снима най-рязкият момент — по-добре снимка, отколкото безкрайно чакане.
+   */
+  patienceMs: 3000,
   /** Рязкост ≥ този дял от най-добрата за прозореца. */
-  sharpnessShare: 0.85,
+  sharpnessShare: 0.8,
   /**
    * Прозорецът се мери във време, но на бавен телефон в него влизат само
-   * 3–4 кадъра (при две очи — по-малко), затова изискваме само 3.
+   * 3–4 кадъра, затова изискваме само 3.
    */
   sharpnessWindowMs: 3000,
   minSharpSamples: 3,
-  /** Толкова поредни добри кадъра преди снимката (~0.4–0.6 s). */
+  /** Толкова поредни добри кадъра преди снимката (~0.3–0.5 s). */
   readyStreak: 3,
 }
 
@@ -74,30 +89,41 @@ export class CaptureGate {
   private prev: FrameReading | null = null
   private sharpHistory: { t: number; v: number }[] = []
   private streak = 0
+  private settledSince: number | null = null
+
+  constructor(private target: GateTarget) {}
+
+  setTarget(target: GateTarget) {
+    this.target = target
+    this.reset()
+  }
 
   reset() {
     this.prev = null
     this.sharpHistory = []
     this.streak = 0
+    this.settledSince = null
   }
 
   push(f: FrameReading): CaptureState {
     const C = LIVE_CAPTURE
+    const T = this.target
     const prev = this.prev
     this.prev = f.found ? f : null
 
-    if (!f.found || f.pupilConfidence < C.minPupilConfidence || f.limbusConfidence < C.minLimbusConfidence) {
+    if (!f.found || f.r <= 0) {
       this.streak = 0
       return { score: 0, hint: 'search', ready: false }
     }
 
-    const rRel = f.r / f.side
-    const sizeOk = rRel >= C.minRadius && rRel <= C.maxRadius
-    const sizeScore = sizeOk ? 1 : rRel < C.minRadius ? Math.max(0, rRel / C.minRadius) : Math.max(0, 1 - (rRel - C.maxRadius) / C.maxRadius)
+    const short = Math.min(f.frameW, f.frameH)
+    const d = (2 * f.r) / short
+    const sizeOk = d >= T.minDiameter && d <= T.maxDiameter
+    const sizeScore = sizeOk ? 1 : d < T.minDiameter ? Math.max(0, d / T.minDiameter) : Math.max(0, 1 - (d - T.maxDiameter) / T.maxDiameter)
 
-    const offset = Math.max(Math.abs(f.cx / f.side - 0.5), Math.abs(f.cy / f.side - 0.5))
-    const centerOk = offset <= C.maxOffset
-    const centerScore = centerOk ? 1 : Math.max(0, 1 - (offset - C.maxOffset) / 0.2)
+    const mx = T.edgeMargin * f.frameW
+    const my = T.edgeMargin * f.frameH
+    const centerOk = f.cx >= mx && f.cx <= f.frameW - mx && f.cy >= my && f.cy <= f.frameH - my
 
     let stable = false
     if (prev) {
@@ -109,31 +135,39 @@ export class CaptureGate {
     this.sharpHistory = this.sharpHistory.filter(s => f.t - s.t <= C.sharpnessWindowMs)
     this.sharpHistory.push({ t: f.t, v: f.sharpness })
     const peak = Math.max(...this.sharpHistory.map(s => s.v))
+    const settled = sizeOk && centerOk && stable
+    if (!settled) this.settledSince = null
+    else if (this.settledSince === null) this.settledSince = f.t
+    const patient = this.settledSince !== null && f.t - this.settledSince >= C.patienceMs
+
+    const openOk = patient || f.openness === undefined || f.openness >= C.minOpenness
     const sharpOk =
       this.sharpHistory.length >= C.minSharpSamples &&
-      f.sharpness >= C.sharpnessFloor &&
+      (patient || f.sharpness >= C.sharpnessFloor) &&
       f.sharpness >= peak * C.sharpnessShare
     const sharpScore = peak > 0 ? Math.min(1, f.sharpness / peak) * (f.sharpness >= C.sharpnessFloor ? 1 : 0.5) : 0
 
-    const allOk = sizeOk && centerOk && stable && sharpOk
+    const allOk = sizeOk && centerOk && openOk && stable && sharpOk
     this.streak = allOk ? this.streak + 1 : 0
 
     const score = Math.min(
       1,
-      0.25 + 0.2 * sizeScore + 0.15 * centerScore + 0.2 * (stable ? 1 : 0) + 0.2 * sharpScore
+      0.25 + 0.25 * sizeScore + 0.1 * (centerOk ? 1 : 0) + 0.2 * (stable ? 1 : 0) + 0.2 * sharpScore
     )
 
     const hint: CaptureHint = !sizeOk
-      ? rRel < C.minRadius
+      ? d < T.minDiameter
         ? 'closer'
         : 'farther'
       : !centerOk
         ? 'center'
-        : !stable
-          ? 'hold'
-          : !sharpOk
-            ? 'focus'
-            : 'ready'
+        : !openOk
+          ? 'open'
+          : !stable
+            ? 'hold'
+            : !sharpOk
+              ? 'focus'
+              : 'ready'
 
     return { score: allOk ? Math.max(score, 0.95) : Math.min(score, 0.9), hint, ready: this.streak >= C.readyStreak }
   }
@@ -141,10 +175,11 @@ export class CaptureGate {
 
 /** Кратки подсказки — показват се на екрана и се казват на глас. */
 export const HINT_TEXT: Record<CaptureHint, string> = {
-  search: 'Търся окото',
+  search: 'Търся очите',
   closer: 'По-близо',
   farther: 'По-далеч',
-  center: 'Окото в средата',
+  center: 'Очите в средата',
+  open: 'Отворете широко очите',
   hold: 'Задръжте неподвижно',
   focus: 'Фокусирам…',
   ready: 'Снимам',

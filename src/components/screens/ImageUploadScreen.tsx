@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import IrisCropEditor from '@/components/iris/IrisCropEditor'
 import IrisCalibrator from '@/components/iris/IrisCalibrator'
 import LiveIrisCamera, { type LiveCapture } from '@/components/iris/LiveIrisCamera'
+import { loadFaceTracker } from '@/lib/face-tracker'
 import { autoFrameIris } from '@/lib/iris-autoframe'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -903,6 +904,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
    * от обработка — оттам нататък опашката на калибратора я поема.
    */
   const liveQueueRef = useRef<LiveCapture[]>([])
+  // AI моделът (~4 MB) се тегли още тук, за да е готов, когато човек натисне „Снимай“.
+  useEffect(() => {
+    void loadFaceTracker()
+  }, [])
   const [liveSide, setLiveSide] = useState<'left' | 'right' | null>(null)
   useEffect(() => {
     if (isProcessing || liveQueueRef.current.length === 0) return
