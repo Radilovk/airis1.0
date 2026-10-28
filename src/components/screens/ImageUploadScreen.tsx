@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
+import { Camera, CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown, Aperture } from '@phosphor-icons/react'
 import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import IrisCropEditor from '@/components/iris/IrisCropEditor'
 import IrisCalibrator from '@/components/iris/IrisCalibrator'
+import LiveIrisCamera, { type LiveCapture } from '@/components/iris/LiveIrisCamera'
 import { autoFrameIris } from '@/lib/iris-autoframe'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -896,6 +897,24 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     setImagesVersion(v => v + 1)
   }
 
+  /**
+   * Живата камера връща една или две снимки наведнъж. `handleFileSelect`
+   * прекъсва предишното четене, затова втората чака, докато първата излезе
+   * от обработка — оттам нататък опашката на калибратора я поема.
+   */
+  const liveQueueRef = useRef<LiveCapture[]>([])
+  const [liveSide, setLiveSide] = useState<'left' | 'right' | null>(null)
+  useEffect(() => {
+    if (isProcessing || liveQueueRef.current.length === 0) return
+    const next = liveQueueRef.current.shift()!
+    void handleFileSelect(next.side, next.file)
+  })
+  const handleLiveDone = (captures: LiveCapture[]) => {
+    setLiveSide(null)
+    liveQueueRef.current.push(...captures)
+    setImagesVersion(v => v + 1)
+  }
+
   const left = leftImageRef.current
   const right = rightImageRef.current
   const leftReady = !!left?.geometry
@@ -966,6 +985,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                   disabled={isProcessing}
                   galleryRef={side === 'left' ? leftInputRef : rightInputRef}
                   onFile={file => handleFileSelect(side, file)}
+                  onLive={() => setLiveSide(side)}
                   onDrop={e => !isProcessing && handleDrop(side, e)}
                   onCalibrate={() => openCalibrator(side)}
                   onCrop={() => handleEditImage(side)}
@@ -1005,6 +1025,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           side={editingSide}
           onSave={handleCropSave}
           onCancel={handleCropCancel}
+        />
+      )}
+
+      {liveSide && (
+        <LiveIrisCamera
+          startSide={liveSide}
+          missing={[liveSide, ...(['left', 'right'] as const).filter(s => s !== liveSide && !(s === 'left' ? left : right))]}
+          onDone={handleLiveDone}
+          onClose={() => setLiveSide(null)}
         />
       )}
 
@@ -1094,6 +1123,7 @@ function EyeSlot({
   disabled,
   galleryRef,
   onFile,
+  onLive,
   onDrop,
   onCalibrate,
   onCrop,
@@ -1105,6 +1135,7 @@ function EyeSlot({
   disabled: boolean
   galleryRef: React.RefObject<HTMLInputElement | null>
   onFile: (file: File) => void
+  onLive: () => void
   onDrop: (e: React.DragEvent) => void
   onCalibrate: () => void
   onCrop: () => void
@@ -1137,13 +1168,16 @@ function EyeSlot({
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <Eye size={34} weight="duotone" className="text-primary" />
           </div>
-          <p className="mb-4 text-sm text-muted-foreground">Снимайте сега или изберете готова снимка.</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button size="lg" className="gap-2" disabled={disabled} onClick={() => cameraRef.current?.click()}>
-              <Camera size={20} weight="bold" /> Снимай
+          <p className="mb-4 text-sm text-muted-foreground">Телефонът сам улавя момента, в който окото е рязко, и снима.</p>
+          <Button size="lg" className="h-12 w-full gap-2" disabled={disabled} onClick={onLive}>
+            <Aperture size={20} weight="bold" /> Снимай автоматично
+          </Button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button variant="outline" className="gap-2" disabled={disabled} onClick={() => cameraRef.current?.click()}>
+              <Camera size={18} weight="bold" /> Камерата
             </Button>
-            <Button size="lg" variant="outline" className="gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
-              <ImageSquare size={20} weight="bold" /> От галерията
+            <Button variant="outline" className="gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
+              <ImageSquare size={18} weight="bold" /> От галерията
             </Button>
           </div>
           <p className="mt-3 hidden text-xs text-muted-foreground md:block">или пуснете файла тук</p>

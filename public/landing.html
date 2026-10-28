@@ -77,11 +77,10 @@
     .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; letter-spacing: -.01em; color: #F2F5F7; text-decoration: none; }
     .logo i { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle, #05080b 30%, var(--teal) 32%, #8a6a34 70%, #14283a 100%); box-shadow: 0 0 0 2px rgba(255,255,255,.12); }
     .nav a.small { color: rgba(242,245,247,.75); font-size: 14px; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
-    .eyes { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6%; width: 92%; max-width: 380px; margin: 26px auto 48px; }
-    .eye { position: relative; aspect-ratio: 1; }
-    .eye::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle, rgba(46,106,138,.55), transparent 70%); filter: blur(22px); }
-    .eye svg { position: relative; width: 100%; height: 100%; }
-    .eye .side { position: absolute; left: 0; right: 0; bottom: -24px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: rgba(242,245,247,.55); }
+    .iris-wrap { position: relative; width: 88%; max-width: 380px; margin: 14px auto 4px; aspect-ratio: 1; }
+    .iris-wrap::before { content: ''; position: absolute; inset: 4%; border-radius: 50%; background: radial-gradient(circle, rgba(46,106,138,.6), rgba(227,162,59,.12) 55%, transparent 72%); filter: blur(30px); animation: glow 7s ease-in-out infinite; }
+    @keyframes glow { 50% { transform: scale(1.06); opacity: .8; } }
+    #iris { position: relative; width: 100%; height: 100%; display: block; }
     .tag {
       position: absolute; font-size: 11px; font-weight: 700; white-space: nowrap;
       padding: 6px 10px; border-radius: 999px;
@@ -90,9 +89,9 @@
       opacity: 0; transform: translateY(6px); animation: tagIn .6s ease forwards;
     }
     .tag b { color: var(--amber); font-weight: 800; }
-    .tag.t1 { left: -2%; top: -6%; animation-delay: .9s; }
-    .tag.t2 { right: -2%; top: -6%; animation-delay: 1.2s; }
-    .tag.t3 { left: 50%; bottom: 8%; margin-left: -58px; animation-delay: 1.5s; }
+    .tag.t1 { left: -4%; top: 22%; animation-delay: .9s; }
+    .tag.t2 { right: -6%; top: 6%; animation-delay: 1.2s; }
+    .tag.t3 { right: -2%; bottom: 12%; animation-delay: 1.5s; }
     @keyframes tagIn { to { opacity: 1; transform: none; } }
     .hero h1 {
       font-family: 'Lora', Georgia, serif; font-weight: 600;
@@ -211,9 +210,8 @@
       <a class="small" href="#protocol">Какво получавам</a>
     </nav>
 
-    <div class="eyes" aria-hidden="true">
-      <div class="eye"><svg id="iris-r" viewBox="0 0 400 400"></svg><span class="side">десен</span></div>
-      <div class="eye"><svg id="iris-l" viewBox="0 0 400 400"></svg><span class="side">ляв</span></div>
+    <div class="iris-wrap" aria-hidden="true">
+      <canvas id="iris"></canvas>
       <span class="tag t1">Конституция</span>
       <span class="tag t2">Храносмилане · <b>фокус</b></span>
       <span class="tag t3">Стресов пръстен</span>
@@ -383,49 +381,186 @@
 <div class="sticky" id="sticky"><a class="btn btn-primary" href="./" data-cta="sticky">Искам своя протокол</a></div>
 
 <script>
-  // Двата ириса: рисунъкът е като в приложението, но с различно зърно — десният и левият не са еднакви.
-  function drawIris(svg, seed, marks) {
-    const NS = 'http://www.w3.org/2000/svg'
-    const id = 'ig' + seed
-    let s = seed
-    const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296)
-    const el = (tag, attrs, parent = svg) => {
-      const n = document.createElementNS(NS, tag)
-      for (const k in attrs) n.setAttribute(k, attrs[k])
-      parent.appendChild(n)
-      return n
+  // Ирисът: рисува се веднъж, в резолюцията на екрана — влакна, крипти,
+  // коларета, пигменти, лимбален пръстен и отблясъци. Зърното е фиксирано,
+  // за да е един и същ ирис при всяко зареждане.
+  function renderIris(canvas) {
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1)
+    const S = Math.min(1200, Math.round((canvas.clientWidth || 340) * dpr))
+    canvas.width = S
+    canvas.height = S
+    const x = canvas.getContext('2d')
+    const C = S / 2, R = S * 0.46, P = R * 0.29, COL = R * 0.5
+    let seed = 11
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
+    const TAU = Math.PI * 2
+    // Неравен, „жив“ ръб — сума от няколко синусоиди.
+    const wobble = (n, amp) => {
+      const k = Array.from({ length: n }, () => [1 + Math.floor(rnd() * 14), rnd() * TAU, amp * (0.3 + rnd())])
+      return a => k.reduce((s, [f, ph, m]) => s + Math.sin(a * f + ph) * m, 0) / n
     }
-    const defs = el('defs', {})
-    const g = el('radialGradient', { id, cx: '50%', cy: '50%', r: '50%' }, defs)
-    ;[['0%', '#7c4a1e'], ['34%', '#8a6a34'], ['48%', '#3f7f86'], ['86%', '#2e6a8a'], ['100%', '#14283a']]
-      .forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, g))
-    for (let i = 0; i < 60; i++) {
-      const a = (i / 60) * Math.PI * 2, long = i % 5 === 0, r0 = long ? 176 : 181
-      el('line', { x1: 200 + Math.cos(a) * r0, y1: 200 + Math.sin(a) * r0, x2: 200 + Math.cos(a) * 188, y2: 200 + Math.sin(a) * 188,
-        stroke: long ? 'rgba(227,162,59,.6)' : 'rgba(255,255,255,.18)', 'stroke-width': long ? 2 : 1 })
+
+    // Сянка около ириса — отделя го от фона като на макро снимка.
+    let g = x.createRadialGradient(C, C, R * 0.96, C, C, R * 1.12)
+    g.addColorStop(0, 'rgba(0,0,0,.55)')
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    x.fillStyle = g
+    x.beginPath(); x.arc(C, C, R * 1.12, 0, TAU); x.fill()
+
+    x.save()
+    x.beginPath(); x.arc(C, C, R, 0, TAU); x.clip()
+
+    // Основа: кехлибарен център, зелен преход, синьо-зелена периферия.
+    g = x.createRadialGradient(C, C, P * 0.9, C, C, R)
+    ;[[0, '#2a1407'], [0.08, '#7a3f12'], [0.2, '#b8772a'], [0.3, '#a07a3a'], [0.38, '#5e7c58'],
+      [0.5, '#2f7186'], [0.72, '#235a76'], [0.9, '#14324a'], [1, '#07131d']].forEach(([o, c]) => g.addColorStop(o, c))
+    x.fillStyle = g
+    x.fillRect(0, 0, S, S)
+
+    // Влакна (строма): тъмни процепи, после светли нишки.
+    const fiber = (a, r0, r1, bend) => {
+      const am = a + bend, rm = (r0 + r1) / 2
+      x.beginPath()
+      x.moveTo(C + Math.cos(a) * r0, C + Math.sin(a) * r0)
+      x.quadraticCurveTo(C + Math.cos(am) * rm, C + Math.sin(am) * rm, C + Math.cos(a + bend * 0.4) * r1, C + Math.sin(a + bend * 0.4) * r1)
+      x.stroke()
     }
-    el('circle', { cx: 200, cy: 200, r: 152, fill: `url(#${id})` })
-    for (let i = 0; i < 150; i++) {
-      const a = (i / 150) * Math.PI * 2 + rnd() * 0.03, r0 = 54 + rnd() * 10, r1 = 118 + rnd() * 32, d = (rnd() - 0.5) * 0.06
-      el('line', { x1: 200 + Math.cos(a) * r0, y1: 200 + Math.sin(a) * r0, x2: 200 + Math.cos(a + d) * r1, y2: 200 + Math.sin(a + d) * r1,
-        stroke: rnd() > 0.5 ? 'rgba(230,240,235,.16)' : 'rgba(10,20,25,.2)', 'stroke-width': 0.6 + rnd() * 1.3 })
+    x.lineCap = 'round'
+    for (let i = 0; i < 1400; i++) {
+      x.strokeStyle = `rgba(4,12,18,${0.12 + rnd() * 0.22})`
+      x.lineWidth = S * (0.0015 + rnd() * 0.004)
+      fiber(rnd() * TAU, P * (1 + rnd() * 0.15), R * (0.85 + rnd() * 0.15), (rnd() - 0.5) * 0.05)
     }
-    const pts = []
-    for (let d = 0; d <= 360; d += 4) {
-      const a = (d * Math.PI) / 180, r = 84 + Math.sin(a * 9) * 4
-      pts.push((200 + Math.cos(a) * r).toFixed(1) + ',' + (200 + Math.sin(a) * r).toFixed(1))
+    x.globalCompositeOperation = 'lighter'
+    for (let i = 0; i < 2200; i++) {
+      const outer = rnd() > 0.35
+      const r0 = outer ? COL * (0.95 + rnd() * 0.2) : P * (1.02 + rnd() * 0.1)
+      const r1 = outer ? R * (0.78 + rnd() * 0.2) : COL * (0.95 + rnd() * 0.25)
+      x.strokeStyle = outer
+        ? `hsla(${182 + rnd() * 22},${35 + rnd() * 30}%,${55 + rnd() * 25}%,${0.04 + rnd() * 0.1})`
+        : `hsla(${30 + rnd() * 14},${70 + rnd() * 25}%,${50 + rnd() * 25}%,${0.06 + rnd() * 0.12})`
+      x.lineWidth = S * (0.0008 + rnd() * 0.0025)
+      fiber(rnd() * TAU, r0, r1, (rnd() - 0.5) * 0.06)
     }
-    el('path', { d: 'M' + pts.join(' L') + ' Z', fill: 'none', stroke: 'rgba(230,190,120,.65)', 'stroke-width': 2.5 })
-    el('circle', { cx: 200, cy: 200, r: 152, fill: 'none', stroke: '#0b1620', 'stroke-width': 4 })
-    el('circle', { cx: 200, cy: 200, r: 54, fill: '#05080b', class: 'breathe' })
-    el('ellipse', { cx: 220, cy: 180, rx: 13, ry: 9, fill: 'rgba(255,255,255,.9)', transform: 'rotate(-35 220 180)' })
-    marks.forEach(([x, y], i) => {
-      el('circle', { cx: x, cy: y, r: 9, fill: 'none', stroke: '#fff', 'stroke-width': 1.5, class: 'pulse', style: `animation-delay:${i * 0.5}s` })
-      el('circle', { cx: x, cy: y, r: 5.5, fill: '#E3A23B', stroke: '#fff', 'stroke-width': 1.5 })
-    })
+    // Снопове — по-светли групи влакна, които дават релеф.
+    for (let i = 0; i < 70; i++) {
+      const a0 = rnd() * TAU
+      for (let j = 0; j < 14; j++) {
+        x.strokeStyle = `hsla(${188 + rnd() * 12},45%,${70 + rnd() * 15}%,${0.05 + rnd() * 0.07})`
+        x.lineWidth = S * (0.001 + rnd() * 0.002)
+        fiber(a0 + (rnd() - 0.5) * 0.04, COL * (1 + rnd() * 0.15), R * (0.7 + rnd() * 0.25), (rnd() - 0.5) * 0.04)
+      }
+    }
+    x.globalCompositeOperation = 'source-over'
+
+    // Крипти — тъмни лещовидни вдлъбнатини около коларетата.
+    for (let i = 0; i < 46; i++) {
+      const a = rnd() * TAU, r = COL * (1.02 + rnd() * 0.5)
+      const len = R * (0.04 + rnd() * 0.1), wid = R * (0.012 + rnd() * 0.03)
+      x.save()
+      x.translate(C + Math.cos(a) * r, C + Math.sin(a) * r)
+      x.rotate(a)
+      g = x.createRadialGradient(0, 0, 0, 0, 0, len)
+      g.addColorStop(0, 'rgba(3,8,12,.75)')
+      g.addColorStop(1, 'rgba(3,8,12,0)')
+      x.fillStyle = g
+      x.beginPath(); x.ellipse(0, 0, len, wid, 0, 0, TAU); x.fill()
+      x.strokeStyle = 'rgba(190,225,225,.12)'
+      x.lineWidth = S * 0.0015
+      x.beginPath(); x.ellipse(0, 0, len * 1.05, wid * 1.2, 0, 0, TAU); x.stroke()
+      x.restore()
+    }
+
+    // Коларета — назъбеният златист пръстен между зеничната и цилиарната зона.
+    const cw = wobble(9, R * 0.05)
+    x.beginPath()
+    for (let d = 0; d <= 720; d++) {
+      const a = (d / 720) * TAU, r = COL + cw(a) + Math.sin(a * 23 + Math.sin(a * 5) * 2) * R * 0.004
+      d ? x.lineTo(C + Math.cos(a) * r, C + Math.sin(a) * r) : x.moveTo(C + Math.cos(a) * r, C + Math.sin(a) * r)
+    }
+    x.closePath()
+    x.shadowColor = 'rgba(240,180,90,.7)'
+    x.shadowBlur = S * 0.012
+    x.strokeStyle = 'rgba(236,190,120,.38)'
+    x.lineWidth = S * 0.0045
+    x.stroke()
+    x.shadowBlur = 0
+
+    // Контракционни бразди — прекъснати концентрични дъги в периферията.
+    x.save()
+    x.filter = `blur(${Math.max(1, S * 0.0025)}px)`
+    x.strokeStyle = 'rgba(2,8,12,.3)'
+    for (const k of [0.7, 0.79, 0.88]) {
+      x.lineWidth = S * (0.002 + rnd() * 0.003)
+      for (let a = rnd(); a < TAU; a += 0.5 + rnd() * 0.6) {
+        x.beginPath(); x.arc(C, C, R * k, a, a + 0.25 + rnd() * 0.5); x.stroke()
+      }
+    }
+    x.restore()
+
+    // Пигментни петна.
+    // По няколко в група, с неравни краища — като истински петна.
+    for (let i = 0; i < 30; i++) {
+      const a = (i < 12 ? 0.6 : 3.9) + (rnd() - 0.5) * (i < 12 ? 0.5 : 1.4)
+      const r = COL * 1.1 + rnd() * (R * 0.75 - COL * 1.1), s = R * (0.006 + rnd() * 0.02)
+      const px = C + Math.cos(a) * r, py = C + Math.sin(a) * r
+      g = x.createRadialGradient(px, py, 0, px, py, s)
+      g.addColorStop(0, `rgba(${150 + rnd() * 60},${70 + rnd() * 40},20,.85)`)
+      g.addColorStop(1, 'rgba(120,60,20,0)')
+      x.fillStyle = g
+      x.beginPath(); x.arc(px, py, s, 0, TAU); x.fill()
+    }
+
+    // Лимбален пръстен — тъмната граница, която прави окото „дълбоко“.
+    g = x.createRadialGradient(C, C, R * 0.8, C, C, R)
+    g.addColorStop(0, 'rgba(4,10,16,0)')
+    g.addColorStop(0.75, 'rgba(4,10,16,.55)')
+    g.addColorStop(1, 'rgba(2,5,8,.95)')
+    x.fillStyle = g
+    x.fillRect(0, 0, S, S)
+
+    // Зеница с ресничест ръб (pupillary ruff).
+    const pw = wobble(7, P * 0.03)
+    x.beginPath()
+    for (let d = 0; d <= 360; d++) {
+      const a = (d / 360) * TAU, r = P + pw(a)
+      d ? x.lineTo(C + Math.cos(a) * r, C + Math.sin(a) * r) : x.moveTo(C + Math.cos(a) * r, C + Math.sin(a) * r)
+    }
+    x.closePath()
+    x.fillStyle = '#010304'
+    x.fill()
+    x.strokeStyle = 'rgba(120,62,20,.9)'
+    x.lineWidth = S * 0.007
+    x.stroke()
+
+    // Отблясъци: прозорец, пръстеновидна светлина и малка точка.
+    x.save()
+    x.filter = `blur(${Math.max(1.5, S * 0.004)}px)`
+    x.translate(C - P * 0.42, C - P * 0.5)
+    x.rotate(-0.25)
+    g = x.createLinearGradient(0, -P * 0.2, 0, P * 0.2)
+    g.addColorStop(0, 'rgba(255,255,255,.85)')
+    g.addColorStop(1, 'rgba(220,235,245,.35)')
+    x.fillStyle = g
+    x.beginPath(); x.ellipse(0, 0, P * 0.26, P * 0.16, 0, 0, TAU); x.fill()
+    x.restore()
+    x.strokeStyle = 'rgba(255,255,255,.1)'
+    x.lineWidth = S * 0.02
+    x.beginPath(); x.arc(C, C, R * 0.66, Math.PI * 1.05, Math.PI * 1.55); x.stroke()
+    x.fillStyle = 'rgba(255,255,255,.7)'
+    x.beginPath(); x.arc(C + P * 0.75, C + P * 0.55, S * 0.006, 0, TAU); x.fill()
+
+    // Зърно — без него рисунката изглежда пластмасова.
+    const img = x.getImageData(0, 0, S, S), d = img.data
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue
+      const n = (rnd() - 0.5) * 14
+      d[i] += n; d[i + 1] += n; d[i + 2] += n
+    }
+    x.putImageData(img, 0, 0)
+    x.restore()
   }
-  drawIris(document.getElementById('iris-r'), 17, [[128, 150], [262, 268]])
-  drawIris(document.getElementById('iris-l'), 41, [[292, 168], [150, 280]])
+  renderIris(document.getElementById('iris'))
 
   // Секциите се показват при скрол; лепкавият бутон — щом основният излезе от екрана.
   const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('in')), { threshold: 0.12 })
