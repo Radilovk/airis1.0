@@ -570,6 +570,30 @@ function findPupil(
     }
   }
 
+  // Кръгът може да спре ВЪТРЕ в зеницата — на ореола около отблясъка или на
+  // неравност в нея. Белег: точно извън кръга пак е тъмно като в зеницата, а
+  // не светло като ириса. Тогава търсим следващия преход навън. (Докладвано:
+  // калибраторът казваше „зеницата не е открита“, а щом човек увеличи
+  // вътрешния кръг до истинския ръб — я намираше.)
+  const irisLevel = ringMean(clean, best.cx, best.cy, limbus.r * 0.8, 64)
+  for (let i = 0; i < 4; i++) {
+    const inside = ringMean(clean, best.cx, best.cy, best.r * 0.9, 48)
+    const outside = ringMean(clean, best.cx, best.cy, best.r * 1.2, 48)
+    if (![irisLevel, inside, outside].every(Number.isFinite) || irisLevel - inside < 12) break
+    if (outside - inside >= 0.6 * (irisLevel - inside)) break
+    const from = best.r * 1.15
+    if (from >= rHi) break
+    const res = scanRadius(clean, best.cx, best.cy, from, rHi, 1, 1)
+    // Най-близкият ясен преход навън, а не най-силният: по-навън текстурата
+    // на ириса също дава преходи и кръгът би прескочил истинския ръб.
+    const peak = Math.max(...res.profile)
+    if (!(peak > 0)) break
+    const p = res.profile
+    const k = p.findIndex((v, j) => v >= 0.5 * peak && (j === 0 || v >= p[j - 1]) && (j === p.length - 1 || v >= p[j + 1]))
+    if (k < 0) break
+    best = { ...best, r: from + k, strength: p[k], profile: p }
+  }
+
   return best
 }
 

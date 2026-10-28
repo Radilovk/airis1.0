@@ -39,6 +39,11 @@ export default defineConfig({
     // Set target for better module support with wider browser compatibility
     target: 'es2020',
     rollupOptions: {
+      // Две страници: лендингът е входът, приложението е отделно.
+      input: {
+        main: resolve(projectRoot, 'index.html'),
+        app: resolve(projectRoot, 'app.html'),
+      },
       output: {
         // Ensure consistent chunk naming for better caching
         entryFileNames: 'assets/[name]-[hash].js',
