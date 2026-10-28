@@ -37,8 +37,26 @@ type Screen = 'welcome' | 'questionnaire' | 'upload' | 'analysis' | 'report' | '
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+/**
+ * Вход от лендинг страницата: `?start=analysis` отваря направо въпросника.
+ * Лендингът вече е убедил човека — втори начален екран с бутон „Започни“
+ * само го спира. Параметърът се маха от адреса, за да не стартира пак при
+ * презареждане.
+ */
+function initialScreen(): Screen {
+  try {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('start') !== 'analysis') return 'welcome'
+    url.searchParams.delete('start')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    return 'questionnaire'
+  } catch {
+    return 'welcome'
+  }
+}
+
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome')
+  const [currentScreen, setCurrentScreen] = useState<Screen>(initialScreen)
   const [questionnaireData, setQuestionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
   const leftIrisRef = useRef<IrisImage | null>(null)
   const rightIrisRef = useRef<IrisImage | null>(null)

@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Camera, Eye, FlipHorizontal, Lightning, LightningSlash, SpeakerHigh, SpeakerSlash, X } from '@phosphor-icons/react'
+import type { FaceLandmarker } from '@mediapipe/tasks-vision'
 import { detectIrisGeometry } from '@/lib/iris-geometry'
-import { CaptureGate, HINT_TEXT, irisSharpness, type CaptureHint, type CaptureState, type FrameReading } from '@/lib/live-capture'
+import { loadFaceTracker, trackIrises } from '@/lib/face-tracker'
+import {
+  CaptureGate,
+  HINT_TEXT,
+  TARGET_BOTH,
+  TARGET_SINGLE,
+  irisSharpness,
+  type CaptureHint,
+  type CaptureState,
+} from '@/lib/live-capture'
 
 type Side = 'left' | 'right'
 type Mode = 'single' | 'both'
@@ -13,7 +23,7 @@ export interface LiveCapture {
 }
 
 interface LiveIrisCameraProps {
-  /** С кое око да започне в режим „едно по едно“. */
+  /** С кое око да започне в режим „по едно“. */
   startSide: Side
   /** Очите, които още нямат снимка — след едното камерата минава сама на другото. */
   missing: Side[]
@@ -21,14 +31,20 @@ interface LiveIrisCameraProps {
   onClose: () => void
 }
 
-/** Анализираният квадрат е до толкова пиксела — детекцията работи на 320. */
+/** Класическият детектор работи на квадрат с тази страна. */
 const ANALYSIS_SIDE = 320
-/** Пауза между два анализа; телефонът остава хладен, а 6–8 кадъра/s стигат. */
-const TICK_MS = 120
+/** Пауза между два анализа: AI моделът върви 20–30 кадъра/s, но 12 стигат. */
+const TICK_MS = 80
 /** Максимална страна на запазената снимка — пред 10 MB лимита на качването. */
 const MAX_PHOTO_SIDE = 4032
+/** Изрязването около окото: 2r × това — остава склера и клепачи за очния скрининг. */
+const CROP_FACTOR = 2.8
+/** Колко дълго следим окото без AI (лицето е излязло от кадъра) преди да го изгубим. */
+const ROI_MEMORY_MS = 1500
 
 const SIDE_LABEL: Record<Side, string> = { left: 'Ляво око', right: 'Дясно око' }
+
+/* ── звук, вибрация, глас ─────────────────────────────────────────────────── */
 
 /* ── звук, вибрация, глас ─────────────────────────────────────────────────── */
 
@@ -112,66 +128,46 @@ class Feedback {
   }
 }
 
-/* ── геометрия на кадъра ──────────────────────────────────────────────────── */
+/* ── следене на окото ─────────────────────────────────────────────────────── */
 
-interface Region {
-  /** Кое око е в този квадрат. */
-  side: Side
-  /** Квадратът в пиксели на видеото. */
-  x: number
-  y: number
-  s: number
+interface EyeFix {
+  cx: number
+  cy: number
+  r: number
+  openness?: number
+  t: number
 }
 
 /**
- * Квадратите, в които търсим ирис. При „едно око“ — централният квадрат.
- * При „двете очи“ — два съседни квадрата в средата: задната камера гледа
- * човека, затова лявата половина на кадъра е неговото ДЯСНО око.
+ * Класическият детектор върху квадрат около последната позиция на окото.
+ * Така окото се следи и когато телефонът е толкова близо, че лицето вече не
+ * е в кадъра и AI моделът го губи. Квадратът е 5r — ирисът е в средата му и
+ * заема размера, за който детекторът е направен.
  */
-function regionsFor(mode: Mode, side: Side, vw: number, vh: number): Region[] {
-  if (mode === 'single') {
-    const s = Math.min(vw, vh)
-    return [{ side, x: (vw - s) / 2, y: (vh - s) / 2, s }]
-  }
-  const s = Math.min(vw / 2, vh)
-  const y = (vh - s) / 2
-  return [
-    { side: 'right', x: vw / 2 - s, y, s },
-    { side: 'left', x: vw / 2, y, s },
-  ]
+function trackNear(video: HTMLVideoElement, last: EyeFix, work: HTMLCanvasElement): EyeFix | null {
+  const side = Math.min(5 * last.r, video.videoWidth, video.videoHeight)
+  const x = Math.max(0, Math.min(video.videoWidth - side, last.cx - side / 2))
+  const y = Math.max(0, Math.min(video.videoHeight - side, last.cy - side / 2))
+  return detectIn(video, x, y, side, work, last.r)
 }
 
-interface Detection {
-  region: Region
-  reading: FrameReading
+/** Без AI модел: търсим ирис в централния квадрат (окото трябва да е в средата). */
+function detectCenter(video: HTMLVideoElement, work: HTMLCanvasElement): EyeFix | null {
+  const side = Math.min(video.videoWidth, video.videoHeight)
+  return detectIn(video, (video.videoWidth - side) / 2, (video.videoHeight - side) / 2, side, work)
 }
 
-function analyseRegion(src: CanvasImageSource, region: Region, work: HTMLCanvasElement, crop: HTMLCanvasElement, rotation: number | undefined): Detection {
-  const k = ANALYSIS_SIDE / region.s
+function detectIn(video: HTMLVideoElement, x: number, y: number, side: number, work: HTMLCanvasElement, expectR?: number): EyeFix | null {
+  if (side < 40) return null
   work.width = ANALYSIS_SIDE
   work.height = ANALYSIS_SIDE
-  work.getContext('2d')!.drawImage(src, region.x, region.y, region.s, region.s, 0, 0, ANALYSIS_SIDE, ANALYSIS_SIDE)
+  work.getContext('2d')!.drawImage(video, x, y, side, side, 0, 0, ANALYSIS_SIDE, ANALYSIS_SIDE)
   const geo = detectIrisGeometry(work)
-  const found = geo.pupilConfidence > 0
-  // Рязкостта се мери в пълната резолюция — на 320 px всичко изглежда рязко.
-  const sharpness = found
-    ? irisSharpness(src, region.x + geo.limbus.cx / k, region.y + geo.limbus.cy / k, geo.limbus.r / k, crop)
-    : 0
-  return {
-    region,
-    reading: {
-      found,
-      cx: geo.limbus.cx,
-      cy: geo.limbus.cy,
-      r: geo.limbus.r,
-      side: ANALYSIS_SIDE,
-      pupilConfidence: geo.pupilConfidence,
-      limbusConfidence: geo.limbusConfidence,
-      sharpness,
-      rotation,
-      t: performance.now(),
-    },
-  }
+  if (geo.pupilConfidence < 0.35 || geo.limbusConfidence < 0.12) return null
+  const k = side / ANALYSIS_SIDE
+  const r = geo.limbus.r * k
+  if (expectR && (r < expectR * 0.6 || r > expectR * 1.6)) return null
+  return { cx: x + geo.limbus.cx * k, cy: y + geo.limbus.cy * k, r, t: performance.now() }
 }
 
 function canvasToFile(canvas: HTMLCanvasElement, name: string): Promise<File | null> {
@@ -213,30 +209,43 @@ async function grabStill(video: HTMLVideoElement, track: MediaStreamTrack | null
   }
 }
 
-/** Изрязва квадрата на окото (с поле около него) от снимката. */
-function cropRegion(still: HTMLCanvasElement, region: Region, vw: number): HTMLCanvasElement {
+/** Квадрат около окото от снимката; координатите на окото са във видеото. */
+function cropEye(still: HTMLCanvasElement, vw: number, eye: { cx: number; cy: number; r: number }): HTMLCanvasElement {
   const k = still.width / vw
+  const side = Math.min(still.width, still.height, eye.r * 2 * CROP_FACTOR * k)
+  const x = Math.max(0, Math.min(still.width - side, eye.cx * k - side / 2))
+  const y = Math.max(0, Math.min(still.height - side, eye.cy * k - side / 2))
   const out = document.createElement('canvas')
-  out.width = Math.round(region.s * k)
+  out.width = Math.round(side)
   out.height = out.width
-  out.getContext('2d')!.drawImage(still, region.x * k, region.y * k, region.s * k, region.s * k, 0, 0, out.width, out.height)
+  out.getContext('2d')!.drawImage(still, x, y, side, side, 0, 0, out.width, out.height)
   return out
+}
+
+/** Ръчна снимка без открито око: средата (едно око) или двете половини (две очи). */
+function fallbackEye(side: Side, mode: Mode, vw: number, vh: number) {
+  const short = Math.min(vw, vh)
+  if (mode === 'single') return { cx: vw / 2, cy: vh / 2, r: short / (2 * CROP_FACTOR) }
+  const r = Math.min(vw / 2, vh) / (2 * CROP_FACTOR)
+  return { cx: side === 'right' ? vw / 4 : (3 * vw) / 4, cy: vh / 2, r }
 }
 
 /* ── компонент ────────────────────────────────────────────────────────────── */
 
+type AiState = 'loading' | 'ready' | 'off'
+
 export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: LiveIrisCameraProps) {
   const [phase, setPhase] = useState<'intro' | 'live' | 'error'>('intro')
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<Mode>('single')
+  const [mode, setMode] = useState<Mode>(missing.length > 1 ? 'both' : 'single')
   const [side, setSide] = useState<Side>(startSide)
   const [mirror, setMirror] = useState(false)
   const [sound, setSound] = useState(true)
   const [torch, setTorch] = useState(false)
   const [torchSupported, setTorchSupported] = useState(false)
+  const [ai, setAi] = useState<AiState>('loading')
   const [state, setState] = useState<CaptureState>({ score: 0, hint: 'search', ready: false })
   const [rings, setRings] = useState<{ x: number; y: number; r: number }[]>([])
-  const [guides, setGuides] = useState<{ x: number; y: number; r: number }[]>([])
   const [flash, setFlash] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -244,8 +253,10 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
   const videoRef = useRef<HTMLVideoElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const modelRef = useRef<FaceLandmarker | null>(null)
   const feedbackRef = useRef(new Feedback())
-  const gatesRef = useRef<Record<Side, CaptureGate>>({ left: new CaptureGate(), right: new CaptureGate() })
+  const gatesRef = useRef<Record<Side, CaptureGate>>({ left: new CaptureGate(TARGET_BOTH), right: new CaptureGate(TARGET_BOTH) })
+  const fixRef = useRef<Record<Side, EyeFix | null>>({ left: null, right: null })
   const capturesRef = useRef<LiveCapture[]>([])
   const rotationRef = useRef<number | undefined>(undefined)
   const capturingRef = useRef(false)
@@ -267,6 +278,19 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
     feedbackRef.current.speech = sound
   }, [sound])
 
+  // AI моделът се тегли още докато човек чете началния екран.
+  useEffect(() => {
+    let alive = true
+    loadFaceTracker().then(m => {
+      if (!alive) return
+      modelRef.current = m
+      setAi(m ? 'ready' : 'off')
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const track = () => streamRef.current?.getVideoTracks()[0] ?? null
 
   const applyTorch = async (on: boolean) => {
@@ -280,9 +304,17 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
     }
   }
 
+  const switchMode = (m: Mode) => {
+    setMode(m)
+    const target = m === 'both' ? TARGET_BOTH : TARGET_SINGLE
+    gatesRef.current.left.setTarget(target)
+    gatesRef.current.right.setTarget(target)
+  }
+
   const start = async () => {
     // Всичко, което иска докосване (звук, жироскоп на iPhone), става тук.
     feedbackRef.current.unlock()
+    switchMode(modeRef.current)
     const DME = window.DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> }
     try {
       if (DME?.requestPermission) await DME.requestPermission()
@@ -303,9 +335,9 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
       }
       const advanced: Record<string, unknown>[] = []
       if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' })
-      // Обективът не фокусира по-близо от ~10 cm. С 2× увеличение окото е
-      // едро от 15–20 cm, където фокусът е сигурен.
-      if (caps.zoom && modeRef.current === 'single') advanced.push({ zoom: Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2)) })
+      // По едно око: 1.5× увеличение дава по-едър ирис от разстояние, на което
+      // камерата фокусира. При двете очи — без увеличение, за да влязат и двете.
+      if (caps.zoom) advanced.push({ zoom: Math.min(caps.zoom.max, Math.max(caps.zoom.min, modeRef.current === 'single' ? 1.5 : 1)) })
       if (advanced.length) await t.applyConstraints({ advanced: advanced as MediaTrackConstraintSet[] }).catch(() => {})
       setTorchSupported(!!caps.torch)
       setPhase('live')
@@ -317,7 +349,7 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
           /* без светкавица */
         }
       }
-      feedbackRef.current.say(modeRef.current === 'single' ? `${SIDE_LABEL[sideRef.current]}. Насочете камерата.` : 'Двете очи в кръговете.', null, performance.now(), true)
+      feedbackRef.current.say(modeRef.current === 'single' ? `${SIDE_LABEL[sideRef.current]}.` : 'Насочете камерата към лицето.', null, performance.now(), true)
     } catch (e) {
       setError(
         e instanceof DOMException && e.name === 'NotAllowedError'
@@ -349,8 +381,10 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
     }
   }, [phase])
 
+  const sidesNow = (): Side[] => (modeRef.current === 'both' ? ['right', 'left'] : [sideRef.current])
+
   const capture = useCallback(
-    async (regions: Region[]) => {
+    async (sides: Side[]) => {
       const video = videoRef.current
       if (!video || capturingRef.current) return
       capturingRef.current = true
@@ -359,19 +393,26 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
       setFlash(true)
       setTimeout(() => setFlash(false), 180)
       try {
+        const vw = video.videoWidth
+        const vh = video.videoHeight
+        // Позициите се вземат ПРЕДИ снимката — тя може да отнеме секунда.
+        const eyes = sides.map(s => ({ side: s, eye: fixRef.current[s] ?? fallbackEye(s, modeRef.current, vw, vh) }))
         const still = await grabStill(video, track())
-        for (const region of regions) {
-          const file = await canvasToFile(cropRegion(still, region, video.videoWidth), `iris-${region.side}-${Date.now()}.jpg`)
-          if (file) capturesRef.current = [...capturesRef.current.filter(c => c.side !== region.side), { side: region.side, file }]
+        for (const { side: s, eye } of eyes) {
+          const file = await canvasToFile(cropEye(still, vw, eye), `iris-${s}-${Date.now()}.jpg`)
+          if (file) capturesRef.current = [...capturesRef.current.filter(c => c.side !== s), { side: s, file }]
         }
         const have = new Set(capturesRef.current.map(c => c.side))
         const next = missing.find(s => !have.has(s))
-        if (modeRef.current === 'single' && next) {
+        if (next) {
           // Едното око е готово — минаваме на другото, без да затваряме камерата.
           gatesRef.current[next].reset()
+          fixRef.current[next] = null
+          setMode('single')
           setSide(next)
-          setBanner(`Готово. Сега ${next === 'left' ? 'лявото' : 'дясното'} око.`)
-          feedbackRef.current.say(`Готово. Сега ${next === 'left' ? 'лявото' : 'дясното'} око.`, null, performance.now(), true)
+          const msg = `Готово. Сега ${next === 'left' ? 'лявото' : 'дясното'} око.`
+          setBanner(msg)
+          feedbackRef.current.say(msg, null, performance.now(), true)
           setTimeout(() => setBanner(null), 2200)
           // Кратка пауза: човекът трябва да премести телефона, преди да търсим пак.
           await new Promise(r => setTimeout(r, 1500))
@@ -389,14 +430,26 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
     [missing, onDone, stop]
   )
 
-  // Цикълът: кадър → откриване → рязкост → решение. Без requestVideoFrameCallback,
-  // за да работи и на по-стари iPhone.
+  /** Видео пиксели → екран; видеото е `object-cover`. */
+  const toScreen = (vw: number, vh: number) => {
+    const box = boxRef.current
+    if (!box) return null
+    const { width: bw, height: bh } = box.getBoundingClientRect()
+    const k = Math.max(bw / vw, bh / vh)
+    const ox = (bw - vw * k) / 2
+    const oy = (bh - vh * k) / 2
+    return (e: { cx: number; cy: number; r: number }) => ({ x: ox + e.cx * k, y: oy + e.cy * k, r: e.r * k })
+  }
+
+  // Цикълът: кадър → AI (или класически детектор около последната позиция) →
+  // рязкост → решение.
   useEffect(() => {
     if (phase !== 'live') return
     const work = document.createElement('canvas')
     const crop = document.createElement('canvas')
     let alive = true
     let timer = 0
+    let lastTs = 0
 
     const loop = () => {
       if (!alive) return
@@ -404,23 +457,46 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
       if (video && video.readyState >= 2 && video.videoWidth && !capturingRef.current) {
         const vw = video.videoWidth
         const vh = video.videoHeight
-        const regions = regionsFor(modeRef.current, sideRef.current, vw, vh)
-        const detections = regions.map(r => analyseRegion(video, r, work, crop, rotationRef.current))
-        const states = detections.map(d => gatesRef.current[d.region.side].push(d.reading))
+        // MediaPipe иска строго растящи времена.
+        const now = Math.max(performance.now(), lastTs + 1)
+        lastTs = now
+        const model = modelRef.current
+        const tracked = model ? trackIrises(model, video, now) : []
+        const sides = sidesNow()
+
+        const states = sides.map(s => {
+          const last = fixRef.current[s]
+          let fix: EyeFix | null = null
+          const fromAi = tracked.find(t => t.side === s)
+          if (fromAi) fix = { ...fromAi, t: now }
+          else if (last && now - last.t < ROI_MEMORY_MS) fix = trackNear(video, last, work)
+          else if (!model && modeRef.current === 'single') fix = detectCenter(video, work)
+          if (fix) fixRef.current[s] = fix
+          else if (last && now - last.t >= ROI_MEMORY_MS) fixRef.current[s] = null
+
+          return gatesRef.current[s].push({
+            found: !!fix,
+            cx: fix?.cx ?? 0,
+            cy: fix?.cy ?? 0,
+            r: fix?.r ?? 0,
+            frameW: vw,
+            frameH: vh,
+            openness: fix?.openness,
+            sharpness: fix ? irisSharpness(video, fix.cx, fix.cy, fix.r, crop) : 0,
+            rotation: rotationRef.current,
+            t: now,
+          })
+        })
+
         // При две очи решава по-слабото.
         const worst = states.reduce((a, b) => (b.score < a.score ? b : a))
         const ready = states.every(s => s.ready)
         setState({ ...worst, ready })
         const view = toScreen(vw, vh)
-        if (view) {
-          setRings(detections.filter(d => d.reading.found && d.reading.pupilConfidence >= 0.3).map(({ region, reading }) => view(region, reading.cx, reading.cy, reading.r)))
-          // Насоката: къде и колко голямо да е окото (средата на допустимия размер).
-          setGuides(regions.map(r => view(r, ANALYSIS_SIDE / 2, ANALYSIS_SIDE / 2, ANALYSIS_SIDE * 0.28)))
-        }
-        const now = performance.now()
+        if (view) setRings(sides.map(s => fixRef.current[s]).filter((f): f is EyeFix => !!f).map(view))
         feedbackRef.current.tick(worst, now)
         if (worst.hint !== 'ready') feedbackRef.current.say(HINT_TEXT[worst.hint], worst.hint, now)
-        if (ready) void capture(regions)
+        if (ready) void capture(sides)
       }
       timer = window.setTimeout(loop, TICK_MS)
     }
@@ -431,28 +507,9 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
     }
   }, [phase, capture])
 
-  /** Точка от анализирания квадрат → екран; видеото е `object-cover`. */
-  const toScreen = (vw: number, vh: number) => {
-    const box = boxRef.current
-    if (!box) return null
-    const { width: bw, height: bh } = box.getBoundingClientRect()
-    const k = Math.max(bw / vw, bh / vh)
-    const ox = (bw - vw * k) / 2
-    const oy = (bh - vh * k) / 2
-    return (region: Region, cx: number, cy: number, r: number) => {
-      const s = region.s / ANALYSIS_SIDE
-      return { x: ox + (region.x + cx * s) * k, y: oy + (region.y + cy * s) * k, r: r * s * k }
-    }
-  }
-
-  const switchMode = (m: Mode) => {
-    setMode(m)
-    gatesRef.current.left.reset()
-    gatesRef.current.right.reset()
-  }
-
   const tone = state.ready || state.hint === 'ready' ? 'emerald' : state.hint === 'search' ? 'white' : 'amber'
   const ringColor = tone === 'emerald' ? '#34d399' : tone === 'amber' ? '#fbbf24' : 'rgba(255,255,255,.55)'
+  const hintText = (h: CaptureHint) => (h === 'center' && mode === 'single' ? 'Окото в средата' : h === 'search' && mode === 'single' ? 'Търся окото' : HINT_TEXT[h])
 
   /* ── начален екран: режим и съвети ── */
   if (phase !== 'live') {
@@ -470,10 +527,10 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Насочете задната камера към окото. Телефонът сам ще улови момента, в който окото е рязко и неподвижно, и ще снима. Сигналите зачестяват, колкото по-близо сте.
+                Насочете задната камера към лицето си. AI намира очите сам и телефонът снима в момента, в който са отворени, неподвижни и на фокус. Сигналите зачестяват, колкото по-близо сте.
               </p>
               <div className="mt-5 grid gap-3">
-                {(missing.length > 1 ? (['single', 'both'] as Mode[]) : (['single'] as Mode[])).map(m => (
+                {(missing.length > 1 ? (['both', 'single'] as Mode[]) : (['single'] as Mode[])).map(m => (
                   <button
                     key={m}
                     type="button"
@@ -482,23 +539,27 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
                   >
                     <div className="flex items-center gap-2 font-semibold">
                       <Eye size={20} weight="duotone" className="text-primary" />
-                      {m === 'single' ? 'Едно по едно' : 'Двете очи наведнъж'}
-                      {m === 'single' && <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">най-ясно</span>}
+                      {m === 'both' ? 'Двете очи наведнъж' : missing.length > 1 ? 'По едно око' : SIDE_LABEL[startSide]}
+                      {m === 'both' && <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">най-лесно</span>}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {m === 'single'
-                        ? 'Окото заема целия кадър — най-много детайли. След първото камерата минава сама на второто.'
-                        : 'По-бързо, но всяко око е по-малко в кадъра и детайлите са по-малко.'}
+                      {m === 'both'
+                        ? 'Телефонът на около 15 cm от лицето. Една снимка — и двете очи.'
+                        : 'Телефонът на около 10–12 cm, окото в средата. По-едро око, но по-бавно.'}
                     </p>
                   </button>
                 ))}
               </div>
               <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
-                <li>• Отворете широко окото и гледайте право в камерата.</li>
-                <li>• Без огледало: включете светкавицата, приближете бавно телефона и чакайте сигнала.</li>
+                <li>• Започнете от 30–40 cm, с цялото лице в кадъра — AI го хваща веднага. После приближете бавно.</li>
+                <li>• Отворете широко очите и гледайте право в камерата.</li>
+                <li>• Не се приближавайте повече от 10 cm — камерата не фокусира толкова близо.</li>
                 <li>• С огледало: обърнете екрана към огледалото и включете „Огледало“, за да четете надписите.</li>
               </ul>
-              <Button size="lg" className="mt-6 h-14 w-full gap-2 text-base font-bold" onClick={start}>
+              <p className="mt-4 text-xs text-muted-foreground">
+                {ai === 'loading' ? 'Зареждам AI модела за очите…' : ai === 'ready' ? 'AI моделът е готов.' : 'AI моделът не се зареди (няма връзка?) — ще търсим окото в средата на кадъра.'}
+              </p>
+              <Button size="lg" className="mt-4 h-14 w-full gap-2 text-base font-bold" onClick={start}>
                 <Camera size={22} weight="bold" /> Включи камерата
               </Button>
             </>
@@ -513,15 +574,9 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
     <div className="fixed inset-0 z-[60] bg-black text-white" style={mirror ? { transform: 'scaleX(-1)' } : undefined}>
       <div ref={boxRef} className="absolute inset-0 overflow-hidden">
         <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
-
         <svg className="pointer-events-none absolute inset-0 h-full w-full">
-          {/* Насоки: къде да е окото. */}
-          {guides.map((g, i) => (
-            <circle key={`g${i}`} cx={g.x} cy={g.y} r={g.r} fill="none" stroke="rgba(255,255,255,.4)" strokeWidth={2} strokeDasharray="8 8" />
-          ))}
-          {/* Откритият ирис. */}
           {rings.map((r, i) => (
-            <circle key={i} cx={r.x} cy={r.y} r={r.r} fill="none" stroke={ringColor} strokeWidth={4} style={{ transition: 'all 120ms linear' }} />
+            <circle key={i} cx={r.x} cy={r.y} r={Math.max(r.r, 8)} fill="none" stroke={ringColor} strokeWidth={3} style={{ transition: 'all 80ms linear' }} />
           ))}
         </svg>
         {flash && <div className="absolute inset-0 bg-white/80" />}
@@ -532,7 +587,10 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
         <button type="button" onClick={() => { stop(); onClose() }} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40" aria-label="Затвори">
           <X size={22} />
         </button>
-        <span className="flex-1 text-center text-base font-bold">{mode === 'single' ? SIDE_LABEL[side] : 'Двете очи'}</span>
+        <span className="flex-1 text-center text-base font-bold">
+          {mode === 'single' ? SIDE_LABEL[side] : 'Двете очи'}
+          {ai === 'ready' && <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">AI</span>}
+        </span>
         {torchSupported && (
           <button type="button" onClick={() => applyTorch(!torch)} className={`flex h-11 w-11 items-center justify-center rounded-full ${torch ? 'bg-amber-400 text-black' : 'bg-black/40'}`} aria-label="Светкавица">
             {torch ? <Lightning size={20} weight="fill" /> : <LightningSlash size={20} />}
@@ -553,7 +611,7 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
       {/* Долна лента: подсказка, напредък, ръчен бутон */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-10">
         <p className="text-center text-2xl font-extrabold" style={{ color: ringColor }}>
-          {busy ? 'Снимам…' : HINT_TEXT[state.hint]}
+          {busy ? 'Снимам…' : hintText(state.hint)}
         </p>
         <div className="mx-auto mt-3 h-2 max-w-xs overflow-hidden rounded-full bg-white/20">
           <div className="h-full rounded-full transition-all duration-150" style={{ width: `${Math.round(state.score * 100)}%`, background: ringColor }} />
@@ -563,10 +621,7 @@ export default function LiveIrisCamera({ startSide, missing, onDone, onClose }: 
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
-              const v = videoRef.current
-              if (v?.videoWidth) void capture(regionsFor(mode, side, v.videoWidth, v.videoHeight))
-            }}
+            onClick={() => void capture(sidesNow())}
             className="h-16 w-16 rounded-full border-4 border-white bg-white/20 active:scale-95"
             aria-label="Снимай ръчно"
           />
