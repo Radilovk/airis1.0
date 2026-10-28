@@ -5,11 +5,11 @@
  * окото вече е в средата и заема голяма част от кадъра. В живия кадър от
  * телефона окото е малко, извън центъра и наоколо има лице, вежди и фон —
  * там той не намира нищо. Моделът намира лицето и дава 478 точки, сред които
- * центъра и ръба на всеки ирис и клепачите. Работи в браузъра, на телефона,
- * 20–30 кадъра в секунда.
+ * центъра и ръба на всеки ирис, клепачите и ъглите на очите. Работи в
+ * браузъра, на телефона, 20–30 кадъра в секунда.
  *
- * Моделът и WASM файловете се зареждат при отваряне на камерата, не с
- * приложението. Ако не се заредят (няма мрежа), камерата продължава с
+ * Моделът и WASM файловете се зареждат при отваряне на екрана за снимки, не
+ * с приложението. Ако не се заредят (няма мрежа), камерата продължава с
  * класическия детектор.
  */
 
@@ -22,21 +22,27 @@ const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmark
 /** Индекси на точките в модела: център + 4 точки по ръба на всеки ирис. */
 const IRIS_A = [468, 469, 470, 471, 472]
 const IRIS_B = [473, 474, 475, 476, 477]
-/** Горен и долен клепач над/под центъра — за двете очи. */
-const LIDS = [
-  { upper: 159, lower: 145 },
-  { upper: 386, lower: 374 },
+/** Клепачите над/под центъра и двата ъгъла — за двете очи. */
+const EYES = [
+  { upper: 159, lower: 145, cornerA: 33, cornerB: 133 },
+  { upper: 386, lower: 374, cornerA: 362, cornerB: 263 },
 ]
 
 export interface TrackedIris {
   /** Кое око на човека: задната камера го гледа, затова лявото в кадъра е ДЯСНОТО му. */
   side: 'left' | 'right'
-  /** Пиксели на видеото. */
+  /** Пиксели на изображението. */
   cx: number
   cy: number
   r: number
-  /** Разстояние между клепачите / диаметър на ириса; под ~0.7 окото е притворено. */
-  openness: number
+  /** Каква част от диаметъра на ириса крие горният / долният клепач (0 = нищо). */
+  topCover: number
+  bottomCover: number
+  /**
+   * Къде е ирисът между ъглите на окото, 0..1; 0.5 = гледа право. Като човек
+   * гледа екрана вместо обектива, ирисът се измества.
+   */
+  gaze: number
 }
 
 let loading: Promise<FaceLandmarker | null> | null = null
@@ -68,28 +74,46 @@ export function loadFaceTracker(): Promise<FaceLandmarker | null> {
   return loading
 }
 
-/** Ирисите в текущия кадър; празен списък, ако няма лице. */
-export function trackIrises(model: FaceLandmarker, video: HTMLVideoElement, timestamp: number): TrackedIris[] {
-  const vw = video.videoWidth
-  const vh = video.videoHeight
+/**
+ * Ирисите в изображението; празен списък, ако няма лице. Работи и върху
+ * видео кадър, и върху готова снимка (canvas) — моделът е в режим VIDEO,
+ * затова времето трябва да расте.
+ */
+export function trackIrises(
+  model: FaceLandmarker,
+  source: HTMLVideoElement | HTMLCanvasElement,
+  width: number,
+  height: number,
+  timestamp: number
+): TrackedIris[] {
   let result
   try {
-    result = model.detectForVideo(video, timestamp)
+    result = model.detectForVideo(source, timestamp)
   } catch {
     return []
   }
   const pts = result.faceLandmarks?.[0]
   if (!pts || pts.length < 478) return []
 
-  const px = (i: number) => ({ x: pts[i].x * vw, y: pts[i].y * vh })
-  const lids = LIDS.map(l => ({ x: px(l.upper).x, gap: Math.hypot(px(l.upper).x - px(l.lower).x, px(l.upper).y - px(l.lower).y) }))
+  const px = (i: number) => ({ x: pts[i].x * width, y: pts[i].y * height })
+  const eyes = EYES.map(e => ({ upper: px(e.upper), lower: px(e.lower), a: px(e.cornerA), b: px(e.cornerB) }))
 
   const irises = [IRIS_A, IRIS_B].map(idx => {
     const c = px(idx[0])
     const r = idx.slice(1).reduce((s, i) => s + Math.hypot(px(i).x - c.x, px(i).y - c.y), 0) / 4
-    // Клепачите се свързват с ириса по близост, а не по номерацията на модела.
-    const lid = lids.reduce((a, b) => (Math.abs(b.x - c.x) < Math.abs(a.x - c.x) ? b : a))
-    return { cx: c.x, cy: c.y, r, openness: r > 0 ? lid.gap / (2 * r) : 0 }
+    // Клепачите и ъглите се свързват с ириса по близост, а не по номерацията на модела.
+    const eye = eyes.reduce((p, q) => (Math.abs(q.upper.x - c.x) < Math.abs(p.upper.x - c.x) ? q : p))
+    const d = Math.max(1, 2 * r)
+    const left = Math.min(eye.a.x, eye.b.x)
+    const span = Math.max(1, Math.abs(eye.a.x - eye.b.x))
+    return {
+      cx: c.x,
+      cy: c.y,
+      r,
+      topCover: Math.max(0, (eye.upper.y - (c.y - r)) / d),
+      bottomCover: Math.max(0, (c.y + r - eye.lower.y) / d),
+      gaze: (c.x - left) / span,
+    }
   })
   irises.sort((a, b) => a.cx - b.cx)
   return [

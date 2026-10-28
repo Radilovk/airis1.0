@@ -19,7 +19,27 @@
  * при самата снимка, не от по-близкото снимане.
  */
 
-export type CaptureHint = 'search' | 'closer' | 'farther' | 'center' | 'open' | 'hold' | 'focus' | 'ready'
+/**
+ * Подсказките са в реда, в който се поправят: първо окото в средата на
+ * кадъра, после разстоянието, погледът в обектива, клепачите и накрая
+ * неподвижност и фокус. („Гледайте в обектива“ се казва и веднага щом окото
+ * бъде намерено — виж `LiveIrisCamera`.)
+ */
+export type CaptureHint =
+  | 'search'
+  | 'closer'
+  | 'farther'
+  | 'moveLeft'
+  | 'moveRight'
+  | 'moveUp'
+  | 'moveDown'
+  | 'gaze'
+  | 'open'
+  | 'raise'
+  | 'lower'
+  | 'hold'
+  | 'focus'
+  | 'ready'
 
 export interface FrameReading {
   found: boolean
@@ -29,8 +49,11 @@ export interface FrameReading {
   r: number
   frameW: number
   frameH: number
-  /** Разстояние между клепачите / диаметър на ириса; undefined, ако не е измерено. */
-  openness?: number
+  /** Част от диаметъра на ириса под горния / долния клепач; undefined, ако не е измерено. */
+  topCover?: number
+  bottomCover?: number
+  /** Ирисът между ъглите на окото, 0..1 (0.5 = гледа право); undefined без AI. */
+  gaze?: number
   /** Дисперсия на Лапласиана в пръстена на ириса — виж `irisSharpness`. */
   sharpness: number
   /** Скорост на въртене на телефона, °/s; undefined, ако няма жироскоп. */
@@ -59,8 +82,14 @@ export const TARGET_BOTH: GateTarget = { minDiameter: 0.06, maxDiameter: 0.2, ed
 export const TARGET_SINGLE: GateTarget = { minDiameter: 0.085, maxDiameter: 0.4, edgeMargin: 0.2 }
 
 export const LIVE_CAPTURE = {
-  /** Под това окото е притворено и клепачът крие горната част на ириса. */
-  minOpenness: 0.58,
+  /**
+   * Колко от ириса могат да крият клепачите. Горният клепач по природа покрива
+   * 10–15 % — затова прагът е над това; долният обикновено не покрива нищо.
+   */
+  maxTopCover: 0.22,
+  maxBottomCover: 0.12,
+  /** Отклонение на погледа от средата на окото (0.5), над което човек не гледа в обектива. */
+  maxGazeOffset: 0.13,
   /** Допустимо преместване между два кадъра, дял от радиуса. */
   maxShift: 0.12,
   maxRadiusChange: 0.1,
@@ -123,7 +152,11 @@ export class CaptureGate {
 
     const mx = T.edgeMargin * f.frameW
     const my = T.edgeMargin * f.frameH
-    const centerOk = f.cx >= mx && f.cx <= f.frameW - mx && f.cy >= my && f.cy <= f.frameH - my
+    // Задната камера гледа човека: окото вляво в кадъра е от ДЯСНАТА му
+    // страна, затова телефонът трябва да отиде надясно (от негова гледна точка).
+    const move: CaptureHint | null =
+      f.cx < mx ? 'moveRight' : f.cx > f.frameW - mx ? 'moveLeft' : f.cy < my ? 'moveUp' : f.cy > f.frameH - my ? 'moveDown' : null
+    const centerOk = move === null
 
     let stable = false
     if (prev) {
@@ -140,14 +173,20 @@ export class CaptureGate {
     else if (this.settledSince === null) this.settledSince = f.t
     const patient = this.settledSince !== null && f.t - this.settledSince >= C.patienceMs
 
-    const openOk = patient || f.openness === undefined || f.openness >= C.minOpenness
+    const gazeOk = patient || f.gaze === undefined || Math.abs(f.gaze - 0.5) <= C.maxGazeOffset
+    const topOk = f.topCover === undefined || f.topCover <= C.maxTopCover
+    const bottomOk = f.bottomCover === undefined || f.bottomCover <= C.maxBottomCover
+    const openOk = patient || (topOk && bottomOk)
+    // И двата клепача → присвито око. Само горният → човек гледа надолу към
+    // ниско държан телефон: вдигнете го. Само долният → обратното.
+    const lidHint: CaptureHint = !topOk && !bottomOk ? 'open' : !topOk ? 'raise' : 'lower'
     const sharpOk =
       this.sharpHistory.length >= C.minSharpSamples &&
       (patient || f.sharpness >= C.sharpnessFloor) &&
       f.sharpness >= peak * C.sharpnessShare
     const sharpScore = peak > 0 ? Math.min(1, f.sharpness / peak) * (f.sharpness >= C.sharpnessFloor ? 1 : 0.5) : 0
 
-    const allOk = sizeOk && centerOk && openOk && stable && sharpOk
+    const allOk = sizeOk && centerOk && gazeOk && openOk && stable && sharpOk
     this.streak = allOk ? this.streak + 1 : 0
 
     const score = Math.min(
@@ -155,34 +194,60 @@ export class CaptureGate {
       0.25 + 0.25 * sizeScore + 0.1 * (centerOk ? 1 : 0) + 0.2 * (stable ? 1 : 0) + 0.2 * sharpScore
     )
 
-    const hint: CaptureHint = !sizeOk
-      ? d < T.minDiameter
-        ? 'closer'
-        : 'farther'
-      : !centerOk
-        ? 'center'
-        : !openOk
-          ? 'open'
-          : !stable
-            ? 'hold'
-            : !sharpOk
-              ? 'focus'
-              : 'ready'
+    // Първо окото в средата — ако се приближава встрани, ще излезе от кадъра.
+    const hint: CaptureHint = move
+      ? move
+      : !sizeOk
+        ? d < T.minDiameter
+          ? 'closer'
+          : 'farther'
+        : !gazeOk
+          ? 'gaze'
+          : !openOk
+            ? lidHint
+            : !stable
+              ? 'hold'
+              : !sharpOk
+                ? 'focus'
+                : 'ready'
 
     return { score: allOk ? Math.max(score, 0.95) : Math.min(score, 0.9), hint, ready: this.streak >= C.readyStreak }
   }
 }
 
-/** Кратки подсказки — показват се на екрана и се казват на глас. */
+/** Кратки подсказки — показват се едро на екрана и се казват на глас. */
 export const HINT_TEXT: Record<CaptureHint, string> = {
   search: 'Търся очите',
   closer: 'По-близо',
   farther: 'По-далеч',
-  center: 'Очите в средата',
+  moveLeft: 'Преместете телефона наляво',
+  moveRight: 'Преместете телефона надясно',
+  moveUp: 'Вдигнете телефона',
+  moveDown: 'Свалете телефона',
+  gaze: 'Гледайте в обектива',
   open: 'Отворете широко очите',
+  raise: 'Вдигнете леко телефона',
+  lower: 'Свалете леко телефона',
   hold: 'Задръжте неподвижно',
   focus: 'Фокусирам…',
   ready: 'Снимам',
+}
+
+/** Защо — по-дребно под подсказката, само на екрана. */
+export const HINT_WHY: Partial<Record<CaptureHint, string>> = {
+  search: 'Насочете задната камера към лицето',
+  closer: 'Окото е малко в кадъра',
+  farther: 'Камерата не фокусира толкова близо',
+  moveLeft: 'Окото е извън средата',
+  moveRight: 'Окото е извън средата',
+  moveUp: 'Окото е извън средата',
+  moveDown: 'Окото е извън средата',
+  gaze: 'В малкото кръгче на гърба, не в екрана',
+  open: 'Клепачите закриват ириса',
+  raise: 'Горният клепач закрива ириса — гледайте нагоре към обектива',
+  lower: 'Долният клепач закрива ириса',
+  hold: 'Телефонът се движи',
+  focus: 'Чакам най-рязкия момент',
 }
 
 /**
