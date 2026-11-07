@@ -58,6 +58,11 @@ function wedgePath(cx: number, cy: number, r0: number, r1: number, sector: numbe
   return `M${a.x},${a.y} A${r1},${r1} 0 0 1 ${b.x},${b.y} L${c.x},${c.y} A${r0},${r0} 0 0 0 ${d.x},${d.y} Z`
 }
 
+/** Знак, на който може да се разчита: видян в два независими прочита или и в двете очи. */
+function isConfirmed(f: Finding): boolean {
+  return (f.confirmations ?? 1) >= 2 || !!f.bilateral
+}
+
 function markerPoint(f: Finding, geometry: IrisGeometrySnapshot) {
   return isCircumferentialFinding(f.type)
     ? ringTopCenterInView(f.ring, geometry, VIEW)
@@ -344,8 +349,21 @@ function FindingList({ findings, onSelect, side, reviewed }: { findings: Finding
         {findings.map((f, i) => {
           const r = readFinding(f)
           const s = STRENGTH_STYLE[r.strength]
+          const confirmed = isConfirmed(f)
+          const firstConfirmed = confirmed && i === 0
+          const firstProbable = !confirmed && (i === 0 || isConfirmed(findings[i - 1]))
           return (
             <motion.li key={`${side}-${f.type}-${f.sector}-${f.ring}-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+              {firstConfirmed && (
+                <p className="mb-1.5 mt-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                  <CheckCircle size={13} weight="fill" /> Потвърдени — на тях може да се разчита
+                </p>
+              )}
+              {firstProbable && (
+                <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Възможни — влизат в плана с по-малка тежест
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => onSelect(i)}
@@ -381,7 +399,13 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
     }
     for (const side of ['left', 'right'] as const) {
       const all = (cal?.findings ?? []).filter(f => f.side === side)
-      out[side] = { shown: groupFindingsForDisplay(all.filter(isPlanRelevantFinding)), reviewed: all.length }
+      // Потвърдените (два независими прочита или и двете очи) са най-отгоре —
+      // по тях човек вижда кое е сигурно и кое е само възможно.
+      const shown = groupFindingsForDisplay(all.filter(isPlanRelevantFinding))
+        .map((f, i) => ({ f, i }))
+        .sort((a, b) => Number(isConfirmed(b.f)) - Number(isConfirmed(a.f)) || a.i - b.i)
+        .map(x => x.f)
+      out[side] = { shown, reviewed: all.length }
     }
     return out
   }, [cal])
@@ -416,7 +440,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gradient-to-r from-primary/5 via-transparent to-accent/5 px-5 py-4">
         <div>
           <h3 className="text-lg font-bold">Вашите ириси отблизо</h3>
-          <p className="text-xs text-muted-foreground">Всеки номер е знак, който влиза в плана. Числата около ириса са часовете от картата.</p>
+          <p className="text-xs text-muted-foreground">Ирисът само уточнява картината от отговорите ви. Докоснете номер, за да видите какво значи за храненето.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-muted p-1" role="tablist" aria-label="Око">

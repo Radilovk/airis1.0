@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { animate, motion } from 'framer-motion'
-import { CheckCircle, Eye, Fingerprint, ShieldCheck, Target, Warning, WarningOctagon } from '@phosphor-icons/react'
+import { CheckCircle, Eye, ShieldCheck, Target, Warning, WarningOctagon } from '@phosphor-icons/react'
 import { summarizeCalibratedReport, topPrioritySystems } from '@/lib/calibrated-report-summary'
-import { constitutionKey } from '@/lib/iris-reading'
 import { eyeReferralChip } from '@/lib/eye-health'
 import type { AnalysisReport, EyeReferral } from '@/types'
 
@@ -11,12 +10,6 @@ const VERDICT_GRADIENT = {
   mild: ['#0ea5e9', '#f59e0b'],
   focus: ['#f59e0b', '#ea580c'],
 } as const
-
-const CONSTITUTION_SHORT: Record<string, string> = {
-  lymphatic: 'лимфатичен тип',
-  hematogenic: 'хематогенен тип',
-  mixed: 'смесен тип',
-}
 
 const EYE_CHIP_STYLE: Record<EyeReferral, string> = {
   none: 'bg-emerald-500/15 text-emerald-900 ring-emerald-500/30',
@@ -93,7 +86,6 @@ export default function ReportHero({
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
   const summary = summarizeCalibratedReport(cal, { briefSummary: report.briefSummary, avgHealth })
   const focus = topPrioritySystems(cal)
-  const cKey = constitutionKey(cal.constitution)
   const eye = cal.eyeHealth
   const confirmed = cal.confirmedCount ?? 0
   const relevant = summary.planRelevant
@@ -117,7 +109,7 @@ export default function ReportHero({
           {focus.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2 md:justify-start">
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-                <Target size={14} weight="duotone" /> Фокус:
+                <Target size={14} weight="duotone" /> Започнете с:
               </span>
               {focus.map((s, i) => (
                 <motion.span
@@ -149,22 +141,14 @@ export default function ReportHero({
             Очи: {eyeReferralChip(eye.referral)}
           </button>
         )}
-        {cKey && (
-          <button
-            type="button"
-            onClick={onOpenIris}
-            className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground/80 ring-1 ring-border transition active:scale-[0.98] md:rounded-full"
-          >
-            <Fingerprint size={16} weight="bold" /> {CONSTITUTION_SHORT[cKey]}
-          </button>
-        )}
         <button
           type="button"
           onClick={onOpenIris}
           className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground/80 ring-1 ring-border transition active:scale-[0.98] md:rounded-full"
         >
-          <ShieldCheck size={16} weight="bold" /> {relevant} знака в плана
-          {confirmed > 0 ? ` · ${confirmed} двойно потвърдени` : ''}
+          <ShieldCheck size={16} weight="bold" />
+          {relevant > 0 ? `Вижте ${relevant} знака в ириса` : 'Вижте ириса'}
+          {confirmed > 0 ? ` · ${confirmed} потвърдени` : ''}
         </button>
       </div>
     </motion.section>

@@ -775,9 +775,9 @@ export function computeScores(input: ScoringInput): ScoringResult {
 
     for (const f of relevant) {
       reasons.push(
-        `${FINDINGS[f.type].label} — ${f.side === 'left' ? 'ляв' : 'десен'} ирис, сектор ${f.sector}, R${f.ring}` +
-          (f.bilateral ? ', потвърдена и в другото око' : '') +
-          (f.confirmations === 2 ? ' ✓ два независими прочита' : '')
+        `${FINDINGS[f.type].clientLabel} — ${f.side === 'left' ? 'ляв' : 'десен'} ирис` +
+          (f.bilateral ? ', и в другото око' : '') +
+          (f.confirmations === 2 ? ' (потвърден два пъти)' : '')
       )
     }
 

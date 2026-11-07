@@ -198,7 +198,7 @@ function finding(
   return {
     side,
     type,
-    label: FINDINGS[type].label,
+    label: FINDINGS[type].clientLabel,
     sector,
     ring,
     size: 'm',
@@ -278,13 +278,13 @@ export function buildDemoReport(): AnalysisReport {
   })
 
   const systems: CalibratedAnalysisPayload['systems'] = [
-    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването и знаците около коларетата сочат към ритъма на храносмилането.', reasons: ['Деформирана коларета в двете очи', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
-    { key: 'nervous', label: 'Нервна система', score: 61, priority: true, description: 'Висок стрес, кратък сън и стресови пръстени в двете очи.', reasons: ['Стресови пръстени — двустранно', 'Сън 6 ч, качество „средно"', 'Стрес „висок"'] },
-    { key: 'metabolic', label: 'Метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевият пигмент насочват към стабилна кръвна захар.', reasons: ['Оранжев пигмент в зоната на кръвната захар', 'Сладко следобед'] },
-    { key: 'circulatory', label: 'Кръвообращение', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и светъл ръб на ириса.', reasons: ['Фамилна анамнеза', 'Светъл ръб по периферията'] },
-    { key: 'detox', label: 'Детоксикация', score: 74, priority: false, description: 'Без силни знаци.', reasons: [] },
-    { key: 'immune', label: 'Имунитет и лимфа', score: 78, priority: false, description: 'Лека лимфна сигнализация.', reasons: [] },
-    { key: 'endocrine', label: 'Ендокринна регулация', score: 80, priority: false, description: 'Стабилно.', reasons: [] },
+    { key: 'digestive', label: 'Храносмилане и черва', score: 58, priority: true, description: 'Подуването след хранене и неравният храносмилателен пръстен сочат към ритъма на храненето.', reasons: ['Неравен храносмилателен пръстен в двете очи', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
+    { key: 'nervous', label: 'Стрес и сън', score: 61, priority: true, description: 'Висок стрес, кратък сън и стресови пръстени в двете очи.', reasons: ['Стресови пръстени — двустранно', 'Сън 6 ч, качество „средно"', 'Стрес „висок"'] },
+    { key: 'metabolic', label: 'Кръвна захар и метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевият пигмент насочват към стабилна кръвна захар.', reasons: ['Оранжев пигмент в зоната на кръвната захар', 'Сладко следобед'] },
+    { key: 'circulatory', label: 'Мазнини и сърце', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и светъл ръб на ириса.', reasons: ['Фамилна анамнеза', 'Светъл ръб по периферията'] },
+    { key: 'detox', label: 'Черен дроб и пречистване', score: 74, priority: false, description: 'Без силни знаци.', reasons: [] },
+    { key: 'immune', label: 'Възпаление и имунитет', score: 78, priority: false, description: 'Без изразен възпалителен фон.', reasons: [] },
+    { key: 'endocrine', label: 'Хормонален баланс', score: 80, priority: false, description: 'Стабилно.', reasons: [] },
   ]
 
   const calibrated: CalibratedAnalysisPayload = {
@@ -297,6 +297,7 @@ export function buildDemoReport(): AnalysisReport {
       { id: 'd1', system: 'digestive', strength: 'high', observation: 'Храносмилането има нужда от ритъм', action: 'Вечеря поне 3 часа преди сън и бавно хранене, седнали — без екран.', source: 'both' },
       { id: 'd2', system: 'nervous', strength: 'high', observation: 'Нервната система работи на висока предавка', action: 'Лягане в един и същ час и 10 минути разходка навън след обяд.', source: 'both' },
       { id: 'd3', system: 'metabolic', strength: 'medium', observation: 'Следобедният спад идва от скок на кръвната захар', action: 'Сменете сладкото следобед с ябълка и шепа ядки.', source: 'questionnaire' },
+      { id: 'd4', system: 'circulatory', strength: 'medium', observation: 'Фамилна склонност към висок холестерол', action: 'Риба два пъти седмично, зехтин вместо масло, по-малко колбаси — и липиден профил при следващото изследване.', source: 'both' },
     ],
     findings,
     agreement: 0.71,

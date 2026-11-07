@@ -31,6 +31,7 @@ interface PlanTabProps {
 interface PlanSection {
   id: string
   title: string
+  subtitle?: string
   icon: typeof AppleLogo
   content: string[]
   priority?: 'high' | 'medium' | 'low'
@@ -62,7 +63,8 @@ export default function PlanTab({ report }: PlanTabProps) {
     <div className="space-y-3">
       {isCalibrated && hasDrivers && (
         <Card className="border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-          Тук са конкретните стъпки — храни, добавки и навици.
+          Конкретните стъпки: какво да ядете, какво да ограничите, кои добавки имат смисъл и кои навици помагат.
+          Започнете с храненето — то дава най-бърз ефект.
         </Card>
       )}
 
@@ -130,7 +132,28 @@ export default function PlanTab({ report }: PlanTabProps) {
           </motion.div>
         )}
 
-        {hasPsychRecs && (
+        {isCalibrated && (hasPsychRecs || hasSpecialRecs) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.25 }}
+          >
+            <CollapsibleSection
+              section={{
+                id: 'habits',
+                title: 'Навици и движение',
+                subtitle: 'Ритъм на хранене, сън и движение',
+                icon: Leaf,
+                content: [
+                  ...(detailedPlan.specialRecommendations || []),
+                  ...(detailedPlan.psychologicalRecommendations || []),
+                ],
+              }}
+            />
+          </motion.div>
+        )}
+
+        {!isCalibrated && hasPsychRecs && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -149,7 +172,7 @@ export default function PlanTab({ report }: PlanTabProps) {
           </motion.div>
         )}
 
-        {hasSpecialRecs && (
+        {!isCalibrated && hasSpecialRecs && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -177,7 +200,8 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'tests',
-                title: 'Препоръчителни изследвания',
+                title: isCalibrated ? 'Изследвания за проверка' : 'Препоръчителни изследвания',
+                subtitle: isCalibrated ? 'С тях проверявате дали изводите важат за вас' : undefined,
                 icon: Flask,
                 content: showFullPlan
                   ? detailedPlan.recommendedTests
@@ -216,8 +240,8 @@ function SupplementsSection({ supplements, questionnaire }: { supplements: Suppl
               <Pill size={22} weight="duotone" className="text-primary-foreground" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <h4 className="font-bold text-base">Хранителни Добавки</h4>
-              <p className="text-xs text-muted-foreground">Дозировка и прием</p>
+              <h4 className="font-bold text-base">Хранителни добавки</h4>
+              <p className="text-xs text-muted-foreground">Само това, което има смисъл за вас</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -310,6 +334,7 @@ function CollapsibleSection({ section }: { section: PlanSection }) {
             </div>
             <div className="flex-1 min-w-0 text-left">
               <h4 className="font-bold text-base">{section.title}</h4>
+              {section.subtitle && <p className="text-xs text-muted-foreground">{section.subtitle}</p>}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -373,7 +398,7 @@ function FoodRecommendationsSection({
             </div>
             <div className="flex-1 min-w-0 text-left">
               <h4 className="font-bold text-base">Хранителни препоръки</h4>
-              <p className="text-xs text-muted-foreground">Пълен списък с препоръчителни и забранени храни</p>
+              <p className="text-xs text-muted-foreground">Какво да добавите и какво да ограничите</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

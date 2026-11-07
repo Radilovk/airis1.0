@@ -12,7 +12,8 @@ import {
   Eye,
   FloppyDisk,
   Warning,
-  ArrowsClockwise
+  ArrowsClockwise,
+  ForkKnife
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
@@ -124,7 +125,9 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
   }
 
   const handleShare = () => {
-    const shareText = `Завърших иридологичен анализ! Общо здраве: ${avgHealth}/100. Получих ${report.recommendations.length} персонализирани препоръки.`
+    const shareText = isCalibrated
+      ? 'Направих си персонален план за хранене по ириса и въпросника в Airis.'
+      : `Завърших иридологичен анализ! Общо здраве: ${avgHealth}/100. Получих ${report.recommendations.length} персонализирани препоръки.`
     
     if (navigator.share) {
       navigator.share({
@@ -173,7 +176,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
               </motion.div>
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  Иридологичен доклад
+                  {isCalibrated ? 'Вашият персонален план' : 'Иридологичен доклад'}
                 </h1>
                 <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
                   <span className="truncate">{report.questionnaireData.name}</span>
@@ -334,14 +337,21 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                     className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
                   >
                     <Target size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Обобщение</span>
+                    <span className="text-xs font-semibold">Вашият фокус</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="plan"
+                    className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+                  >
+                    <ForkKnife size={22} weight="duotone" />
+                    <span className="text-xs font-semibold">Хранене и план</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="iris"
                     className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
                   >
                     <Eye size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Ирис и очи</span>
+                    <span className="text-xs font-semibold">Ирис</span>
                   </TabsTrigger>
                 </>
               ) : (
@@ -353,13 +363,15 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                   <span className="text-xs font-semibold">Анализ</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger
-                value="plan"
-                className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
-              >
-                <ClipboardText size={22} weight="duotone" />
-                <span className="text-xs font-semibold">План</span>
-              </TabsTrigger>
+              {!isCalibrated && (
+                <TabsTrigger
+                  value="plan"
+                  className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+                >
+                  <ClipboardText size={22} weight="duotone" />
+                  <span className="text-xs font-semibold">План</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {!isCalibrated && (
@@ -374,7 +386,13 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
               <>
                 <TabsContent value="summary" className="mt-6">
                   <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
-                    <CalibratedSummaryReport report={report} />
+                    <CalibratedSummaryReport
+                      report={report}
+                      onOpenPlan={() => {
+                        setActiveTab('plan')
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                    />
                   </ErrorBoundary>
                 </TabsContent>
                 <TabsContent value="iris" className="mt-6">

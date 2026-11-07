@@ -903,7 +903,7 @@ ${response}
       findings: [...result.left.findings, ...result.right.findings].map(f => ({
         side: f.side,
         type: f.type,
-        label: FINDINGS[f.type].label,
+        label: FINDINGS[f.type].clientLabel,
         sector: f.sector,
         ring: f.ring,
         size: f.size,

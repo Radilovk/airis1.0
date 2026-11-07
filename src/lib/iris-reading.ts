@@ -134,7 +134,7 @@ export function readFinding(f: Finding): FindingReading {
   if (f.bilateral) reliability.push('и в двете очи')
 
   return {
-    title: def?.label ?? f.label,
+    title: def?.clientLabel ?? f.label,
     sideLabel,
     where,
     zone: sector?.label,
