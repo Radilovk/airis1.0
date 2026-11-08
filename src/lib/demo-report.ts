@@ -260,11 +260,17 @@ export function buildDemoReport(): AnalysisReport {
     finding('right', 'pigment_orange', 9, 7, 0.71),
     finding('right', 'nerve_rings', 1, 8, 0.74, { bilateral: true }),
     finding('right', 'fiber_defect', 7, 6, 0.62),
-    finding('right', 'sodium_ring', 1, 11, 0.7),
+    finding('right', 'sodium_ring', 1, 11, 0.7, { bilateral: true }),
+    finding('right', 'pigment_brown', 4, 7, 0.66),
+    finding('right', 'radial_furrow', 3, 5, 0.64),
+    finding('right', 'transversal_fiber', 1, 6, 0.63),
     finding('left', 'collarette_deform', 7, 3, 0.76, { bilateral: true }),
     finding('left', 'fiber_defect', 9, 7, 0.68),
     finding('left', 'nerve_rings', 1, 8, 0.72, { bilateral: true }),
     finding('left', 'lymphatic_rosary', 1, 10, 0.55),
+    finding('left', 'pigment_orange', 3, 7, 0.69),
+    finding('left', 'sodium_ring', 1, 11, 0.68, { bilateral: true }),
+    finding('left', 'pigment_diffuse', 10, 6, 0.61),
   ]
 
   const eyeHealth = assessEyeHealth({

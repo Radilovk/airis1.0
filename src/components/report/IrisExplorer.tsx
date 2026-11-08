@@ -16,7 +16,7 @@ import { fitImageInSquare } from '@/lib/image-utils'
 import { cellCenterInView, findingOverlayPath, ringTopCenterInView } from '@/lib/iris-coords'
 import { isCircumferentialFinding, sectorsFor, RING_BANDS } from '@/lib/iris-map'
 import { groupFindingsForDisplay, isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
-import { readFinding, type SignalStrength } from '@/lib/iris-reading'
+import { readFinding, rankKeySigns, isConfirmedFinding, type SignalStrength } from '@/lib/iris-reading'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
 
 const VIEW = 360
@@ -56,11 +56,6 @@ function wedgePath(cx: number, cy: number, r0: number, r1: number, sector: numbe
   const c = pt(cx, cy, r0, m1)
   const d = pt(cx, cy, r0, m0)
   return `M${a.x},${a.y} A${r1},${r1} 0 0 1 ${b.x},${b.y} L${c.x},${c.y} A${r0},${r0} 0 0 0 ${d.x},${d.y} Z`
-}
-
-/** Знак, на който може да се разчита: видян в два независими прочита или и в двете очи. */
-function isConfirmed(f: Finding): boolean {
-  return (f.confirmations ?? 1) >= 2 || !!f.bilateral
 }
 
 function markerPoint(f: Finding, geometry: IrisGeometrySnapshot) {
@@ -260,7 +255,9 @@ function FindingDetail({
         </span>
         <div className="min-w-0 flex-1">
           <h4 className="text-lg font-bold leading-tight">{r.title}</h4>
-          <p className="mt-0.5 text-xs text-muted-foreground">{r.where}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {r.where}
+          </p>
         </div>
         <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted" aria-label="Затвори">
           <X size={16} />
@@ -277,17 +274,11 @@ function FindingDetail({
       </div>
 
       <dl className="mt-4 space-y-3 text-sm">
-        {r.zone && (
-          <div>
-            <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Зона</dt>
-            <dd className="mt-0.5 font-medium">{r.zone}</dd>
-          </div>
-        )}
         <div>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Какво означава</dt>
-          <dd className="mt-0.5 leading-relaxed">
-            {r.meaning.charAt(0).toUpperCase() + r.meaning.slice(1)}. {r.bandMeaning}
-          </dd>
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Какво означава{r.area ? ` · ${r.area}` : ''}
+          </dt>
+          <dd className="mt-0.5 leading-relaxed">{r.meaning}</dd>
         </div>
         <div className="rounded-xl bg-primary/5 p-3 ring-1 ring-primary/15">
           <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
@@ -302,11 +293,6 @@ function FindingDetail({
             </dt>
             <dd className="mt-1 leading-relaxed">{r.ophthalmicNote}</dd>
           </div>
-        )}
-        {r.mapReference && (
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            По иридологичната карта зоната съответства на: {r.mapReference}. Това е справка от картата, не оценка на органа.
-          </p>
         )}
       </dl>
 
@@ -325,63 +311,88 @@ function FindingDetail({
   )
 }
 
-function FindingList({ findings, onSelect, side, reviewed }: { findings: Finding[]; onSelect: (i: number) => void; side: Side; reviewed: number }) {
+function FindingList({
+  findings,
+  keyCount,
+  moreCount,
+  showMore,
+  onToggleMore,
+  onSelect,
+  side,
+  reviewed,
+}: {
+  findings: Finding[]
+  keyCount: number
+  moreCount: number
+  showMore: boolean
+  onToggleMore: () => void
+  onSelect: (i: number) => void
+  side: Side
+  reviewed: number
+}) {
   if (findings.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
         <Sparkle size={32} weight="duotone" className="text-emerald-500" />
-        <p className="font-semibold">Чист ирис в това око</p>
+        <p className="font-semibold">Без ясни знаци в това око</p>
         <p className="max-w-xs text-sm text-muted-foreground">
           {reviewed > 0
             ? `Прегледани са ${reviewed} точки — нито една не е достатъчно ясна, за да промени плана.`
-            : 'Няма открити ирисови акценти за това око.'}
+            : 'Планът за това око се опира на вашите отговори.'}
         </p>
       </div>
     )
   }
+  const row = (f: Finding, i: number) => {
+    const r = readFinding(f)
+    const s = STRENGTH_STYLE[r.strength]
+    const confirmed = isConfirmedFinding(f)
+    return (
+      <motion.li key={`${side}-${f.type}-${f.sector}-${f.ring}-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 6) * 0.04 }}>
+        <button
+          type="button"
+          onClick={() => onSelect(i)}
+          className="group flex min-h-14 w-full items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2.5 text-left ring-1 ring-transparent transition hover:bg-background hover:shadow-md hover:ring-primary/20 active:scale-[0.99]"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white" style={{ background: s.dot }}>
+            {i + 1}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{r.title}</span>
+            <span className="block truncate text-[12px] text-muted-foreground">
+              {r.area ?? r.zone}
+              {f.bilateral ? ' · и в двете очи' : ''}
+            </span>
+          </span>
+          {confirmed && (
+            <CheckCircle size={18} weight="fill" className="shrink-0 text-emerald-600" aria-label="потвърден" />
+          )}
+          <ArrowRight size={14} className="shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+        </button>
+      </motion.li>
+    )
+  }
   return (
     <div>
-      <p className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Crosshair size={16} className="text-primary" />
-        Докоснете номер на снимката или знак от списъка.
+      <p className="mb-3 text-sm text-muted-foreground">
+        {keyCount === 1 ? 'Ключовият знак' : `${keyCount}-те ключови знака`} в това око, подредени по значение за
+        храненето. <CheckCircle size={13} weight="fill" className="inline align-[-2px] text-emerald-600" /> — потвърден.
       </p>
-      <ul className="space-y-2">
-        {findings.map((f, i) => {
-          const r = readFinding(f)
-          const s = STRENGTH_STYLE[r.strength]
-          const confirmed = isConfirmed(f)
-          const firstConfirmed = confirmed && i === 0
-          const firstProbable = !confirmed && (i === 0 || isConfirmed(findings[i - 1]))
-          return (
-            <motion.li key={`${side}-${f.type}-${f.sector}-${f.ring}-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-              {firstConfirmed && (
-                <p className="mb-1.5 mt-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                  <CheckCircle size={13} weight="fill" /> Потвърдени — на тях може да се разчита
-                </p>
-              )}
-              {firstProbable && (
-                <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Възможни — влизат в плана с по-малка тежест
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => onSelect(i)}
-                className="group flex w-full items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2.5 text-left ring-1 ring-transparent transition hover:bg-background hover:shadow-md hover:ring-primary/20 active:scale-[0.99]"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white" style={{ background: s.dot }}>
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{r.title}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">{r.zone ?? r.where}</span>
-                </span>
-                <ArrowRight size={14} className="shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-              </button>
-            </motion.li>
-          )
-        })}
-      </ul>
+      <ul className="space-y-2">{findings.slice(0, keyCount).map(row)}</ul>
+      {moreCount > 0 && (
+        <>
+          {showMore && (
+            <ul className="mt-2 space-y-2 opacity-90">{findings.slice(keyCount).map((f, k) => row(f, keyCount + k))}</ul>
+          )}
+          <button
+            type="button"
+            onClick={onToggleMore}
+            className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            {showMore ? 'Само ключовите' : `Още ${moreCount} по-слаби ${moreCount === 1 ? 'знак' : 'знака'}`}
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -393,32 +404,33 @@ function FindingList({ findings, onSelect, side, reviewed }: { findings: Finding
 export default function IrisExplorer({ report }: { report: AnalysisReport }) {
   const cal = report.calibrated
   const perSide = useMemo(() => {
-    const out: Record<Side, { shown: Finding[]; reviewed: number }> = {
-      left: { shown: [], reviewed: 0 },
-      right: { shown: [], reviewed: 0 },
+    const out: Record<Side, { key: Finding[]; more: Finding[]; reviewed: number }> = {
+      left: { key: [], more: [], reviewed: 0 },
+      right: { key: [], more: [], reviewed: 0 },
     }
     for (const side of ['left', 'right'] as const) {
       const all = (cal?.findings ?? []).filter(f => f.side === side)
-      // Потвърдените (два независими прочита или и двете очи) са най-отгоре —
-      // по тях човек вижда кое е сигурно и кое е само възможно.
-      const shown = groupFindingsForDisplay(all.filter(isPlanRelevantFinding))
-        .map((f, i) => ({ f, i }))
-        .sort((a, b) => Number(isConfirmed(b.f)) - Number(isConfirmed(a.f)) || a.i - b.i)
-        .map(x => x.f)
-      out[side] = { shown, reviewed: all.length }
+      // Само ясно видимите, подредени по сигурност и значение за храненето.
+      // До 5 са ключовите; останалите са свити отдолу.
+      const { key, more } = rankKeySigns(groupFindingsForDisplay(all.filter(isPlanRelevantFinding)))
+      out[side] = { key, more, reviewed: all.length }
     }
     return out
   }, [cal])
 
-  const firstSide: Side = perSide.right.shown.length >= perSide.left.shown.length ? 'right' : 'left'
+  const firstSide: Side = perSide.right.key.length >= perSide.left.key.length ? 'right' : 'left'
   const [side, setSide] = useState<Side>(firstSide)
   const [active, setActive] = useState<number | null>(null)
   const [showZones, setShowZones] = useState(false)
   const [showMarks, setShowMarks] = useState(true)
 
-  const list = perSide[side].shown
+  const [showMore, setShowMore] = useState(false)
+  const list = showMore ? [...perSide[side].key, ...perSide[side].more] : perSide[side].key
 
-  useEffect(() => setActive(null), [side])
+  useEffect(() => {
+    setActive(null)
+    setShowMore(false)
+  }, [side])
 
   useEffect(() => {
     if (active === null) return
@@ -440,7 +452,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gradient-to-r from-primary/5 via-transparent to-accent/5 px-5 py-4">
         <div>
           <h3 className="text-lg font-bold">Вашите ириси отблизо</h3>
-          <p className="text-xs text-muted-foreground">Ирисът само уточнява картината от отговорите ви. Докоснете номер, за да видите какво значи за храненето.</p>
+          <p className="text-xs text-muted-foreground">Докоснете номер — ще видите какво значи и какво да направите.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-muted p-1" role="tablist" aria-label="Око">
@@ -456,7 +468,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                 {side === s && <motion.span layoutId="eye-pill" className="absolute inset-0 rounded-full bg-primary shadow" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
                 <span className="relative">
                   {s === 'left' ? 'Ляв' : 'Десен'}
-                  <span className="ml-1.5 text-[11px] opacity-80">{perSide[s].shown.length}</span>
+                  <span className="ml-1.5 text-[11px] opacity-80">{perSide[s].key.length}</span>
                 </span>
               </button>
             ))}
@@ -514,7 +526,19 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
               />
             ) : (
               <motion.div key={`l-${side}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <FindingList findings={list} onSelect={setActive} side={side} reviewed={perSide[side].reviewed} />
+                <FindingList
+                  findings={list}
+                  keyCount={perSide[side].key.length}
+                  moreCount={perSide[side].more.length}
+                  showMore={showMore}
+                  onToggleMore={() => {
+                    setShowMore(v => !v)
+                    setActive(null)
+                  }}
+                  onSelect={setActive}
+                  side={side}
+                  reviewed={perSide[side].reviewed}
+                />
               </motion.div>
             )}
           </AnimatePresence>

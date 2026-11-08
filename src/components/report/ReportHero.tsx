@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { animate, motion } from 'framer-motion'
 import { CheckCircle, Eye, ShieldCheck, Target, Warning, WarningOctagon } from '@phosphor-icons/react'
-import { summarizeCalibratedReport, topPrioritySystems } from '@/lib/calibrated-report-summary'
+import {
+  groupFindingsForDisplay,
+  isPlanRelevantFinding,
+  summarizeCalibratedReport,
+  topPrioritySystems,
+} from '@/lib/calibrated-report-summary'
+import { isConfirmedFinding, rankKeySigns } from '@/lib/iris-reading'
 import { eyeReferralChip } from '@/lib/eye-health'
 import type { AnalysisReport, EyeReferral } from '@/types'
 
@@ -87,8 +93,10 @@ export default function ReportHero({
   const summary = summarizeCalibratedReport(cal, { briefSummary: report.briefSummary, avgHealth })
   const focus = topPrioritySystems(cal)
   const eye = cal.eyeHealth
-  const confirmed = cal.confirmedCount ?? 0
-  const relevant = summary.planRelevant
+  const keySigns = (['left', 'right'] as const).flatMap(
+    side => rankKeySigns(groupFindingsForDisplay(cal.findings.filter(f => f.side === side && isPlanRelevantFinding(f)))).key
+  )
+  const confirmed = keySigns.filter(isConfirmedFinding).length
 
   return (
     <motion.section
@@ -147,7 +155,7 @@ export default function ReportHero({
           className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground/80 ring-1 ring-border transition active:scale-[0.98] md:rounded-full"
         >
           <ShieldCheck size={16} weight="bold" />
-          {relevant > 0 ? `Вижте ${relevant} знака в ириса` : 'Вижте ириса'}
+          {keySigns.length > 0 ? `${keySigns.length} ключови знака в ириса` : 'Вижте ириса'}
           {confirmed > 0 ? ` · ${confirmed} потвърдени` : ''}
         </button>
       </div>
