@@ -155,7 +155,7 @@ export default function ReportHero({
           className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground/80 ring-1 ring-border transition active:scale-[0.98] md:rounded-full"
         >
           <ShieldCheck size={16} weight="bold" />
-          {keySigns.length > 0 ? `${keySigns.length} ключови знака в ириса` : 'Вижте ириса'}
+          {keySigns.length > 0 ? `${keySigns.length} ключови знака в ириса` : 'Ирисов анализ'}
           {confirmed > 0 ? ` · ${confirmed} потвърдени` : ''}
         </button>
       </div>

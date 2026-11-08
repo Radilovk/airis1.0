@@ -17,13 +17,57 @@ import {
   ShieldWarning,
 } from '@phosphor-icons/react'
 import type { CalibratedAnalysisPayload } from '@/types'
-import { topPrioritySystems } from '@/lib/calibrated-report-summary'
+import {
+  groupFindingsForDisplay,
+  isPlanRelevantFinding,
+  topPrioritySystems,
+} from '@/lib/calibrated-report-summary'
+import { findingAreaKey, rankKeySigns, visibleLabel } from '@/lib/iris-reading'
 
 interface Props {
   data: CalibratedAnalysisPayload
   /** Отваря таба с плана (храни, добавки, навици). */
   onOpenPlan?: () => void
+  /** Отваря таба със снимките. */
+  onOpenIris?: () => void
 }
+
+type Finding = CalibratedAnalysisPayload['findings'][number]
+
+/** Знаците от ирисовия анализ за дадена област: до два, всеки знак веднъж. */
+interface Evidence {
+  label: string
+  where: string
+}
+
+function evidenceBySystem(data: CalibratedAnalysisPayload): Map<string, Evidence[]> {
+  const key: Finding[] = (['left', 'right'] as const).flatMap(
+    side => rankKeySigns(groupFindingsForDisplay(data.findings.filter(f => f.side === side && isPlanRelevantFinding(f)))).key
+  )
+  const out = new Map<string, Evidence[]>()
+  const seen = new Set<string>()
+  for (const f of key) {
+    const sys = findingAreaKey(f)
+    if (!sys) continue
+    // Един и същ знак в двете очи се показва веднъж.
+    const id = `${sys}:${f.type}`
+    if (seen.has(id)) continue
+    seen.add(id)
+    const both = f.bilateral || key.some(o => o !== f && o.type === f.type && o.side !== f.side)
+    const list = out.get(sys) ?? []
+    if (list.length < 2) {
+      list.push({
+        label: visibleLabel(f),
+        where: both ? 'двете очи' : f.side === 'left' ? 'ляво око' : 'дясно око',
+      })
+    }
+    out.set(sys, list)
+  }
+  return out
+}
+
+/** Причините от ириса са в блока „Ирисов анализ“ — тук остават отговорите. */
+const IRIS_REASON = /—\s*(ляв|десен)\s+ирис/i
 
 type Driver = CalibratedAnalysisPayload['drivers'][number]
 type System = CalibratedAnalysisPayload['systems'][number]
@@ -68,9 +112,22 @@ function SourceChip({ source }: { source: Driver['source'] }) {
   )
 }
 
-function FocusCard({ system, drivers, rank }: { system: System; drivers: Driver[]; rank: number }) {
+function FocusCard({
+  system,
+  drivers,
+  rank,
+  evidence,
+  onOpenIris,
+}: {
+  system: System
+  drivers: Driver[]
+  rank: number
+  evidence: Evidence[]
+  onOpenIris?: () => void
+}) {
   const [open, setOpen] = useState(false)
   const lv = level(system.score)
+  const answers = system.reasons.filter(r => !IRIS_REASON.test(r))
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: rank * 0.07 }}>
       <Card className="gap-0 p-4">
@@ -99,6 +156,26 @@ function FocusCard({ system, drivers, rank }: { system: System; drivers: Driver[
 
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{system.description}</p>
 
+        {evidence.length > 0 && (
+          <button
+            type="button"
+            onClick={onOpenIris}
+            className="mt-3 flex w-full items-start gap-2 rounded-xl bg-muted/50 px-3 py-2.5 text-left text-sm transition active:scale-[0.99]"
+          >
+            <Eye size={16} weight="duotone" className="mt-0.5 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Ирисов анализ
+              </span>
+              {evidence.map(e => (
+                <span key={e.label} className="block leading-snug">
+                  {e.label} <span className="text-muted-foreground">· {e.where}</span>
+                </span>
+              ))}
+            </span>
+          </button>
+        )}
+
         {drivers.length > 0 && (
           <div className="mt-3 space-y-2">
             {drivers.map(d => (
@@ -115,15 +192,15 @@ function FocusCard({ system, drivers, rank }: { system: System; drivers: Driver[
           </div>
         )}
 
-        {system.reasons.length > 0 && (
+        {answers.length > 0 && (
           <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleTrigger className="mt-2 flex min-h-11 items-center gap-1 text-xs font-medium text-primary">
-              {open ? 'Скрий' : 'Защо точно това'}
+              {open ? 'Скрий' : 'От вашите отговори'}
               <CaretDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
             </CollapsibleTrigger>
             <CollapsibleContent>
               <ul className="space-y-1.5 border-t pt-3 text-sm text-muted-foreground">
-                {system.reasons.map((r, k) => (
+                {answers.map((r, k) => (
                   <li key={k} className="flex gap-2">
                     <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
                     <span>{r}</span>
@@ -143,11 +220,12 @@ function FocusCard({ system, drivers, rank }: { system: System; drivers: Driver[
  * и един отговор: до три области, всяка с конкретна стъпка и с посочено
  * основание. Всичко останало е свито или е в другите табове.
  */
-export default function CalibratedInsightPanel({ data, onOpenPlan }: Props) {
+export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }: Props) {
   const [moreOpen, setMoreOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
 
   const focus = topPrioritySystems(data)
+  const evidence = evidenceBySystem(data)
   const focusKeys = new Set(focus.map(s => s.key))
   const driversFor = (key: string) => data.drivers.filter(d => d.system === key).slice(0, 2)
   const shownDriverIds = new Set(focus.flatMap(s => driversFor(s.key).map(d => d.id)))
@@ -183,7 +261,14 @@ export default function CalibratedInsightPanel({ data, onOpenPlan }: Props) {
         </p>
         <div className="mt-4 space-y-3">
           {focus.map((s, i) => (
-            <FocusCard key={s.key} system={s} drivers={driversFor(s.key)} rank={i} />
+            <FocusCard
+              key={s.key}
+              system={s}
+              drivers={driversFor(s.key)}
+              rank={i}
+              evidence={evidence.get(s.key) ?? []}
+              onOpenIris={onOpenIris}
+            />
           ))}
         </div>
         {onOpenPlan && (

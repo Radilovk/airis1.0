@@ -6,8 +6,6 @@ import {
   ArrowRight,
   CheckCircle,
   Crosshair,
-  Eye,
-  Lightbulb,
   MapTrifold,
   Sparkle,
   X,
@@ -276,24 +274,10 @@ function FindingDetail({
       <dl className="mt-4 space-y-3 text-sm">
         <div>
           <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Какво означава{r.area ? ` · ${r.area}` : ''}
+            Към какво сочи{r.area ? ` · ${r.area}` : ''}
           </dt>
           <dd className="mt-0.5 leading-relaxed">{r.meaning}</dd>
         </div>
-        <div className="rounded-xl bg-primary/5 p-3 ring-1 ring-primary/15">
-          <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-            <Lightbulb size={13} weight="fill" /> Какво да направите
-          </dt>
-          <dd className="mt-1 leading-relaxed">{r.support}</dd>
-        </div>
-        {r.ophthalmicNote && (
-          <div className="rounded-xl bg-sky-50 p-3 text-sky-950 ring-1 ring-sky-200">
-            <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-              <Eye size={13} weight="fill" /> Погледът на офталмолога
-            </dt>
-            <dd className="mt-1 leading-relaxed">{r.ophthalmicNote}</dd>
-          </div>
-        )}
       </dl>
 
       <div className="mt-auto flex items-center justify-between pt-4">
@@ -375,8 +359,8 @@ function FindingList({
   return (
     <div>
       <p className="mb-3 text-sm text-muted-foreground">
-        {keyCount === 1 ? 'Ключовият знак' : `${keyCount}-те ключови знака`} в това око, подредени по значение за
-        храненето. <CheckCircle size={13} weight="fill" className="inline align-[-2px] text-emerald-600" /> — потвърден.
+        Най-важните знаци за храненето.{' '}
+        <CheckCircle size={13} weight="fill" className="inline align-[-2px] text-emerald-600" /> — потвърден при повторен прочит.
       </p>
       <ul className="space-y-2">{findings.slice(0, keyCount).map(row)}</ul>
       {moreCount > 0 && (
@@ -451,8 +435,8 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
     <Card className="overflow-hidden p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gradient-to-r from-primary/5 via-transparent to-accent/5 px-5 py-4">
         <div>
-          <h3 className="text-lg font-bold">Вашите ириси отблизо</h3>
-          <p className="text-xs text-muted-foreground">Докоснете номер — ще видите какво значи и какво да направите.</p>
+          <h3 className="text-lg font-bold">Ирисов анализ</h3>
+          <p className="text-xs text-muted-foreground">Номерата отбелязват мястото на всеки знак в ириса.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-muted p-1" role="tablist" aria-label="Око">
@@ -506,7 +490,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                     boxShadow: k === 'clear' ? `0 0 0 1.5px var(--background, #fff), 0 0 0 3px ${STRENGTH_STYLE[k].dot}` : undefined,
                   }}
                 />
-                {k === 'clear' ? 'ясен знак' : 'умерен знак'}
+                {k === 'clear' ? 'вижда се ясно' : 'вижда се слабо'}
               </span>
             ))}
           </div>

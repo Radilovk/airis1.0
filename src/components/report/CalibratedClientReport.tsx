@@ -18,7 +18,8 @@ export function CalibratedSummaryReport({
   report,
   withLead,
   onOpenPlan,
-}: Props & { withLead?: boolean; onOpenPlan?: () => void }) {
+  onOpenIris,
+}: Props & { withLead?: boolean; onOpenPlan?: () => void; onOpenIris?: () => void }) {
   const cal = report.calibrated!
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
 
@@ -33,7 +34,7 @@ export function CalibratedSummaryReport({
         />
       )}
 
-      <CalibratedInsightPanel data={cal} onOpenPlan={onOpenPlan} />
+      <CalibratedInsightPanel data={cal} onOpenPlan={onOpenPlan} onOpenIris={onOpenIris} />
     </div>
   )
 }

@@ -351,7 +351,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                     className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
                   >
                     <Eye size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Ирис</span>
+                    <span className="text-xs font-semibold">Ирисов анализ</span>
                   </TabsTrigger>
                 </>
               ) : (
@@ -390,6 +390,10 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                       report={report}
                       onOpenPlan={() => {
                         setActiveTab('plan')
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      onOpenIris={() => {
+                        setActiveTab('iris')
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
                     />

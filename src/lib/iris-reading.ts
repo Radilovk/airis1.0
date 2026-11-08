@@ -109,8 +109,8 @@ export function isConfirmedFinding(f: Finding): boolean {
   return (f.confirmations ?? 1) >= 2 || !!f.bilateral
 }
 
-/** Хранителната област, към която знакът сочи най-силно (тип + зона). */
-export function findingArea(f: Finding): string | undefined {
+/** Ключът на хранителната област, към която знакът сочи най-силно (тип + зона). */
+export function findingAreaKey(f: Finding): SystemKey | undefined {
   const def = FINDINGS[f.type as FindingType]
   if (!def) return undefined
   const weights: Partial<Record<SystemKey, number>> = { ...def.systems }
@@ -121,7 +121,67 @@ export function findingArea(f: Finding): string | undefined {
     }
   }
   const top = (Object.entries(weights) as Array<[SystemKey, number]>).sort((a, b) => b[1] - a[1])[0]
-  return top ? systemLabel(top[0]) : undefined
+  return top?.[0]
+}
+
+/** Хранителната област, към която знакът сочи — с име за клиента. */
+export function findingArea(f: Finding): string | undefined {
+  const key = findingAreaKey(f)
+  return key ? systemLabel(key) : undefined
+}
+
+/**
+ * Как изглежда знакът — с думи, които човек може сам да провери на снимката.
+ * Първото е за ясен знак, второто — за по-слаб: колкото по-несигурен е
+ * знакът, толкова по-общо е описанието, за да не обещава повече, отколкото
+ * се вижда.
+ */
+const VISIBLE: Record<FindingType, [clear: string, faint: string]> = {
+  collarette_deform: ['Неравна линия около зеницата', 'Леко неравна линия около зеницата'],
+  pigment_orange: ['Оранжеви петънца', 'Оранжев оттенък'],
+  pigment_brown: ['Тъмно петно', 'По-тъмно място'],
+  pigment_yellow: ['Жълтеникав оттенък', 'Лек жълтеникав оттенък'],
+  pigment_diffuse: ['Петнист оттенък', 'Неравномерен цвят'],
+  fiber_defect: ['Тъмно празно място', 'По-рехаво място'],
+  fiber_thinning: ['По-редки влакна', 'Малко по-редки влакна'],
+  radial_furrow: ['Тъмна линия към ръба', 'Линия към ръба'],
+  nerve_rings: ['Кръгови линии в ириса', 'Слаби кръгови линии'],
+  lymphatic_rosary: ['Светли точки по края', 'Бледи точки по края'],
+  scurf_rim: ['Тъмен ръб по края', 'По-тъмен ръб по края'],
+  sodium_ring: ['Светъл пръстен по края', 'Светла дъга по края'],
+  transversal_fiber: ['Напречна линия', 'Слаба напречна линия'],
+  pupil_flattening: ['Сплескан ръб на зеницата', 'Леко неравен ръб на зеницата'],
+}
+
+/** Описание на знака, което човек може да провери на снимката. */
+export function visibleLabel(f: Finding): string {
+  const pair = VISIBLE[f.type as FindingType]
+  if (!pair) return f.label
+  return signalStrength(f.confidence) === 'clear' ? pair[0] : pair[1]
+}
+
+const DIR8 = ['горе', 'горе вдясно', 'вдясно', 'долу вдясно', 'долу', 'долу вляво', 'вляво', 'горе вляво']
+const DIR4 = ['горе', 'вдясно', 'долу', 'вляво']
+
+/**
+ * Къде е знакът — както изглежда на снимката, без часове и имена на пояси.
+ * При по-слаб знак посоката е само в четири части: точността не бива да
+ * надхвърля сигурността.
+ */
+export function plainLocation(f: Finding): string {
+  const band = ringBand(f.ring)
+  const depth =
+    band.key === 'IPB' || band.key === 'STOM' || band.key === 'ANW'
+      ? 'около зеницата'
+      : band.key === 'ORG'
+        ? 'в средата на ириса'
+        : 'по края'
+  if (isCircumferentialFinding(f.type as FindingType)) return `${depth}, по цялата обиколка`
+  // Секторът покрива минути (id−1)·5 … id·5 по часовника на снимката.
+  const hour = (f.sector - 0.5) % 12
+  const clear = signalStrength(f.confidence) === 'clear'
+  const dir = clear ? DIR8[Math.round(hour / 1.5) % 8] : DIR4[Math.round(hour / 3) % 4]
+  return depth === 'около зеницата' ? `${depth}, ${dir}` : `${dir}, ${depth}`
 }
 
 /** Тежест за подредба: сигурност × значение за храненето. */
@@ -188,9 +248,9 @@ export function signalStrength(confidence: number): SignalStrength {
 }
 
 const STRENGTH_LABEL: Record<SignalStrength, string> = {
-  clear: 'ясен знак',
-  moderate: 'умерен знак',
-  faint: 'слаб знак',
+  clear: 'вижда се ясно',
+  moderate: 'вижда се слабо',
+  faint: 'едва се вижда',
 }
 
 function cleanAppearance(text: string): string {
@@ -212,23 +272,16 @@ export function readFinding(f: Finding): FindingReading {
   // ръба значението идва от самия пояс и името на сектора само обърква.
   const zone = band.key === 'ORG' ? sector?.label : undefined
 
-  const where = [
-    sideLabel,
-    circumferential ? 'по цялата обиколка' : sector?.clock,
-    zone ?? band.label.replace(/\s*\(.*\)$/, ''),
-  ]
-    .filter(Boolean)
-    .join(' · ')
 
   const strength = signalStrength(f.confidence)
   const reliability: string[] = [STRENGTH_LABEL[strength]]
-  if ((f.confirmations ?? 1) >= 2) reliability.push('потвърден два пъти')
+  if ((f.confirmations ?? 1) >= 2) reliability.push('потвърден при повторен прочит')
   if (f.bilateral) reliability.push('и в двете очи')
 
   return {
-    title: def?.clientLabel ?? f.label,
+    title: visibleLabel(f),
     sideLabel,
-    where,
+    where: `${f.side === 'left' ? 'Ляво око' : 'Дясно око'} · ${plainLocation(f)}`,
     zone,
     mapReference: sector?.reference,
     appearance: def ? cleanAppearance(def.appearanceUnwrapped) : '',
