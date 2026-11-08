@@ -57,7 +57,7 @@ export interface SystemDef {
 export const SYSTEMS: SystemDef[] = [
   {
     key: 'digestive',
-    label: 'Храносмилане и черва',
+    label: 'Храносмилане',
     blurb: 'Подуване, редовност, усвояване на храната',
     priority: true,
   },
@@ -69,20 +69,20 @@ export const SYSTEMS: SystemDef[] = [
   },
   {
     key: 'endocrine',
-    label: 'Хормонален баланс',
+    label: 'Хормони и щитовидна жлеза',
     blurb: 'Щитовидна жлеза, надбъбречни, хормонален ритъм',
     priority: true,
   },
   {
     key: 'detox',
-    label: 'Черен дроб и пречистване',
-    blurb: 'Обработка на мазнини, алкохол и лекарства; бъбреци',
+    label: 'Черен дроб и бъбреци',
+    blurb: 'Обработка на мазнини, алкохол и лекарства; воден баланс',
     priority: false,
   },
   {
     key: 'immune',
-    label: 'Възпаление и имунитет',
-    blurb: 'Възпалителен фон, автоимунна склонност, лимфа',
+    label: 'Имунна система',
+    blurb: 'Възпалителни и автоимунни процеси, алергии, лимфа',
     priority: false,
   },
   {
@@ -93,7 +93,7 @@ export const SYSTEMS: SystemDef[] = [
   },
   {
     key: 'circulatory',
-    label: 'Мазнини и сърце',
+    label: 'Сърдечно-съдова система',
     blurb: 'Холестерол, кръвно налягане, съдове',
     priority: false,
   },

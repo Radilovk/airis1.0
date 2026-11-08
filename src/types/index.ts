@@ -19,6 +19,8 @@ export interface QuestionnaireData {
   medications: string
   complaints: string
   healthStatus: string[]
+  /** Често усещани симптоми (чеклист). Липсва в стари отчети. */
+  symptoms?: string[]
   uploadedDocuments?: UploadedDocument[]
   customAnswers?: Record<string, any>
 }

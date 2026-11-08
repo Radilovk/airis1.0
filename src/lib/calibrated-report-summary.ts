@@ -75,7 +75,7 @@ export function summarizeCalibratedReport(
   const planRelevant = relevant.length
   const sectorsAffected = new Set(relevant.map(f => `${f.side}:${f.sector}`)).size
 
-  const topSystem = data.systems.find(s => s.priority && data.focus[0] === s.key)
+  const topSystem = data.systems.find(s => data.focus[0] === s.key)
 
   let verdict: CalibratedVerdict = 'stable'
   if (planRelevant >= 6 || (topSystem && topSystem.score < 55)) verdict = 'focus'
@@ -147,11 +147,16 @@ export function getTopClientInsights(
   return out.slice(0, limit)
 }
 
+/** Над този резултат областта е в поддръжка — не се показва като приоритет. */
+export const FOCUS_MAX_SCORE = 75
+
 export function topPrioritySystems(data: CalibratedAnalysisPayload) {
   const ordered = data.focus
     .map(key => data.systems.find(s => s.key === key))
     .filter(Boolean) as CalibratedAnalysisPayload['systems']
-  return ordered.slice(0, 3)
+  // Редът на фокуса винаги дава три системи, дори третата да е 85/100 и „без
+  // сигнали“. Приоритет без проблем обърква — показват се само тези със сигнал.
+  return ordered.filter(s => s.score < FOCUS_MAX_SCORE).slice(0, 3)
 }
 
 export function significantZoneCount(report: {

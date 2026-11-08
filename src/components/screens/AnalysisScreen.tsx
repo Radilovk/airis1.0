@@ -889,7 +889,9 @@ ${response}
         label: sys.label,
         score: sys.score,
         priority: sys.priority,
-        description: sys.description,
+        // Бележката на модела е конкретна за човека; общото описание по прага е резерва.
+        description:
+          result.interpretation?.systemNotes?.find(n => n.system === sys.label)?.note || sys.description,
         reasons: sys.reasons,
       })),
       drivers: result.scoring.drivers.map(d => ({
@@ -958,7 +960,9 @@ ${response}
         recommendedFoods: plan?.eatMore ?? [],
         avoidFoods: plan?.eatLess ?? [],
         supplements,
-        psychologicalRecommendations: plan?.lifestyle?.stress ?? [],
+        // Сънят се губеше: влизаше само в общия списък препоръки, който докладът
+        // не показва. Сън + стрес = навиците в плана.
+        psychologicalRecommendations: [...(plan?.lifestyle?.sleep ?? []), ...(plan?.lifestyle?.stress ?? [])],
         // „Специални (индивидуални) препоръки" = конкретните стъпки за първата
         // седмица. Преди тук влизаше движението, което е режим, не индивидуална
         // препоръка.
@@ -2594,7 +2598,7 @@ JSON формат:
                 <div className="mt-6 space-y-2 text-left">
                   <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Обикновено отнема 1–2 минути. Моля, не затваряйте приложението.
+                      Обикновено отнема под минута. Не затваряйте приложението.
                     </p>
                   </div>
                 </div>
