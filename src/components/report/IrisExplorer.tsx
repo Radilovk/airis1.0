@@ -5,8 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle,
-  Crosshair,
-  MapTrifold,
   Sparkle,
   X,
 } from '@phosphor-icons/react'
@@ -253,9 +251,7 @@ function FindingDetail({
         </span>
         <div className="min-w-0 flex-1">
           <h4 className="text-lg font-bold leading-tight">{r.title}</h4>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {r.where}
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{f.side === 'left' ? 'Ляво око' : 'Дясно око'}</p>
         </div>
         <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted" aria-label="Затвори">
           <X size={16} />
@@ -405,8 +401,6 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
   const firstSide: Side = perSide.right.key.length >= perSide.left.key.length ? 'right' : 'left'
   const [side, setSide] = useState<Side>(firstSide)
   const [active, setActive] = useState<number | null>(null)
-  const [showZones, setShowZones] = useState(false)
-  const [showMarks, setShowMarks] = useState(true)
 
   const [showMore, setShowMore] = useState(false)
   const list = showMore ? [...perSide[side].key, ...perSide[side].more] : perSide[side].key
@@ -471,15 +465,11 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                 findings={list}
                 active={active}
                 onSelect={setActive}
-                showZones={showZones}
-                showMarks={showMarks}
+                showZones={false}
+                showMarks
               />
             </motion.div>
           </AnimatePresence>
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            <Toggle on={showMarks} onClick={() => setShowMarks(v => !v)} icon={<Crosshair size={14} />} label="Знаци" />
-            <Toggle on={showZones} onClick={() => setShowZones(v => !v)} icon={<MapTrifold size={14} />} label="Карта на зоните" />
-          </div>
           <div className="mt-3 flex justify-center gap-4 text-xs text-muted-foreground">
             {(['clear', 'moderate'] as const).map(k => (
               <span key={k} className="inline-flex items-center gap-1.5">
@@ -529,19 +519,5 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
         </div>
       </div>
     </Card>
-  )
-}
-
-function Toggle({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${on ? 'bg-primary/10 text-primary ring-primary/30' : 'bg-background text-muted-foreground ring-border hover:text-foreground'}`}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }
