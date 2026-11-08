@@ -26,9 +26,9 @@ export interface QuestionnaireFlowState extends QuestionnaireContext {
   profileComplete: boolean
 }
 
-export const QUESTIONNAIRE_CONFIG_VERSION = '3.0'
+export const QUESTIONNAIRE_CONFIG_VERSION = '3.1'
 
-const FEMALE_ONLY_HEALTH = new Set(['Менопауза', 'Бременност', 'Кърмене'])
+const FEMALE_ONLY_HEALTH = new Set(['Менопауза', 'Бременност', 'Кърмене', 'Поликистозни яйчници (ПКОС)'])
 
 /** Взаимно изключващи се здравни състояния. */
 export const HEALTH_MUTUAL_EXCLUSION: Record<string, string[]> = {
@@ -37,6 +37,7 @@ export const HEALTH_MUTUAL_EXCLUSION: Record<string, string[]> = {
 }
 
 const SKIPPABLE_FIELDS = new Set([
+  'symptoms',
   'healthGate',
   'healthStatus',
   'complaints',
@@ -231,6 +232,8 @@ export function isQuestionVisible(
 
   if (id === 'goals') return state.profileComplete
 
+  if (id === 'symptoms') return state.profileComplete && hasGoals(answers)
+
   if (id === 'healthGate') {
     return state.profileComplete && hasGoals(answers) && !state.needsHealthBlock
   }
@@ -406,6 +409,7 @@ export function normalizeQuestionnairePayload(
     height: Number(clean.height) || 0,
     goals: (clean.goals as string[]) || [],
     healthStatus: (clean.healthStatus as string[]) || [],
+    symptoms: (clean.symptoms as string[]) || [],
     complaints: mergedComplaints,
     medicalConditions: mergedComplaints,
     familyHistory: String(clean.familyHistory || '').trim(),

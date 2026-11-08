@@ -17,7 +17,9 @@ import {
   AppleLogo,
   WarningCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  ForkKnife,
+  CalendarCheck
 } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import type { AnalysisReport, SupplementRecommendation } from '@/types'
@@ -31,6 +33,7 @@ interface PlanTabProps {
 interface PlanSection {
   id: string
   title: string
+  subtitle?: string
   icon: typeof AppleLogo
   content: string[]
   priority?: 'high' | 'medium' | 'low'
@@ -58,11 +61,14 @@ export default function PlanTab({ report }: PlanTabProps) {
   const hasTests = detailedPlan.recommendedTests && detailedPlan.recommendedTests.length > 0
   const showFullPlan = isCalibrated
 
+  if (isCalibrated) return <CalibratedPlan report={report} />
+
   return (
     <div className="space-y-3">
       {isCalibrated && hasDrivers && (
         <Card className="border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-          Тук са конкретните стъпки — храни, добавки и навици.
+          Конкретните стъпки: какво да ядете, какво да ограничите, кои добавки имат смисъл и кои навици помагат.
+          Започнете с храненето — то дава най-бърз ефект.
         </Card>
       )}
 
@@ -130,7 +136,28 @@ export default function PlanTab({ report }: PlanTabProps) {
           </motion.div>
         )}
 
-        {hasPsychRecs && (
+        {isCalibrated && (hasPsychRecs || hasSpecialRecs) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.25 }}
+          >
+            <CollapsibleSection
+              section={{
+                id: 'habits',
+                title: 'Навици и движение',
+                subtitle: 'Ритъм на хранене, сън и движение',
+                icon: Leaf,
+                content: [
+                  ...(detailedPlan.specialRecommendations || []),
+                  ...(detailedPlan.psychologicalRecommendations || []),
+                ],
+              }}
+            />
+          </motion.div>
+        )}
+
+        {!isCalibrated && hasPsychRecs && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -149,7 +176,7 @@ export default function PlanTab({ report }: PlanTabProps) {
           </motion.div>
         )}
 
-        {hasSpecialRecs && (
+        {!isCalibrated && hasSpecialRecs && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -177,7 +204,8 @@ export default function PlanTab({ report }: PlanTabProps) {
             <CollapsibleSection 
               section={{
                 id: 'tests',
-                title: 'Препоръчителни изследвания',
+                title: isCalibrated ? 'Изследвания за проверка' : 'Препоръчителни изследвания',
+                subtitle: isCalibrated ? 'С тях проверявате дали изводите важат за вас' : undefined,
                 icon: Flask,
                 content: showFullPlan
                   ? detailedPlan.recommendedTests
@@ -187,6 +215,111 @@ export default function PlanTab({ report }: PlanTabProps) {
           </motion.div>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Разделя редовете по префикс („Закуска: …“) — така ги записва анализът. */
+function splitByPrefix(lines: string[], prefixes: string[]) {
+  const tagged: Record<string, string[]> = {}
+  const plain: string[] = []
+  for (const raw of lines) {
+    const line = String(raw ?? '').trim()
+    if (!line) continue
+    const p = prefixes.find(x => line.startsWith(`${x}:`))
+    if (p) (tagged[p] ??= []).push(line.slice(p.length + 1).trim())
+    else plain.push(line)
+  }
+  return { tagged, plain }
+}
+
+/**
+ * Планът на калибрирания анализ — в реда, в който човек ще го използва:
+ * откъде да започне, какво да яде, как изглежда един ден, добавки, навици,
+ * първата седмица и как да провери ефекта.
+ */
+function CalibratedPlan({ report }: { report: AnalysisReport }) {
+  const plan = report.detailedPlan
+  const general = splitByPrefix(plan.generalRecommendations || [], ['Закуска', 'Обяд', 'Вечеря', 'Ритъм', 'Движение'])
+  const special = splitByPrefix(plan.specialRecommendations || [], ['Първа седмица', 'За проследяване'])
+  const priorities = general.plain.slice(0, 3)
+  const day = (['Закуска', 'Обяд', 'Вечеря'] as const).filter(k => general.tagged[k]?.length)
+  const rhythm = general.tagged['Ритъм']?.[0]
+  const habits = [
+    ...(general.tagged['Движение'] ?? []),
+    ...(plan.psychologicalRecommendations ?? []),
+    ...special.plain,
+  ]
+  const firstWeek = special.tagged['Първа седмица'] ?? []
+  const followUp = special.tagged['За проследяване'] ?? []
+  const tests = plan.recommendedTests ?? []
+
+  return (
+    <div className="space-y-3">
+      {priorities.length > 0 && (
+        <Card className="gap-3 p-5">
+          <h3 className="text-base font-bold">Откъде да започнете</h3>
+          <ol className="space-y-2.5">
+            {priorities.map((p, i) => (
+              <li key={i} className="flex gap-3 text-[15px] leading-relaxed">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {i + 1}
+                </span>
+                <span>{p}</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
+      {((plan.recommendedFoods?.length ?? 0) > 0 || (plan.avoidFoods?.length ?? 0) > 0) && (
+        <FoodRecommendationsSection recommendedFoods={plan.recommendedFoods || []} avoidFoods={plan.avoidFoods || []} />
+      )}
+
+      {day.length > 0 && (
+        <Card className="gap-3 p-5">
+          <h3 className="flex items-center gap-2 text-base font-bold">
+            <ForkKnife size={20} weight="duotone" className="text-primary" /> Примерен ден
+          </h3>
+          <dl className="space-y-3">
+            {day.map(k => (
+              <div key={k}>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{k}</dt>
+                <dd className="mt-0.5 text-[15px] leading-relaxed">{general.tagged[k][0]}</dd>
+              </div>
+            ))}
+          </dl>
+          {rhythm && <p className="rounded-xl bg-muted/50 p-3 text-sm leading-relaxed text-muted-foreground">{rhythm}</p>}
+        </Card>
+      )}
+
+      {(plan.supplements?.length ?? 0) > 0 && (
+        <SupplementsSection supplements={plan.supplements} questionnaire={report.questionnaireData} />
+      )}
+
+      {habits.length > 0 && (
+        <CollapsibleSection
+          section={{ id: 'habits', title: 'Сън, стрес и движение', subtitle: 'Навиците, които помагат на храненето', icon: Leaf, content: habits }}
+        />
+      )}
+
+      {firstWeek.length > 0 && (
+        <CollapsibleSection
+          section={{ id: 'week', title: 'Първата седмица', subtitle: 'Най-малките стъпки, с които да започнете', icon: CalendarCheck, content: firstWeek }}
+        />
+      )}
+
+      {(tests.length > 0 || followUp.length > 0) && (
+        <CollapsibleSection
+          section={{
+            id: 'tests',
+            title: 'Проверка и проследяване',
+            subtitle: 'Изследвания и какво да наблюдавате след 4–6 седмици',
+            icon: Flask,
+            content: [...tests.map(t => `Изследване: ${t}`), ...followUp.map(f => `Наблюдавайте: ${f}`)],
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -216,8 +349,8 @@ function SupplementsSection({ supplements, questionnaire }: { supplements: Suppl
               <Pill size={22} weight="duotone" className="text-primary-foreground" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <h4 className="font-bold text-base">Хранителни Добавки</h4>
-              <p className="text-xs text-muted-foreground">Дозировка и прием</p>
+              <h4 className="font-bold text-base">Хранителни добавки</h4>
+              <p className="text-xs text-muted-foreground">Само това, което има смисъл за вас</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -310,6 +443,7 @@ function CollapsibleSection({ section }: { section: PlanSection }) {
             </div>
             <div className="flex-1 min-w-0 text-left">
               <h4 className="font-bold text-base">{section.title}</h4>
+              {section.subtitle && <p className="text-xs text-muted-foreground">{section.subtitle}</p>}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -373,7 +507,7 @@ function FoodRecommendationsSection({
             </div>
             <div className="flex-1 min-w-0 text-left">
               <h4 className="font-bold text-base">Хранителни препоръки</h4>
-              <p className="text-xs text-muted-foreground">Пълен списък с препоръчителни и забранени храни</p>
+              <p className="text-xs text-muted-foreground">Какво да добавите и какво да ограничите</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -421,9 +555,6 @@ function FoodRecommendationsSection({
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium text-green-900 leading-relaxed block break-words">{food}</span>
                       </div>
-                      <div className="text-xs font-semibold text-green-600 flex-shrink-0 px-2 py-0.5 bg-green-100 rounded-full">
-                        #{idx + 1}
-                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -458,9 +589,6 @@ function FoodRecommendationsSection({
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium text-amber-900 leading-relaxed block break-words">{food}</span>
-                      </div>
-                      <div className="text-xs font-semibold text-amber-800 flex-shrink-0 px-2 py-0.5 bg-amber-100 rounded-full">
-                        #{idx + 1}
                       </div>
                     </motion.div>
                   ))}

@@ -198,7 +198,7 @@ function finding(
   return {
     side,
     type,
-    label: FINDINGS[type].label,
+    label: FINDINGS[type].clientLabel,
     sector,
     ring,
     size: 'm',
@@ -260,11 +260,17 @@ export function buildDemoReport(): AnalysisReport {
     finding('right', 'pigment_orange', 9, 7, 0.71),
     finding('right', 'nerve_rings', 1, 8, 0.74, { bilateral: true }),
     finding('right', 'fiber_defect', 7, 6, 0.62),
-    finding('right', 'sodium_ring', 1, 11, 0.7),
+    finding('right', 'sodium_ring', 1, 11, 0.7, { bilateral: true }),
+    finding('right', 'pigment_brown', 4, 7, 0.66),
+    finding('right', 'radial_furrow', 3, 5, 0.64),
+    finding('right', 'transversal_fiber', 1, 6, 0.63),
     finding('left', 'collarette_deform', 7, 3, 0.76, { bilateral: true }),
     finding('left', 'fiber_defect', 9, 7, 0.68),
     finding('left', 'nerve_rings', 1, 8, 0.72, { bilateral: true }),
     finding('left', 'lymphatic_rosary', 1, 10, 0.55),
+    finding('left', 'pigment_orange', 3, 7, 0.69),
+    finding('left', 'sodium_ring', 1, 11, 0.68, { bilateral: true }),
+    finding('left', 'pigment_diffuse', 10, 6, 0.61),
   ]
 
   const eyeHealth = assessEyeHealth({
@@ -278,13 +284,13 @@ export function buildDemoReport(): AnalysisReport {
   })
 
   const systems: CalibratedAnalysisPayload['systems'] = [
-    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването и знаците около коларетата сочат към ритъма на храносмилането.', reasons: ['Деформирана коларета в двете очи', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
-    { key: 'nervous', label: 'Нервна система', score: 61, priority: true, description: 'Висок стрес, кратък сън и стресови пръстени в двете очи.', reasons: ['Стресови пръстени — двустранно', 'Сън 6 ч, качество „средно"', 'Стрес „висок"'] },
-    { key: 'metabolic', label: 'Метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевият пигмент насочват към стабилна кръвна захар.', reasons: ['Оранжев пигмент в зоната на кръвната захар', 'Сладко следобед'] },
-    { key: 'circulatory', label: 'Кръвообращение', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и светъл ръб на ириса.', reasons: ['Фамилна анамнеза', 'Светъл ръб по периферията'] },
-    { key: 'detox', label: 'Детоксикация', score: 74, priority: false, description: 'Без силни знаци.', reasons: [] },
-    { key: 'immune', label: 'Имунитет и лимфа', score: 78, priority: false, description: 'Лека лимфна сигнализация.', reasons: [] },
-    { key: 'endocrine', label: 'Ендокринна регулация', score: 80, priority: false, description: 'Стабилно.', reasons: [] },
+    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването след хранене и неравната коларета сочат към ритъма на храненето.', reasons: ['Неравна коларета в двете очи', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
+    { key: 'nervous', label: 'Стрес и сън', score: 61, priority: true, description: 'Висок стрес, кратък сън и нервни пръстени в двете очи.', reasons: ['Нервни пръстени в двете очи', 'Сън 6 ч, качество „средно"', 'Стрес „висок"'] },
+    { key: 'metabolic', label: 'Кръвна захар и метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевата пигментация насочват към стабилна кръвна захар.', reasons: ['Оранжева пигментация', 'Сладко следобед'] },
+    { key: 'circulatory', label: 'Сърдечно-съдова система', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и натриев пръстен по края на ириса.', reasons: ['Фамилна анамнеза', 'Натриев пръстен'] },
+    { key: 'detox', label: 'Черен дроб и бъбреци', score: 74, priority: false, description: 'Без силни знаци.', reasons: [] },
+    { key: 'immune', label: 'Имунна система', score: 78, priority: false, description: 'Без изразен възпалителен фон.', reasons: [] },
+    { key: 'endocrine', label: 'Хормони и щитовидна жлеза', score: 80, priority: false, description: 'Стабилно.', reasons: [] },
   ]
 
   const calibrated: CalibratedAnalysisPayload = {
@@ -297,6 +303,7 @@ export function buildDemoReport(): AnalysisReport {
       { id: 'd1', system: 'digestive', strength: 'high', observation: 'Храносмилането има нужда от ритъм', action: 'Вечеря поне 3 часа преди сън и бавно хранене, седнали — без екран.', source: 'both' },
       { id: 'd2', system: 'nervous', strength: 'high', observation: 'Нервната система работи на висока предавка', action: 'Лягане в един и същ час и 10 минути разходка навън след обяд.', source: 'both' },
       { id: 'd3', system: 'metabolic', strength: 'medium', observation: 'Следобедният спад идва от скок на кръвната захар', action: 'Сменете сладкото следобед с ябълка и шепа ядки.', source: 'questionnaire' },
+      { id: 'd4', system: 'circulatory', strength: 'medium', observation: 'Фамилна склонност към висок холестерол', action: 'Риба два пъти седмично, зехтин вместо масло, по-малко колбаси — и липиден профил при следващото изследване.', source: 'both' },
     ],
     findings,
     agreement: 0.71,
@@ -329,6 +336,11 @@ export function buildDemoReport(): AnalysisReport {
         'Вечеря до 19:30, лека и сготвена',
         'Белтък и зеленчуци на всяко хранене',
         'Лягане в 23:00 всяка вечер',
+        'Закуска: 2 яйца, домат, филийка пълнозърнест хляб',
+        'Обяд: пилешко филе с печени зеленчуци и салата със зехтин',
+        'Вечеря: до 19:30 — супа от леща или риба със задушени зеленчуци',
+        'Ритъм: три хранения през 4–5 часа и 6–8 чаши вода, повечето до 17 ч',
+        'Движение: 10 минути разходка след обяд',
       ],
       recommendedFoods: ['Сготвени зеленчуци всеки ден', 'Овесени ядки на закуска', 'Риба 2 пъти седмично', 'Кисело мляко', 'Шепа ядки следобед', 'Горчиви салати (рукола, радикио)'],
       avoidFoods: ['Сладко следобед (скок на захарта)', 'Тежка късна вечеря (подуване)', 'Газирани напитки (подуване)'],

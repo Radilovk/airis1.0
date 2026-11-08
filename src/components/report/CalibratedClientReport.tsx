@@ -4,47 +4,27 @@ import IrisExplorer from '@/components/report/IrisExplorer'
 import EyeHealthCard from '@/components/report/EyeHealthCard'
 import ConstitutionCard from '@/components/report/ConstitutionCard'
 import CalibratedInsightPanel from '@/components/report/CalibratedInsightPanel'
-import CalibratedSystemsChart from '@/components/report/CalibratedSystemsChart'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Target } from '@phosphor-icons/react'
 
 interface Props {
   report: AnalysisReport
 }
 
-function GoalsCard({ report }: { report: AnalysisReport }) {
-  if (report.questionnaireData.goals.length === 0) return null
-  return (
-    <Card className="p-4">
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-        <Target size={18} weight="duotone" className="text-primary" />
-        Вашите цели
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {report.questionnaireData.goals.map(g => (
-          <Badge key={g} variant="secondary" className="text-xs">
-            {g}
-          </Badge>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
 /**
- * Таб „Обобщение“ — какво е важно сега, системи, насоки, методика.
- * Водещият извод и резултатът са в героя над табовете, затова тук не се повтарят.
- * Очният скрининг е в героя (бутон към таб „Ирис и очи“) — тук не се повтаря.
+ * Таб „Вашият фокус“ — до три хранителни приоритета с конкретна стъпка и
+ * основание, останалото е свито. Водещият извод и резултатът са в героя над
+ * табовете, затова тук не се повтарят.
  */
-export function CalibratedSummaryReport({ report, withLead }: Props & { withLead?: boolean }) {
+export function CalibratedSummaryReport({
+  report,
+  withLead,
+  onOpenPlan,
+  onOpenIris,
+}: Props & { withLead?: boolean; onOpenPlan?: () => void; onOpenIris?: () => void }) {
   const cal = report.calibrated!
   const avgHealth = Math.round((report.leftIris.overallHealth + report.rightIris.overallHealth) / 2)
 
   return (
     <div className="space-y-8">
-      <GoalsCard report={report} />
-
       {withLead && (
         <CalibratedReportSummary
           data={cal}
@@ -54,23 +34,21 @@ export function CalibratedSummaryReport({ report, withLead }: Props & { withLead
         />
       )}
 
-      <CalibratedSystemsChart systems={cal.systems} />
-
-      <CalibratedInsightPanel data={cal} />
+      <CalibratedInsightPanel data={cal} onOpenPlan={onOpenPlan} onOpenIris={onOpenIris} />
     </div>
   )
 }
 
 /**
- * Таб „Ирис и очи“ — интерактивният ирис, теренът и очният скрининг.
+ * Таб „Ирис“ — интерактивният ирис, теренът и очният скрининг.
  */
 export function CalibratedIrisReport({ report }: Props) {
   const cal = report.calibrated
   return (
     <div className="space-y-6">
       <IrisExplorer report={report} />
-      {cal && <ConstitutionCard data={cal} />}
       {cal?.eyeHealth && <EyeHealthCard report={cal.eyeHealth} />}
+      {cal && <ConstitutionCard data={cal} />}
     </div>
   )
 }

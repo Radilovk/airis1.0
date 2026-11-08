@@ -92,7 +92,10 @@ function Block({ label, text, strong }: { label: string; text: string; strong?: 
  * колко бързо), знаците под него — сгънати до едно докосване.
  */
 export default function EyeHealthCard({ report, compact }: { report?: EyeHealthReport; compact?: boolean }) {
-  const [open, setOpen] = useState<number | null>(report && report.referral !== 'none' && !compact ? 0 : null)
+  // Подробностите се разгъват сами само при спешен знак — иначе един ясен
+  // извод най-горе стига, а останалото е на едно докосване.
+  const [open, setOpen] = useState<number | null>(report && report.referral === 'urgent' && !compact ? 0 : null)
+  const [checkedOpen, setCheckedOpen] = useState(false)
   if (!report || !report.ran) return null
   const tone = TONE[report.referral]
   const copy = REFERRAL_COPY[report.referral]
@@ -125,7 +128,17 @@ export default function EyeHealthCard({ report, compact }: { report?: EyeHealthR
         </ul>
       )}
 
-      {!compact && (
+      {!compact && !checkedOpen && (
+        <button
+          type="button"
+          onClick={() => setCheckedOpen(true)}
+          className="mt-3 flex min-h-11 items-center gap-1 text-xs font-medium text-primary"
+        >
+          Какво проверихме <CaretDown size={12} />
+        </button>
+      )}
+
+      {!compact && checkedOpen && (
         <div className="mt-4 rounded-2xl bg-background/60 p-3.5">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Какво проверихме</p>
           <ul className="grid gap-1.5 text-sm sm:grid-cols-2">

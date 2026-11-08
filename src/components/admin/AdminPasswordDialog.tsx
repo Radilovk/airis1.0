@@ -34,7 +34,8 @@ export default function AdminPasswordDialog({ open, onOpenChange, onSuccess }: A
       toast.success('✓ Достъп разрешен', {
         description: 'Добре дошли в административния панел'
       })
-      onOpenChange(false)
+      // Само onSuccess: затварянето (onOpenChange(false)) значи „отказ“ за
+      // този, който е отворил диалога.
       onSuccess()
       setPassword('')
     } else {

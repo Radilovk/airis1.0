@@ -28,6 +28,13 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  server: {
+    watch: {
+      // `wrangler dev` пише в worker/.wrangler — без това страницата се
+      // презареждаше по средата на анализа.
+      ignored: ['**/worker/**', '**/.wrangler/**'],
+    },
+  },
   optimizeDeps: {
     include: [
       '@dnd-kit/core',

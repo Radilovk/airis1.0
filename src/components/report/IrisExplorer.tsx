@@ -5,10 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle,
-  Crosshair,
-  Eye,
-  Lightbulb,
-  MapTrifold,
   Sparkle,
   X,
 } from '@phosphor-icons/react'
@@ -16,7 +12,7 @@ import { fitImageInSquare } from '@/lib/image-utils'
 import { cellCenterInView, findingOverlayPath, ringTopCenterInView } from '@/lib/iris-coords'
 import { isCircumferentialFinding, sectorsFor, RING_BANDS } from '@/lib/iris-map'
 import { groupFindingsForDisplay, isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
-import { readFinding, type SignalStrength } from '@/lib/iris-reading'
+import { readFinding, rankKeySigns, isConfirmedFinding, type SignalStrength } from '@/lib/iris-reading'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
 
 const VIEW = 360
@@ -255,7 +251,7 @@ function FindingDetail({
         </span>
         <div className="min-w-0 flex-1">
           <h4 className="text-lg font-bold leading-tight">{r.title}</h4>
-          <p className="mt-0.5 text-xs text-muted-foreground">{r.where}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{f.side === 'left' ? 'Ляво око' : 'Дясно око'}</p>
         </div>
         <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted" aria-label="Затвори">
           <X size={16} />
@@ -272,37 +268,18 @@ function FindingDetail({
       </div>
 
       <dl className="mt-4 space-y-3 text-sm">
-        {r.zone && (
+        {r.gloss && (
           <div>
-            <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Зона</dt>
-            <dd className="mt-0.5 font-medium">{r.zone}</dd>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Какво е</dt>
+            <dd className="mt-0.5 leading-relaxed">{r.gloss}</dd>
           </div>
         )}
         <div>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Какво означава</dt>
-          <dd className="mt-0.5 leading-relaxed">
-            {r.meaning.charAt(0).toUpperCase() + r.meaning.slice(1)}. {r.bandMeaning}
-          </dd>
-        </div>
-        <div className="rounded-xl bg-primary/5 p-3 ring-1 ring-primary/15">
-          <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-            <Lightbulb size={13} weight="fill" /> Какво да направите
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Към какво сочи{r.area ? ` · ${r.area}` : ''}
           </dt>
-          <dd className="mt-1 leading-relaxed">{r.support}</dd>
+          <dd className="mt-0.5 leading-relaxed">{r.meaning}</dd>
         </div>
-        {r.ophthalmicNote && (
-          <div className="rounded-xl bg-sky-50 p-3 text-sky-950 ring-1 ring-sky-200">
-            <dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-              <Eye size={13} weight="fill" /> Погледът на офталмолога
-            </dt>
-            <dd className="mt-1 leading-relaxed">{r.ophthalmicNote}</dd>
-          </div>
-        )}
-        {r.mapReference && (
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            По иридологичната карта зоната съответства на: {r.mapReference}. Това е справка от картата, не оценка на органа.
-          </p>
-        )}
       </dl>
 
       <div className="mt-auto flex items-center justify-between pt-4">
@@ -320,50 +297,88 @@ function FindingDetail({
   )
 }
 
-function FindingList({ findings, onSelect, side, reviewed }: { findings: Finding[]; onSelect: (i: number) => void; side: Side; reviewed: number }) {
+function FindingList({
+  findings,
+  keyCount,
+  moreCount,
+  showMore,
+  onToggleMore,
+  onSelect,
+  side,
+  reviewed,
+}: {
+  findings: Finding[]
+  keyCount: number
+  moreCount: number
+  showMore: boolean
+  onToggleMore: () => void
+  onSelect: (i: number) => void
+  side: Side
+  reviewed: number
+}) {
   if (findings.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
         <Sparkle size={32} weight="duotone" className="text-emerald-500" />
-        <p className="font-semibold">Чист ирис в това око</p>
+        <p className="font-semibold">Без ясни знаци в това око</p>
         <p className="max-w-xs text-sm text-muted-foreground">
           {reviewed > 0
             ? `Прегледани са ${reviewed} точки — нито една не е достатъчно ясна, за да промени плана.`
-            : 'Няма открити ирисови акценти за това око.'}
+            : 'Планът за това око се опира на вашите отговори.'}
         </p>
       </div>
     )
   }
+  const row = (f: Finding, i: number) => {
+    const r = readFinding(f)
+    const s = STRENGTH_STYLE[r.strength]
+    const confirmed = isConfirmedFinding(f)
+    return (
+      <motion.li key={`${side}-${f.type}-${f.sector}-${f.ring}-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 6) * 0.04 }}>
+        <button
+          type="button"
+          onClick={() => onSelect(i)}
+          className="group flex min-h-14 w-full items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2.5 text-left ring-1 ring-transparent transition hover:bg-background hover:shadow-md hover:ring-primary/20 active:scale-[0.99]"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white" style={{ background: s.dot }}>
+            {i + 1}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{r.title}</span>
+            <span className="block truncate text-[12px] text-muted-foreground">
+              {r.area ?? r.zone}
+              {f.bilateral ? ' · и в двете очи' : ''}
+            </span>
+          </span>
+          {confirmed && (
+            <CheckCircle size={18} weight="fill" className="shrink-0 text-emerald-600" aria-label="потвърден" />
+          )}
+          <ArrowRight size={14} className="shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+        </button>
+      </motion.li>
+    )
+  }
   return (
     <div>
-      <p className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Crosshair size={16} className="text-primary" />
-        Докоснете номер на снимката или знак от списъка.
+      <p className="mb-3 text-sm text-muted-foreground">
+        Най-важните знаци за храненето.{' '}
+        <CheckCircle size={13} weight="fill" className="inline align-[-2px] text-emerald-600" /> — потвърден при повторен прочит.
       </p>
-      <ul className="space-y-2">
-        {findings.map((f, i) => {
-          const r = readFinding(f)
-          const s = STRENGTH_STYLE[r.strength]
-          return (
-            <motion.li key={`${side}-${f.type}-${f.sector}-${f.ring}-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-              <button
-                type="button"
-                onClick={() => onSelect(i)}
-                className="group flex w-full items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2.5 text-left ring-1 ring-transparent transition hover:bg-background hover:shadow-md hover:ring-primary/20 active:scale-[0.99]"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white" style={{ background: s.dot }}>
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{r.title}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">{r.zone ?? r.where}</span>
-                </span>
-                <ArrowRight size={14} className="shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-              </button>
-            </motion.li>
-          )
-        })}
-      </ul>
+      <ul className="space-y-2">{findings.slice(0, keyCount).map(row)}</ul>
+      {moreCount > 0 && (
+        <>
+          {showMore && (
+            <ul className="mt-2 space-y-2 opacity-90">{findings.slice(keyCount).map((f, k) => row(f, keyCount + k))}</ul>
+          )}
+          <button
+            type="button"
+            onClick={onToggleMore}
+            className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            {showMore ? 'Само ключовите' : `Още ${moreCount} по-слаби ${moreCount === 1 ? 'знак' : 'знака'}`}
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -375,26 +390,31 @@ function FindingList({ findings, onSelect, side, reviewed }: { findings: Finding
 export default function IrisExplorer({ report }: { report: AnalysisReport }) {
   const cal = report.calibrated
   const perSide = useMemo(() => {
-    const out: Record<Side, { shown: Finding[]; reviewed: number }> = {
-      left: { shown: [], reviewed: 0 },
-      right: { shown: [], reviewed: 0 },
+    const out: Record<Side, { key: Finding[]; more: Finding[]; reviewed: number }> = {
+      left: { key: [], more: [], reviewed: 0 },
+      right: { key: [], more: [], reviewed: 0 },
     }
     for (const side of ['left', 'right'] as const) {
       const all = (cal?.findings ?? []).filter(f => f.side === side)
-      out[side] = { shown: groupFindingsForDisplay(all.filter(isPlanRelevantFinding)), reviewed: all.length }
+      // Само ясно видимите, подредени по сигурност и значение за храненето.
+      // До 5 са ключовите; останалите са свити отдолу.
+      const { key, more } = rankKeySigns(groupFindingsForDisplay(all.filter(isPlanRelevantFinding)))
+      out[side] = { key, more, reviewed: all.length }
     }
     return out
   }, [cal])
 
-  const firstSide: Side = perSide.right.shown.length >= perSide.left.shown.length ? 'right' : 'left'
+  const firstSide: Side = perSide.right.key.length >= perSide.left.key.length ? 'right' : 'left'
   const [side, setSide] = useState<Side>(firstSide)
   const [active, setActive] = useState<number | null>(null)
-  const [showZones, setShowZones] = useState(false)
-  const [showMarks, setShowMarks] = useState(true)
 
-  const list = perSide[side].shown
+  const [showMore, setShowMore] = useState(false)
+  const list = showMore ? [...perSide[side].key, ...perSide[side].more] : perSide[side].key
 
-  useEffect(() => setActive(null), [side])
+  useEffect(() => {
+    setActive(null)
+    setShowMore(false)
+  }, [side])
 
   useEffect(() => {
     if (active === null) return
@@ -415,8 +435,8 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
     <Card className="overflow-hidden p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gradient-to-r from-primary/5 via-transparent to-accent/5 px-5 py-4">
         <div>
-          <h3 className="text-lg font-bold">Вашите ириси отблизо</h3>
-          <p className="text-xs text-muted-foreground">Всеки номер е знак, който влиза в плана. Числата около ириса са часовете от картата.</p>
+          <h3 className="text-lg font-bold">Ирисов анализ</h3>
+          <p className="text-xs text-muted-foreground">Номерата отбелязват мястото на всеки знак в ириса.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-muted p-1" role="tablist" aria-label="Око">
@@ -432,7 +452,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                 {side === s && <motion.span layoutId="eye-pill" className="absolute inset-0 rounded-full bg-primary shadow" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
                 <span className="relative">
                   {s === 'left' ? 'Ляв' : 'Десен'}
-                  <span className="ml-1.5 text-[11px] opacity-80">{perSide[s].shown.length}</span>
+                  <span className="ml-1.5 text-[11px] opacity-80">{perSide[s].key.length}</span>
                 </span>
               </button>
             ))}
@@ -451,15 +471,11 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                 findings={list}
                 active={active}
                 onSelect={setActive}
-                showZones={showZones}
-                showMarks={showMarks}
+                showZones={false}
+                showMarks
               />
             </motion.div>
           </AnimatePresence>
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            <Toggle on={showMarks} onClick={() => setShowMarks(v => !v)} icon={<Crosshair size={14} />} label="Знаци" />
-            <Toggle on={showZones} onClick={() => setShowZones(v => !v)} icon={<MapTrifold size={14} />} label="Карта на зоните" />
-          </div>
           <div className="mt-3 flex justify-center gap-4 text-xs text-muted-foreground">
             {(['clear', 'moderate'] as const).map(k => (
               <span key={k} className="inline-flex items-center gap-1.5">
@@ -470,7 +486,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                     boxShadow: k === 'clear' ? `0 0 0 1.5px var(--background, #fff), 0 0 0 3px ${STRENGTH_STYLE[k].dot}` : undefined,
                   }}
                 />
-                {k === 'clear' ? 'ясен знак' : 'умерен знак'}
+                {k === 'clear' ? 'вижда се ясно' : 'вижда се слабо'}
               </span>
             ))}
           </div>
@@ -490,26 +506,24 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
               />
             ) : (
               <motion.div key={`l-${side}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <FindingList findings={list} onSelect={setActive} side={side} reviewed={perSide[side].reviewed} />
+                <FindingList
+                  findings={list}
+                  keyCount={perSide[side].key.length}
+                  moreCount={perSide[side].more.length}
+                  showMore={showMore}
+                  onToggleMore={() => {
+                    setShowMore(v => !v)
+                    setActive(null)
+                  }}
+                  onSelect={setActive}
+                  side={side}
+                  reviewed={perSide[side].reviewed}
+                />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
     </Card>
-  )
-}
-
-function Toggle({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${on ? 'bg-primary/10 text-primary ring-primary/30' : 'bg-background text-muted-foreground ring-border hover:text-foreground'}`}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }
