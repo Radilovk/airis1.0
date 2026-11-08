@@ -1,0 +1,12 @@
+# Прокси към Gemini за AIRIS. Ключът е таен, не е тук:
+#   npx wrangler secret put GEMINI_API_KEY --config worker/wrangler.toml
+# Публикуване:
+#   npx wrangler deploy --config worker/wrangler.toml
+name = "airis-ai"
+main = "airis-ai.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+# Допълнителни разрешени адреси на сайта (напр. собствен домейн), със запетая.
+ALLOWED_ORIGINS = ""

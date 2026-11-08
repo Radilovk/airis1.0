@@ -36,3 +36,7 @@ pids
 # Копия на тестови страници, създавани от npm run test:browser
 public/__truth.html
 public/__reliability.html
+
+# Cloudflare worker (wrangler) — локално състояние и тайни
+.wrangler
+.dev.vars

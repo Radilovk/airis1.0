@@ -15,10 +15,27 @@ import { rememberEntrySource } from '@/lib/nutriplan-handoff'
 import type { QuestionnaireData, IrisImage, AnalysisReport } from '@/types'
 
 // Lazy load heavy components
-const AnalysisScreen = lazy(() => import('@/components/screens/AnalysisScreen'))
-const ReportScreen = lazy(() => import('@/components/screens/ReportScreen'))
+// Анализът и докладът се теглят предварително (виж ефекта в App), докато човек
+// попълва въпросника и снима. Иначе модулът се искаше чак при „Започни анализ“ —
+// ако междувременно е излязла нова версия, файлът вече го няма, страницата се
+// презарежда и снимките се губят.
+const loadAnalysisScreen = () => import('@/components/screens/AnalysisScreen')
+const loadReportScreen = () => import('@/components/screens/ReportScreen')
+const AnalysisScreen = lazy(loadAnalysisScreen)
+const ReportScreen = lazy(loadReportScreen)
 const HistoryScreen = lazy(() => import('@/components/screens/HistoryScreen'))
 const AdminScreen = lazy(() => import('@/components/screens/AdminScreen'))
+const AdminPasswordDialog = lazy(() => import('@/components/admin/AdminPasswordDialog'))
+
+/** Настройките и диагностиката са за администратора — ПИН веднъж на сесия. */
+const ADMIN_SESSION_KEY = 'airis_admin_ok'
+function adminUnlocked(): boolean {
+  try {
+    return sessionStorage.getItem(ADMIN_SESSION_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 const AboutAirisScreen = lazy(() => import('@/components/screens/AboutAirisScreen'))
 const DiagnosticScreen = lazy(() => import('@/components/screens/DiagnosticScreen'))
 
@@ -64,6 +81,16 @@ const goHome = () => window.location.assign(import.meta.env.BASE_URL)
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(ENTRY.screen)
+  const [adminOk, setAdminOk] = useState(adminUnlocked)
+
+  useEffect(() => {
+    if (currentScreen !== 'questionnaire' && currentScreen !== 'upload') return
+    // Грешка тук не е фатална: ако предварителното теглене не успее, lazy()
+    // ще опита пак при показване на екрана.
+    loadAnalysisScreen().catch(() => {})
+    loadReportScreen().catch(() => {})
+  }, [currentScreen])
+  const isAdminScreen = currentScreen === 'settings' || currentScreen === 'diagnostics'
   const [questionnaireData, setQuestionnaireData] = useKVWithFallback<QuestionnaireData | null>('questionnaire-data', null)
   const leftIrisRef = useRef<IrisImage | null>(null)
   const rightIrisRef = useRef<IrisImage | null>(null)
@@ -487,7 +514,25 @@ function App() {
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" />
       {/* Бутонът за диагностика стои над съдържанието — показва се само в служебните екрани. */}
-      {(currentScreen === 'settings' || currentScreen === 'diagnostics') && <QuickDebugPanel />}
+      {isAdminScreen && !adminOk && (
+        <Suspense fallback={null}>
+          <AdminPasswordDialog
+            open
+            onOpenChange={open => {
+              if (!open) goHome()
+            }}
+            onSuccess={() => {
+              try {
+                sessionStorage.setItem(ADMIN_SESSION_KEY, '1')
+              } catch {
+                // без sessionStorage ПИН-ът се иска при всяко отваряне
+              }
+              setAdminOk(true)
+            }}
+          />
+        </Suspense>
+      )}
+      {isAdminScreen && adminOk && <QuickDebugPanel />}
       <AnimatePresence mode="wait">
         {currentScreen === 'questionnaire' && (
           <motion.div
@@ -563,7 +608,7 @@ function App() {
             </Suspense>
           </motion.div>
         )}
-        {currentScreen === 'settings' && (
+        {currentScreen === 'settings' && adminOk && (
           <motion.div
             key="settings"
             initial={{ opacity: 0 }}
@@ -589,7 +634,7 @@ function App() {
             </Suspense>
           </motion.div>
         )}
-        {currentScreen === 'diagnostics' && (
+        {currentScreen === 'diagnostics' && adminOk && (
           <motion.div
             key="diagnostics"
             initial={{ opacity: 0 }}

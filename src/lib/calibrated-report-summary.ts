@@ -147,8 +147,8 @@ export function getTopClientInsights(
   return out.slice(0, limit)
 }
 
-/** Над този резултат областта е в поддръжка — не се показва като приоритет. */
-export const FOCUS_MAX_SCORE = 75
+/** От 80 нагоре областта е „без съществени сигнали“ (същата граница като в описанието от `computeScores`). */
+export const FOCUS_MAX_SCORE = 80
 
 export function topPrioritySystems(data: CalibratedAnalysisPayload) {
   const ordered = data.focus

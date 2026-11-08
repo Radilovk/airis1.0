@@ -99,7 +99,8 @@ const SOURCE: Record<Driver['source'], { label: string; icon: typeof Eye; style:
 /** Степен вместо голо число — числото без контекст плаши повече, отколкото казва. */
 function level(score: number) {
   if (score < 60) return { label: 'започнете оттук', bar: 'from-amber-400 to-orange-500', text: 'text-amber-800' }
-  if (score < 72) return { label: 'заслужава внимание', bar: 'from-amber-300 to-amber-500', text: 'text-amber-700' }
+  // Същите граници като описанието на системата: под 80 има сигнали.
+  if (score < 80) return { label: 'заслужава внимание', bar: 'from-amber-300 to-amber-500', text: 'text-amber-700' }
   return { label: 'поддръжка', bar: 'from-emerald-400 to-teal-500', text: 'text-emerald-700' }
 }
 

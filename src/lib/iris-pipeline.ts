@@ -688,8 +688,19 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     if (!img.dataUrl) return null
     const sideName = side === 'left' ? 'ляв' : 'десен'
     try {
-      const response = await withLlmSlot(() => callLLM(buildEyeHealthPrompt(side), true, 1, img.dataUrl))
-      const screen = parseEyeHealthResponse(parseJsonResponse(response), side)
+      // ДВА независими прочита, както при ириса. Един прочит е непоследователен
+      // за граничните знаци (същата снимка, огледана: arcus 0.9 срещу 0.3), а
+      // грешно „покажете се на лекар“ плаши. Знак остава само ако е видян и в
+      // двата; увереността е по-ниската от двете. Ако единият прочит се провали,
+      // остава другият.
+      const read = () =>
+        withLlmSlot(() => callLLM(buildEyeHealthPrompt(side), true, 1, img.dataUrl)).then(r =>
+          parseEyeHealthResponse(parseJsonResponse(r), side)
+        )
+      const [a, b] = await Promise.allSettled([read(), read()])
+      const ok = [a, b].filter((r): r is PromiseFulfilledResult<PhotoScreen> => r.status === 'fulfilled').map(r => r.value)
+      if (ok.length === 0) throw (a as PromiseRejectedResult).reason
+      const screen = ok.length === 1 ? ok[0] : agreeEyeScreens(ok[0], ok[1])
       addLog(
         'info',
         `[Очно здраве ${sideName}] ${screen.signs.length ? screen.signs.map(s => s.key).join(', ') : 'без видими знаци'}`
@@ -700,6 +711,14 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       return null
     }
   }
+  const agreeEyeScreens = (x: PhotoScreen, y: PhotoScreen): PhotoScreen => ({
+    ...x,
+    visibleCount: Math.max(x.visibleCount, y.visibleCount),
+    signs: x.signs.flatMap(sx => {
+      const sy = y.signs.find(s => s.key === sx.key)
+      return sy ? [{ ...sx, confidence: Math.min(sx.confidence, sy.confidence) }] : []
+    }),
+  })
   const colorFor = (img: IrisImage, prep: EyePreparation) =>
     sampleIrisColor(img.dataUrl, img.geometry ?? prep.geometry).catch(() => null)
 

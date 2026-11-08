@@ -19,6 +19,7 @@ import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 import { RECOMMENDED_GEMINI_MODEL, geminiThinkingConfig, resolveGeminiModel } from '@/lib/ai-models'
+import { geminiEndpoint } from '@/lib/ai-proxy'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 /** Таван за една LLM заявка. Детекцията е ~10–20 s, планът — до минута. */
@@ -161,7 +162,7 @@ export default function AnalysisScreen({
     const maxTokens = modelStrategy?.maxTokens ?? 4000
     const topP = modelStrategy?.topP ?? 0.9
     
-    addLog('info', `🔑 Използване на собствен API: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
+    addLog('info', `🔑 ${apiKey?.trim() ? 'Собствен ключ' : 'AIRIS сървър'}: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
     
     if (provider === 'openai') {
       // Build content array - text + optional image
@@ -224,12 +225,11 @@ export default function AnalysisScreen({
       })
       
       const thinkingConfig = geminiThinkingConfig(model)
+      const endpoint = geminiEndpoint(model, apiKey)
       const send = (withThinking: boolean) =>
-        fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        fetch(endpoint.url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: endpoint.headers,
           // Увиснала заявка иначе държи слот и целия анализ без край.
           signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
           body: JSON.stringify({
@@ -294,17 +294,16 @@ export default function AnalysisScreen({
       topP: 0.9
     }
     
-    const provider = finalConfig.provider
-    const configuredModel = provider === 'gemini' ? resolveGeminiModel(finalConfig.model) : finalConfig.model
-    if (configuredModel !== finalConfig.model) {
-      addLog('info', `Моделът ${finalConfig.model} е остарял — използва се ${configuredModel}`)
+    const apiKey = (finalConfig.apiKey || '').trim()
+    // Без собствен ключ заявките минават през сървъра на AIRIS (`worker/`),
+    // който пази ключа и работи само с Gemini. Клиентът не настройва нищо.
+    const provider = apiKey ? finalConfig.provider : 'gemini'
+    const wantedModel = provider === finalConfig.provider ? finalConfig.model : undefined
+    const configuredModel = provider === 'gemini' ? resolveGeminiModel(wantedModel) : finalConfig.model
+    if (wantedModel && configuredModel !== wantedModel) {
+      addLog('info', `Моделът ${wantedModel} е остарял — използва се ${configuredModel}`)
     }
     const requestDelay = finalConfig.requestDelay ?? 2000
-    const apiKey = finalConfig.apiKey || ''
-    
-    if (!apiKey || apiKey.trim() === '') {
-      throw new Error('Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
-    }
     
     console.log(`🔍 [LLM CONFIG] Provider: "${provider}"`)
     console.log(`🔍 [LLM CONFIG] Model: "${configuredModel}"`)
@@ -649,42 +648,18 @@ ${response}
         
         console.log('⚙️ [ANALYSIS] Зареждане на AI конфигурация от KV storage...')
         
-        // Helper function to try loading config with retries
-        const loadConfigWithRetries = async (maxRetries: number = 5, delayMs: number = 500): Promise<AIModelConfig | null> => {
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            console.log(`🔄 [CONFIG] Опит ${attempt}/${maxRetries} за зареждане на конфигурация...`)
-            
-            // Try from KV storage (which now uses IndexedDB)
-            const storedConfig = await window.spark.kv.get<AIModelConfig>('ai-model-config')
-            if (storedConfig && storedConfig.apiKey && storedConfig.apiKey.trim() !== '') {
-              console.log(`✅ [CONFIG] Конфигурация заредена от KV storage (опит ${attempt})`)
-              return storedConfig
-            }
-            
-            // Try from hook state
-            if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
-              console.log(`✅ [CONFIG] Конфигурация заредена от hook (опит ${attempt})`)
-              return aiConfig
-            }
-            
-            if (attempt < maxRetries) {
-              console.log(`⏳ [CONFIG] Конфигурацията не е намерена, изчакване ${delayMs}ms...`)
-              await sleep(delayMs)
-              // Progressive backoff with 1.5x multiplier - gentler than 2x to avoid long waits
-              // for a config that might be ready soon, while still providing increasing delays
-              delayMs = Math.min(delayMs * 1.5, 2000)
-            }
+        // Настройките се четат веднъж. Ключ не е задължителен: без собствен ключ
+        // анализът минава през сървъра на AIRIS. (Преди тук имаше 5 опита с
+        // изчакване до ~3 s, които при липса на ключ завършваха с грешка.)
+        const finalConfig: AIModelConfig =
+          (await window.spark.kv.get<AIModelConfig>('ai-model-config')) ||
+          aiConfig || {
+            provider: 'gemini',
+            model: RECOMMENDED_GEMINI_MODEL,
+            apiKey: '',
+            useCustomKey: false,
           }
-          return null
-        }
-        
-        const finalConfig = await loadConfigWithRetries(5, 300)
-        
-        if (!finalConfig || !finalConfig.apiKey || finalConfig.apiKey.trim() === '') {
-          addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
-          throw new Error('Липсва API ключ за AI анализ')
-        }
-        
+
         const providerToUse = finalConfig.provider
         const modelToUse = finalConfig.model
         const apiKey = finalConfig.apiKey
@@ -1011,11 +986,8 @@ ${response}
       const requestCount = finalConfig.requestCount || 8
       const apiKey = finalConfig.apiKey || ''
       const usePipelineV9 = finalConfig.usePipelineV9 ?? true
-      
-      if (!apiKey || apiKey.trim() === '') {
-        addLog('error', 'Липсва API ключ. Моля, добавете валиден API ключ в Admin панела.')
-        throw new Error('Липсва API ключ за AI анализ')
-      }
+      // Ключ не е задължителен — без него заявките минават през сървъра на AIRIS.
+      addLog('info', apiKey.trim() ? '🔑 Собствен API ключ' : '🔑 AI през сървъра на AIRIS')
       
       const actualModel = configuredModel
       const actualProvider = provider
