@@ -383,8 +383,8 @@ export interface FindingDef {
   /** Иридологичното име (за модела и за справка). */
   label: string
   /**
-   * Име за клиента — описва какво се вижда и към какво сочи, без думи като
-   * „дефект“ или „деформиран“, които звучат като диагноза.
+   * Име за клиента — класическият иридологичен термин (лакуна, коларета,
+   * пигментно петно…), без „дефект“ или „деформиран“, които звучат като диагноза.
    */
   clientLabel: string
   /** Как изглежда в РАЗГЪНАТАТА лента — това го вижда моделът. */
@@ -413,7 +413,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   fiber_defect: {
     type: 'fiber_defect',
     label: 'Дефект във влакната',
-    clientLabel: 'Зона с по-рехава структура',
+    clientLabel: 'Лакуна',
     appearanceUnwrapped:
       'КОМПАКТНА тъмна зона с различим ръб, в която влакната липсват — овална, ' +
       'листовидна или ромбовидна са едно и също; НЕ е издължена вертикално',
@@ -425,7 +425,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   radial_furrow: {
     type: 'radial_furrow',
     label: 'Радиална бразда',
-    clientLabel: 'Радиална линия',
+    clientLabel: 'Радиална бразда',
     appearanceUnwrapped:
       'ВЕРТИКАЛНА тъмна ивица, по-дълга отколкото широка (в разгъвката радиалното ' +
       'е вертикално); за разлика от `fiber_defect` формата ѝ е ИЗДЪЛЖЕНА по височина',
@@ -437,7 +437,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   fiber_thinning: {
     type: 'fiber_thinning',
     label: 'Разреждане на влакната',
-    clientLabel: 'По-рехави влакна',
+    clientLabel: 'Разредени влакна',
     appearanceUnwrapped:
       'по-редки, размити или бледи влакна БЕЗ ясен ръб — преходът е плавен',
     meaning: 'по-нисък тъканен тонус в зоната',
@@ -448,7 +448,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   collarette_deform: {
     type: 'collarette_deform',
     label: 'Деформиран автономен пръстен',
-    clientLabel: 'Неравен храносмилателен пръстен',
+    clientLabel: 'Неравна коларета',
     appearanceUnwrapped:
       'границата около R2–R3 е вълнообразна, накъсана, изтеглена или неравномерно ' +
       'отдалечена от зеницата; определя се по МЯСТО, не по форма',
@@ -460,7 +460,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   transversal_fiber: {
     type: 'transversal_fiber',
     label: 'Напречно влакно',
-    clientLabel: 'Напречна линия',
+    clientLabel: 'Трансверзала',
     appearanceUnwrapped: 'ХОРИЗОНТАЛНА линия, пресичаща няколко сектора',
     meaning: 'преминала през зоната реакция',
     weight: 0.5,
@@ -471,7 +471,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   pigment_orange: {
     type: 'pigment_orange',
     label: 'Оранжево-ръждив пигмент',
-    clientLabel: 'Оранжев пигмент',
+    clientLabel: 'Оранжево пигментно петно',
     appearanceUnwrapped: 'ясно очертано оранжево или ръждиво петно върху влакната',
     // „панкреас+черен дроб; гликемичен риск НЕЗАВИСИМО ОТ ЛОКАЦИЯ"
     meaning: 'кръвно-захарна натовареност — тежи навсякъде, не само в панкреасната зона',
@@ -482,7 +482,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   pigment_brown: {
     type: 'pigment_brown',
     label: 'Кафяво-черен пигмент',
-    clientLabel: 'Кафяво петно',
+    clientLabel: 'Тъмно пигментно петно',
     appearanceUnwrapped: 'тъмнокафяво до почти черно петно с ясен ръб',
     meaning: 'чернодробно натоварване',
     weight: 0.8,
@@ -492,7 +492,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   pigment_yellow: {
     type: 'pigment_yellow',
     label: 'Жълт пигмент',
-    clientLabel: 'Жълтеникав пигмент',
+    clientLabel: 'Жълто пигментно петно',
     appearanceUnwrapped: 'жълтеникаво петно или воал върху влакната',
     meaning: 'бъбречно натоварване',
     weight: 0.7,
@@ -502,7 +502,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   pigment_diffuse: {
     type: 'pigment_diffuse',
     label: 'Дифузен пигмент',
-    clientLabel: 'Размит пигмент',
+    clientLabel: 'Дифузна пигментация',
     appearanceUnwrapped: 'размита цветна мъгла без ясен ръб над няколко минути',
     meaning: 'по-общо метаболитно натоварване',
     weight: 0.5,
@@ -512,7 +512,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   nerve_rings: {
     type: 'nerve_rings',
     label: 'Стресови пръстени',
-    clientLabel: 'Стресови пръстени',
+    clientLabel: 'Нервни пръстени',
     appearanceUnwrapped: 'ХОРИЗОНТАЛНИ дъги/ленти по цялата ширина или част от нея',
     meaning: 'натрупано нервно напрежение',
     weight: 0.7,
@@ -523,7 +523,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   lymphatic_rosary: {
     type: 'lymphatic_rosary',
     label: 'Лимфна броеница',
-    clientLabel: 'Лимфни точки по периферията',
+    clientLabel: 'Лимфна броеница',
     appearanceUnwrapped: 'верига от бледи топчета по ред R10',
     meaning: 'забавен лимфен дренаж',
     weight: 0.8,
@@ -534,7 +534,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   scurf_rim: {
     type: 'scurf_rim',
     label: 'Кожен ръб',
-    clientLabel: 'Тъмен външен ръб',
+    clientLabel: 'Кожен пръстен',
     appearanceUnwrapped: 'тъмна лента по най-долния ред R11',
     meaning: 'по-слабо кожно елиминиране',
     weight: 0.6,
@@ -545,7 +545,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   sodium_ring: {
     type: 'sodium_ring',
     label: 'Натриев/липиден ръб',
-    clientLabel: 'Светъл ръб по периферията',
+    clientLabel: 'Натриев пръстен',
     appearanceUnwrapped: 'бледа млечнобяла лента по долния ръб R10–R11',
     meaning: 'липиден и минерален обмен',
     weight: 0.7,
@@ -557,7 +557,7 @@ export const FINDINGS: Record<FindingType, FindingDef> = {
   pupil_flattening: {
     type: 'pupil_flattening',
     label: 'Сплеснат ръб на зеницата',
-    clientLabel: 'Неравен ръб на зеницата',
+    clientLabel: 'Сплескване на зеничния ръб',
     appearanceUnwrapped: 'горният ред R0 е видимо изтеглен/прав над няколко минути',
     meaning: 'вегетативна асиметрия в сектора',
     weight: 0.5,

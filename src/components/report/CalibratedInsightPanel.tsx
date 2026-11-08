@@ -53,7 +53,8 @@ function evidenceBySystem(data: CalibratedAnalysisPayload): Map<string, Evidence
     const id = `${sys}:${f.type}`
     if (seen.has(id)) continue
     seen.add(id)
-    const both = f.bilateral || key.some(o => o !== f && o.type === f.type && o.side !== f.side)
+    const both =
+      f.bilateral || key.some(o => o.side !== f.side && o.type === f.type && findingAreaKey(o) === sys)
     const list = out.get(sys) ?? []
     if (list.length < 2) {
       list.push({

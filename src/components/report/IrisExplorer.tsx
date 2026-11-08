@@ -268,6 +268,12 @@ function FindingDetail({
       </div>
 
       <dl className="mt-4 space-y-3 text-sm">
+        {r.gloss && (
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Какво е</dt>
+            <dd className="mt-0.5 leading-relaxed">{r.gloss}</dd>
+          </div>
+        )}
         <div>
           <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Към какво сочи{r.area ? ` · ${r.area}` : ''}
