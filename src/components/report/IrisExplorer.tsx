@@ -9,7 +9,7 @@ import {
   X,
 } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
-import { findingOverlayPath } from '@/lib/iris-coords'
+import { findingOverlayPath, irisPoint } from '@/lib/iris-coords'
 import { isCircumferentialFinding, sectorsFor, RING_BANDS } from '@/lib/iris-map'
 import { groupFindingsForDisplay, isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
 import { readFinding, rankKeySigns, isConfirmedFinding, type SignalStrength } from '@/lib/iris-reading'
@@ -33,8 +33,13 @@ function useOverlay(geometry?: IrisGeometrySnapshot) {
     return {
       cx: geometry.limbus.cx * fit.scale + fit.offsetX,
       cy: geometry.limbus.cy * fit.scale + fit.offsetY,
+      pcx: (geometry.pupil.cx ?? geometry.limbus.cx) * fit.scale + fit.offsetX,
+      pcy: (geometry.pupil.cy ?? geometry.limbus.cy) * fit.scale + fit.offsetY,
       pr: geometry.pupil.r * fit.scale,
       lr: geometry.limbus.r * fit.scale,
+      scale: fit.scale,
+      offsetX: fit.offsetX,
+      offsetY: fit.offsetY,
     }
   }, [geometry])
 }
@@ -54,7 +59,7 @@ function wedgePath(cx: number, cy: number, r0: number, r1: number, sector: numbe
   return `M${a.x},${a.y} A${r1},${r1} 0 0 1 ${b.x},${b.y} L${c.x},${c.y} A${r0},${r0} 0 0 0 ${d.x},${d.y} Z`
 }
 
-type Overlay = { cx: number; cy: number; pr: number; lr: number }
+type Overlay = NonNullable<ReturnType<typeof useOverlay>>
 
 interface Mark {
   index: number
@@ -103,10 +108,10 @@ function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Ov
       ring = f.ring + 0.5
       shape = 'region'
     }
-    const t = (minute / 60) * Math.PI * 2
-    const rad = ov.pr + span * (ring / 12)
-    const x = ov.cx + rad * Math.sin(t)
-    const y = ov.cy - rad * Math.cos(t)
+    // Същият модел като разгъвката и проверката по снимката (`irisPoint`).
+    const img = irisPoint(geometry, minute, ring)
+    const x = img.x * ov.scale + ov.offsetX
+    const y = img.y * ov.scale + ov.offsetY
     return {
       index,
       strength,
@@ -247,8 +252,8 @@ function EyeStage({
             </g>
           )}
 
-          <circle cx={ov.cx} cy={ov.cy} r={ov.lr} fill="none" stroke="rgba(251,191,36,0.75)" strokeWidth={1.4} strokeDasharray="5 4" className="pointer-events-none" />
-          <circle cx={ov.cx} cy={ov.cy} r={ov.pr} fill="none" stroke="rgba(56,189,248,0.85)" strokeWidth={1.4} className="pointer-events-none" />
+          <ellipse cx={ov.cx} cy={ov.cy} rx={ov.lr} ry={(geometry.limbus.ry ?? geometry.limbus.r) * ov.scale} fill="none" stroke="rgba(251,191,36,0.75)" strokeWidth={1.4} strokeDasharray="5 4" className="pointer-events-none" />
+          <circle cx={ov.pcx} cy={ov.pcy} r={ov.pr} fill="none" stroke="rgba(56,189,248,0.85)" strokeWidth={1.4} className="pointer-events-none" />
 
           {showMarks && (
             <defs>

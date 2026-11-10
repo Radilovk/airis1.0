@@ -73,13 +73,29 @@ export interface IrisGeometry {
   eyelids?: Eyelids
 }
 
-/** Зеницата и лимбусът споделят център — иначе мрежата в калибратора изглежда изместена. */
+/**
+ * Колко може да е отместена зеницата от центъра на ириса (дял от радиуса на
+ * лимбуса). Естествено зеницата е изместена към носа — измерено на реални
+ * снимки до ~7 %. По-голямо отместване почти сигурно е грешка в разпознаването.
+ */
+export const MAX_PUPIL_OFFSET = 0.12
+
+/**
+ * Привежда геометрията към единния модел: истинското отместване на зеницата
+ * се ПАЗИ (разгъвката и координатите работят по модела „гумен лист“), а
+ * неправдоподобно голямо се изравнява към центъра на лимбуса.
+ *
+ * Досега центровете се изравняваха винаги — зеницата на реална снимка се
+ * премести с 16 px и част от черната зеница влизаше в анализираната лента.
+ */
 export function concentricGeometry(geo: IrisGeometry): IrisGeometry {
   const { cx, cy } = geo.limbus
+  const dx = geo.pupil.cx - cx
+  const dy = geo.pupil.cy - cy
+  const keep = Number.isFinite(dx) && Number.isFinite(dy) && Math.hypot(dx, dy) <= geo.limbus.r * MAX_PUPIL_OFFSET
   return {
     ...geo,
-    pupil: { ...geo.pupil, cx, cy },
-    limbus: { ...geo.limbus, cx, cy },
+    pupil: { ...geo.pupil, cx: keep ? geo.pupil.cx : cx, cy: keep ? geo.pupil.cy : cy },
   }
 }
 

@@ -199,8 +199,9 @@ export default function IrisCalibrator({
     const d = Math.hypot(p.x - geo.limbus.cx, p.y - geo.limbus.cy)
     const tol = 22 / scale
     let handle: Exclude<Handle, null> | null = null
+    const dp = Math.hypot(p.x - geo.pupil.cx, p.y - geo.pupil.cy)
     if (Math.abs(d - geo.limbus.r) <= tol) handle = 'limbus'
-    else if (Math.abs(d - geo.pupil.r) <= Math.max(tol * 0.8, 6)) handle = 'pupil'
+    else if (Math.abs(dp - geo.pupil.r) <= Math.max(tol * 0.8, 6)) handle = 'pupil'
     else if (d <= geo.limbus.r * 1.05) handle = 'move'
     if (!handle) return
     e.preventDefault()
@@ -226,7 +227,8 @@ export default function IrisCalibrator({
         prev
           ? concentricGeometry({
               ...prev,
-              pupil: { ...prev.pupil, cx, cy },
+              // Зеницата се мести заедно с ириса и пази естественото си отместване.
+              pupil: { ...prev.pupil, cx: cx + (prev.pupil.cx - prev.limbus.cx), cy: cy + (prev.pupil.cy - prev.limbus.cy) },
               limbus: { ...prev.limbus, cx, cy },
               manual: true,
             })
@@ -240,10 +242,12 @@ export default function IrisCalibrator({
       const cy = prev.limbus.cy
       const r = Math.hypot(p.x - cx, p.y - cy)
       if (drag === 'pupil') {
-        const nr = Math.max(4, Math.min(prev.limbus.r * 0.7, r))
+        // Радиусът на зеницата се мери от нейния център.
+        const pr = Math.hypot(p.x - prev.pupil.cx, p.y - prev.pupil.cy)
+        const nr = Math.max(4, Math.min(prev.limbus.r * 0.7, pr))
         return concentricGeometry({
           ...prev,
-          pupil: { cx, cy, r: nr },
+          pupil: { ...prev.pupil, r: nr },
           manual: true,
           pupilConfidence: 1,
         })
@@ -301,7 +305,7 @@ export default function IrisCalibrator({
         const nr = Math.max(4, Math.min(prev.limbus.r * 0.7, prev.pupil.r + delta))
         return concentricGeometry({
           ...prev,
-          pupil: { cx, cy, r: nr },
+          pupil: { ...prev.pupil, r: nr },
           manual: true,
           pupilConfidence: 1,
         })
@@ -483,11 +487,14 @@ export default function IrisCalibrator({
 
                   {(() => {
                     const c = toView(geo.limbus.cx, geo.limbus.cy)
+                    // Зеницата се рисува в собствения си център — тя естествено е леко отместена.
+                    const pc = toView(geo.pupil.cx, geo.pupil.cy)
                     const pr = geo.pupil.r * scale
                     const lr = geo.limbus.r * scale
                     const rings = Array.from({ length: 11 }, (_, i) => {
                       const t = (i + 1) / 12
-                      return { cx: c.x, cy: c.y, r: pr + (lr - pr) * t }
+                      // Гумен лист: центърът се плъзга от зеницата към лимбуса.
+                      return { cx: pc.x + (c.x - pc.x) * t, cy: pc.y + (c.y - pc.y) * t, r: pr + (lr - pr) * t }
                     })
                     return (
                       <>
@@ -513,8 +520,8 @@ export default function IrisCalibrator({
                           return (
                             <line
                               key={`s${i}`}
-                              x1={c.x + pr * sin}
-                              y1={c.y - pr * cos}
+                              x1={pc.x + pr * sin}
+                              y1={pc.y - pr * cos}
                               x2={c.x + lr * sin}
                               y2={c.y - lr * cos}
                               stroke="rgba(125,211,252,0.28)"
@@ -547,13 +554,13 @@ export default function IrisCalibrator({
                         })}
 
                         {/* зеница — синя */}
-                        <circle cx={c.x} cy={c.y} r={pr * 1.35} fill="url(#pupilGlow)" opacity={0.5} />
-                        <circle cx={c.x} cy={c.y} r={pr} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth={5} />
-                        <circle cx={c.x} cy={c.y} r={pr} fill="none" stroke="#38bdf8" strokeWidth={drag === 'pupil' ? 3.5 : 2.5} />
+                        <circle cx={pc.x} cy={pc.y} r={pr * 1.35} fill="url(#pupilGlow)" opacity={0.5} />
+                        <circle cx={pc.x} cy={pc.y} r={pr} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth={5} />
+                        <circle cx={pc.x} cy={pc.y} r={pr} fill="none" stroke="#38bdf8" strokeWidth={drag === 'pupil' ? 3.5 : 2.5} />
                         {[45, 225].map(deg => {
                           const a = (deg * Math.PI) / 180
                           return (
-                            <circle key={`ph${deg}`} cx={c.x + pr * Math.sin(a)} cy={c.y - pr * Math.cos(a)} r={drag === 'pupil' ? 8 : 6} fill="#38bdf8" stroke="#0f172a" strokeWidth={2} />
+                            <circle key={`ph${deg}`} cx={pc.x + pr * Math.sin(a)} cy={pc.y - pr * Math.cos(a)} r={drag === 'pupil' ? 8 : 6} fill="#38bdf8" stroke="#0f172a" strokeWidth={2} />
                           )
                         })}
 
@@ -580,6 +587,7 @@ export default function IrisCalibrator({
               {drag && pointer && geo && natural.w > 0 && (() => {
                 const z = 60
                 const c = toView(geo.limbus.cx, geo.limbus.cy)
+                const pc = toView(geo.pupil.cx, geo.pupil.cy)
                 const pr = geo.pupil.r * scale
                 const lr = geo.limbus.r * scale
                 const left = pointer.x < VIEW / 2
@@ -590,7 +598,7 @@ export default function IrisCalibrator({
                     <svg viewBox={`${pointer.x - z / 2} ${pointer.y - z / 2} ${z} ${z}`} className="h-full w-full bg-black">
                       <image href={imageDataUrl} x={offset.x} y={offset.y} width={natural.w * scale} height={natural.h * scale} />
                       <circle cx={c.x} cy={c.y} r={lr} fill="none" stroke="#fbbf24" strokeWidth={0.6} />
-                      <circle cx={c.x} cy={c.y} r={pr} fill="none" stroke="#38bdf8" strokeWidth={0.6} />
+                      <circle cx={pc.x} cy={pc.y} r={pr} fill="none" stroke="#38bdf8" strokeWidth={0.6} />
                       <circle cx={pointer.x} cy={pointer.y} r={0.9} fill="#fff" />
                     </svg>
                   </div>

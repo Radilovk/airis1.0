@@ -28,6 +28,7 @@
 
 import { isCircumferentialFinding, type FindingType } from './iris-map'
 import { rgbToLab } from './eye-health'
+import { irisPoint } from './iris-coords'
 
 export type PhotoCheck = 'seen' | 'not_seen' | 'unchecked'
 
@@ -38,8 +39,8 @@ export interface VerifiableFinding {
 }
 
 export interface VerifyGeometry {
-  pupil: { r: number }
-  limbus: { cx: number; cy: number; r: number }
+  pupil: { r: number; cx?: number; cy?: number }
+  limbus: { cx: number; cy: number; r: number; ry?: number }
   imageWidth?: number
   imageHeight?: number
 }
@@ -120,11 +121,24 @@ function mad(xs: number[], med: number): number {
 
 /** Средният Lab цвят на всяка клетка (пръстен × клетка по обиколката). */
 export function patchGrid(px: PixelSource, geo: VerifyGeometry, scale = 1): PatchStat[][] {
-  const cx = geo.limbus.cx * scale
-  const cy = geo.limbus.cy * scale
-  const rp = geo.pupil.r * scale
-  const ri = geo.limbus.r * scale
-  const span = ri - rp
+  // Същият модел „гумен лист“ като разгъвката и картата (`irisPoint`): зеницата
+  // пази собствения си център, иначе клетките на проверката и стрелките на
+  // снимката биха сочели различни места.
+  const g = {
+    pupil: {
+      cx: (geo.pupil.cx ?? geo.limbus.cx) * scale,
+      cy: (geo.pupil.cy ?? geo.limbus.cy) * scale,
+      r: geo.pupil.r * scale,
+    },
+    limbus: {
+      cx: geo.limbus.cx * scale,
+      cy: geo.limbus.cy * scale,
+      r: geo.limbus.r * scale,
+      ...(geo.limbus.ry !== undefined ? { ry: geo.limbus.ry * scale } : {}),
+    },
+  }
+  const rp = g.pupil.r
+  const span = g.limbus.r - rp
   const grid: PatchStat[][] = []
   for (let ring = 0; ring < ROWS; ring++) {
     const row: PatchStat[] = []
@@ -142,13 +156,11 @@ export function patchGrid(px: PixelSource, geo: VerifyGeometry, scale = 1): Patc
       let total = 0
       for (let j = 0; j < perPatchAng; j++) {
         const minute = ((p + (j + 0.5) / perPatchAng) / PATCHES) * 60
-        const t = (minute / 60) * Math.PI * 2
-        const sin = Math.sin(t)
-        const cos = Math.cos(t)
         for (let k = 0; k < radial; k++) {
-          const r = r0 + ((k + 0.5) / radial) * (r1 - r0)
-          const x = Math.round(cx + r * sin)
-          const y = Math.round(cy - r * cos)
+          const ringPos = ((ring + (k + 0.5) / radial) / ROWS) * RINGS
+          const pt = irisPoint(g, minute, ringPos)
+          const x = Math.round(pt.x)
+          const y = Math.round(pt.y)
           total++
           if (x < 0 || y < 0 || x >= px.width || y >= px.height) continue
           const i = (y * px.width + x) * 4

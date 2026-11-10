@@ -424,6 +424,34 @@ function findPupilAround(p: Plane, cx: number, cy: number, rMin: number, rMax: n
     const fit = ransacCircle(edges, { rMin, rMax, tol: 0.04, maxShift, seedX: cx, seedY: cy, iterations: 700 })
     if (fit && (!best || fit.support > best.support)) best = fit
   }
+  if (!best) return null
+  // Около зеницата често има по-тъмен (кафяв) пупиларен пръстен. По яркост
+  // ръбът „пръстен → ирис“ е по-силен от „зеница → пръстен“ и окръжността
+  // хващаше пръстена — зеницата излизаше с ~20 % по-голяма. Ако вътре има
+  // по-малка концентрична окръжност, а между двете е по-светло от вътре,
+  // истинската зеница е вътрешната.
+  for (let guard = 0; guard < 2; guard++) {
+    const cur: FitCircle = best
+    let inner: FitCircle | null = null
+    for (const ch of [p.red, p.lum]) {
+      const edges = rayEdges(p, ch, cur.cx, cur.cy, cur.r * 0.4, cur.r * 0.95, 2)
+      const f = ransacCircle(edges, {
+        rMin: Math.max(rMin * 0.6, cur.r * 0.45),
+        rMax: cur.r * 0.9,
+        tol: 0.04,
+        maxShift: cur.r * 0.15,
+        seedX: cur.cx,
+        seedY: cur.cy,
+        iterations: 500,
+      })
+      if (f && (!inner || f.support > inner.support)) inner = f
+    }
+    if (!inner || inner.support < Math.max(0.4, cur.support * 0.5)) break
+    const core = ringMean(p, p.lum, inner.cx, inner.cy, 0, inner.r * 0.8)
+    const band = ringMean(p, p.lum, inner.cx, inner.cy, inner.r * 1.08, Math.max(inner.r * 1.1, cur.r * 0.92))
+    if (Number.isNaN(core) || Number.isNaN(band) || band < core + 12) break
+    best = inner
+  }
   return best
 }
 
