@@ -198,6 +198,16 @@ function realDiagnoses(a: Answers): string[] {
   return list(a, 'diagnoses').filter(d => d !== NO_DIAGNOSIS && d !== 'other')
 }
 
+/** Има ли поне едно уместно състояние за този профил (иначе въпросът не съществува). */
+function statesRelevant(a: Answers, all?: QuestionConfig[]): boolean {
+  const ctx = buildQuestionnaireContext(a)
+  // Мъжете: от състоянията остава само „задържане на вода“ — то е в общите
+  // усещания („подути крака“), отделен въпрос с една опция няма смисъл.
+  if (ctx.gender === 'male') return false
+  const q = questionById('states', all)
+  return (q?.options ?? []).some(o => o.value !== NO_STATE && profileAllows(o.value, ctx))
+}
+
 function realStates(a: Answers): string[] {
   return list(a, 'states').filter(s => s !== NO_STATE)
 }
@@ -231,17 +241,47 @@ export function shouldAskSleepQuality(a: Answers): boolean {
 
 /* ── опции: филтър и подредба ────────────────────────────────────────────── */
 
+/**
+ * Дали опцията е уместна за този профил. Правилото: показваме само това, което
+ * реално се среща при този пол, възраст и тегло. Рядкото остава възможно през
+ * „Друго“ — но не заема място в списъка на всички.
+ */
 function profileAllows(value: string, ctx: QuestionnaireContext): boolean {
-  if (FEMALE_ONLY.has(value) && ctx.gender === 'male') return false
+  const male = ctx.gender === 'male'
+  if (FEMALE_ONLY.has(value) && male) return false
   const age = ctx.age
-  if (age !== undefined) {
-    if (value === MENOPAUSE && age < 35) return false
-    if (value === PREGNANCY && (age < 15 || age > 50)) return false
-    if (value === POSTPARTUM && (age < 15 || age > 52)) return false
-    if (value === PCOS && age > 55) return false
+  const bmi = ctx.bmi
+  const heavy = bmi !== undefined && bmi >= 27
+  if (age === undefined) return value === 'Затлъстяване' ? bmi === undefined || bmi >= 25 : true
+  switch (value) {
+    // ── състояния ──
+    case MENOPAUSE:
+      // Перименопаузата започва обичайно след 40.
+      return age >= 40
+    case PREGNANCY:
+      return age >= 16 && age <= 47
+    case POSTPARTUM:
+      return age >= 16 && age <= 48
+    case CELLULITE:
+      return age >= 16
+    // ── диагнози ──
+    case PCOS:
+      // След менопаузата ПКОС не определя храненето.
+      return age >= 14 && age <= 50
+    case 'Затлъстяване':
+      return bmi === undefined || bmi >= 25
+    case 'Диабет 2 тип':
+      return age >= 30 || heavy
+    case 'Хипертония':
+    case 'Висок холестерол':
+      return age >= 25 || heavy
+    case 'Сърдечно-съдово заболяване':
+      return age >= 35
+    case 'Мастен черен дроб':
+      return age >= 35 || (bmi !== undefined && bmi >= 25)
+    default:
+      return true
   }
-  if (value === 'Затлъстяване') return ctx.bmi === undefined || ctx.bmi >= 25
-  return true
 }
 
 function boost(value: string, ctx: QuestionnaireContext): number {
@@ -329,7 +369,7 @@ export function getFilteredOptions(question: QuestionConfig, answers: Answers, a
 
   if (question.id === 'goals') {
     return question.options.filter(o => {
-      if (o.value === 'Отслабване') return ctx.bmi === undefined || ctx.bmi >= 18.5
+      if (o.value === 'Отслабване') return ctx.bmi === undefined || ctx.bmi >= 20
       if (o.value === 'Наддаване на тегло') return ctx.bmi !== undefined && ctx.bmi < 22
       return true
     })
@@ -395,7 +435,7 @@ function baseVisible(question: QuestionConfig, a: Answers): boolean {
     return groupActive(group, a)
   }
 
-  if (id === 'states') return true
+  if (id === 'states') return statesRelevant(a)
   const states = realStates(a)
   switch (id) {
     case 'postpartumStage':
@@ -408,7 +448,7 @@ function baseVisible(question: QuestionConfig, a: Answers): boolean {
       return states.includes(WATER) || states.includes(CELLULITE)
   }
 
-  const afterStates = list(a, 'states').length > 0
+  const afterStates = !statesRelevant(a) || list(a, 'states').length > 0
   if (!afterStates) return false
   const hasDiagnosis = realDiagnoses(a).length > 0
 
@@ -491,7 +531,7 @@ export function sanitizeAnswers(answers: Answers, allQuestions?: QuestionConfig[
 
   const goals = list(next, 'goals')
   const goodGoals = goals.filter(g => {
-    if (g === 'Отслабване') return ctx.bmi === undefined || ctx.bmi >= 18.5
+    if (g === 'Отслабване') return ctx.bmi === undefined || ctx.bmi >= 20
     if (g === 'Наддаване на тегло') return ctx.bmi !== undefined && ctx.bmi < 22
     return true
   })
@@ -508,6 +548,9 @@ export function sanitizeAnswers(answers: Answers, allQuestions?: QuestionConfig[
     }
     if (vals.length !== (next[id] as string[]).length) next[id] = vals
   }
+
+  // Без уместни състояния (напр. мъж) въпросът не съществува — и отговорът му също.
+  if (!statesRelevant(next, allQuestions)) next.states = []
 
   const questions = allQuestions ?? defaultQuestions
   // Отговор на опция, която вече не се показва (питана е по-рано), отпада.
