@@ -1,22 +1,27 @@
-import type { QuestionConfig, QuestionnaireData, QuestionOption, UploadedDocument } from '@/types'
+import type {
+  DiagnosisDetail,
+  QuestionConfig,
+  QuestionnaireData,
+  QuestionOption,
+  StateDetails,
+  UploadedDocument,
+} from '@/types'
+import { defaultQuestions } from './defaultQuestions'
 
 /**
- * Адаптивен въпросник (v4).
+ * Адаптивен въпросник (v5). Строго разделени нива:
  *
- * Редът е: профил → цели → състояния → уточняващи въпроси по състоянията →
- * усещания (списъкът зависи от състоянията) → подробни усещания (само ако са
- * отключени) → начин на живот → хранене.
+ *   1. ДИАГНОЗИ — само заболявания, поставени от лекар (`diagnoses`).
+ *   2. УТОЧНЕНИЯ ПО ДИАГНОЗА — за всяка избрана диагноза: вид, оплаквания при
+ *      нея, лечение. Оплакванията се записват КЪМ диагнозата (`diagnosisDetails`).
+ *   3. СЪСТОЯНИЯ — не са заболявания, но променят нуждите (`states`):
+ *      менопауза, бременност, след раждане, задържане на вода, целулит.
+ *   4. ДРУГИ УСЕЩАНИЯ — само това, което още не е питано (`generalSymptoms`).
+ *      Две от тях отварят подробен въпрос (храносмилане, кръвообращение).
  *
- * Всеки въпрос се показва само когато предишните отговори го правят смислен:
- *  - уточнение за автоимунно — само ако е отбелязано автоимунно;
- *  - въпросите след раждане — само при „Възстановяване след раждане“;
- *  - въпросите за менопауза — само при „Менопауза“;
- *  - подробните храносмилателни въпроси — само при храносмилателно състояние
- *    или ако човекът отбележи дискомфорт след хранене;
- *  - въпросите за кръвообращението — само при сърдечно-съдово състояние,
- *    кръвна захар, задържане на вода, целулит или ако човекът ги отбележи.
- * Опциите на състоянията и усещанията се филтрират и пренареждат по пол,
- * възраст, тегло и по вече дадените отговори.
+ * Така моделът знае, че „зиморничавост“ при хипотиреоидизъм е проява на
+ * диагнозата, а не нов проблем; и че „задържане на вода“ е състояние, не болест.
+ * Усещане, вече питано в по-ранен въпрос, не се появява по-късно.
  */
 
 export type BmiCategory = 'underweight' | 'normal' | 'overweight' | 'obese'
@@ -31,88 +36,120 @@ export interface QuestionnaireContext {
   bmiCategory?: BmiCategory
 }
 
-export interface QuestionnaireFlowState extends QuestionnaireContext {
-  goals: string[]
-  healthStatus: string[]
-  dietGate?: GateAnswer
-  sleepHours?: number
-  activityLevel?: string
-  /** Има ли поне едно реално състояние (не „Нищо от изброените“). */
-  hasCondition: boolean
-  /** Автоматично разширяване — не показваме gate, директно хранителния блок. */
-  needsDietBlock: boolean
-  profileComplete: boolean
-}
+export const QUESTIONNAIRE_CONFIG_VERSION = '5.0'
 
-export const QUESTIONNAIRE_CONFIG_VERSION = '4.0'
+/* ── речник ──────────────────────────────────────────────────────────────── */
 
-/* ── стойности, от които зависи разклоняването ───────────────────────────── */
+export const NO_DIAGNOSIS = 'Нямам диагностицирано заболяване'
+export const NO_STATE = 'Нищо от тези'
+/** Стойности, които изключват всички останали в същия въпрос. */
+const EXCLUSIVE: Record<string, string> = { diagnoses: NO_DIAGNOSIS, states: NO_STATE }
 
-export const NONE_OF_THE_ABOVE = 'Нищо от изброените'
-const AUTOIMMUNE = 'Автоимунно заболяване'
-const POSTPARTUM = 'Възстановяване след раждане'
 const MENOPAUSE = 'Менопауза'
 const PREGNANCY = 'Бременност'
-const DIGESTIVE_CONDITION = 'Храносмилателни смущения'
+const POSTPARTUM = 'Възстановяване след раждане'
+const WATER = 'Задържане на вода'
+const CELLULITE = 'Целулит'
+const PCOS = 'Поликистозни яйчници (ПКОС)'
 const GATE_DIGESTIVE = 'Храносмилателен дискомфорт'
 const GATE_CIRCULATION = 'Студени крайници или подути крака'
 
-/** Състояния, при които въпросите за кръвообращението са по същество. */
-const CIRCULATION_CONDITIONS = [
-  'Хипертония',
-  'Висок холестерол',
-  'Сърдечно-съдово заболяване',
-  'Преддиабет или инсулинова резистентност',
-  'Диабет 2 тип',
-  'Задържане на вода',
-  'Целулит',
-]
+const FEMALE_ONLY = new Set([MENOPAUSE, PREGNANCY, POSTPARTUM, CELLULITE, PCOS])
 
-const FEMALE_ONLY_HEALTH = new Set([
-  MENOPAUSE,
-  PREGNANCY,
-  POSTPARTUM,
-  'Поликистозни яйчници (ПКОС)',
-  'Целулит',
-])
-
-/** Взаимно изключващи се здравни състояния. */
-export const HEALTH_MUTUAL_EXCLUSION: Record<string, string[]> = {
+/** Взаимно изключващи се състояния. */
+export const STATE_MUTUAL_EXCLUSION: Record<string, string[]> = {
   [PREGNANCY]: [POSTPARTUM, MENOPAUSE],
   [POSTPARTUM]: [PREGNANCY, MENOPAUSE],
   [MENOPAUSE]: [PREGNANCY, POSTPARTUM],
 }
 
-const SKIPPABLE_FIELDS = new Set([
-  'autoimmuneType',
-  'postpartumStage',
-  'breastfeeding',
+type Answers = Record<string, unknown>
+
+function list(answers: Answers, id: string): string[] {
+  const v = answers[id]
+  return Array.isArray(v) ? (v as string[]) : []
+}
+
+/* ── групи диагнози ──────────────────────────────────────────────────────── */
+
+export interface DiagnosisGroup {
+  key: string
+  label: string
+  diagnoses: string[]
+  subtypeQ?: string
+  symptomQ?: string
+  treatmentQ?: string
+  /** Допълнително включване от уточнение (напр. Хашимото → щитовидна жлеза). */
+  alsoWhen?: (a: Answers) => boolean
+}
+
+export const DIAGNOSIS_GROUPS: DiagnosisGroup[] = [
+  {
+    key: 'autoimmune',
+    label: 'Автоимунно заболяване',
+    diagnoses: ['Автоимунно заболяване'],
+    subtypeQ: 'dxAutoimmuneType',
+    symptomQ: 'dxAutoimmuneSymptoms',
+  },
+  {
+    key: 'thyroid',
+    label: 'Щитовидна жлеза',
+    diagnoses: ['Хипотиреоидизъм'],
+    symptomQ: 'dxThyroidSymptoms',
+    alsoWhen: a => list(a, 'dxAutoimmuneType').some(t => /хашимото/i.test(t)),
+  },
+  { key: 'weight', label: 'Затлъстяване', diagnoses: ['Затлъстяване'], symptomQ: 'dxWeightSymptoms' },
+  {
+    key: 'heart',
+    label: 'Сърце и кръвно налягане',
+    diagnoses: ['Хипертония', 'Сърдечно-съдово заболяване'],
+    symptomQ: 'dxHeartSymptoms',
+  },
+  { key: 'lipids', label: 'Холестерол', diagnoses: ['Висок холестерол'], treatmentQ: 'dxLipidTreatment' },
+  {
+    key: 'sugar',
+    label: 'Кръвна захар',
+    diagnoses: ['Преддиабет или инсулинова резистентност', 'Диабет 2 тип'],
+    symptomQ: 'dxSugarSymptoms',
+    treatmentQ: 'dxSugarTreatment',
+  },
+  {
+    key: 'digestive',
+    label: 'Храносмилане',
+    diagnoses: ['Храносмилателно заболяване'],
+    subtypeQ: 'dxDigestiveType',
+    symptomQ: 'dxDigestiveSymptoms',
+    alsoWhen: a => list(a, 'dxAutoimmuneType').some(t => /цьолиак|черват/i.test(t)),
+  },
+  { key: 'liver', label: 'Черен дроб', diagnoses: ['Мастен черен дроб'], symptomQ: 'dxLiverSymptoms' },
+  { key: 'pcos', label: 'ПКОС', diagnoses: [PCOS], symptomQ: 'dxPcosSymptoms' },
+]
+
+function groupSelected(g: DiagnosisGroup, a: Answers): boolean {
+  return list(a, 'diagnoses').some(d => g.diagnoses.includes(d))
+}
+
+function groupActive(g: DiagnosisGroup, a: Answers): boolean {
+  return groupSelected(g, a) || (g.alsoWhen?.(a) ?? false)
+}
+
+const GROUP_BY_QUESTION = new Map<string, DiagnosisGroup>()
+for (const g of DIAGNOSIS_GROUPS) {
+  for (const q of [g.subtypeQ, g.symptomQ, g.treatmentQ]) if (q) GROUP_BY_QUESTION.set(q, g)
+}
+
+/**
+ * Въпросите с усещания — в реда, в който се задават. По-късен въпрос не
+ * повтаря усещане, което вече е показано в по-ранен.
+ */
+const SYMPTOM_QUESTIONS = [
+  ...DIAGNOSIS_GROUPS.map(g => g.symptomQ).filter((x): x is string => !!x),
   'menopauseSymptoms',
+  'legsSymptoms',
   'symptoms',
   'digestiveSymptoms',
   'circulationSymptoms',
-  'complaints',
-  'medications',
-  'dietGate',
-  'dietaryProfile',
-  'dietaryHabits',
-  'foodRestrictions',
-  'sleepQuality',
-  'documents',
-])
-
-const ARRAY_FIELDS = new Set([
-  'healthStatus',
-  'autoimmuneType',
-  'menopauseSymptoms',
-  'symptoms',
-  'digestiveSymptoms',
-  'circulationSymptoms',
-  'dietaryProfile',
-  'dietaryHabits',
-])
-
-const RADIO_FIELDS = new Set(['postpartumStage', 'breastfeeding', 'dietGate', 'sleepQuality'])
+]
 
 /* ── контекст ────────────────────────────────────────────────────────────── */
 
@@ -130,7 +167,7 @@ export function bmiCategory(bmi: number | undefined): BmiCategory | undefined {
   return 'obese'
 }
 
-export function buildQuestionnaireContext(answers: Record<string, unknown>): QuestionnaireContext {
+export function buildQuestionnaireContext(answers: Answers): QuestionnaireContext {
   const gender = answers.gender as QuestionnaireContext['gender'] | undefined
   const age = Number(answers.age)
   const weight = Number(answers.weight)
@@ -146,39 +183,23 @@ export function buildQuestionnaireContext(answers: Record<string, unknown>): Que
   }
 }
 
-function isProfileComplete(answers: Record<string, unknown>): boolean {
-  const name = String(answers.name || '').trim()
-  const age = Number(answers.age)
-  const gender = answers.gender
-  const weight = Number(answers.weight)
-  const height = Number(answers.height)
+function isProfileComplete(a: Answers): boolean {
+  const ctx = buildQuestionnaireContext(a)
   return (
-    name.length >= 2 &&
-    Number.isFinite(age) &&
-    age > 0 &&
-    !!gender &&
-    Number.isFinite(weight) &&
-    weight > 0 &&
-    Number.isFinite(height) &&
-    height > 0
+    String(a.name || '').trim().length >= 2 &&
+    !!a.gender &&
+    (ctx.age ?? 0) > 0 &&
+    (ctx.weight ?? 0) > 0 &&
+    (ctx.height ?? 0) > 0
   )
 }
 
-function list(answers: Record<string, unknown>, id: string): string[] {
-  const v = answers[id]
-  return Array.isArray(v) ? (v as string[]) : []
+function realDiagnoses(a: Answers): string[] {
+  return list(a, 'diagnoses').filter(d => d !== NO_DIAGNOSIS && d !== 'other')
 }
 
-function hasGoals(answers: Record<string, unknown>): boolean {
-  return list(answers, 'goals').length > 0
-}
-
-function healthAnswered(answers: Record<string, unknown>): boolean {
-  return list(answers, 'healthStatus').length > 0
-}
-
-function realConditions(health: string[]): string[] {
-  return health.filter(h => h !== NONE_OF_THE_ABOVE && h !== 'other')
+function realStates(a: Answers): string[] {
+  return list(a, 'states').filter(s => s !== NO_STATE)
 }
 
 /** Профилът сам по себе си изисква хранителния блок (без gate). */
@@ -186,100 +207,50 @@ export function needsHealthBlock(ctx: QuestionnaireContext, goals: string[]): bo
   if (ctx.bmi !== undefined && (ctx.bmi >= 27 || ctx.bmi < 18.5)) return true
   if (ctx.age !== undefined && ctx.age >= 50) return true
   if (ctx.gender === 'female' && ctx.age !== undefined && ctx.age >= 38) return true
-  if (goals.some(g => /отслаб|наддаван|здрав/i.test(g))) return true
-  return false
+  return goals.some(g => /отслаб|наддаван|здрав/i.test(g))
 }
 
-/** Хранителният блок е релевантен без gate. */
-export function needsDietBlock(
-  ctx: QuestionnaireContext,
-  goals: string[],
-  healthStatus: string[]
-): boolean {
+function needsDietBlock(a: Answers): boolean {
+  const ctx = buildQuestionnaireContext(a)
+  const goals = list(a, 'goals')
   if (needsHealthBlock(ctx, goals)) return true
-  if (realConditions(healthStatus).length > 0) return true
+  if (realDiagnoses(a).length > 0 || realStates(a).length > 0) return true
   if (goals.some(g => /отслаб|наддаван|енерг|мускул|сън/i.test(g))) return true
-  if (ctx.bmi !== undefined && (ctx.bmi >= 25 || ctx.bmi < 20)) return true
-  return false
+  return ctx.bmi !== undefined && (ctx.bmi >= 25 || ctx.bmi < 20)
 }
 
-export function buildFlowState(answers: Record<string, unknown>): QuestionnaireFlowState {
-  const ctx = buildQuestionnaireContext(answers)
-  const goals = list(answers, 'goals')
-  const healthStatus = list(answers, 'healthStatus')
-  const dietGate = answers.dietGate as GateAnswer | undefined
-  const sleepHours = Number(answers.sleepHours)
-  return {
-    ...ctx,
-    goals,
-    healthStatus,
-    dietGate,
-    sleepHours: Number.isFinite(sleepHours) ? sleepHours : undefined,
-    activityLevel: answers.activityLevel as string | undefined,
-    hasCondition: realConditions(healthStatus).length > 0,
-    needsDietBlock: needsDietBlock(ctx, goals, healthStatus),
-    profileComplete: isProfileComplete(answers),
-  }
-}
-
-function dietBlockOpen(state: QuestionnaireFlowState): boolean {
-  return state.needsDietBlock || state.dietGate === 'yes'
-}
-
-export function shouldAskSleepQuality(answers: Record<string, unknown>): boolean {
-  const hours = Number(answers.sleepHours)
-  const goals = list(answers, 'goals')
+export function shouldAskSleepQuality(a: Answers): boolean {
+  const hours = Number(a.sleepHours)
   if (!Number.isFinite(hours)) return false
   if (hours < 7) return true
-  if (list(answers, 'menopauseSymptoms').includes('Нарушен сън')) return true
-  if (list(answers, 'healthStatus').includes(POSTPARTUM)) return true
-  return goals.some(g => /сън/i.test(g))
-}
-
-/** Отключени ли са подробните храносмилателни въпроси. */
-export function asksDigestiveDetail(answers: Record<string, unknown>): boolean {
-  const health = list(answers, 'healthStatus')
-  if (health.includes(DIGESTIVE_CONDITION)) return true
-  if (list(answers, 'autoimmuneType').some(a => /цьолиак|черват/i.test(a))) return true
-  return list(answers, 'symptoms').includes(GATE_DIGESTIVE)
-}
-
-/** Отключени ли са въпросите за кръвообращението. */
-export function asksCirculationDetail(answers: Record<string, unknown>): boolean {
-  const health = list(answers, 'healthStatus')
-  if (health.some(h => CIRCULATION_CONDITIONS.includes(h))) return true
-  return list(answers, 'symptoms').includes(GATE_CIRCULATION)
+  if ([...list(a, 'menopauseSymptoms'), ...list(a, 'symptoms')].includes('Нарушен сън')) return true
+  if (list(a, 'dxWeightSymptoms').includes('Хъркане или накъсан сън')) return true
+  if (realStates(a).includes(POSTPARTUM)) return true
+  return list(a, 'goals').some(g => /сън/i.test(g))
 }
 
 /* ── опции: филтър и подредба ────────────────────────────────────────────── */
 
-function healthOptionVisible(value: string, ctx: QuestionnaireContext, health: string[]): boolean {
-  if (FEMALE_ONLY_HEALTH.has(value)) {
-    if (ctx.gender === 'male') return false
-    if (value === MENOPAUSE && ctx.age !== undefined && ctx.age < 35) return false
-    if (value === PREGNANCY && ctx.age !== undefined && (ctx.age < 15 || ctx.age > 50)) return false
-    if (value === POSTPARTUM && ctx.age !== undefined && (ctx.age < 15 || ctx.age > 52)) return false
-    if (value === 'Поликистозни яйчници (ПКОС)' && ctx.age !== undefined && ctx.age > 55) return false
-    const excluded = Object.entries(HEALTH_MUTUAL_EXCLUSION).some(
-      ([k, v]) => health.includes(k) && v.includes(value)
-    )
-    if (excluded) return false
+function profileAllows(value: string, ctx: QuestionnaireContext): boolean {
+  if (FEMALE_ONLY.has(value) && ctx.gender === 'male') return false
+  const age = ctx.age
+  if (age !== undefined) {
+    if (value === MENOPAUSE && age < 35) return false
+    if (value === PREGNANCY && (age < 15 || age > 50)) return false
+    if (value === POSTPARTUM && (age < 15 || age > 52)) return false
+    if (value === PCOS && age > 55) return false
   }
   if (value === 'Затлъстяване') return ctx.bmi === undefined || ctx.bmi >= 25
   return true
 }
 
-/**
- * Колко напред да се изтегли едно състояние за този профил. По-голямото
- * число — по-високо в списъка. Базовата подредба е тази в defaultQuestions.
- */
-function healthBoost(value: string, ctx: QuestionnaireContext): number {
+function boost(value: string, ctx: QuestionnaireContext): number {
   const bmi = ctx.bmi
   const age = ctx.age ?? 35
   const female = ctx.gender === 'female'
   switch (value) {
-    case AUTOIMMUNE:
-      // Автоимунните състояния са значително по-чести при жените.
+    case 'Автоимунно заболяване':
+      // Автоимунните заболявания са значително по-чести при жените.
       return female ? 4 : 0
     case 'Затлъстяване':
     case 'Преддиабет или инсулинова резистентност':
@@ -293,63 +264,66 @@ function healthBoost(value: string, ctx: QuestionnaireContext): number {
       return female && age >= 42 && age <= 60 ? 8 : 0
     case POSTPARTUM:
       return female && age >= 20 && age <= 42 ? 5 : 0
-    case 'Задържане на вода':
-    case 'Целулит':
-      return female ? 2 : 0
     default:
       return 0
   }
 }
 
-/** Усещания, които вече са казани чрез състоянието — не питаме повторно. */
-function symptomOptionVisible(value: string, answers: Record<string, unknown>, ctx: QuestionnaireContext): boolean {
-  const health = list(answers, 'healthStatus')
-  const goals = list(answers, 'goals')
-  if (value === GATE_DIGESTIVE) return !health.includes(DIGESTIVE_CONDITION)
-  if (value === GATE_CIRCULATION) return !health.some(h => CIRCULATION_CONDITIONS.includes(h))
-  if (value === 'Трудно отслабване') {
-    return (ctx.bmi !== undefined && ctx.bmi >= 23) || goals.some(g => /отслаб/i.test(g)) || health.includes('Затлъстяване')
-  }
-  if (value === 'Зиморничавост') return !health.includes('Хипотиреоидизъм')
-  if (value === 'Ставни болки или скованост') {
-    return !list(answers, 'autoimmuneType').includes('Ревматоиден артрит')
-  }
-  return true
-}
-
-function symptomBoost(value: string, answers: Record<string, unknown>): number {
-  const health = list(answers, 'healthStatus')
-  const goals = list(answers, 'goals')
-  const metabolic = health.some(h => /диабет|инсулин|затлъст|мастен/i.test(h))
-  switch (value) {
-    case 'Силен апетит за сладко':
-    case 'Спад на енергия следобед':
-      return metabolic ? 4 : 0
-    case 'Трудно отслабване':
-      return goals.some(g => /отслаб/i.test(g)) || metabolic ? 3 : 0
-    case 'Трайна умора':
-      return health.some(h => /щитовид|хипотиреоид|автоимун|раждане/i.test(h)) ? 4 : 0
-    case 'Ставни болки или скованост':
-    case 'Кожни проблеми (акне, екзема, сухота)':
-      return health.includes(AUTOIMMUNE) ? 3 : 0
-    case GATE_DIGESTIVE:
-      return goals.some(g => /здрав|енерг/i.test(g)) ? 1 : 0
-    default:
-      return 0
-  }
-}
-
-function rankByBoost(options: QuestionOption[], boost: (v: string) => number): QuestionOption[] {
+function rank(options: QuestionOption[], score: (v: string) => number): QuestionOption[] {
   return options
-    .map((o, i) => ({ o, key: i - boost(o.value) * 1.5 }))
-    .sort((a, b) => a.key - b.key)
+    .map((o, i) => ({ o, key: i - score(o.value) * 1.5 }))
+    .sort((x, y) => x.key - y.key)
     .map(x => x.o)
 }
 
-export function getFilteredOptions(
-  question: QuestionConfig,
-  answers: Record<string, unknown>
-): QuestionOption[] {
+function questionById(id: string, all?: QuestionConfig[]): QuestionConfig | undefined {
+  return all?.find(q => q.id === id) ?? defaultQuestions.find(q => q.id === id)
+}
+
+/**
+ * Опциите на всички въпроси с усещания — изчислени наведнъж, в реда на
+ * задаване: всеки въпрос губи усещанията, вече показани в по-ранен видим
+ * въпрос. Кешира се по обекта с отговорите (React създава нов при промяна).
+ */
+const optionCache = new WeakMap<object, Map<string, QuestionOption[]>>()
+
+function symptomOptionMap(a: Answers, all?: QuestionConfig[]): Map<string, QuestionOption[]> {
+  const hit = optionCache.get(a)
+  if (hit) return hit
+  const ctx = buildQuestionnaireContext(a)
+  const out = new Map<string, QuestionOption[]>()
+  const asked = new Set<string>()
+  const digestive = DIAGNOSIS_GROUPS.find(g => g.key === 'digestive')!
+  const heart = DIAGNOSIS_GROUPS.find(g => g.key === 'heart')!
+  for (const id of SYMPTOM_QUESTIONS) {
+    const q = questionById(id, all)
+    if (!q) continue
+    let opts = (q.options ?? []).filter(o => !asked.has(o.value))
+    if (id === 'symptoms') {
+      opts = opts.filter(o => {
+        if (o.value === GATE_DIGESTIVE) return !groupActive(digestive, a)
+        if (o.value === GATE_CIRCULATION) {
+          return !groupActive(heart, a) && !(out.get('legsSymptoms')?.length && baseVisible(questionById('legsSymptoms', all)!, a))
+        }
+        if (o.value === 'Трудно отслабване') {
+          return (ctx.bmi !== undefined && ctx.bmi >= 23) || list(a, 'goals').some(g => /отслаб/i.test(g))
+        }
+        return true
+      })
+    }
+    out.set(id, opts)
+    if (baseVisible(q, a)) for (const o of opts) asked.add(o.value)
+  }
+  optionCache.set(a, out)
+  return out
+}
+
+/** Опциите на въпрос с усещания, без вече питаните. */
+function symptomOptions(q: QuestionConfig, a: Answers, all?: QuestionConfig[]): QuestionOption[] {
+  return symptomOptionMap(a, all).get(q.id) ?? q.options ?? []
+}
+
+export function getFilteredOptions(question: QuestionConfig, answers: Answers, all?: QuestionConfig[]): QuestionOption[] {
   if (!question.options) return []
   const ctx = buildQuestionnaireContext(answers)
 
@@ -361,32 +335,31 @@ export function getFilteredOptions(
     })
   }
 
-  if (question.id === 'healthStatus') {
-    const health = list(answers, 'healthStatus')
-    const visible = question.options.filter(o => healthOptionVisible(o.value, ctx, health))
-    const none = visible.filter(o => o.value === NONE_OF_THE_ABOVE)
-    const rest = visible.filter(o => o.value !== NONE_OF_THE_ABOVE)
-    // „Нищо от изброените“ остава винаги последно.
-    return [...rankByBoost(rest, v => healthBoost(v, ctx)), ...none]
+  if (question.id === 'diagnoses' || question.id === 'states') {
+    const chosen = realStates(answers)
+    const none = EXCLUSIVE[question.id]
+    const visible = question.options.filter(o => {
+      if (!profileAllows(o.value, ctx)) return false
+      if (question.id === 'states') {
+        const excluded = chosen.some(c => STATE_MUTUAL_EXCLUSION[c]?.includes(o.value))
+        if (excluded) return false
+      }
+      return true
+    })
+    // „Нямам …“ остава винаги последно.
+    return [
+      ...rank(visible.filter(o => o.value !== none), v => boost(v, ctx)),
+      ...visible.filter(o => o.value === none),
+    ]
   }
 
-  if (question.id === 'symptoms') {
-    const visible = question.options.filter(o => symptomOptionVisible(o.value, answers, ctx))
-    return rankByBoost(visible, v => symptomBoost(v, answers))
-  }
-
-  if (question.id === 'digestiveSymptoms') {
-    const health = list(answers, 'healthStatus').join(' ').toLowerCase()
-    // При рефлукс/гастрит киселините са първи; иначе — подуването.
-    return rankByBoost(question.options, v =>
-      /рефлукс|гастрит/.test(health) && /киселин/i.test(v) ? 3 : 0
-    )
-  }
-
-  if (question.id === 'circulationSymptoms') {
-    const health = list(answers, 'healthStatus')
-    const legs = health.includes('Задържане на вода') || health.includes('Целулит')
-    return rankByBoost(question.options, v => (legs && /крака|вени/i.test(v) ? 3 : 0))
+  if (SYMPTOM_QUESTIONS.includes(question.id)) {
+    const opts = symptomOptions(question, answers, all)
+    if (question.id === 'dxDigestiveSymptoms') {
+      const reflux = list(answers, 'dxDigestiveType').some(t => /рефлукс|гастрит|язва/i.test(t))
+      return rank(opts, v => (reflux && /киселин/i.test(v) ? 3 : 0))
+    }
+    return opts
   }
 
   return question.options
@@ -394,199 +367,188 @@ export function getFilteredOptions(
 
 /* ── видимост ────────────────────────────────────────────────────────────── */
 
-function matchesConditional(
-  cond: NonNullable<QuestionConfig['conditionalOn']>,
-  answers: Record<string, unknown>
-): boolean {
+function matchesConditional(cond: NonNullable<QuestionConfig['conditionalOn']>, answers: Answers): boolean {
   const val = answers[cond.questionId]
   if (Array.isArray(cond.value)) return cond.value.includes(val)
   return val === cond.value
 }
 
-/** Дали целият въпрос се показва при текущите отговори. */
-export function isQuestionVisible(
-  question: QuestionConfig,
-  answers: Record<string, unknown>
-): boolean {
-  if (question.conditionalOn && !matchesConditional(question.conditionalOn, answers)) {
-    return false
-  }
-
-  const state = buildFlowState(answers)
+/** Видимост без проверката „има ли останали опции“ (тя зависи от по-ранни въпроси). */
+function baseVisible(question: QuestionConfig, a: Answers): boolean {
+  if (question.conditionalOn && !matchesConditional(question.conditionalOn, a)) return false
   const id = question.id
-  const health = state.healthStatus
 
   if (['name', 'age', 'gender', 'weight', 'height'].includes(id)) return true
+  const profile = isProfileComplete(a)
+  if (id === 'goals') return profile
 
-  if (id === 'goals') return state.profileComplete
+  const afterGoals = profile && list(a, 'goals').length > 0
+  if (id === 'diagnoses') return afterGoals
+  const afterDiagnoses = afterGoals && list(a, 'diagnoses').length > 0
+  if (!afterDiagnoses) return false
 
-  const afterGoals = state.profileComplete && hasGoals(answers)
-  if (id === 'healthStatus') return afterGoals
+  const group = GROUP_BY_QUESTION.get(id)
+  if (group) {
+    // Видът на храносмилателното заболяване се пита само при избрана диагноза
+    // (при цьолиакия/Крон видът вече е известен).
+    if (id === group.subtypeQ) return groupSelected(group, a)
+    return groupActive(group, a)
+  }
 
-  const afterHealth = afterGoals && healthAnswered(answers)
-  if (!afterHealth) return false
+  if (id === 'states') return true
+  const states = realStates(a)
+  switch (id) {
+    case 'postpartumStage':
+      return states.includes(POSTPARTUM)
+    case 'breastfeeding':
+      return states.includes(POSTPARTUM) && a.postpartumStage !== undefined
+    case 'menopauseSymptoms':
+      return states.includes(MENOPAUSE)
+    case 'legsSymptoms':
+      return states.includes(WATER) || states.includes(CELLULITE)
+  }
+
+  const afterStates = list(a, 'states').length > 0
+  if (!afterStates) return false
+  const hasDiagnosis = realDiagnoses(a).length > 0
 
   switch (id) {
-    case 'autoimmuneType':
-      return health.includes(AUTOIMMUNE)
-    case 'postpartumStage':
-      return health.includes(POSTPARTUM)
-    case 'breastfeeding':
-      return health.includes(POSTPARTUM) && answers.postpartumStage !== undefined
-    case 'menopauseSymptoms':
-      return health.includes(MENOPAUSE)
     case 'symptoms':
-      return true
-    case 'digestiveSymptoms':
-      return asksDigestiveDetail(answers)
-    case 'circulationSymptoms':
-      return asksCirculationDetail(answers)
     case 'complaints':
-      return true
-    case 'medications':
-      // Без нито едно състояние и под 50 г. лекарствата рядко са релевантни —
-      // свободният текст „Нещо друго“ ги покрива.
-      return state.hasCondition || (state.age ?? 0) >= 50
     case 'activityLevel':
       return true
+    case 'digestiveSymptoms':
+      return list(a, 'symptoms').includes(GATE_DIGESTIVE)
+    case 'circulationSymptoms':
+      return list(a, 'symptoms').includes(GATE_CIRCULATION)
+    case 'medications':
+      // Без диагноза и под 50 г. лекарствата рядко са релевантни — свободният
+      // текст „Нещо друго“ ги покрива.
+      return hasDiagnosis || (buildQuestionnaireContext(a).age ?? 0) >= 50
     case 'stressLevel':
     case 'sleepHours':
-      return !!state.activityLevel
+      return !!a.activityLevel
     case 'sleepQuality':
-      return !!state.activityLevel && shouldAskSleepQuality(answers)
+      return !!a.activityLevel && shouldAskSleepQuality(a)
     case 'waterLitres':
-      if (!state.activityLevel) return false
-      if (shouldAskSleepQuality(answers)) return answers.sleepQuality !== undefined
-      return answers.sleepHours !== undefined
+      if (!a.activityLevel) return false
+      return shouldAskSleepQuality(a) ? a.sleepQuality !== undefined : a.sleepHours !== undefined
     case 'dietGate':
-      return answers.waterLitres !== undefined && !state.needsDietBlock
+      return a.waterLitres !== undefined && !needsDietBlock(a)
     case 'dietaryProfile':
     case 'dietaryHabits':
     case 'foodRestrictions':
-      if (answers.waterLitres === undefined) return false
-      return dietBlockOpen(state)
+      return a.waterLitres !== undefined && (needsDietBlock(a) || a.dietGate === 'yes')
     case 'documents':
-      return state.hasCondition && answers.waterLitres !== undefined
+      return hasDiagnosis && a.waterLitres !== undefined
     default:
       return true
   }
 }
 
-export function getVisibleQuestions(
-  questions: QuestionConfig[],
-  answers: Record<string, unknown>
-): QuestionConfig[] {
-  return questions.filter(q => isQuestionVisible(q, answers))
+/** Дали въпросът се показва при текущите отговори. */
+export function isQuestionVisible(question: QuestionConfig, answers: Answers, all?: QuestionConfig[]): boolean {
+  if (!baseVisible(question, answers)) return false
+  // Въпрос с усещания, чиито опции вече са питани, се пропуска.
+  if (SYMPTOM_QUESTIONS.includes(question.id)) return symptomOptions(question, answers, all).length > 0
+  return true
+}
+
+export function getVisibleQuestions(questions: QuestionConfig[], answers: Answers): QuestionConfig[] {
+  return questions.filter(q => isQuestionVisible(q, answers, questions))
 }
 
 export function getQuestionSectionLabel(questionId: string): string | undefined {
   if (['name', 'age', 'gender', 'weight', 'height'].includes(questionId)) return 'Профил'
   if (questionId === 'goals') return 'Цели'
-  if (
-    [
-      'healthStatus',
-      'autoimmuneType',
-      'postpartumStage',
-      'breastfeeding',
-      'menopauseSymptoms',
-      'complaints',
-      'medications',
-      'documents',
-    ].includes(questionId)
-  ) {
-    return 'Здраве'
+  if (questionId === 'diagnoses') return 'Диагнози'
+  const group = GROUP_BY_QUESTION.get(questionId)
+  if (group) return `Диагнози · ${group.label}`
+  if (['states', 'postpartumStage', 'breastfeeding', 'menopauseSymptoms', 'legsSymptoms'].includes(questionId)) {
+    return 'Състояния'
   }
   if (['symptoms', 'digestiveSymptoms', 'circulationSymptoms'].includes(questionId)) return 'Как се чувствате'
+  if (['complaints', 'medications', 'documents'].includes(questionId)) return 'Здраве'
   if (['activityLevel', 'stressLevel', 'sleepHours', 'sleepQuality', 'waterLitres'].includes(questionId)) {
     return 'Начин на живот'
   }
-  if (['dietGate', 'dietaryProfile', 'dietaryHabits', 'foodRestrictions'].includes(questionId)) {
-    return 'Хранене'
-  }
+  if (['dietGate', 'dietaryProfile', 'dietaryHabits', 'foodRestrictions'].includes(questionId)) return 'Хранене'
   return undefined
 }
 
 /* ── почистване ──────────────────────────────────────────────────────────── */
 
-function applyMutualExclusion(health: string[]): string[] {
-  let out = [...health]
-  for (const item of health) {
-    const exclude = HEALTH_MUTUAL_EXCLUSION[item]
-    if (exclude) out = out.filter(h => !exclude.includes(h) || h === item)
-  }
-  return out
-}
-
-function isKnownSymptom(value: string, allQuestions?: QuestionConfig[]): boolean {
-  const q = allQuestions?.find(x => x.id === 'symptoms')
-  return !!q?.options?.some(o => o.value === value)
-}
+/** Задължителните полета, които не се изчистват, когато са скрити. */
+const KEEP_WHEN_HIDDEN = new Set([
+  'name', 'age', 'gender', 'weight', 'height', 'goals', 'diagnoses', 'states',
+  'activityLevel', 'stressLevel', 'sleepHours', 'waterLitres',
+])
 
 /** Премахва невалидни избори и изчиства скрити полета. */
-export function sanitizeAnswers(
-  answers: Record<string, unknown>,
-  allQuestions?: QuestionConfig[]
-): Record<string, unknown> {
+export function sanitizeAnswers(answers: Answers, allQuestions?: QuestionConfig[]): Answers {
   const next = { ...answers }
   const ctx = buildQuestionnaireContext(next)
 
   const goals = list(next, 'goals')
-  const filteredGoals = goals.filter(g => {
+  const goodGoals = goals.filter(g => {
     if (g === 'Отслабване') return ctx.bmi === undefined || ctx.bmi >= 18.5
     if (g === 'Наддаване на тегло') return ctx.bmi !== undefined && ctx.bmi < 22
     return true
   })
-  if (filteredGoals.length !== goals.length) next.goals = filteredGoals
+  if (goodGoals.length !== goals.length) next.goals = goodGoals
 
-  if (Array.isArray(next.healthStatus)) {
-    let health = applyMutualExclusion(next.healthStatus as string[])
-    health = health.filter(h => {
-      if (!FEMALE_ONLY_HEALTH.has(h) && h !== 'Затлъстяване') return true
-      return healthOptionVisible(h, ctx, health.filter(x => x !== h))
-    })
-    if (JSON.stringify(health) !== JSON.stringify(next.healthStatus)) next.healthStatus = health
-  }
-
-  // Усещане, което вече е покрито от състояние, отпада (напр. „Зиморничавост“
-  // при отбелязана намалена функция на щитовидната жлеза). Свободен текст от
-  // „Друго“ остава.
-  if (Array.isArray(next.symptoms)) {
-    const symptoms = (next.symptoms as string[]).filter(
-      s => !isKnownSymptom(s, allQuestions) || symptomOptionVisible(s, next, ctx)
-    )
-    if (symptoms.length !== (next.symptoms as string[]).length) next.symptoms = symptoms
-  }
-
-  if (allQuestions) {
-    const visible = new Set(getVisibleQuestions(allQuestions, next).map(q => q.id))
-    for (const field of SKIPPABLE_FIELDS) {
-      if (visible.has(field)) continue
-      if (ARRAY_FIELDS.has(field)) next[field] = []
-      else if (RADIO_FIELDS.has(field)) delete next[field]
-      else next[field] = ''
+  for (const id of ['diagnoses', 'states']) {
+    if (!Array.isArray(next[id])) continue
+    let vals = (next[id] as string[]).filter(v => profileAllows(v, ctx))
+    if (id === 'states') {
+      for (const v of [...vals]) {
+        const excl = STATE_MUTUAL_EXCLUSION[v]
+        if (excl && vals.includes(v)) vals = vals.filter(x => x === v || !excl.includes(x))
+      }
     }
+    if (vals.length !== (next[id] as string[]).length) next[id] = vals
   }
 
+  const questions = allQuestions ?? defaultQuestions
+  // Отговор на опция, която вече не се показва (питана е по-рано), отпада.
+  for (const q of questions) {
+    if (!SYMPTOM_QUESTIONS.includes(q.id) || !Array.isArray(next[q.id])) continue
+    const allowed = new Set(symptomOptions(q, next, questions).map(o => o.value))
+    const known = new Set((q.options ?? []).map(o => o.value))
+    const vals = (next[q.id] as string[]).filter(v => !known.has(v) || allowed.has(v))
+    if (vals.length !== (next[q.id] as string[]).length) next[q.id] = vals
+  }
+
+  // `next` се променя на място — кешът на опциите за него вече е остарял.
+  optionCache.delete(next)
+  const visible = new Set(getVisibleQuestions(questions, next).map(q => q.id))
+  for (const q of questions) {
+    if (visible.has(q.id) || KEEP_WHEN_HIDDEN.has(q.id)) continue
+    if (q.type === 'checkbox') next[q.id] = []
+    else if (q.type === 'radio') delete next[q.id]
+    else if (q.type === 'text' || q.type === 'textarea') next[q.id] = ''
+  }
+  optionCache.delete(next)
   return next
 }
 
-/** При checkbox избор — прилага взаимно изключване. */
-export function applyCheckboxExclusion(
-  questionId: string,
-  current: string[],
-  value: string,
-  checked: boolean
-): string[] {
+/** При checkbox избор — прилага „нямам“ и взаимно изключване. */
+export function applyCheckboxExclusion(questionId: string, current: string[], value: string, checked: boolean): string[] {
   if (!checked) return current.filter(v => v !== value)
-  if (questionId === 'healthStatus') {
-    // „Нищо от изброените“ изключва всичко останало и обратно.
-    if (value === NONE_OF_THE_ABOVE) return [NONE_OF_THE_ABOVE]
-    let next = [...current.filter(v => v !== NONE_OF_THE_ABOVE), value]
-    const exclude = HEALTH_MUTUAL_EXCLUSION[value]
-    if (exclude) next = next.filter(v => v === value || !exclude.includes(v))
+  const none = EXCLUSIVE[questionId]
+  if (none) {
+    if (value === none) return [none]
+    let next = [...current.filter(v => v !== none), value]
+    const excl = questionId === 'states' ? STATE_MUTUAL_EXCLUSION[value] : undefined
+    if (excl) next = next.filter(v => v === value || !excl.includes(v))
     return next
   }
   return [...current, value]
+}
+
+/** Изключващата опция на въпроса („Нямам …“), ако има такава. */
+export function exclusiveOption(questionId: string): string | undefined {
+  return EXCLUSIVE[questionId]
 }
 
 /* ── единен payload ──────────────────────────────────────────────────────── */
@@ -595,46 +557,86 @@ function uniq(items: string[]): string[] {
   return Array.from(new Set(items.filter(Boolean)))
 }
 
-/** Единен payload за scoring, safety и AI промптове. */
+/**
+ * Единен payload. Пази структурата (диагноза → нейните оплаквания; състояние →
+ * неговите; други усещания) за модела, и плоските `healthStatus`/`symptoms`
+ * за оценките и защитните правила.
+ */
 export function normalizeQuestionnairePayload(
-  answers: Record<string, unknown>,
+  answers: Answers,
   uploadedFiles: UploadedDocument[] = [],
   allQuestions?: QuestionConfig[]
 ): QuestionnaireData {
   const clean = sanitizeAnswers(answers, allQuestions)
-  const complaintsText = String(clean.complaints || '').trim()
-  const legacyMedical = String(clean.medicalConditions || '').trim()
-  const mergedComplaints =
-    complaintsText && legacyMedical
-      ? `${complaintsText}\n${legacyMedical}`
-      : complaintsText || legacyMedical
-
+  const complaints = [String(clean.complaints || '').trim(), String(clean.medicalConditions || '').trim()]
+    .filter(Boolean)
+    .join('\n')
   const restrictions = String(clean.foodRestrictions || clean.foodIntolerances || '').trim()
   const sleepHours = Number(clean.sleepHours) || 7
-  const askSleepQuality = shouldAskSleepQuality(clean)
 
-  // Състоянията: основният избор + уточненията (вид автоимунно, кърмене).
-  // Така scoring, safety и промптовете виждат „Хашимото“ и „Кърмене“ директно.
-  const healthStatus = uniq([
-    ...realConditions(list(clean, 'healthStatus')),
-    ...list(clean, 'autoimmuneType'),
-    ...(clean.breastfeeding === 'yes' ? ['Кърмене'] : []),
-  ])
+  const diagnoses = realDiagnoses(clean)
+  const diagnosisDetails: DiagnosisDetail[] = DIAGNOSIS_GROUPS.filter(g => groupActive(g, clean)).map(g => {
+    const subtypes = g.subtypeQ ? list(clean, g.subtypeQ).filter(v => v !== 'other') : []
+    // Група, включена от уточнение (Хашимото → щитовидна), носи уточнението като диагноза.
+    const fromSubtype = groupSelected(g, clean)
+      ? []
+      : list(clean, 'dxAutoimmuneType').filter(t =>
+          g.key === 'thyroid' ? /хашимото/i.test(t) : /цьолиак|черват/i.test(t)
+        )
+    const treatment = g.treatmentQ ? (clean[g.treatmentQ] as string | undefined) : undefined
+    return {
+      key: g.key,
+      label: g.label,
+      diagnoses: uniq([...diagnoses.filter(d => g.diagnoses.includes(d)), ...fromSubtype]),
+      subtypes,
+      symptoms: g.symptomQ ? list(clean, g.symptomQ) : [],
+      ...(treatment ? { treatment } : {}),
+    }
+  })
+  // Диагноза, написана в „Друго“, няма група — остава като диагноза без уточнения.
+  const grouped = new Set(DIAGNOSIS_GROUPS.flatMap(g => g.diagnoses))
+  const otherDiagnoses = diagnoses.filter(d => !grouped.has(d))
 
-  // Усещанията: общият списък + подробните. Общият „вход“ (напр. „Дискомфорт
-  // след хранене“) отпада, когато подробностите са дадени — те го заместват.
+  const states = realStates(clean)
+  const stateDetails: StateDetails = {
+    ...(clean.postpartumStage ? { postpartumStage: String(clean.postpartumStage) } : {}),
+    ...(clean.breastfeeding ? { breastfeeding: clean.breastfeeding === 'yes' } : {}),
+    ...(list(clean, 'menopauseSymptoms').length ? { menopauseSymptoms: list(clean, 'menopauseSymptoms') } : {}),
+    ...(list(clean, 'legsSymptoms').length ? { legsSymptoms: list(clean, 'legsSymptoms') } : {}),
+  }
+
+  // Общите усещания: подробните заместват своя „вход“.
   const digestive = list(clean, 'digestiveSymptoms')
   const circulation = list(clean, 'circulationSymptoms')
-  const general = list(clean, 'symptoms').filter(
-    s =>
-      !(s === GATE_DIGESTIVE && digestive.length > 0) &&
-      !(s === GATE_CIRCULATION && circulation.length > 0)
-  )
-  const symptoms = uniq([...general, ...digestive, ...circulation, ...list(clean, 'menopauseSymptoms')])
+  const generalSymptoms = uniq([
+    ...list(clean, 'symptoms').filter(
+      s => !(s === GATE_DIGESTIVE && digestive.length) && !(s === GATE_CIRCULATION && circulation.length)
+    ),
+    ...digestive,
+    ...circulation,
+  ])
 
-  const postpartumNote = clean.postpartumStage ? `Време след раждането: ${clean.postpartumStage}` : ''
+  const symptoms = uniq([
+    ...diagnosisDetails.flatMap(d => d.symptoms),
+    ...(stateDetails.menopauseSymptoms ?? []),
+    ...(stateDetails.legsSymptoms ?? []),
+    ...generalSymptoms,
+  ])
 
-  // Водата е в литри; `hydration` пази еквивалента в чаши за стари потребители.
+  const healthStatus = uniq([
+    ...diagnoses,
+    ...diagnosisDetails.flatMap(d => [...d.diagnoses, ...d.subtypes]),
+    ...states,
+    ...(stateDetails.breastfeeding ? ['Кърмене'] : []),
+  ])
+
+  // Лечението влиза и в текста за лекарства — защитните правила го търсят там
+  // (напр. инсулин → без пропускане на хранене).
+  const treatmentNotes = diagnosisDetails
+    .filter(d => d.treatment && !/^(не|без лекарства)$/i.test(d.treatment))
+    .map(d => `${d.label}: ${d.treatment}`)
+  const medications = [String(clean.medications || '').trim(), ...treatmentNotes].filter(Boolean).join('\n')
+
   const rawLitres =
     clean.waterLitres !== undefined && clean.waterLitres !== ''
       ? Number(clean.waterLitres)
@@ -652,13 +654,18 @@ export function normalizeQuestionnairePayload(
     goals: list(clean, 'goals'),
     healthStatus,
     symptoms,
-    complaints: [mergedComplaints, postpartumNote].filter(Boolean).join('\n'),
-    medicalConditions: mergedComplaints,
+    diagnoses: uniq([...diagnoses.filter(d => grouped.has(d)), ...otherDiagnoses]),
+    diagnosisDetails,
+    states,
+    stateDetails,
+    generalSymptoms,
+    complaints,
+    medicalConditions: complaints,
     familyHistory: String(clean.familyHistory || '').trim(),
     activityLevel: (clean.activityLevel as QuestionnaireData['activityLevel']) || 'moderate',
     stressLevel: (clean.stressLevel as QuestionnaireData['stressLevel']) || 'moderate',
     sleepHours,
-    sleepQuality: askSleepQuality
+    sleepQuality: shouldAskSleepQuality(clean)
       ? ((clean.sleepQuality as QuestionnaireData['sleepQuality']) || 'fair')
       : sleepHours >= 7
         ? 'good'
@@ -669,12 +676,8 @@ export function normalizeQuestionnairePayload(
     dietaryHabits: list(clean, 'dietaryHabits'),
     foodIntolerances: restrictions,
     allergies: restrictions,
-    medications: String(clean.medications || '').trim(),
+    medications,
     uploadedDocuments: uploadedFiles,
-    customAnswers: {
-      ...clean,
-      dietGate: clean.dietGate,
-      flowVersion: QUESTIONNAIRE_CONFIG_VERSION,
-    },
+    customAnswers: { ...clean, flowVersion: QUESTIONNAIRE_CONFIG_VERSION },
   }
 }

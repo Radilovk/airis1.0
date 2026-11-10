@@ -32,7 +32,7 @@ import {
   applyCheckboxExclusion,
   getQuestionSectionLabel,
   QUESTIONNAIRE_CONFIG_VERSION,
-  NONE_OF_THE_ABOVE,
+  exclusiveOption,
 } from '@/lib/questionnaire-logic'
 
 interface QuestionnaireScreenProps {
@@ -94,8 +94,17 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
 
   const [answers, setAnswers] = useState<Record<string, any>>(() => {
     if (initialData) {
+      // Суровите отговори от същата версия на въпросника се възстановяват
+      // напълно (диагнози, уточнения, състояния). По-стари — само общите полета.
+      const raw = initialData.customAnswers
+      if (raw && raw.flowVersion === QUESTIONNAIRE_CONFIG_VERSION) {
+        return { ...raw, uploadedDocuments: initialData.uploadedDocuments || [] }
+      }
       return {
         ...initialData,
+        diagnoses: undefined,
+        healthStatus: undefined,
+        symptoms: undefined,
         customAnswers: initialData.customAnswers || {},
         uploadedDocuments: initialData.uploadedDocuments || []
       }
@@ -162,7 +171,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       const cleaned = sanitizeAnswers(prev, allQuestions)
       const changed =
         JSON.stringify(cleaned.goals) !== JSON.stringify(prev.goals) ||
-        JSON.stringify(cleaned.healthStatus) !== JSON.stringify(prev.healthStatus) ||
+        JSON.stringify(cleaned.diagnoses) !== JSON.stringify(prev.diagnoses) ||
+        JSON.stringify(cleaned.states) !== JSON.stringify(prev.states) ||
         JSON.stringify(cleaned.symptoms) !== JSON.stringify(prev.symptoms) ||
         cleaned.dietGate !== prev.dietGate ||
         cleaned.complaints !== prev.complaints ||
@@ -177,7 +187,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     answers.weight,
     answers.height,
     answers.goals,
-    answers.healthStatus,
+    answers.diagnoses,
+    answers.states,
     answers.dietGate,
   ])
 
@@ -311,8 +322,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     
     if (checked) {
       const next = applyCheckboxExclusion(questionId, current, value, true)
-      // „Нищо от изброените“ затваря и полето „Друго“.
-      if (questionId === 'healthStatus' && value === NONE_OF_THE_ABOVE) {
+      // „Нямам …“ затваря и полето „Друго“.
+      if (value === exclusiveOption(questionId)) {
         setShowOther({ ...showOther, [questionId]: false })
         setOtherValues({ ...otherValues, [questionId]: '' })
       }
@@ -432,7 +443,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     if (currentStep.length > 1) return renderBodyGroup()
     const question = currentQuestion
     const value = answers[question.id]
-    const options = getFilteredOptions(question, answers)
+    const options = getFilteredOptions(question, answers, allQuestions)
 
     switch (question.type) {
       case 'text':

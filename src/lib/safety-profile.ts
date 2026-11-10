@@ -38,6 +38,8 @@ export interface SafetyProfile {
   breastfeeding: boolean
   /** Под 18 г. */
   minor: boolean
+  /** Болка или стягане в гърдите при усилие — повод за лекар, не за хранителен план. */
+  exertionalChestPain?: boolean
   /** ИТМ < 18.5 */
   underweight: boolean
   /** Съобщено разстройство в храненето. */
@@ -139,6 +141,7 @@ export function buildSafetyProfile(q: QuestionnaireData): SafetyProfile {
     inList(q.healthStatus, 'кърмен', 'лактаци') || inText(['кърм', 'лактаци'], ...free)
 
   const minor = (q.age ?? 30) < 18
+  const exertionalChestPain = (q.symptoms ?? []).some(s => /стягане в гърдите/i.test(s))
 
   const eatingDisorder = inText(
     ['анорекси', 'булими', 'разстройство в храненето', 'хранително разстройство', 'преяждан'],
@@ -256,6 +259,7 @@ export function buildSafetyProfile(q: QuestionnaireData): SafetyProfile {
     pregnancy,
     breastfeeding,
     minor,
+    exertionalChestPain,
     underweight: bmi < 18.5,
     eatingDisorder,
     kidneyDisease,
@@ -327,6 +331,16 @@ export function safetyNotices(p: SafetyProfile): SafetyNotice[] {
         'Планът е в поддържащ режим: без ограничаване на калориите, без периоди на гладуване ' +
         'и без хранителни добавки по преценка. Нуждите в този период се определят от ' +
         'наблюдаващия лекар или акушерка — съгласувайте всяка промяна с тях.',
+    })
+  }
+
+  if (p.exertionalChestPain) {
+    out.push({
+      level: 'critical',
+      title: 'Болка в гърдите при усилие',
+      body:
+        'Това оплакване трябва да се прегледа от лекар, преди да променяте храненето и ' +
+        'натоварването. Ако болката е силна, продължителна или в покой — 112.',
     })
   }
 

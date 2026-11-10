@@ -75,6 +75,9 @@ export function buildNutriPlanHandoff(report: AnalysisReport) {
       medicalConditions: q.medicalConditions,
       complaints: [q.complaints, q.familyHistory ? `Фамилна обремененост: ${q.familyHistory}` : ''].filter(Boolean).join('. '),
       healthStatus: list(q.healthStatus, 10),
+      diagnoses: list(q.diagnoses, 10),
+      states: list(q.states, 6),
+      symptoms: list(q.symptoms, 20),
     },
     analysis: {
       constitution: constitutionLabel(c?.constitution),

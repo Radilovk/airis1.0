@@ -26,10 +26,47 @@ export interface QuestionnaireData {
   medications: string
   complaints: string
   healthStatus: string[]
-  /** Често усещани симптоми (чеклист). Липсва в стари отчети. */
+  /**
+   * ВСИЧКИ усещания в един списък — за оценките. Липсва в стари отчети.
+   * За модела се ползва структурата отдолу, която пази към какво се отнасят.
+   */
   symptoms?: string[]
+  /** Поставени от лекар диагнози (строг списък). Липсва в стари отчети. */
+  diagnoses?: string[]
+  /** Уточнения по диагноза: вид, оплаквания при нея, лечение. */
+  diagnosisDetails?: DiagnosisDetail[]
+  /** Състояния, които не са заболявания (менопауза, след раждане, задържане на вода…). */
+  states?: string[]
+  /** Уточнения по състоянията. */
+  stateDetails?: StateDetails
+  /** Усещания, които НЕ са свързани с посочена диагноза или състояние. */
+  generalSymptoms?: string[]
   uploadedDocuments?: UploadedDocument[]
   customAnswers?: Record<string, any>
+}
+
+export interface DiagnosisDetail {
+  /** Ключ на групата (`sugar`, `thyroid`…). */
+  key: string
+  /** Име на групата за човек и за модела. */
+  label: string
+  /** Избраните диагнози от тази група. */
+  diagnoses: string[]
+  /** Уточнен вид (напр. „Хашимото“, „Рефлукс или гастрит“). */
+  subtypes: string[]
+  /** Оплаквания, които човекът свързва с тази диагноза. */
+  symptoms: string[]
+  /** Лечение, ако е питано (кръвна захар, холестерол). */
+  treatment?: string
+}
+
+export interface StateDetails {
+  postpartumStage?: string
+  breastfeeding?: boolean
+  /** Оплаквания при менопауза. */
+  menopauseSymptoms?: string[]
+  /** Оплаквания при задържане на вода / целулит. */
+  legsSymptoms?: string[]
 }
 
 export interface UploadedDocument {
