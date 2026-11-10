@@ -43,6 +43,7 @@
  * За ЛЯВО око — 9:00 (мин 45). (Старият Python код ги разменяше.)
  */
 
+import { artifactAt, artifactMapFor, ARTIFACT_NONE } from './photo-artifacts'
 import type { IrisGeometry } from './iris-geometry'
 import { RING_BANDS, sectorsFor, type Side } from './iris-map'
 
@@ -433,6 +434,10 @@ export function unwrapIris(
 
   const src = loadSource(img)
   const pupilEdge = pupilEdgeByColumn(src, geo, PW, rotationTurns)
+  // Отражения, мигли и баланс на бялото — смятат се веднъж на снимка
+  // (`photo-artifacts.ts`); разгъвката минава 6 пъти върху същото око.
+  const artifacts = artifactMapFor(img, src.data, src.w, src.h, geo)
+  const [gainR, gainG, gainB] = artifacts.gains
 
   const px = new Float32Array(PW * PH * 3)
   const valid = new Uint8Array(PW * PH)
@@ -486,9 +491,15 @@ export function unwrapIris(
         (lidUpper !== null && y < lidUpper[0] * x * x + lidUpper[1] * x + lidUpper[2]) ||
         (lidLower !== null && y > lidLower[0] * x * x + lidLower[1] * x + lidLower[2])
 
+      // Баланс на бялото по склерата: цветът на пигмента не зависи от оттенъка на снимката.
+      sampleBuf[0] = Math.min(255, sampleBuf[0] * gainR)
+      sampleBuf[1] = Math.min(255, sampleBuf[1] * gainG)
+      sampleBuf[2] = Math.min(255, sampleBuf[2] * gainB)
       const l = luma(sampleBuf[0], sampleBuf[1], sampleBuf[2])
-      // мигли/дълбока сянка ИЛИ спекуларен отблясък → също нечетимо
-      const readable = !occluded && l > 20 && l < 249
+      // Отражение (с ореола) или мигла/сянка по картата на артефактите → нечетимо;
+      // плюс дълбока сянка и напълно избелено.
+      const artifact = artifactAt(artifacts, x, y) !== ARTIFACT_NONE
+      const readable = !occluded && !artifact && l > 20 && l < 249
       valid[i] = readable ? 1 : 0
       px[i * 3] = sampleBuf[0]
       px[i * 3 + 1] = sampleBuf[1]
