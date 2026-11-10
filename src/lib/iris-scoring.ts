@@ -19,6 +19,7 @@
  * решава кое е приоритет.
  */
 
+import { waterLitresOf, formatLitres } from './water'
 import {
   FINDINGS,
   zoneBoost,
@@ -74,7 +75,20 @@ export interface NormalizedFinding {
    * коларетата). Секторът му е само котва за показване, не посока към орган.
    */
   spread?: 'circumferential'
+  /**
+   * Проверка по пикселите на снимката (`finding-verify.ts`): има ли на това
+   * място измеримо отклонение от околната тъкан. 'not_seen' — моделът е
+   * посочил знак, който на снимката не се различава от съседните участъци.
+   */
+  photoCheck?: PhotoCheck
+  /**
+   * Точното място на измереното отклонение — минута (0–60 по часовника) и
+   * пръстен (0–12, дробно). По него се поставя стрелката на снимката.
+   */
+  anchor?: { minute: number; ring: number }
 }
+
+export type PhotoCheck = 'seen' | 'not_seen' | 'unchecked'
 
 export interface SystemResult {
   key: SystemKey
@@ -609,10 +623,9 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     .filter(Boolean)
     .join(' ')
 
-  // ВАЖНО: въпросникът пита за ЧАШИ вода (~250 мл), не за литри.
-  // Кодът четеше стойността като литри, така че 4 чаши (1 л — реално малко)
-  // не задействаше нищо, а промптът съобщаваше „вода: 8 л/ден".
-  const waterLitres = (q.hydration ?? 8) * 0.25
+  // Въпросникът пита в литри (`waterLitres`); стари отчети пазят само чаши
+  // в `hydration` — `waterLitresOf` покрива и двата случая.
+  const waterLitres = waterLitresOf(q)
 
   // ── метаболизъм ──
   if (bmi >= 30) add('metabolic', 0.45, `ИТМ ${bmi.toFixed(1)} — изразено наднормено тегло`)
@@ -629,7 +642,18 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
   )
     add('metabolic', 0.4, 'посочена кръвно-захарна проблематика')
   if (has(q.healthStatus, 'затлъстяване') && bmi < 30)
-    add('metabolic', 0.15, 'самоотчетено затлъстяване')
+    add('metabolic', 0.15, 'самоотчетено наднормено тегло')
+  if (has(q.healthStatus, 'мастен черен дроб')) add('metabolic', 0.15, 'мастен черен дроб')
+  if (has(q.healthStatus, 'след раждане')) {
+    add('metabolic', 0.16, 'възстановяване след раждане — променени нужди')
+    add('endocrine', 0.2, 'възстановяване след раждане — хормонално пренастройване')
+    add('nervous', 0.12, 'възстановяване след раждане — накъсан сън')
+  }
+  if (has(q.healthStatus, 'целулит')) {
+    add('circulatory', 0.14, 'целулит — бавен оток и микроциркулация')
+    add('detox', 0.1, 'целулит — задържане на течности')
+    add('metabolic', 0.08, 'целулит')
+  }
   if (has(q.healthStatus, 'менопауз') || textHas(anamnesis, 'менопауз'))
     add('metabolic', 0.18, 'менопауза — променен енергиен обмен')
   if (has(q.dietaryHabits, 'сладк', 'захар', 'газирани', 'бърза храна', 'тестен'))
@@ -640,7 +664,7 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     add('metabolic', 0.12, 'заявена цел за качване на тегло')
 
   // ── храносмилане ──
-  if (has(q.healthStatus, 'гастрит', 'рефлукс', 'киселин', 'язва', 'колит', 'храносмилане', 'запек', 'подуване', 'черво'))
+  if (has(q.healthStatus, 'гастрит', 'рефлукс', 'киселин', 'язва', 'колит', 'храносмилане', 'храносмилателн', 'запек', 'подуване', 'черво', 'цьолиак', 'черват'))
     add('digestive', 0.4, 'посочени храносмилателни оплаквания')
   if (textHas(q.complaints, 'подуване', 'газове', 'запек', 'диария', 'тежест', 'киселини', 'стомах'))
     add('digestive', 0.3, 'описани симптоми от храносмилателния тракт')
@@ -651,7 +675,7 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
   if (textHas(anamnesis, 'гастрит', 'рефлукс', 'колит', 'крон', 'цьолиак', 'целиак', 'ибс'))
     add('digestive', 0.3, 'посочено състояние на храносмилателния тракт')
   if (waterLitres < 1.5)
-    add('digestive', 0.15, `${(q.hydration ?? 0)} чаши вода дневно (~${waterLitres.toFixed(1)} л) — под нужното`)
+    add('digestive', 0.15, `${formatLitres(waterLitres)} вода дневно — под нужното`)
 
   // ── ендокринна ──
   // „Автоимунен тиреоидит" е опция във въпросника, но нито едно от старите
@@ -691,7 +715,7 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
 
   // ── имунна ──
   if (
-    has(q.healthStatus, 'алерг', 'автоимун', 'възпал', 'артрит', 'екзема', 'астма') ||
+    has(q.healthStatus, 'алерг', 'автоимун', 'възпал', 'артрит', 'екзема', 'астма', 'псориаз', 'цьолиак') ||
     textHas(anamnesis, 'алерг', 'автоимун', 'артрит', 'екзема', 'астма', 'псориаз')
   )
     add('immune', 0.38, 'посочен алергичен/възпалителен профил')
@@ -706,6 +730,10 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     textHas(anamnesis, 'холестерол', 'хипертон', 'налягане', 'сърц', 'съдов', 'инфаркт', 'инсулт')
   )
     add('circulatory', 0.4, 'посочена сърдечно-съдова проблематика')
+  if (has(q.healthStatus, 'задържане на вода')) {
+    add('circulatory', 0.24, 'задържане на вода, отоци')
+    add('detox', 0.16, 'задържане на вода — бавно отвеждане на течности')
+  }
   if (bmi >= 30) add('circulatory', 0.18, 'наднормено тегло натоварва съдовата система')
   if (q.age >= 55) add('circulatory', 0.12, 'възрастов фактор')
   if (q.activityLevel === 'sedentary') add('circulatory', 0.15, 'липса на движение')
@@ -717,6 +745,10 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     ['подуване', [['digestive', 0.3]], 'подуване или газове след хранене'],
     ['запек', [['digestive', 0.26]], 'запек или нередовно изхождане'],
     ['киселини', [['digestive', 0.24]], 'чести киселини'],
+    ['диария', [['digestive', 0.26]], 'диария или кашави изпражнения'],
+    ['спазми', [['digestive', 0.22], ['nervous', 0.06]], 'болки или спазми в корема'],
+    ['гадене', [['digestive', 0.16], ['detox', 0.08]], 'гадене'],
+    ['храносмилателен дискомфорт', [['digestive', 0.22]], 'дискомфорт след хранене'],
     ['мазна храна', [['detox', 0.28], ['digestive', 0.12]], 'тежест след мазна храна'],
     ['спад на енергия', [['metabolic', 0.28]], 'спад на енергия следобед'],
     ['апетит за сладко', [['metabolic', 0.3]], 'силен апетит за сладко'],
@@ -726,6 +758,17 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     ['ставни болки', [['immune', 0.3]], 'ставни болки или скованост'],
     ['кожни проблеми', [['detox', 0.2], ['immune', 0.16]], 'кожни проблеми'],
     ['отоци', [['circulatory', 0.22], ['detox', 0.14]], 'отоци, задържане на вода'],
+    ['студени крайници', [['circulatory', 0.18], ['endocrine', 0.08]], 'студени крайници или подути крака'],
+    ['студени ръце', [['circulatory', 0.18], ['endocrine', 0.1]], 'студени ръце и крака'],
+    ['подути крака', [['circulatory', 0.24], ['detox', 0.1]], 'тежки или подути крака вечер'],
+    ['изтръпване', [['circulatory', 0.16], ['nervous', 0.08]], 'изтръпване на крайниците'],
+    ['разширени вени', [['circulatory', 0.22]], 'разширени вени'],
+    ['задух', [['circulatory', 0.22]], 'задух при леко натоварване'],
+    ['сърцебиене', [['circulatory', 0.16], ['nervous', 0.1]], 'сърцебиене'],
+    ['горещи вълни', [['endocrine', 0.24]], 'горещи вълни или нощно изпотяване'],
+    ['нарушен сън', [['nervous', 0.2], ['endocrine', 0.08]], 'нарушен сън'],
+    ['наддаване в областта на корема', [['metabolic', 0.24], ['endocrine', 0.08]], 'наддаване в областта на корема'],
+    ['промени в настроението', [['nervous', 0.18], ['endocrine', 0.08]], 'промени в настроението'],
     ['чести настинки', [['immune', 0.26]], 'чести настинки'],
   ]
   for (const [needle, targets, why] of SYMPTOM_SIGNALS) {
@@ -741,7 +784,7 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     add('digestive', 0.2, 'бременност — чести храносмилателни промени')
     add('endocrine', 0.15, 'бременност — изменен хормонален фон')
   }
-  if (textHas(anamnesis, 'кърм', 'лактаци')) {
+  if (has(q.healthStatus, 'кърмене') || textHas(anamnesis, 'кърм', 'лактаци')) {
     add('metabolic', 0.2, 'кърмене — повишени енергийни и течностни нужди')
   }
 

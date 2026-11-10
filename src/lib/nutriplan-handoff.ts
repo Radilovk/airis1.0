@@ -9,6 +9,7 @@
  * Не се изпращат снимките на очите, разгънатите ленти, документите и
  * суровите находки — само това, което планът може да използва.
  */
+import { waterLitresOf } from './water'
 import type { AnalysisReport } from '@/types'
 import { CONSTITUTIONS } from '@/lib/iris-map'
 import { constitutionKey } from '@/lib/iris-reading'
@@ -65,6 +66,7 @@ export function buildNutriPlanHandoff(report: AnalysisReport) {
       sleepHours: q.sleepHours,
       sleepQuality: q.sleepQuality,
       hydration: q.hydration,
+      waterLitres: waterLitresOf(q),
       dietaryProfile: list(q.dietaryProfile),
       dietaryHabits: list(q.dietaryHabits),
       foodIntolerances: q.foodIntolerances,

@@ -223,6 +223,7 @@ const QUESTIONNAIRE: QuestionnaireData = {
   sleepHours: 6,
   sleepQuality: 'fair',
   hydration: 5,
+  waterLitres: 1.25,
   dietaryProfile: [],
   dietaryHabits: ['Сладко следобед', 'Късна вечеря'],
   foodIntolerances: '',
@@ -254,23 +255,24 @@ export function buildDemoReport(): AnalysisReport {
   const leftImage: IrisImage = { side: 'left', dataUrl: drawEye('left'), geometry: geo }
   const rightImage: IrisImage = { side: 'right', dataUrl: drawEye('right'), geometry: geo }
 
+  // Само знаците, които наистина са нарисувани в drawEye — с точното им място.
+  // Демото показва как изглежда отчетът; ако посочва знак, той трябва да се вижда.
+  // Ъгъл → минута: ъгъл/6; радиус → пръстен: (r − RP)/(RL − RP) × 12.
+  const at = (angleDeg: number, rFrac: number) => ({
+    minute: angleDeg / 6,
+    ring: ((RL * rFrac - RP) / (RL - RP)) * 12,
+  })
+  const seen = (angleDeg: number, rFrac: number): Partial<F> => ({ photoCheck: 'seen', anchor: at(angleDeg, rFrac) })
   const findings: F[] = [
-    finding('right', 'collarette_deform', 6, 3, 0.82, { bilateral: true }),
-    finding('right', 'fiber_defect', 5, 7, 0.78),
-    finding('right', 'pigment_orange', 9, 7, 0.71),
+    finding('right', 'collarette_deform', 5, 1, 0.82, seen(140, 0.42)),
+    finding('right', 'fiber_defect', 5, 5, 0.78, seen(135, 0.62)),
+    finding('right', 'pigment_orange', 9, 6, 0.71, seen(268, 0.66)),
     finding('right', 'nerve_rings', 1, 8, 0.74, { bilateral: true }),
-    finding('right', 'fiber_defect', 7, 6, 0.62),
+    finding('right', 'fiber_defect', 7, 4, 0.66, seen(205, 0.55)),
     finding('right', 'sodium_ring', 1, 11, 0.7, { bilateral: true }),
-    finding('right', 'pigment_brown', 4, 7, 0.66),
-    finding('right', 'radial_furrow', 3, 5, 0.64),
-    finding('right', 'transversal_fiber', 1, 6, 0.63),
-    finding('left', 'collarette_deform', 7, 3, 0.76, { bilateral: true }),
-    finding('left', 'fiber_defect', 9, 7, 0.68),
+    finding('left', 'fiber_defect', 9, 5, 0.72, seen(255, 0.6)),
     finding('left', 'nerve_rings', 1, 8, 0.72, { bilateral: true }),
-    finding('left', 'lymphatic_rosary', 1, 10, 0.55),
-    finding('left', 'pigment_orange', 3, 7, 0.69),
     finding('left', 'sodium_ring', 1, 11, 0.68, { bilateral: true }),
-    finding('left', 'pigment_diffuse', 10, 6, 0.61),
   ]
 
   const eyeHealth = assessEyeHealth({
@@ -284,7 +286,7 @@ export function buildDemoReport(): AnalysisReport {
   })
 
   const systems: CalibratedAnalysisPayload['systems'] = [
-    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването след хранене и неравната коларета сочат към ритъма на храненето.', reasons: ['Неравна коларета в двете очи', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
+    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването след хранене и неравната коларета сочат към ритъма на храненето.', reasons: ['Неравна коларета', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
     { key: 'nervous', label: 'Стрес и сън', score: 61, priority: true, description: 'Висок стрес, кратък сън и нервни пръстени в двете очи.', reasons: ['Нервни пръстени в двете очи', 'Сън 6 ч, качество „средно"', 'Стрес „висок"'] },
     { key: 'metabolic', label: 'Кръвна захар и метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевата пигментация насочват към стабилна кръвна захар.', reasons: ['Оранжева пигментация', 'Сладко следобед'] },
     { key: 'circulatory', label: 'Сърдечно-съдова система', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и натриев пръстен по края на ириса.', reasons: ['Фамилна анамнеза', 'Натриев пръстен'] },
@@ -339,7 +341,7 @@ export function buildDemoReport(): AnalysisReport {
         'Закуска: 2 яйца, домат, филийка пълнозърнест хляб',
         'Обяд: пилешко филе с печени зеленчуци и салата със зехтин',
         'Вечеря: до 19:30 — супа от леща или риба със задушени зеленчуци',
-        'Ритъм: три хранения през 4–5 часа и 6–8 чаши вода, повечето до 17 ч',
+        'Ритъм: три хранения през 4–5 часа и 1,5–2 л вода, повечето до 17 ч',
         'Движение: 10 минути разходка след обяд',
       ],
       recommendedFoods: ['Сготвени зеленчуци всеки ден', 'Овесени ядки на закуска', 'Риба 2 пъти седмично', 'Кисело мляко', 'Шепа ядки следобед', 'Горчиви салати (рукола, радикио)'],

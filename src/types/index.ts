@@ -11,7 +11,14 @@ export interface QuestionnaireData {
   stressLevel: 'low' | 'moderate' | 'high' | 'very-high'
   sleepHours: number
   sleepQuality: 'poor' | 'fair' | 'good' | 'excellent'
+  /**
+   * Наследено поле: прием на вода в ЧАШИ (~250 мл). Новите отговори се пазят в
+   * `waterLitres`; `hydration` се попълва като еквивалент в чаши, за да работят
+   * стари отчети и NutriPlan. За показване — `waterLitresOf` (`lib/water.ts`).
+   */
   hydration: number
+  /** Прием на вода в литри на ден. Липсва в стари отчети. */
+  waterLitres?: number
   dietaryProfile: string[]
   dietaryHabits: string[]
   foodIntolerances: string
@@ -217,6 +224,10 @@ export interface CalibratedAnalysisPayload {
     confirmations?: number
     /** Потвърдена ли е и от другото око. */
     bilateral?: boolean
+    /** Проверка по пикселите на снимката. Липсва в стари отчети. */
+    photoCheck?: 'seen' | 'not_seen' | 'unchecked'
+    /** Измереното място на знака: минута 0–60 и пръстен 0–12 (дробно). */
+    anchor?: { minute: number; ring: number }
   }>
   /**
    * ПОВТОРЯЕМОСТ на разчитането, 0–1. Всяко око се разчита ДВА пъти — веднъж с

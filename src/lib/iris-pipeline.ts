@@ -24,6 +24,8 @@
  * въпросника.
  */
 
+import { verifyFindingsOnPhoto, NOT_SEEN_LOAD_FACTOR } from './finding-verify'
+import { naturalBulgarianDeep } from './ui-copy'
 import type { EyeHealthReport, FiberDensity, IrisImage, QuestionnaireData } from '@/types'
 import {
   assessEyeHealth,
@@ -124,6 +126,29 @@ async function withLlmSlot<T>(fn: () => Promise<T>): Promise<T> {
 export type LogLevel = 'info' | 'success' | 'error' | 'warning'
 export type AddLog = (level: LogLevel, message: string) => void
 export type OnProgress = (step: string, progress: number) => void
+
+/**
+ * Структурирани събития за екрана „Анализ в ход“. Всяко отговаря на реална
+ * стъпка — екранът не показва нищо, което не се е случило.
+ */
+export type PipelineEvent =
+  | { kind: 'prep'; side: Side; quality: number; coverage: number }
+  | { kind: 'pass'; side: Side; layer: 'structure' | 'pigment'; reading: number; status: 'start' | 'done' | 'fail'; accepted?: number }
+  | { kind: 'merge'; side: Side; total: number; confirmed: number }
+  | { kind: 'constitution'; side: Side; label?: string }
+  | { kind: 'screen'; signs: number }
+  | {
+      kind: 'verify'
+      side: Side
+      checked: number
+      seen: number
+      notSeen: number
+      /** Местата на видените знаци — за точките върху окото на екрана. */
+      points: Array<{ minute: number; ring: number }>
+    }
+  | { kind: 'score'; status: 'start' | 'done' }
+  | { kind: 'plan'; status: 'start' | 'done' | 'fail' }
+export type OnPipelineEvent = (ev: PipelineEvent) => void
 export type CallLLM = (
   prompt: string,
   jsonMode: boolean,
@@ -435,7 +460,8 @@ export async function detectEye(
   callLLM: CallLLM,
   addLog: AddLog,
   onProgress: OnProgress,
-  delayBetweenCalls: number
+  delayBetweenCalls: number,
+  onEvent: OnPipelineEvent = () => {}
 ): Promise<EyeDetection> {
   const sideName = prep.side === 'left' ? 'ляв' : 'десен'
   let rejected = 0
@@ -456,6 +482,7 @@ export async function detectEye(
     const label = layer === 'structure' ? 'структурен' : 'пигментен'
     const seam = view.rotationSectors === 0 ? '12:00' : `${(view.rotationSectors % 12) || 12}:00`
     onProgress(`Детекция (${sideName}, ${label}, шев ${seam})`, progress)
+    onEvent({ kind: 'pass', side: prep.side, layer, reading: readingIdx, status: 'start' })
     addLog('info', `[Детекция ${sideName}] ${label} слой, шев на ${seam}...`)
 
     const prompt = buildDetectionPrompt({
@@ -494,6 +521,7 @@ export async function detectEye(
       rejected += rawList.length - normalized.length
       perReading[readingIdx].push(...normalized)
       passesOk++
+      onEvent({ kind: 'pass', side: prep.side, layer, reading: readingIdx, status: 'done', accepted: normalized.length })
       addLog(
         'success',
         `[Детекция ${sideName}] ${label}, шев ${seam}: ${normalized.length} приети` +
@@ -503,6 +531,7 @@ export async function detectEye(
             : '')
       )
     } catch (e) {
+      onEvent({ kind: 'pass', side: prep.side, layer, reading: readingIdx, status: 'fail' })
       addLog(
         'warning',
         `[Детекция ${sideName}] ${label}, шев ${seam} се провали: ` +
@@ -547,6 +576,12 @@ export async function detectEye(
     )
   }
   const collected = widespread.findings
+  onEvent({
+    kind: 'merge',
+    side: prep.side,
+    total: collected.length,
+    confirmed: collected.filter(f => (f.confirmations ?? 1) >= 2).length,
+  })
   addLog(
     'success',
     `[Детекция ${sideName}] ${collected.length} приети находки от structure и pigment слоевете`
@@ -573,6 +608,7 @@ export async function detectEye(
       constitution = parsed.constitution
       passesOk++
       addLog('info', `[Детекция ${sideName}] Конституция: ${CONSTITUTIONS[constitution].label}`)
+      onEvent({ kind: 'constitution', side: prep.side, label: CONSTITUTIONS[constitution].label })
     }
   } catch (e) {
     addLog('warning', `[Детекция ${sideName}] Конституцията не бе определена`)
@@ -638,10 +674,13 @@ export interface RunPipelineOptions {
   onProgress: OnProgress
   /** Пауза между LLM заявките, ms (срещу rate limit). */
   requestDelay?: number
+  /** Структурирани събития за екрана по време на анализа. */
+  onEvent?: OnPipelineEvent
 }
 
 export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPipelineResult> {
   const { leftIris, rightIris, questionnaire, callLLM, addLog, onProgress } = opts
+  const onEvent: OnPipelineEvent = opts.onEvent ?? (() => {})
   // Паузата от настройките вече не прави анализа последователен — тя само
   // разрежда стартовете в `withLlmSlot`. Затова всички стъпки вървят по
   // паралелния път (`delay = 0`).
@@ -656,6 +695,9 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     prepareEye(rightIris, 'right', addLog),
   ])
 
+  for (const prep of [leftPrep, rightPrep]) {
+    onEvent({ kind: 'prep', side: prep.side, quality: prep.qualityScore, coverage: prep.strips.base.coverage })
+  }
   const imageQuality = (leftPrep.qualityScore + rightPrep.qualityScore) / 2
   const stripCoverage = (leftPrep.strips.base.coverage + rightPrep.strips.base.coverage) / 2
 
@@ -730,16 +772,55 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
 
   if (delay > 0) {
     onProgress('Анализ на ляв ирис', 15)
-    left = await detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay)
+    left = await detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay, onEvent)
     await sleep(delay)
     onProgress('Анализ на десен ирис', 40)
-    right = await detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay)
+    right = await detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay, onEvent)
   } else {
     onProgress('Анализ на двата ириса', 15)
     ;[left, right] = await Promise.all([
-      detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay),
-      detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay),
+      detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay, onEvent),
+      detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay, onEvent),
     ])
+  }
+
+  // ── 2б. проверка по снимката ──────────────────────────────────────────
+  // Всеки знак с конкретно място се търси в самите пиксели. Невидимият не се
+  // показва на снимката и тежи по-малко в оценките. Виж finding-verify.ts.
+  onProgress('Проверка на находките по снимката', 60)
+  for (const [det, img, prep] of [
+    [left, leftIris, leftPrep],
+    [right, rightIris, rightPrep],
+  ] as const) {
+    try {
+      const geo = img.geometry ?? prep.geometry
+      const verdicts = await verifyFindingsOnPhoto(img.dataUrl, geo, det.findings)
+      det.findings = det.findings.map((f, i) => {
+        const v = verdicts[i]
+        if (!v) return f
+        if (v.check === 'not_seen') {
+          return { ...f, photoCheck: 'not_seen' as const, load: f.load * NOT_SEEN_LOAD_FACTOR }
+        }
+        return { ...f, photoCheck: v.check, anchor: v.anchor }
+      })
+      const seen = verdicts.filter(v => v.check === 'seen').length
+      const notSeen = verdicts.filter(v => v.check === 'not_seen').length
+      onEvent({
+        kind: 'verify',
+        side: det.side,
+        checked: seen + notSeen,
+        seen,
+        notSeen,
+        points: det.findings.filter(f => f.anchor).map(f => f.anchor!),
+      })
+      addLog(
+        notSeen > 0 ? 'warning' : 'success',
+        `[Проверка ${det.side === 'left' ? 'ляв' : 'десен'}] по снимката: ${seen} видими, ${notSeen} не се различават от околната тъкан`
+      )
+    } catch (e) {
+      addLog('warning', `Проверката по снимката не бе направена: ${e instanceof Error ? e.message : String(e)}`)
+      onEvent({ kind: 'verify', side: det.side, checked: 0, seen: 0, notSeen: 0, points: [] })
+    }
   }
 
   if (screensPromise) {
@@ -756,6 +837,10 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     colorFor(rightIris, rightPrep),
   ])
 
+  onEvent({
+    kind: 'screen',
+    signs: (screens[0]?.signs.length ?? 0) + (screens[1]?.signs.length ?? 0),
+  })
   const allFindings = [...left.findings, ...right.findings]
   const passTotal = left.passesOk + right.passesOk
   const expectedPasses = 6
@@ -773,6 +858,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
 
   // ── 3. детерминистични оценки ──────────────────────────────────────────
   onProgress('Изчисляване на системните оценки', 65)
+  onEvent({ kind: 'score', status: 'start' })
   const scoring = computeScores({
     findings: allFindings,
     questionnaire,
@@ -785,6 +871,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
     `Оценки готови — обща ${scoring.overall}/100, тежест на ириса ${Math.round(scoring.irisWeight * 100)} %`
   )
   addLog('info', `Фокус: ${scoring.focus.join(' → ')}`)
+  onEvent({ kind: 'score', status: 'done' })
   addLog('info', `${scoring.drivers.length} хранителни драйвера`)
 
   const eyeHealth = assessEyeHealth({
@@ -807,6 +894,7 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
 
   // ── 4. интерпретация ────────────────────────────────────────────────────
   onProgress('Изготвяне на плана', 75)
+  onEvent({ kind: 'plan', status: 'start' })
   if (delay > 0) await sleep(delay)
 
   let interpretation: InterpretationOutput | null = null
@@ -827,10 +915,13 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       eyeHealth,
     })
     const response = await withLlmSlot(() => callLLM(prompt, true, 2))
-    interpretation = parseJsonResponse(response) as InterpretationOutput
+    // „Подкрепа на …“ и подобни калки се поправят и тук, ако моделът ги е написал.
+    interpretation = naturalBulgarianDeep(parseJsonResponse(response) as InterpretationOutput)
     addLog('success', 'Планът е готов')
+    onEvent({ kind: 'plan', status: 'done' })
   } catch (e) {
     addLog('error', `Интерпретацията се провали: ${e instanceof Error ? e.message : String(e)}`)
+    onEvent({ kind: 'plan', status: 'fail' })
   }
 
   onProgress('Готово', 95)

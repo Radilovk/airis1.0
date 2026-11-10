@@ -1,3 +1,4 @@
+import { waterLitresOf, formatLitres, waterIsEnough, waterIsLow } from '@/lib/water'
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,8 +32,8 @@ export default function ActionTimeline({ report }: ActionTimelineProps) {
     if (report.detailedPlan?.recommendedFoods && report.detailedPlan.recommendedFoods.length > 0) {
       phase1Actions.push(`Започнете с ${report.detailedPlan.recommendedFoods.slice(0, 2).join(', ')}`)
     }
-    if (report.questionnaireData.hydration < 8) {
-      phase1Actions.push('Увеличете дневния прием на вода до 8-10 чаши (2-2.5л)')
+    if (!waterIsEnough(report.questionnaireData)) {
+      phase1Actions.push('Увеличете дневния прием на вода до 2–2,5 л')
     }
     
     timeline.push({

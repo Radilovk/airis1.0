@@ -1,12 +1,13 @@
+import { waterLitresOf, formatLitres, waterIsEnough, waterIsLow } from '@/lib/water'
 import { useEffect, useState, useRef } from 'react'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { useIrisUnwrap } from '@/hooks/useIrisUnwrap'
 import type { IrisUnwrapResult } from '@/hooks/useIrisUnwrap'
 import { Card } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
+import AnalysisLiveView, { useLiveState } from '@/components/analysis/AnalysisLiveView'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Sparkle, Warning, Bug, Check } from '@phosphor-icons/react'
+import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
@@ -24,14 +25,6 @@ import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIMode
 
 /** Таван за една LLM заявка. Детекцията е ~10–20 s, планът — до минута. */
 const LLM_TIMEOUT_MS = 120_000
-
-/** Етапите, които вижда човекът — праговете съвпадат с прогреса на pipeline-а. */
-const ANALYSIS_STAGES = [
-  { from: 0, label: 'Подготовка на снимките' },
-  { from: 15, label: 'Разчитане на двата ириса' },
-  { from: 65, label: 'Оценки и очен скрининг' },
-  { from: 75, label: 'Вашият личен план' },
-] as const
 
 /** Превежда стъпката на pipeline-а на разбираем за човека език. */
 function plainStatus(step: string): string {
@@ -62,6 +55,7 @@ export default function AnalysisScreen({
   onComplete
 }: AnalysisScreenProps) {
   const [progress, setProgress] = useState(0)
+  const [liveState, dispatchLive] = useLiveState()
   const [status, setStatus] = useState('Зареждане на настройките...')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [showDebug, setShowDebug] = useState(false)
@@ -752,6 +746,7 @@ ${response}
         setStatus(plainStatus(step))
         setProgress(prev => Math.max(prev, Math.max(2, Math.min(98, pct))))
       },
+      onEvent: dispatchLive,
       requestDelay,
     })
 
@@ -888,6 +883,8 @@ ${response}
         priorityZones: f.priorityZones,
         confirmations: f.confirmations,
         bilateral: f.bilateral,
+        photoCheck: f.photoCheck,
+        anchor: f.anchor,
       })),
       // Смалени копия: пълните ленти (≈780 KB всяка) се ползват САМО за
       // заявките към модела и остават в паметта. В отчета влизат намалени
@@ -2267,7 +2264,7 @@ JSON формат:
 Цели: ${questionnaire.goals.join(', ')}
 Оплаквания: ${questionnaire.complaints || 'Няма'}
 Сън: ${questionnaire.sleepHours}ч (${questionnaire.sleepQuality}), Стрес: ${questionnaire.stressLevel}
-Активност: ${questionnaire.activityLevel}, Хидратация: ${questionnaire.hydration}л
+Активност: ${questionnaire.activityLevel}, Вода: ${formatLitres(waterLitresOf(questionnaire))}/ден
 
 СТРУКТУРА (КРАТКО И ПО СЪЩЕСТВО):
 1. Обща оценка (1 параграф) - интегрирано състояние без ляв/десен разделяне
@@ -2503,7 +2500,7 @@ JSON формат:
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
-          <Card className="p-8 md:p-12">
+          <Card className="p-5 sm:p-8 md:p-12">
             <motion.div
               // Спокоен пулс вместо безкрайно въртене; без движение при „намалено движение".
               animate={error || reduceMotion ? { scale: 1 } : { scale: [1, 1.06, 1] }}
@@ -2512,7 +2509,8 @@ JSON формат:
                 repeat: error || reduceMotion ? 0 : Infinity,
                 ease: 'easeInOut'
               }}
-              className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${
+              // Докато тече анализът, очите със скенера заместват иконата.
+              className={`items-center justify-center w-20 h-20 rounded-full mb-6 ${error ? 'inline-flex' : 'hidden'} ${
                 error 
                   ? 'bg-destructive' 
                   : 'bg-gradient-to-br from-primary to-accent'
@@ -2528,52 +2526,19 @@ JSON формат:
             <h2 className="text-2xl font-bold mb-2">
               {error ? 'Възникна грешка' : 'Анализ в ход'}
             </h2>
-            <p className={`mb-8 ${error ? 'text-destructive' : 'text-muted-foreground'}`}>
-              {error ? 'Прочетете детайлите и следвайте инструкциите по-долу' : 'Обработваме снимките и подготвяме вашия доклад'}
+            <p className={`mb-6 ${error ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {error ? 'Прочетете детайлите и следвайте инструкциите по-долу' : 'Кръстосан анализ: снимките на ирисите и вашите отговори'}
             </p>
 
             {!error && (
               <>
-                <div className="space-y-4">
-                  <Progress value={progress} className="h-3" />
-                  <p className="text-sm font-medium text-center">{status}</p>
-                  <p className="text-xs text-muted-foreground text-center">
-                    {Math.round(progress)}% завършено
-                  </p>
-                </div>
-
-                <ol className="mt-8 space-y-3 text-left">
-                  {ANALYSIS_STAGES.map((stage, i) => {
-                    const next = ANALYSIS_STAGES[i + 1]?.from ?? 100
-                    const done = progress >= next
-                    const active = !done && progress >= stage.from
-                    return (
-                      <li key={stage.label} className="flex items-center gap-3 text-[15px]">
-                        <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
-                            done
-                              ? 'bg-primary text-primary-foreground'
-                              : active
-                                ? 'bg-primary/15 text-primary ring-2 ring-primary/40'
-                                : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          {done ? <Check size={14} weight="bold" /> : <span className="text-xs font-semibold">{i + 1}</span>}
-                        </span>
-                        <span className={done || active ? 'text-foreground font-medium' : 'text-muted-foreground'}>
-                          {stage.label}
-                        </span>
-                      </li>
-                    )
-                  })}
-                </ol>
-                <div className="mt-6 space-y-2 text-left">
-                  <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Обикновено отнема под минута. Не затваряйте приложението.
-                    </p>
-                  </div>
-                </div>
+                <AnalysisLiveView
+                  state={liveState}
+                  progress={progress}
+                  status={status}
+                  leftIris={leftIris}
+                  rightIris={rightIris}
+                />
               </>
             )}
 
@@ -2598,6 +2563,7 @@ JSON формат:
                   <Button
                     onClick={() => {
                       setError(null)
+                      dispatchLive({ kind: 'reset' })
                       setProgress(0)
                       setStatus('Подготовка за анализ...')
                       setLogs([])

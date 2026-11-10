@@ -32,6 +32,7 @@ import {
   applyCheckboxExclusion,
   getQuestionSectionLabel,
   QUESTIONNAIRE_CONFIG_VERSION,
+  NONE_OF_THE_ABOVE,
 } from '@/lib/questionnaire-logic'
 
 interface QuestionnaireScreenProps {
@@ -40,13 +41,20 @@ interface QuestionnaireScreenProps {
 }
 
 /**
- * Начална позиция на плъзгачите. Преди започваха от минимума (3 ч сън, 0 чаши)
+ * Начална позиция на плъзгачите. Преди започваха от минимума (3 ч сън, 0 л вода)
  * — числото изглеждаше избрано, а „Напред“ връщаше „задължително поле“.
  * Сега плъзгачът стои на обичайна стойност и тя се приема, ако човекът не я
  * промени.
  */
-const SLIDER_START: Record<string, number> = { sleepHours: 7, hydration: 6 }
-const SLIDER_STEP: Record<string, number> = { sleepHours: 0.5, hydration: 1 }
+const SLIDER_START: Record<string, number> = { sleepHours: 7, waterLitres: 1.5 }
+const SLIDER_STEP: Record<string, number> = { sleepHours: 0.5, waterLitres: 0.25 }
+/** Мерна единица под голямото число на плъзгача. */
+const SLIDER_UNIT: Record<string, string> = { sleepHours: 'часа', waterLitres: 'литра' }
+
+/** 1.5 → „1,5“ — българска десетична запетая. */
+function formatSliderValue(v: number): string {
+  return String(Math.round(v * 100) / 100).replace('.', ',')
+}
 
 function sliderStart(q: QuestionConfig): number {
   const min = q.validation?.min ?? 0
@@ -155,7 +163,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       const changed =
         JSON.stringify(cleaned.goals) !== JSON.stringify(prev.goals) ||
         JSON.stringify(cleaned.healthStatus) !== JSON.stringify(prev.healthStatus) ||
-        cleaned.healthGate !== prev.healthGate ||
+        JSON.stringify(cleaned.symptoms) !== JSON.stringify(prev.symptoms) ||
         cleaned.dietGate !== prev.dietGate ||
         cleaned.complaints !== prev.complaints ||
         cleaned.medications !== prev.medications
@@ -169,7 +177,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     answers.weight,
     answers.height,
     answers.goals,
-    answers.healthGate,
+    answers.healthStatus,
     answers.dietGate,
   ])
 
@@ -303,6 +311,11 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     
     if (checked) {
       const next = applyCheckboxExclusion(questionId, current, value, true)
+      // „Нищо от изброените“ затваря и полето „Друго“.
+      if (questionId === 'healthStatus' && value === NONE_OF_THE_ABOVE) {
+        setShowOther({ ...showOther, [questionId]: false })
+        setOtherValues({ ...otherValues, [questionId]: '' })
+      }
       setAnswersSanitized({ ...answers, [questionId]: next })
     } else {
       setAnswersSanitized({ ...answers, [questionId]: current.filter(v => v !== value) })
@@ -557,10 +570,13 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
         const sliderValue = value !== undefined && value !== '' ? Number(value) : sliderStart(question)
         return (
           <div className="space-y-6 pt-4">
-            <div className="flex items-center justify-center">
-              <div className="text-5xl font-bold text-primary">
-                {sliderValue}
+            <div className="flex flex-col items-center justify-center">
+              <div className="text-5xl font-bold text-primary tabular-nums">
+                {formatSliderValue(sliderValue)}
               </div>
+              {SLIDER_UNIT[question.id] && (
+                <div className="mt-1 text-sm text-muted-foreground">{SLIDER_UNIT[question.id]}</div>
+              )}
             </div>
             <Slider
               value={[sliderValue]}
@@ -571,8 +587,8 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
               className="py-4"
             />
             <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{question.validation?.min || 0}</span>
-              <span>{question.validation?.max || 100}</span>
+              <span>{formatSliderValue(question.validation?.min || 0)}</span>
+              <span>{formatSliderValue(question.validation?.max || 100)}</span>
             </div>
           </div>
         )
