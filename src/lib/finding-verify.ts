@@ -28,6 +28,16 @@
 
 import { isCircumferentialFinding, type FindingType } from './iris-map'
 import { rgbToLab } from './eye-health'
+import { irisPoint } from './iris-coords'
+import {
+  artifactAt,
+  buildArtifactMap,
+  ARTIFACT_GLARE,
+  ARTIFACT_LASH,
+  ARTIFACT_NONE,
+  type ArtifactGeometry,
+  type ArtifactMap,
+} from './photo-artifacts'
 
 export type PhotoCheck = 'seen' | 'not_seen' | 'unchecked'
 
@@ -38,8 +48,8 @@ export interface VerifiableFinding {
 }
 
 export interface VerifyGeometry {
-  pupil: { r: number }
-  limbus: { cx: number; cy: number; r: number }
+  pupil: { r: number; cx?: number; cy?: number }
+  limbus: { cx: number; cy: number; r: number; ry?: number }
   imageWidth?: number
   imageHeight?: number
 }
@@ -55,6 +65,8 @@ export interface FindingVerdict {
   /** Най-голямото отклонение, в единици разсейване. */
   score: number
   anchor?: { minute: number; ring: number }
+  /** Мястото е заето от артефакт от снимката, не от тъкан. */
+  artifact?: 'glare' | 'lash'
 }
 
 /** Клетки по обиколката — 8 на сектор. */
@@ -119,12 +131,25 @@ function mad(xs: number[], med: number): number {
 }
 
 /** Средният Lab цвят на всяка клетка (пръстен × клетка по обиколката). */
-export function patchGrid(px: PixelSource, geo: VerifyGeometry, scale = 1): PatchStat[][] {
-  const cx = geo.limbus.cx * scale
-  const cy = geo.limbus.cy * scale
-  const rp = geo.pupil.r * scale
-  const ri = geo.limbus.r * scale
-  const span = ri - rp
+export function patchGrid(px: PixelSource, geo: VerifyGeometry, scale = 1, artifacts?: ArtifactMap): PatchStat[][] {
+  // Същият модел „гумен лист“ като разгъвката и картата (`irisPoint`): зеницата
+  // пази собствения си център, иначе клетките на проверката и стрелките на
+  // снимката биха сочели различни места.
+  const g = {
+    pupil: {
+      cx: (geo.pupil.cx ?? geo.limbus.cx) * scale,
+      cy: (geo.pupil.cy ?? geo.limbus.cy) * scale,
+      r: geo.pupil.r * scale,
+    },
+    limbus: {
+      cx: geo.limbus.cx * scale,
+      cy: geo.limbus.cy * scale,
+      r: geo.limbus.r * scale,
+      ...(geo.limbus.ry !== undefined ? { ry: geo.limbus.ry * scale } : {}),
+    },
+  }
+  const rp = g.pupil.r
+  const span = g.limbus.r - rp
   const grid: PatchStat[][] = []
   for (let ring = 0; ring < ROWS; ring++) {
     const row: PatchStat[] = []
@@ -142,13 +167,11 @@ export function patchGrid(px: PixelSource, geo: VerifyGeometry, scale = 1): Patc
       let total = 0
       for (let j = 0; j < perPatchAng; j++) {
         const minute = ((p + (j + 0.5) / perPatchAng) / PATCHES) * 60
-        const t = (minute / 60) * Math.PI * 2
-        const sin = Math.sin(t)
-        const cos = Math.cos(t)
         for (let k = 0; k < radial; k++) {
-          const r = r0 + ((k + 0.5) / radial) * (r1 - r0)
-          const x = Math.round(cx + r * sin)
-          const y = Math.round(cy - r * cos)
+          const ringPos = ((ring + (k + 0.5) / radial) / ROWS) * RINGS
+          const pt = irisPoint(g, minute, ringPos)
+          const x = Math.round(pt.x)
+          const y = Math.round(pt.y)
           total++
           if (x < 0 || y < 0 || x >= px.width || y >= px.height) continue
           const i = (y * px.width + x) * 4
@@ -159,6 +182,8 @@ export function patchGrid(px: PixelSource, geo: VerifyGeometry, scale = 1): Patc
           const min = Math.min(R, G, Bl)
           // Отблясък (почти бяло) и дълбока сянка (клепач, мигли) не са тъкан.
           if (max > 245 && max - min < 30) continue
+          // Отражение (с ореола) или мигла по картата на артефактите — не е тъкан.
+          if (artifacts && artifactAt(artifacts, x, y) !== ARTIFACT_NONE) continue
           if (max < 14) continue
           const lab = rgbToLab(R, G, Bl)
           L += lab[0]
@@ -291,8 +316,58 @@ export async function verifyFindingsOnPhoto(
   // Геометрията е в пиксели на изображението, за което е измерена.
   const geoW = geometry.imageWidth || loaded.px.width / loaded.scale
   const scale = loaded.px.width / geoW
-  const grid = patchGrid(loaded.px, geometry, scale)
-  return findings.map(f => verifyAgainstGrid(f, grid))
+  const scaledGeo: ArtifactGeometry = {
+    pupil: {
+      r: geometry.pupil.r * scale,
+      cx: (geometry.pupil.cx ?? geometry.limbus.cx) * scale,
+      cy: (geometry.pupil.cy ?? geometry.limbus.cy) * scale,
+    },
+    limbus: {
+      cx: geometry.limbus.cx * scale,
+      cy: geometry.limbus.cy * scale,
+      r: geometry.limbus.r * scale,
+      ...(geometry.limbus.ry !== undefined ? { ry: geometry.limbus.ry * scale } : {}),
+    },
+  }
+  const artifacts = buildArtifactMap(loaded.px.data, loaded.px.width, loaded.px.height, scaledGeo)
+  const grid = patchGrid(loaded.px, geometry, scale, artifacts)
+  return findings.map(f => {
+    // Мястото на знака е заето от отражение или мигла → това не е тъкан и
+    // знакът не се приема, каквото и да е отклонението около него.
+    const art = artifactShareAt(f, scaledGeo, artifacts)
+    if (art.share >= ARTIFACT_REJECT_SHARE) return { check: 'not_seen' as const, score: 0, artifact: art.kind }
+    return verifyAgainstGrid(f, grid)
+  })
+}
+
+/**
+ * Над този дял на клетката под отражение/мигла знакът се смята за артефакт
+ * от снимката. Под него клетката се проверява по останалите пиксели.
+ */
+export const ARTIFACT_REJECT_SHARE = 0.4
+
+/** Какъв дял от клетката на находката е отражение или мигла и кое преобладава. */
+export function artifactShareAt(
+  f: VerifiableFinding,
+  geo: ArtifactGeometry,
+  map: ArtifactMap
+): { share: number; kind?: 'glare' | 'lash' } {
+  if (isCircumferentialFinding(f.type as FindingType)) return { share: 0 }
+  const g = { pupil: { cx: geo.pupil.cx ?? geo.limbus.cx, cy: geo.pupil.cy ?? geo.limbus.cy, r: geo.pupil.r }, limbus: geo.limbus }
+  let total = 0
+  let glare = 0
+  let lash = 0
+  for (let i = 0; i < 10; i++) {
+    for (let k = 0; k < 4; k++) {
+      const pt = irisPoint(g, (f.sector - 1) * 5 + ((i + 0.5) / 10) * 5, f.ring + (k + 0.5) / 4)
+      total++
+      const a = artifactAt(map, pt.x, pt.y)
+      if (a === ARTIFACT_GLARE) glare++
+      else if (a === ARTIFACT_LASH) lash++
+    }
+  }
+  const share = (glare + lash) / total
+  return share > 0 ? { share, kind: glare >= lash ? 'glare' : 'lash' } : { share: 0 }
 }
 
 /** Колко от тежестта остава на знак, който не се вижда на снимката. */

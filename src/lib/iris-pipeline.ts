@@ -805,6 +805,14 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       })
       const seen = verdicts.filter(v => v.check === 'seen').length
       const notSeen = verdicts.filter(v => v.check === 'not_seen').length
+      const glare = verdicts.filter(v => v.artifact === 'glare').length
+      const lash = verdicts.filter(v => v.artifact === 'lash').length
+      if (glare + lash > 0) {
+        addLog(
+          'warning',
+          `[Проверка ${det.side === 'left' ? 'ляв' : 'десен'}] ${glare} знака върху отражение, ${lash} върху мигла/сянка — махнати като артефакти от снимката`
+        )
+      }
       onEvent({
         kind: 'verify',
         side: det.side,

@@ -1,3 +1,4 @@
+import { topPrioritySystems } from '@/lib/calibrated-report-summary'
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -253,6 +254,13 @@ function CalibratedPlan({ report }: { report: AnalysisReport }) {
   const firstWeek = special.tagged['Първа седмица'] ?? []
   const followUp = special.tagged['За проследяване'] ?? []
   const tests = plan.recommendedTests ?? []
+  // Детерминистичните стъпки — групирани по областите от анализа, в същия ред.
+  const cal = report.calibrated
+  const byArea = cal
+    ? topPrioritySystems(cal)
+        .map(system => ({ system, steps: cal.drivers.filter(d => d.system === system.key).slice(0, 3) }))
+        .filter(x => x.steps.length > 0)
+    : []
 
   return (
     <div className="space-y-3">
@@ -269,6 +277,32 @@ function CalibratedPlan({ report }: { report: AnalysisReport }) {
               </li>
             ))}
           </ol>
+        </Card>
+      )}
+
+      {byArea.length > 0 && (
+        <Card className="gap-4 p-5">
+          <div>
+            <h3 className="text-base font-bold">По областите от анализа</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">Всяка стъпка е за област, открита в таб „1 · Анализ“.</p>
+          </div>
+          {byArea.map(({ system, steps }, i) => (
+            <div key={system.key} className="space-y-2">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {i + 1}
+                </span>
+                {system.label}
+              </p>
+              <ul className="space-y-2 pl-8">
+                {steps.map(d => (
+                  <li key={d.id} className="text-[15px] leading-relaxed">
+                    {d.action}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </Card>
       )}
 

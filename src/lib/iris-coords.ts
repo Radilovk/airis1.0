@@ -6,23 +6,79 @@ import type { IrisGeometrySnapshot } from '@/types'
 import { fitImageInSquare } from './image-utils'
 import { ringBand, isCircumferentialFinding, type RingBandDef } from './iris-map'
 
+/**
+ * Точка в ириса по модела „гумен лист“ — същият, по който се разгъва лентата
+ * (`iris-unwrap.ts`). Зеницата НЕ е в центъра на ириса (естествено е отместена
+ * към носа с до ~10 % от радиуса), затова центърът се плъзга от центъра на
+ * зеницата (t = 0) към центъра на лимбуса (t = 1), а радиусът — от ръба на
+ * зеницата към ръба на лимбуса (елиптичен, ако е измерен такъв).
+ *
+ * `minute` — 0..60 по часовника (0 = 12:00), `ringPos` — 0..12 (дробно).
+ */
+export function irisPoint(
+  geometry: Pick<IrisGeometrySnapshot, 'pupil' | 'limbus'>,
+  minute: number,
+  ringPos: number
+): { x: number; y: number } {
+  const { pupil, limbus } = geometry
+  const t = Math.max(0, Math.min(1, ringPos / 12))
+  const theta = (minute / 60) * 2 * Math.PI
+  const sin = Math.sin(theta)
+  const cos = Math.cos(theta)
+  const pcx = pupil.cx ?? limbus.cx
+  const pcy = pupil.cy ?? limbus.cy
+  const cx = pcx + (limbus.cx - pcx) * t
+  const cy = pcy + (limbus.cy - pcy) * t
+  const ry = limbus.ry
+  const rOut = ry === undefined ? limbus.r : (limbus.r * ry) / Math.sqrt((ry * sin) ** 2 + (limbus.r * cos) ** 2 || 1)
+  const r = pupil.r + (rOut - pupil.r) * t
+  return { x: cx + r * sin, y: cy - r * cos }
+}
+
+function toView(pt: { x: number; y: number }, geometry: IrisGeometrySnapshot, viewSize: number) {
+  const { scale, offsetX, offsetY } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
+  return { x: pt.x * scale + offsetX, y: pt.y * scale + offsetY }
+}
+
+/** Затворен контур между два пръстена и два ъгъла (минути), като полилиния. */
+function bandPolygon(
+  geometry: IrisGeometrySnapshot,
+  viewSize: number,
+  m0: number,
+  m1: number,
+  ring0: number,
+  ring1: number
+): string {
+  const steps = Math.max(6, Math.ceil((m1 - m0) * 2))
+  const pts: Array<{ x: number; y: number }> = []
+  for (let i = 0; i <= steps; i++) pts.push(toView(irisPoint(geometry, m0 + ((m1 - m0) * i) / steps, ring1), geometry, viewSize))
+  for (let i = steps; i >= 0; i--) pts.push(toView(irisPoint(geometry, m0 + ((m1 - m0) * i) / steps, ring0), geometry, viewSize))
+  return pts.map((q, i) => `${i ? 'L' : 'M'} ${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' ') + ' Z'
+}
+
+/** Пълен пояс между два пръстена (360°) — два затворени контура (evenodd дупка). */
+function fullAnnulus(geometry: IrisGeometrySnapshot, viewSize: number, ring0: number, ring1: number): string {
+  const ring = (rp: number) => {
+    const pts: string[] = []
+    for (let i = 0; i <= 120; i++) {
+      const q = toView(irisPoint(geometry, (i / 120) * 60, rp), geometry, viewSize)
+      pts.push(`${i ? 'L' : 'M'} ${q.x.toFixed(1)} ${q.y.toFixed(1)}`)
+    }
+    return pts.join(' ') + ' Z'
+  }
+  return `${ring(ring1)} ${ring(ring0)}`
+}
+
 /** Център на клетка (sector 1..12, ring 0..11) в пиксели на оригиналната снимка. */
 export function cellCenterInImage(
   sector: number,
   ring: number,
   geometry: IrisGeometrySnapshot
 ): { x: number; y: number } {
-  const cx = geometry.limbus.cx
-  const cy = geometry.limbus.cy
-  const rp = geometry.pupil.r
-  const ri = geometry.limbus.r
-  const minute = (sector - 1) * 5 + 2.5
-  const theta = (minute / 60) * 2 * Math.PI
-  const r = rp + (ri - rp) * ((ring + 0.5) / 12)
-  return { x: cx + r * Math.sin(theta), y: cy - r * Math.cos(theta) }
+  return irisPoint(geometry, (sector - 1) * 5 + 2.5, ring + 0.5)
 }
 
-/** Радиус на пръстен (център на клетката) в пиксели. */
+/** Среден радиус на пръстен (център на клетката) в пиксели — за оразмеряване. */
 export function ringRadius(ring: number, geometry: IrisGeometrySnapshot): number {
   const rp = geometry.pupil.r
   const ri = geometry.limbus.r
@@ -50,7 +106,7 @@ export function sectorAngles(sector: number): { start: number; end: number } {
   }
 }
 
-/** Точка на окружност в viewBox координати (object-contain в квадрат). */
+/** Точка на окръжност в viewBox координати (object-contain в квадрат). */
 export function polarToView(
   cx: number,
   cy: number,
@@ -59,74 +115,17 @@ export function polarToView(
   geometry: IrisGeometrySnapshot,
   viewSize: number
 ): { x: number; y: number } {
-  const { scale, offsetX, offsetY } = fitImageInSquare(
-    geometry.imageWidth,
-    geometry.imageHeight,
-    viewSize
-  )
-  const ix = cx + radius * Math.sin(thetaRad)
-  const iy = cy - radius * Math.cos(thetaRad)
-  return { x: ix * scale + offsetX, y: iy * scale + offsetY }
+  return toView({ x: cx + radius * Math.sin(thetaRad), y: cy - radius * Math.cos(thetaRad) }, geometry, viewSize)
 }
 
-/** SVG path за пълен пръstenен пояс (360°) — околообхватни находки. */
-export function fullBandAnnulusPath(
-  band: RingBandDef,
-  geometry: IrisGeometrySnapshot,
-  viewSize: number
-): string {
-  const cx = geometry.limbus.cx
-  const cy = geometry.limbus.cy
-  const rp = geometry.pupil.r
-  const ri = geometry.limbus.r
-  const span = ri - rp
-  const inner = rp + span * (band.rings[0] / 12)
-  const outer = rp + span * ((band.rings[1] + 1) / 12)
-  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
-  const riScaled = outer * scale
-  const roScaled = inner * scale
-
-  const fit = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
-  const vcx = cx * fit.scale + fit.offsetX
-  const vcy = cy * fit.scale + fit.offsetY
-
-  return [
-    `M ${vcx + roScaled} ${vcy}`,
-    `A ${roScaled} ${roScaled} 0 1 1 ${vcx - roScaled} ${vcy}`,
-    `A ${roScaled} ${roScaled} 0 1 1 ${vcx + roScaled} ${vcy}`,
-    `M ${vcx + riScaled} ${vcy}`,
-    `A ${riScaled} ${riScaled} 0 1 0 ${vcx - riScaled} ${vcy}`,
-    `A ${riScaled} ${riScaled} 0 1 0 ${vcx + riScaled} ${vcy}`,
-    'Z',
-  ].join(' ')
+/** SVG path за пълен пръстенен пояс (360°) — околообхватни находки. */
+export function fullBandAnnulusPath(band: RingBandDef, geometry: IrisGeometrySnapshot, viewSize: number): string {
+  return fullAnnulus(geometry, viewSize, band.rings[0], band.rings[1] + 1)
 }
 
-/** SVG path за един пръsten R0..R11 по цялата окружност. */
-export function fullRingAnnulusPath(
-  ring: number,
-  geometry: IrisGeometrySnapshot,
-  viewSize: number
-): string {
-  const cx = geometry.limbus.cx
-  const cy = geometry.limbus.cy
-  const { inner, outer } = ringBandRadii(ring, geometry)
-  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
-  const riScaled = outer * scale
-  const roScaled = inner * scale
-
-  const fit = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
-  const vcx = cx * fit.scale + fit.offsetX
-  const vcy = cy * fit.scale + fit.offsetY
-
-  return [
-    `M ${vcx + roScaled} ${vcy}`,
-    `A ${roScaled} ${roScaled} 0 1 1 ${vcx - roScaled} ${vcy}`,
-    `A ${roScaled} ${roScaled} 0 1 1 ${vcx + roScaled} ${vcy}`,
-    `M ${vcx + riScaled} ${vcy}`,
-    `A ${riScaled} ${riScaled} 0 1 0 ${vcx - riScaled} ${vcy}`,
-    `A ${riScaled} ${riScaled} 0 1 0 ${vcx + riScaled} ${vcy}`,
-    'Z',
-  ].join(' ')
+/** SVG path за един пръстен R0..R11 по цялата окръжност. */
+export function fullRingAnnulusPath(ring: number, geometry: IrisGeometrySnapshot, viewSize: number): string {
+  return fullAnnulus(geometry, viewSize, ring, ring + 1)
 }
 
 /** Избира overlay path: околообхватна дъга или секторен клин по пояс. */
@@ -148,96 +147,22 @@ export function findingOverlayPath(
 }
 
 /** Точка на 12:00 по пръстена — за маркер при околообхватни находки. */
-export function ringTopCenterInView(
-  ring: number,
-  geometry: IrisGeometrySnapshot,
-  viewSize: number
-): { x: number; y: number } {
-  const cx = geometry.limbus.cx
-  const cy = geometry.limbus.cy
-  const r = ringRadius(ring, geometry)
-  return polarToView(cx, cy, r, 0, geometry, viewSize)
+export function ringTopCenterInView(ring: number, geometry: IrisGeometrySnapshot, viewSize: number): { x: number; y: number } {
+  return toView(irisPoint(geometry, 0, ring + 0.5), geometry, viewSize)
 }
 
-/** SVG path за секторен сегмент в целия пръstenен пояс (IPB, STOM, ANW …). */
-export function sectorBandWedgePath(
-  sector: number,
-  ring: number,
-  geometry: IrisGeometrySnapshot,
-  viewSize: number
-): string {
-  const cx = geometry.limbus.cx
-  const cy = geometry.limbus.cy
-  const rp = geometry.pupil.r
-  const ri = geometry.limbus.r
-  const span = ri - rp
+/** SVG path за секторен сегмент в целия пръстенен пояс (IPB, STOM, ANW …). */
+export function sectorBandWedgePath(sector: number, ring: number, geometry: IrisGeometrySnapshot, viewSize: number): string {
   const band = ringBand(ring)
-  const inner = rp + span * (band.rings[0] / 12)
-  const outer = rp + span * ((band.rings[1] + 1) / 12)
-  const { start, end } = sectorAngles(sector)
-  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
-  const riScaled = outer * scale
-  const roScaled = inner * scale
-
-  const p1 = polarToView(cx, cy, inner, start, geometry, viewSize)
-  const p2 = polarToView(cx, cy, outer, start, geometry, viewSize)
-  const p3 = polarToView(cx, cy, outer, end, geometry, viewSize)
-  const p4 = polarToView(cx, cy, inner, end, geometry, viewSize)
-
-  const largeArc = end - start > Math.PI ? 1 : 0
-  return [
-    `M ${p1.x} ${p1.y}`,
-    `L ${p2.x} ${p2.y}`,
-    `A ${riScaled} ${riScaled} 0 ${largeArc} 1 ${p3.x} ${p3.y}`,
-    `L ${p4.x} ${p4.y}`,
-    `A ${roScaled} ${roScaled} 0 ${largeArc} 0 ${p1.x} ${p1.y}`,
-    'Z',
-  ].join(' ')
+  return bandPolygon(geometry, viewSize, (sector - 1) * 5, sector * 5, band.rings[0], band.rings[1] + 1)
 }
 
 /** SVG path за секторен сегмент между два пръстена. */
-export function sectorRingWedgePath(
-  sector: number,
-  ring: number,
-  geometry: IrisGeometrySnapshot,
-  viewSize: number
-): string {
-  const cx = geometry.limbus.cx
-  const cy = geometry.limbus.cy
-  const { scale } = fitImageInSquare(geometry.imageWidth, geometry.imageHeight, viewSize)
-  const { start, end } = sectorAngles(sector)
-  const { inner, outer } = ringBandRadii(ring, geometry)
-  const ri = outer * scale
-  const ro = inner * scale
-
-  const p1 = polarToView(cx, cy, inner, start, geometry, viewSize)
-  const p2 = polarToView(cx, cy, outer, start, geometry, viewSize)
-  const p3 = polarToView(cx, cy, outer, end, geometry, viewSize)
-  const p4 = polarToView(cx, cy, inner, end, geometry, viewSize)
-
-  const largeArc = end - start > Math.PI ? 1 : 0
-  return [
-    `M ${p1.x} ${p1.y}`,
-    `L ${p2.x} ${p2.y}`,
-    `A ${ri} ${ri} 0 ${largeArc} 1 ${p3.x} ${p3.y}`,
-    `L ${p4.x} ${p4.y}`,
-    `A ${ro} ${ro} 0 ${largeArc} 0 ${p1.x} ${p1.y}`,
-    'Z',
-  ].join(' ')
+export function sectorRingWedgePath(sector: number, ring: number, geometry: IrisGeometrySnapshot, viewSize: number): string {
+  return bandPolygon(geometry, viewSize, (sector - 1) * 5, sector * 5, ring, ring + 1)
 }
 
 /** Център на клетка в viewBox координати. */
-export function cellCenterInView(
-  sector: number,
-  ring: number,
-  geometry: IrisGeometrySnapshot,
-  viewSize: number
-): { x: number; y: number } {
-  const pt = cellCenterInImage(sector, ring, geometry)
-  const { scale, offsetX, offsetY } = fitImageInSquare(
-    geometry.imageWidth,
-    geometry.imageHeight,
-    viewSize
-  )
-  return { x: pt.x * scale + offsetX, y: pt.y * scale + offsetY }
+export function cellCenterInView(sector: number, ring: number, geometry: IrisGeometrySnapshot, viewSize: number): { x: number; y: number } {
+  return toView(cellCenterInImage(sector, ring, geometry), geometry, viewSize)
 }

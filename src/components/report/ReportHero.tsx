@@ -117,7 +117,7 @@ export default function ReportHero({
           {focus.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2 md:justify-start">
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-                <Target size={14} weight="duotone" /> Започнете с:
+                <Target size={14} weight="duotone" /> Основни области:
               </span>
               {focus.map((s, i) => (
                 <motion.span

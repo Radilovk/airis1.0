@@ -11,7 +11,6 @@ import {
   CheckCircle,
   ClipboardText,
   Eye,
-  ForkKnife,
   Scales,
   SealCheck,
   ShieldWarning,
@@ -97,10 +96,10 @@ const SOURCE: Record<Driver['source'], { label: string; icon: typeof Eye; style:
 
 /** Степен вместо голо число — числото без контекст плаши повече, отколкото казва. */
 function level(score: number) {
-  if (score < 60) return { label: 'започнете оттук', bar: 'from-amber-400 to-orange-500', text: 'text-amber-800' }
+  if (score < 60) return { label: 'изисква най-много внимание', bar: 'from-amber-400 to-orange-500', text: 'text-amber-800' }
   // Същите граници като описанието на системата: под 80 има сигнали.
   if (score < 80) return { label: 'заслужава внимание', bar: 'from-amber-300 to-amber-500', text: 'text-amber-700' }
-  return { label: 'поддръжка', bar: 'from-emerald-400 to-teal-500', text: 'text-emerald-700' }
+  return { label: 'в добро състояние', bar: 'from-emerald-400 to-teal-500', text: 'text-emerald-700' }
 }
 
 function SourceChip({ source }: { source: Driver['source'] }) {
@@ -115,13 +114,11 @@ function SourceChip({ source }: { source: Driver['source'] }) {
 
 function FocusCard({
   system,
-  drivers,
   rank,
   evidence,
   onOpenIris,
 }: {
   system: System
-  drivers: Driver[]
   rank: number
   evidence: Evidence[]
   onOpenIris?: () => void
@@ -157,60 +154,50 @@ function FocusCard({
 
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{system.description}</p>
 
-        {evidence.length > 0 && (
-          <button
-            type="button"
-            onClick={onOpenIris}
-            className="mt-3 flex w-full items-start gap-2 rounded-xl bg-muted/50 px-3 py-2.5 text-left text-sm transition active:scale-[0.99]"
-          >
-            <Eye size={16} weight="duotone" className="mt-0.5 shrink-0 text-primary" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Ирисов анализ
-              </span>
-              {evidence.map(e => (
-                <span key={e.label} className="block leading-snug">
-                  {e.label} <span className="text-muted-foreground">· {e.where}</span>
-                </span>
-              ))}
-            </span>
-          </button>
-        )}
-
-        {drivers.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {drivers.map(d => (
-              <div key={d.id} className="rounded-xl bg-primary/5 p-3 ring-1 ring-primary/15">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                  <ForkKnife size={13} weight="bold" /> Какво да направите
-                </p>
-                <p className="mt-1 text-[15px] leading-relaxed">{d.action}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                  Основание: <SourceChip source={d.source} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {answers.length > 0 && (
-          <Collapsible open={open} onOpenChange={setOpen}>
-            <CollapsibleTrigger className="mt-2 flex min-h-11 items-center gap-1 text-xs font-medium text-primary">
-              {open ? 'Скрий' : 'От вашите отговори'}
-              <CaretDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <ul className="space-y-1.5 border-t pt-3 text-sm text-muted-foreground">
-                {answers.map((r, k) => (
-                  <li key={k} className="flex gap-2">
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
-                    <span>{r}</span>
-                  </li>
+        {/* Основанието — двата източника, видими, без съвети. Съветите са в плана. */}
+        <div className="mt-3 space-y-2">
+          {answers.length > 0 && (
+            <div className="rounded-xl bg-muted/40 px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <ClipboardText size={13} weight="bold" /> От вашите отговори
+              </p>
+              <ul className="mt-1 space-y-0.5 text-sm leading-snug">
+                {answers.slice(0, open ? answers.length : 3).map((r, k) => (
+                  <li key={k}>{r}</li>
                 ))}
               </ul>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+              {answers.length > 3 && (
+                <button type="button" onClick={() => setOpen(v => !v)} className="mt-1 min-h-8 text-xs font-medium text-primary">
+                  {open ? 'По-малко' : `Още ${answers.length - 3}`}
+                </button>
+              )}
+            </div>
+          )}
+          {evidence.length > 0 && (
+            <button
+              type="button"
+              onClick={onOpenIris}
+              className="flex w-full items-start gap-2 rounded-xl bg-muted/40 px-3 py-2.5 text-left text-sm transition active:scale-[0.99]"
+            >
+              <Eye size={16} weight="duotone" className="mt-0.5 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  В ириса · вижте къде
+                </span>
+                {evidence.map(e => (
+                  <span key={e.label} className="block leading-snug">
+                    {e.label} <span className="text-muted-foreground">· {e.where}</span>
+                  </span>
+                ))}
+              </span>
+            </button>
+          )}
+          {answers.length > 0 && evidence.length > 0 && (
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+              <SealCheck size={13} weight="fill" /> Двата източника сочат едно и също
+            </p>
+          )}
+        </div>
       </Card>
     </motion.div>
   )
@@ -221,16 +208,13 @@ function FocusCard({
  * и един отговор: до три области, всяка с конкретна стъпка и с посочено
  * основание. Всичко останало е свито или е в другите табове.
  */
-export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }: Props) {
+export default function CalibratedInsightPanel({ data, onOpenIris }: Props) {
   const [moreOpen, setMoreOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
 
   const focus = topPrioritySystems(data)
   const evidence = evidenceBySystem(data)
   const focusKeys = new Set(focus.map(s => s.key))
-  const driversFor = (key: string) => data.drivers.filter(d => d.system === key).slice(0, 2)
-  const shownDriverIds = new Set(focus.flatMap(s => driversFor(s.key).map(d => d.id)))
-  const otherDrivers = data.drivers.filter(d => !shownDriverIds.has(d.id))
   const rest = data.systems.filter(s => !focusKeys.has(s.key)).sort((a, b) => a.score - b.score)
   const confirmed = data.confirmedCount ?? 0
 
@@ -253,36 +237,27 @@ export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }:
       )}
 
       <div>
-        <h3 className="text-lg font-bold">Къде храненето ще помогне най-много</h3>
+        <h3 className="text-lg font-bold">Какво показва анализът</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           {focus.length > 0
-            ? `${focus.length === 1 ? 'Една област' : `${focus.length} области`}, подредени по това откъде да започнете.`
-            : 'Няма област, която да изисква специален фокус — планът поддържа доброто състояние.'}
+            ? `${focus.length === 1 ? 'Една област изисква' : `${focus.length} области изискват`} внимание — подредени по важност. Под всяка е основанието: вашите отговори и знаците в ириса.`
+            : 'Няма област, която да изисква специално внимание.'}
         </p>
         <div className="mt-4 space-y-3">
           {focus.map((s, i) => (
             <FocusCard
               key={s.key}
               system={s}
-              drivers={driversFor(s.key)}
               rank={i}
               evidence={evidence.get(s.key) ?? []}
               onOpenIris={onOpenIris}
             />
           ))}
         </div>
-        {onOpenPlan && (
-          <button
-            type="button"
-            onClick={onOpenPlan}
-            className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-[15px] font-semibold text-primary-foreground shadow-md transition active:scale-[0.99]"
-          >
-            <ForkKnife size={18} weight="bold" /> Вижте храните, добавките и навиците
-          </button>
-        )}
+
       </div>
 
-      {(rest.length > 0 || otherDrivers.length > 0) && (
+      {rest.length > 0 && (
         <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
           <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between rounded-xl border bg-card px-4 py-3 text-sm font-medium active:bg-muted/50">
             <span className="flex items-center gap-2">
@@ -295,7 +270,6 @@ export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }:
             <div className="mt-2 space-y-2">
               {rest.map(s => {
                 const lv = level(s.score)
-                const extra = otherDrivers.filter(d => d.system === s.key)
                 return (
                   <Card key={s.key} className="gap-1 p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -304,11 +278,7 @@ export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }:
                         {lv.label} · <span className="tabular-nums">{s.score}</span>
                       </span>
                     </div>
-                    {extra.map(d => (
-                      <p key={d.id} className="text-sm leading-relaxed text-muted-foreground">
-                        {d.action}
-                      </p>
-                    ))}
+                    <p className="text-sm leading-relaxed text-muted-foreground">{s.description}</p>
                   </Card>
                 )
               })}

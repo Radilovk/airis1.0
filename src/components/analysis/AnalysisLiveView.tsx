@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Check, CircleNotch, Warning } from '@phosphor-icons/react'
+import { irisPoint } from '@/lib/iris-coords'
 import type { IrisImage } from '@/types'
 import type { PipelineEvent } from '@/lib/iris-pipeline'
 
@@ -225,10 +226,12 @@ function ScanEye({ image, eye, scanning, label }: { image: IrisImage; eye: EyeSt
           </g>
           {/* знаците, които проверката по снимката потвърди */}
           {verified?.points.map((p, i) => {
+            // Същият модел като картата в отчета (`irisPoint`); без геометрия — по кръга на екрана.
+            const at = geo && fit ? irisPoint(geo, p.minute, p.ring) : null
             const t = (p.minute / 60) * Math.PI * 2
             const rad = pr + (lr - pr) * (p.ring / 12)
-            const x = S / 2 + rad * Math.sin(t)
-            const y = S / 2 - rad * Math.cos(t)
+            const x = at && fit ? at.x * fit.scale + fit.left : S / 2 + rad * Math.sin(t)
+            const y = at && fit ? at.y * fit.scale + fit.top : S / 2 - rad * Math.cos(t)
             return (
               <motion.g key={i} initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.12 }} style={{ transformOrigin: `${x}px ${y}px` }}>
                 <circle cx={x} cy={y} r={5.5} fill="none" stroke="#fff" strokeWidth={1.4} />
@@ -488,25 +491,6 @@ export default function AnalysisLiveView({
           </motion.li>
         ))}
       </ol>
-
-      {state.feed.length > 0 && (
-        <div className="rounded-xl bg-slate-950 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-slate-300" aria-live="polite">
-          <AnimatePresence initial={false}>
-            {state.feed.map((f, i) => (
-              <motion.p
-                key={f.id}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: i === 0 ? 1 : Math.max(0.35, 0.85 - i * 0.12), height: 'auto' }}
-                exit={{ opacity: 0 }}
-                className="truncate"
-              >
-                <span className={f.tone === 'ok' ? 'text-emerald-400' : f.tone === 'warn' ? 'text-amber-400' : 'text-sky-400'}>›</span>{' '}
-                {f.text}
-              </motion.p>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
 
       <p className="text-center text-xs text-muted-foreground">Обикновено отнема под минута. Не затваряйте приложението.</p>
     </div>

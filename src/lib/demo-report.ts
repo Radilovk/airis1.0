@@ -286,10 +286,10 @@ export function buildDemoReport(): AnalysisReport {
   })
 
   const systems: CalibratedAnalysisPayload['systems'] = [
-    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването след хранене и неравната коларета сочат към ритъма на храненето.', reasons: ['Неравна коларета', 'Подуване след хранене (въпросник)', 'Късна вечеря'] },
-    { key: 'nervous', label: 'Стрес и сън', score: 61, priority: true, description: 'Висок стрес, кратък сън и нервни пръстени в двете очи.', reasons: ['Нервни пръстени в двете очи', 'Сън 6 ч, качество „средно"', 'Стрес „висок"'] },
-    { key: 'metabolic', label: 'Кръвна захар и метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевата пигментация насочват към стабилна кръвна захар.', reasons: ['Оранжева пигментация', 'Сладко следобед'] },
-    { key: 'circulatory', label: 'Сърдечно-съдова система', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и натриев пръстен по края на ириса.', reasons: ['Фамилна анамнеза', 'Натриев пръстен'] },
+    { key: 'digestive', label: 'Храносмилане', score: 58, priority: true, description: 'Подуването след хранене и неравната коларета сочат към ритъма на храненето.', reasons: ['Неравна коларета — десен ирис', 'подуване или газове след хранене', 'храня се късно вечер'] },
+    { key: 'nervous', label: 'Стрес и сън', score: 61, priority: true, description: 'Висок стрес, кратък сън и нервни пръстени в двете очи.', reasons: ['Нервни пръстени — ляв ирис', 'Нервни пръстени — десен ирис', '6 ч сън — под нужното', 'високо ниво на стрес'] },
+    { key: 'metabolic', label: 'Кръвна захар и метаболизъм', score: 66, priority: true, description: 'Следобедният спад на енергия и оранжевата пигментация насочват към стабилна кръвна захар.', reasons: ['Оранжева пигментация — десен ирис', 'силен апетит за сладко', 'спад на енергия следобед'] },
+    { key: 'circulatory', label: 'Сърдечно-съдова система', score: 72, priority: false, description: 'Фамилна обремененост с холестерол и натриев пръстен по края на ириса.', reasons: ['Натриев пръстен — ляв ирис', 'холестерол в семейството'] },
     { key: 'detox', label: 'Черен дроб и бъбреци', score: 74, priority: false, description: 'Без силни знаци.', reasons: [] },
     { key: 'immune', label: 'Имунна система', score: 78, priority: false, description: 'Без изразен възпалителен фон.', reasons: [] },
     { key: 'endocrine', label: 'Хормони и щитовидна жлеза', score: 80, priority: false, description: 'Стабилно.', reasons: [] },

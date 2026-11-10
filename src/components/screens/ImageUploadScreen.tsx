@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { CheckCircle, ArrowRight, X, Crop, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
+import { CheckCircle, ArrowRight, X, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
 import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import IrisCropEditor from '@/components/iris/IrisCropEditor'
+import { autoCalibrate } from '@/lib/iris-autocalibrate'
 import IrisCalibrator from '@/components/iris/IrisCalibrator'
 import { loadFaceTracker } from '@/lib/face-tracker'
 import { cropEyesFromPhoto } from '@/lib/eye-crop'
@@ -17,7 +17,7 @@ import type { IrisGeometrySnapshot, IrisImage } from '@/types'
 
 // Compression and size limit constants
 // Iris images need ≥1600px width to preserve fine medical detail (lacunae, crypts, radial lines).
-// Shared with IrisCropEditor – keep in sync.
+// Размерът, до който се свива снимката на окото.
 export const IRIS_MAX_DIMENSION = 1600
 const SECOND_PASS_THRESHOLD_BYTES = 3 * 1024 * 1024 // 3 MB – only re-compress truly large files
 const MAX_FINAL_SIZE_BYTES = 5 * 1024 * 1024        // 5 MB – supports 1600px JPEG at q=0.92
@@ -54,7 +54,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   // `handleFileSelect` е async и не вижда актуалния state, затова огледални ref-ове.
   const editingSideRef = useRef<'left' | 'right' | null>(null)
   const calibratingRef = useRef<unknown>(null)
-  const [tempImageData, setTempImageData] = useState<string | null>(null)
   // Стъпката „калибриране" се показва веднага след изрязването: там се измерва
   // геометрията и се решава дали снимката изобщо става за анализ.
   const [calibrating, setCalibrating] = useState<{ side: 'left' | 'right'; dataUrl: string } | null>(null)
@@ -68,12 +67,8 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     const next = pendingCropRef.current
     if (!next) return
     pendingCropRef.current = null
-    if (next.auto) {
-      void handleCropSaveRef.current?.(next.dataUrl, next.side)
-      return
-    }
-    setTempImageData(next.dataUrl)
-    setEditingSide(next.side)
+    // Ръчно изрязване няма — снимката отива направо към разпознаването.
+    void handleCropSaveRef.current?.(next.dataUrl, next.side)
   }, [editingSide, calibrating])
   // Ефектът по-горе е деклариран преди `handleCropSave`; достъпва го през ref.
   const handleCropSaveRef = useRef<((d: string, s: 'left' | 'right') => Promise<void>) | null>(null)
@@ -404,15 +399,14 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         }
         if (framed) {
           setIsProcessing(false)
-          toast.success(`${side === 'left' ? 'Лявото' : 'Дясното'} око е намерено и центрирано`, {
-            description: 'Проверете кръговете и потвърдете.',
-          })
           await handleCropSave(framed.dataUrl, side)
           return
         }
-        setTempImageData(compressedDataUrl)
-        setEditingSide(side)
+        // Окото не е намерено уверено за изрязване — разпознаването върви върху
+        // цялата снимка. Ръчно изрязване вече няма: ако и тогава не е сигурно,
+        // се отваря един екран с кръговете.
         setIsProcessing(false)
+        await handleCropSave(compressedDataUrl, side)
       } catch (error) {
         uploadDiagnostics.log('FILE_PROCESSING_ERROR', 'error', {
           side,
@@ -556,7 +550,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         toast.error(`Изображението е твърде голямо (${Math.round(finalImage.length / 1024)} KB). Моля, опитайте с по-малка снимка или по-ниска резолюция.`)
         setIsProcessing(false)
         setEditingSide(null)
-        setTempImageData(null)
         return
       }
       
@@ -595,7 +588,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       console.log('🧹 [UPLOAD] Clearing temp data before saving to ref...')
       
       uploadDiagnostics.log('CLEAR_TEMP_DATA', 'info')
-      setTempImageData(null)
       setEditingSide(null)
       
       await new Promise(resolve => setTimeout(resolve, 50))
@@ -654,9 +646,27 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       setIsProcessing(false)
       console.log(`✅ [UPLOAD] ${savedSide === 'left' ? 'Left' : 'Right'} iris saved successfully`)
 
-      // Веднага след изрязването минаваме през калибрирането. Дотогава снимката
-      // е записана, но НЯМА геометрия — а без геометрия анализът не тръгва.
-      setCalibrating({ side: savedSide, dataUrl: image.dataUrl })
+      // Зеницата и ирисът се разпознават автоматично. Ако разпознаването е
+      // сигурно и снимката става за анализ, резултатът се приема без ръчна
+      // стъпка; иначе се отваря един екран с кръговете.
+      setIsProcessing(true)
+      const auto = await autoCalibrate(image.dataUrl, savedSide).catch(() => null)
+      setIsProcessing(false)
+      if (!isMountedRef.current) return
+      const sideName = savedSide === 'left' ? 'Лявото' : 'Дясното'
+      if (auto?.confident) {
+        const target = savedSide === 'left' ? leftImageRef : rightImageRef
+        if (target.current) target.current = { ...target.current, geometry: auto.geometry, quality: auto.quality }
+        setImagesVersion(v => v + 1)
+        toast.success(`${sideName} око е разпознато · качество ${auto.quality.score}/100`, {
+          description: 'Зеницата и ирисът са намерени автоматично. Ако нещо не е наред — „Коригирай“.',
+        })
+      } else {
+        toast.info(`${sideName} око: проверете кръговете`, {
+          description: auto?.reason ?? 'Разпознаването не е сигурно.',
+        })
+        setCalibrating({ side: savedSide, dataUrl: image.dataUrl })
+      }
     } catch (error) {
       uploadDiagnostics.log('CROP_SAVE_ERROR', 'error', {
         activeSide,
@@ -673,25 +683,10 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       toast.error(`Грешка при запазване: ${error instanceof Error ? error.message : 'Неизвестна грешка'}`)
       setIsProcessing(false)
       setEditingSide(null)
-      setTempImageData(null)
     }
   }
 
   handleCropSaveRef.current = handleCropSave
-
-  const handleCropCancel = () => {
-    setEditingSide(null)
-    setTempImageData(null)
-    setIsProcessing(false)
-  }
-
-  const handleEditImage = (side: 'left' | 'right') => {
-    const image = side === 'left' ? leftImageRef.current : rightImageRef.current
-    if (!image) return
-    
-    setTempImageData(image.dataUrl)
-    setEditingSide(side)
-  }
 
   const handleDrop = (side: 'left' | 'right', e: React.DragEvent) => {
     e.preventDefault()
@@ -968,7 +963,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
             <p className="text-muted-foreground">
               {isReanalysis
                 ? 'Ще използваме предишните ви отговори от въпросника.'
-                : 'Окото се намира и центрира само. Вие само проверявате кръговете.'}
+                : 'Зеницата и ирисът се разпознават автоматично. Ако кръговете не са точни — „Коригирай“.'}
             </p>
           </motion.div>
 
@@ -1018,7 +1013,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                   onFile={file => handleFileSelect(side, file)}
                   onDrop={e => !isProcessing && handleDrop(side, e)}
                   onCalibrate={() => openCalibrator(side)}
-                  onCrop={() => handleEditImage(side)}
                   onRemove={() => removeImage(side)}
                 />
               </motion.div>
@@ -1048,15 +1042,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           </motion.div>
         </div>
       </div>
-
-      {editingSide && tempImageData && !isProcessing && (
-        <IrisCropEditor
-          imageDataUrl={tempImageData}
-          side={editingSide}
-          onSave={handleCropSave}
-          onCancel={handleCropCancel}
-        />
-      )}
 
       {calibrating && (
         <IrisCalibrator
@@ -1133,6 +1118,34 @@ function UploadStepper({ step }: { step: number }) {
   )
 }
 
+/** Кръговете на зеницата и ириса върху снимката (object-contain). */
+function DetectedOverlay({ geometry }: { geometry: IrisGeometrySnapshot }) {
+  const W = geometry.imageWidth
+  const H = geometry.imageHeight
+  if (!W || !H) return null
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="pointer-events-none absolute inset-0 h-full w-full">
+      <ellipse
+        cx={geometry.limbus.cx}
+        cy={geometry.limbus.cy}
+        rx={geometry.limbus.r}
+        ry={geometry.limbus.ry ?? geometry.limbus.r}
+        fill="none"
+        stroke="rgba(251,191,36,0.95)"
+        strokeWidth={Math.max(3, W / 140)}
+      />
+      <circle
+        cx={geometry.pupil.cx}
+        cy={geometry.pupil.cy}
+        r={geometry.pupil.r}
+        fill="none"
+        stroke="rgba(56,189,248,0.95)"
+        strokeWidth={Math.max(3, W / 140)}
+      />
+    </svg>
+  )
+}
+
 /**
  * Едно око: празно — два ясни бутона (снимай / от галерията) и място за
  * пускане на файл; заредено — снимката с винаги видими действия.
@@ -1146,7 +1159,6 @@ function EyeSlot({
   onFile,
   onDrop,
   onCalibrate,
-  onCrop,
   onRemove,
 }: {
   side: 'left' | 'right'
@@ -1157,7 +1169,6 @@ function EyeSlot({
   onFile: (file: File) => void
   onDrop: (e: React.DragEvent) => void
   onCalibrate: () => void
-  onCrop: () => void
   onRemove: () => void
 }) {
   const label = side === 'left' ? 'Ляво око' : 'Дясно око'
@@ -1198,15 +1209,14 @@ function EyeSlot({
         </div>
       ) : (
         <>
-          <button type="button" onClick={onCalibrate} className="block w-full overflow-hidden rounded-2xl bg-black">
-            <img src={image.dataUrl} alt={label} className="mx-auto h-60 w-full object-contain" />
+          {/* Снимката с намерените граници — човекът вижда какво е разпознато. */}
+          <button type="button" onClick={onCalibrate} className="relative block h-60 w-full overflow-hidden rounded-2xl bg-black">
+            <img src={image.dataUrl} alt={label} className="absolute inset-0 h-full w-full object-contain" />
+            {image.geometry && <DetectedOverlay geometry={image.geometry} />}
           </button>
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <Button variant={image.geometry ? 'outline' : 'default'} className="gap-1.5" onClick={onCalibrate}>
-              <Crosshair size={16} weight="bold" /> Настрой
-            </Button>
-            <Button variant="outline" className="gap-1.5" onClick={onCrop}>
-              <Crop size={16} weight="bold" /> Изрежи
+              <Crosshair size={16} weight="bold" /> {image.geometry ? 'Коригирай' : 'Настрой'}
             </Button>
             <Button variant="outline" className="gap-1.5 text-rose-600 hover:text-rose-700" onClick={onRemove}>
               <X size={16} weight="bold" /> Премахни

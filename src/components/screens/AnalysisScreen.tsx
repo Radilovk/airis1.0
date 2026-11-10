@@ -6,8 +6,7 @@ import type { IrisUnwrapResult } from '@/hooks/useIrisUnwrap'
 import { Card } from '@/components/ui/card'
 import AnalysisLiveView, { useLiveState } from '@/components/analysis/AnalysisLiveView'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Sparkle, Warning, Bug } from '@phosphor-icons/react'
+import { Sparkle, Warning } from '@phosphor-icons/react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
@@ -57,16 +56,12 @@ export default function AnalysisScreen({
   const [progress, setProgress] = useState(0)
   const [liveState, dispatchLive] = useLiveState()
   const [status, setStatus] = useState('Зареждане на настройките...')
-  const [logs, setLogs] = useState<LogEntry[]>([])
-  const [showDebug, setShowDebug] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const reduceMotion = useReducedMotion()
   const [analysisStarted, setAnalysisStarted] = useState(false)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [loadedConfig, setLoadedConfig] = useState<AIModelConfig | null>(null)
   const [analysisRunning, setAnalysisRunning] = useState(false)
-  const [diagnosticResponses, setDiagnosticResponses] = useState<{left?: string, right?: string}>({})
-  const [showDiagnostics, setShowDiagnostics] = useState(true)
 
   // Iris unwrap integration – calls method1/app.py when VITE_IRIS_BACKEND_URL is set
   const {
@@ -123,8 +118,7 @@ export default function AnalysisScreen({
   const [pipelineConfig] = useKVWithFallback<PipelineConfig>('pipeline-config', DEFAULT_PIPELINE_CONFIG)
 
   const addLog = (level: LogEntry['level'], message: string) => {
-    const timestamp = new Date().toLocaleTimeString('bg-BG', { hour12: false })
-    setLogs(prev => [...prev, { timestamp, level, message }])
+    // Логовете отиват само в конзолата — на екрана ги няма.
     
     const emoji = {
       info: '📝',
@@ -133,7 +127,7 @@ export default function AnalysisScreen({
       warning: '⚠️'
     }[level]
     
-    console.log(`${emoji} [${timestamp}] ${message}`)
+    console.log(`${emoji} ${message}`)
   }
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -1315,7 +1309,6 @@ ${response}
       console.error('❌ [ГРЕШКА] Текущ статус при грешка:', status)
       
       setStatus(`Грешка: ${userFriendlyMessage.split('\n\n')[0]}`)
-      setShowDebug(true)
     }
   }
 
@@ -1411,7 +1404,6 @@ ${response}
           console.log(`🔍 [ИРИС ${side}] ====================================================`)
           
           // Store diagnostic response in state
-          setDiagnosticResponses(prev => ({ ...prev, [side]: diagnosticResponse }))
           
           // Log a short version to the UI logs
           const shortDiag = diagnosticResponse.length > 200 
@@ -2566,7 +2558,6 @@ JSON формат:
                       dispatchLive({ kind: 'reset' })
                       setProgress(0)
                       setStatus('Подготовка за анализ...')
-                      setLogs([])
                       performAnalysis()
                     }}
                     className="gap-2"
@@ -2583,117 +2574,6 @@ JSON формат:
                   </Button>
                 </div>
               </>
-            )}
-
-            <div className="mt-8 flex gap-2 justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDebug(!showDebug)}
-                className="gap-2"
-              >
-                <Bug size={16} />
-                {showDebug ? 'Скрий детайли' : 'Технически детайли'}
-              </Button>
-              
-              {(diagnosticResponses.left || diagnosticResponses.right) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDiagnostics(!showDiagnostics)}
-                  className="gap-2"
-                >
-                  <Sparkle size={16} />
-                  {showDiagnostics ? 'Скрий диагностика' : 'Покажи AI диагностика'}
-                </Button>
-              )}
-            </div>
-
-            {showDebug && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-6"
-              >
-                <Card className="p-4 bg-muted/50">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Bug size={20} className="text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">Технически логове</h3>
-                  </div>
-                  <ScrollArea className="h-[300px] w-full">
-                    <div className="space-y-1 text-left">
-                      {logs.map((log, index) => (
-                        <div
-                          key={index}
-                          className={`text-xs font-mono p-2 rounded ${
-                            log.level === 'error'
-                              ? 'bg-destructive/10 text-destructive'
-                              : log.level === 'success'
-                              ? 'bg-primary/10 text-primary'
-                              : log.level === 'warning'
-                              ? 'bg-accent/10 text-accent'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          <span className="opacity-60">[{log.timestamp}]</span>{' '}
-                          <span className="font-semibold uppercase text-[10px]">
-                            {log.level}
-                          </span>
-                          : {log.message}
-                        </div>
-                      ))}
-                      {logs.length === 0 && (
-                        <p className="text-xs text-muted-foreground text-center py-4">
-                          Няма логове
-                        </p>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </Card>
-              </motion.div>
-            )}
-            
-            {showDiagnostics && (diagnosticResponses.left || diagnosticResponses.right) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-6"
-              >
-                <Card className="p-4 bg-muted/50">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkle size={20} className="text-primary" />
-                    <h3 className="text-sm font-semibold">Диагностика — какво вижда моделът</h3>
-                  </div>
-                  <div className="space-y-4 text-left">
-                    {diagnosticResponses.left && (
-                      <div className="p-3 bg-background rounded-lg border border-border">
-                        <div className="text-xs font-semibold text-muted-foreground mb-2">
-                          👁️ ЛЯВ ИРИС:
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                          {diagnosticResponses.left}
-                        </p>
-                      </div>
-                    )}
-                    {diagnosticResponses.right && (
-                      <div className="p-3 bg-background rounded-lg border border-border">
-                        <div className="text-xs font-semibold text-muted-foreground mb-2">
-                          👁️ ДЕСЕН ИРИС:
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                          {diagnosticResponses.right}
-                        </p>
-                      </div>
-                    )}
-                    <div className="mt-3 p-2 bg-accent/10 rounded text-xs text-muted-foreground">
-                      ℹ️ Тази диагностика показва какво AI моделът реално вижда в изображенията преди структурирания анализ. 
-                      Използвайте я за да проверите дали изображенията са качествени и дали AI може да открие находки.
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
             )}
           </Card>
         </motion.div>
