@@ -1,3 +1,4 @@
+import { waterLitresOf, formatLitres, waterIsEnough, waterIsLow } from '@/lib/water'
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -63,7 +64,7 @@ function getSupportingFactors(report: AnalysisReport) {
   if (report.questionnaireData.sleepHours >= 7 && report.questionnaireData.sleepHours <= 9) {
     factors.push('Добър сън')
   }
-  if (report.questionnaireData.hydration >= 8) {
+  if (waterIsEnough(report.questionnaireData)) {
     factors.push('Добра хидратация')
   }
   if (report.questionnaireData.stressLevel === 'low' || report.questionnaireData.stressLevel === 'moderate') {
@@ -106,7 +107,7 @@ function getLimitingFactors(report: AnalysisReport) {
     factors.push('Ниска физическа активност')
   }
   
-  if (report.questionnaireData.hydration < 6) {
+  if (waterIsLow(report.questionnaireData)) {
     factors.push('Ниска хидратация')
   }
   
@@ -176,9 +177,9 @@ export default function OverviewTabFullyEditable({ report, avgHealth, editorMode
       {
         icon: Drop,
         label: 'Хидратация',
-        value: `${report.questionnaireData.hydration} чаши`,
-        quality: report.questionnaireData.hydration >= 8 ? 'добра' : 'недостатъчна',
-        score: report.questionnaireData.hydration >= 8 ? 'good' : 'needs-attention'
+        value: formatLitres(waterLitresOf(report.questionnaireData)),
+        quality: waterIsEnough(report.questionnaireData) ? 'добра' : 'недостатъчна',
+        score: waterIsEnough(report.questionnaireData) ? 'good' : 'needs-attention'
       },
       {
         icon: Lightning,

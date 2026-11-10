@@ -1,3 +1,4 @@
+import { waterLitresOf, formatLitres, waterIsEnough, waterIsLow } from '@/lib/water'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -85,9 +86,9 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
       {
         icon: Drop,
         label: 'Хидратация',
-        value: `${report.questionnaireData.hydration} чаши`,
-        quality: report.questionnaireData.hydration >= 8 ? 'добра' : 'недостатъчна',
-        score: report.questionnaireData.hydration >= 8 ? 'good' : 'needs-attention'
+        value: formatLitres(waterLitresOf(report.questionnaireData)),
+        quality: waterIsEnough(report.questionnaireData) ? 'добра' : 'недостатъчна',
+        score: waterIsEnough(report.questionnaireData) ? 'good' : 'needs-attention'
       },
       {
         icon: Lightning,
@@ -353,7 +354,7 @@ export default function OverviewTab({ report, avgHealth }: OverviewTabProps) {
         <Card className="p-5">
           <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
             <TrendUp size={18} weight="duotone" className="text-green-600" />
-            Подкрепящи Фактори
+            Какво ви помага
           </h3>
           <div className="space-y-2">
             {supportingFactors.map((factor, idx) => (
@@ -416,7 +417,7 @@ function calculateGoalAchievability(report: AnalysisReport): Record<string, numb
       if (report.questionnaireData.sleepQuality === 'excellent' || report.questionnaireData.sleepQuality === 'good') {
         score += 10
       }
-      if (report.questionnaireData.hydration >= 8) {
+      if (waterIsEnough(report.questionnaireData)) {
         score += 5
       }
     }
@@ -462,7 +463,7 @@ function getSupportingFactors(report: AnalysisReport): string[] {
     Math.max(1, [...report.leftIris.systemScores, ...report.rightIris.systemScores]
       .filter(s => s.system.toLowerCase().includes('детоксикац')).length)
 
-  if (report.questionnaireData.hydration >= 8 && detoxSystemScore >= 65) {
+  if (waterIsEnough(report.questionnaireData) && detoxSystemScore >= 65) {
     factors.push('Добра хидратация и ефективна детоксикация')
   }
 
@@ -549,7 +550,7 @@ function getLimitingFactors(report: AnalysisReport): string[] {
     ? detoxSystemScores.reduce((sum, s) => sum + s.score, 0) / detoxSystemScores.length
     : 70
 
-  if (report.questionnaireData.hydration < 6 && detoxSystemScore < 65) {
+  if (waterIsLow(report.questionnaireData) && detoxSystemScore < 65) {
     factors.push('Недостатъчна хидратация влошаваща детоксикацията')
   }
 

@@ -9,7 +9,7 @@ import {
   X,
 } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
-import { cellCenterInView, findingOverlayPath, ringTopCenterInView } from '@/lib/iris-coords'
+import { findingOverlayPath } from '@/lib/iris-coords'
 import { isCircumferentialFinding, sectorsFor, RING_BANDS } from '@/lib/iris-map'
 import { groupFindingsForDisplay, isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
 import { readFinding, rankKeySigns, isConfirmedFinding, type SignalStrength } from '@/lib/iris-reading'
@@ -54,13 +54,114 @@ function wedgePath(cx: number, cy: number, r0: number, r1: number, sector: numbe
   return `M${a.x},${a.y} A${r1},${r1} 0 0 1 ${b.x},${b.y} L${c.x},${c.y} A${r0},${r0} 0 0 0 ${d.x},${d.y} Z`
 }
 
-function markerPoint(f: Finding, geometry: IrisGeometrySnapshot) {
-  return isCircumferentialFinding(f.type)
-    ? ringTopCenterInView(f.ring, geometry, VIEW)
-    : cellCenterInView(f.sector, f.ring, geometry, VIEW)
+type Overlay = { cx: number; cy: number; pr: number; lr: number }
+
+interface Mark {
+  index: number
+  strength: SignalStrength
+  /** 'circle' — точно измерено място; 'region' — само зоната (стари отчети, пръстени). */
+  shape: 'circle' | 'region'
+  /** Центърът на знака във viewBox. */
+  x: number
+  y: number
+  /** Радиус на кръга около знака. */
+  r: number
+  path?: string
+  /** Номерът — извън ириса. */
+  lx: number
+  ly: number
+  /** Върхът на стрелката — на ръба на кръга (или в центъра на зоната). */
+  tx: number
+  ty: number
 }
 
-/** Голямото интерактивно око: снимка + карта на зоните + номерирани знаци. */
+/**
+ * Разполага знаците: кръг около мястото, номер извън ириса и стрелка до
+ * кръга. Номерът никога не стои върху самия знак — иначе закрива точно това,
+ * което човекът трябва да види.
+ */
+function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Overlay): Mark[] {
+  const span = ov.lr - ov.pr
+  const ringPx = span / 12
+  const base = findings.map((f, index) => {
+    const strength = readFinding(f).strength
+    const circum = isCircumferentialFinding(f.type)
+    let minute: number
+    let ring: number
+    let shape: Mark['shape']
+    if (f.anchor && !circum) {
+      minute = f.anchor.minute
+      ring = f.anchor.ring
+      shape = 'circle'
+    } else if (circum) {
+      // Пръстенът няма една точка — стрелката сочи горе вдясно по него.
+      minute = 7.5
+      ring = f.ring + 0.5
+      shape = 'region'
+    } else {
+      minute = (f.sector - 0.5) * 5
+      ring = f.ring + 0.5
+      shape = 'region'
+    }
+    const t = (minute / 60) * Math.PI * 2
+    const rad = ov.pr + span * (ring / 12)
+    const x = ov.cx + rad * Math.sin(t)
+    const y = ov.cy - rad * Math.cos(t)
+    return {
+      index,
+      strength,
+      shape,
+      minute,
+      x,
+      y,
+      r: Math.max(7, ringPx * 1.15),
+      path: shape === 'region' ? findingOverlayPath(f, geometry, VIEW) : undefined,
+    }
+  })
+
+  // Номерата по обиколката извън ириса; съседните се раздалечават, за да не се застъпват.
+  const labelR = Math.min(ov.lr + 22, Math.max(ov.lr + 10, Math.min(ov.cx, ov.cy, VIEW - ov.cx, VIEW - ov.cy) - 12))
+  const minGap = (24 / (2 * Math.PI * labelR)) * 60 // минути за ~24 px
+  const order = base.slice().sort((a, b) => a.minute - b.minute)
+  const pos = order.map(m => m.minute)
+  const n = pos.length
+  for (let iter = 0; n > 1 && iter < 40; iter++) {
+    let moved = false
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n
+      const gap = pos[j] - pos[i] + (j === 0 ? 60 : 0)
+      if (gap < minGap) {
+        const push = (minGap - gap) / 2
+        pos[i] -= push
+        pos[j] += push
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
+  const labelMinute = new Map(order.map((m, i) => [m.index, pos[i]]))
+
+  return base.map(m => {
+    const lm = labelMinute.get(m.index) ?? m.minute
+    const lt = (lm / 60) * Math.PI * 2
+    const lx = Math.max(12, Math.min(VIEW - 12, ov.cx + labelR * Math.sin(lt)))
+    const ly = Math.max(12, Math.min(VIEW - 12, ov.cy - labelR * Math.cos(lt)))
+    // Стрелката спира на ръба на кръга — не влиза върху самия знак.
+    const dx = m.x - lx
+    const dy = m.y - ly
+    const d = Math.hypot(dx, dy) || 1
+    const stop = m.shape === 'circle' ? m.r + 2 : Math.min(ringPx * 0.8, d * 0.3)
+    return {
+      ...m,
+      lx,
+      ly,
+      tx: m.x - (dx / d) * stop,
+      ty: m.y - (dy / d) * stop,
+    }
+  })
+}
+
+/** Голямото интерактивно око: снимка + карта на зоните + знаци със стрелки. */
 function EyeStage({
   side,
   dataUrl,
@@ -81,6 +182,7 @@ function EyeStage({
   showMarks: boolean
 }) {
   const ov = useOverlay(geometry)
+  const marks = useMemo(() => (ov && geometry ? layoutMarks(findings, geometry, ov) : []), [findings, geometry, ov])
   const [hoverSector, setHoverSector] = useState<number | null>(null)
   const sectors = sectorsFor(side)
   const hovered = hoverSector ? sectors[hoverSector - 1] : null
@@ -148,52 +250,97 @@ function EyeStage({
           <circle cx={ov.cx} cy={ov.cy} r={ov.lr} fill="none" stroke="rgba(251,191,36,0.75)" strokeWidth={1.4} strokeDasharray="5 4" className="pointer-events-none" />
           <circle cx={ov.cx} cy={ov.cy} r={ov.pr} fill="none" stroke="rgba(56,189,248,0.85)" strokeWidth={1.4} className="pointer-events-none" />
 
+          {showMarks && (
+            <defs>
+              {(['clear', 'moderate', 'faint'] as const).map(k => (
+                <marker
+                  key={k}
+                  id={`arrow-${side}-${k}`}
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="5"
+                  markerHeight="5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0,0 L10,5 L0,10 z" fill={STRENGTH_STYLE[k].dot} stroke="#fff" strokeWidth={1} />
+                </marker>
+              ))}
+            </defs>
+          )}
+
+          {/* Областта на знака: само контур, без запълване — снимката под него се вижда. */}
           {showMarks &&
-            findings.map((f, i) => {
-              const s = STRENGTH_STYLE[readFinding(f).strength]
+            marks.map(m => {
+              const s = STRENGTH_STYLE[m.strength]
+              const on = active === m.index
+              const dim = active !== null && !on
+              if (m.shape === 'circle') {
+                return (
+                  <g key={`r${m.index}`} className="pointer-events-none" opacity={dim ? 0.35 : 1}>
+                    <circle cx={m.x} cy={m.y} r={m.r} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={on ? 4 : 3} />
+                    <circle
+                      cx={m.x}
+                      cy={m.y}
+                      r={m.r}
+                      fill="none"
+                      stroke={on ? '#fff' : s.dot}
+                      strokeWidth={on ? 2 : 1.6}
+                      strokeDasharray={m.strength === 'clear' ? undefined : '3 2'}
+                    />
+                    {on && <circle cx={m.x} cy={m.y} r={m.r + 5} fill="none" stroke="#fff" strokeWidth={1.2} className="iris-pulse" />}
+                  </g>
+                )
+              }
               return (
                 <path
-                  key={`a${i}`}
-                  d={findingOverlayPath(f, geometry, VIEW)}
-                  fill={active === i ? s.fill : active === null ? s.fill.replace(/0\.\d+\)$/, '0.22)') : 'rgba(255,255,255,0.04)'}
-                  stroke={active === i ? '#fff' : 'rgba(255,255,255,0.25)'}
-                  strokeWidth={active === i ? 1.6 : 0.6}
-                  className="cursor-pointer transition-all duration-200"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onSelect(active === i ? null : i)
-                  }}
+                  key={`r${m.index}`}
+                  d={m.path}
+                  fill="none"
+                  stroke={on ? '#fff' : s.dot}
+                  strokeWidth={on ? 1.8 : 1.1}
+                  strokeDasharray="4 3"
+                  opacity={dim ? 0.3 : 0.9}
+                  className="pointer-events-none"
                 />
               )
             })}
 
+          {/* Стрелка от номера (извън ириса) до мястото на знака. */}
           {showMarks &&
-            findings.map((f, i) => {
-              const p = markerPoint(f, geometry)
-              const strength = readFinding(f).strength
-              const s = STRENGTH_STYLE[strength]
-              const on = active === i
+            marks.map(m => {
+              const s = STRENGTH_STYLE[m.strength]
+              const on = active === m.index
+              const dim = active !== null && !on
               return (
                 <g
-                  key={`m${i}`}
+                  key={`m${m.index}`}
                   className="cursor-pointer"
+                  opacity={dim ? 0.45 : 1}
                   onClick={e => {
                     e.stopPropagation()
-                    onSelect(on ? null : i)
+                    onSelect(on ? null : m.index)
                   }}
                   role="button"
-                  aria-label={`Знак ${i + 1}: ${f.label}`}
+                  aria-label={`Знак ${m.index + 1}: ${findings[m.index]?.label ?? ''}`}
                 >
-                  {on && (
-                    <circle cx={p.x} cy={p.y} r={14} fill="none" stroke="#fff" strokeWidth={1.5} className="iris-pulse" />
-                  )}
-                  {/* Ясният знак носи и външен пръстен — силата не се чете само по цвета. */}
-                  {strength === 'clear' && (
-                    <circle cx={p.x} cy={p.y} r={on ? 13 : 11} fill="none" stroke={s.dot} strokeWidth={1.8} />
-                  )}
-                  <circle cx={p.x} cy={p.y} r={on ? 10.5 : 8.5} fill={s.dot} stroke="#fff" strokeWidth={1.6} className="transition-all duration-200" />
-                  <text x={p.x} y={p.y + 3.4} textAnchor="middle" fontSize={on ? 10.5 : 9.5} fontWeight={800} fill="#fff" className="pointer-events-none">
-                    {i + 1}
+                  <line x1={m.lx} y1={m.ly} x2={m.tx} y2={m.ty} stroke="rgba(0,0,0,0.55)" strokeWidth={on ? 3.6 : 3} strokeLinecap="round" />
+                  <line
+                    x1={m.lx}
+                    y1={m.ly}
+                    x2={m.tx}
+                    y2={m.ty}
+                    stroke={on ? '#fff' : s.dot}
+                    strokeWidth={on ? 1.8 : 1.4}
+                    strokeLinecap="round"
+                    markerEnd={`url(#arrow-${side}-${m.strength})`}
+                  />
+                  {/* по-голяма невидима зона за докосване */}
+                  <circle cx={m.lx} cy={m.ly} r={16} fill="transparent" />
+                  {m.strength === 'clear' && <circle cx={m.lx} cy={m.ly} r={on ? 12.5 : 11} fill="none" stroke={s.dot} strokeWidth={1.6} />}
+                  <circle cx={m.lx} cy={m.ly} r={on ? 10 : 8.5} fill={s.dot} stroke="#fff" strokeWidth={1.6} />
+                  <text x={m.lx} y={m.ly + 3.4} textAnchor="middle" fontSize={on ? 10.5 : 9.5} fontWeight={800} fill="#fff" className="pointer-events-none">
+                    {m.index + 1}
                   </text>
                 </g>
               )
@@ -436,7 +583,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-gradient-to-r from-primary/5 via-transparent to-accent/5 px-5 py-4">
         <div>
           <h3 className="text-lg font-bold">Ирисов анализ</h3>
-          <p className="text-xs text-muted-foreground">Номерата отбелязват мястото на всеки знак в ириса.</p>
+          <p className="text-xs text-muted-foreground">Стрелката сочи всеки знак, кръгът огражда мястото му на снимката.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-muted p-1" role="tablist" aria-label="Око">

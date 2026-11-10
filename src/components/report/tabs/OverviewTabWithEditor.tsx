@@ -1,3 +1,4 @@
+import { waterLitresOf, formatLitres, waterIsEnough, waterIsLow } from '@/lib/water'
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -61,7 +62,7 @@ function getSupportingFactors(report: AnalysisReport) {
   if (report.questionnaireData.sleepHours >= 7 && report.questionnaireData.sleepHours <= 9) {
     factors.push('Добър сън')
   }
-  if (report.questionnaireData.hydration >= 8) {
+  if (waterIsEnough(report.questionnaireData)) {
     factors.push('Добра хидратация')
   }
   if (report.questionnaireData.stressLevel === 'low' || report.questionnaireData.stressLevel === 'moderate') {
@@ -104,7 +105,7 @@ function getLimitingFactors(report: AnalysisReport) {
     factors.push('Ниска физическа активност')
   }
   
-  if (report.questionnaireData.hydration < 6) {
+  if (waterIsLow(report.questionnaireData)) {
     factors.push('Ниска хидратация')
   }
   
@@ -172,9 +173,9 @@ export default function OverviewTabWithEditor({ report, avgHealth, editorMode = 
       {
         icon: Drop,
         label: 'Хидратация',
-        value: `${report.questionnaireData.hydration} чаши`,
-        quality: report.questionnaireData.hydration >= 8 ? 'добра' : 'недостатъчна',
-        score: report.questionnaireData.hydration >= 8 ? 'good' : 'needs-attention'
+        value: formatLitres(waterLitresOf(report.questionnaireData)),
+        quality: waterIsEnough(report.questionnaireData) ? 'добра' : 'недостатъчна',
+        score: waterIsEnough(report.questionnaireData) ? 'good' : 'needs-attention'
       },
       {
         icon: Lightning,
@@ -390,7 +391,7 @@ export default function OverviewTabWithEditor({ report, avgHealth, editorMode = 
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <TrendUp size={20} weight="duotone" className="text-green-600" />
-                    <h4 className="font-semibold text-sm">Подкрепящи Фактори</h4>
+                    <h4 className="font-semibold text-sm">Какво ви помага</h4>
                   </div>
                   <ul className="space-y-2">
                     {supportingFactors.map((factor, i) => (

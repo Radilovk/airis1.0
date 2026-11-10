@@ -74,13 +74,12 @@ type Driver = CalibratedAnalysisPayload['drivers'][number]
 type System = CalibratedAnalysisPayload['systems'][number]
 
 /**
- * Откъде идва изводът. Това е отговорът на „кое от това е реално“:
- * отговорите са стабилната основа, ирисът само уточнява, а когато двете
- * съвпадат — изводът е най-сигурен.
+ * Откъде идва изводът — в кръстосания анализ. Без проценти и дялове:
+ * показва се само дали изводът е потвърден от двата източника.
  */
 const SOURCE: Record<Driver['source'], { label: string; icon: typeof Eye; style: string }> = {
   both: {
-    label: 'отговорите + ирисът',
+    label: 'потвърдено кръстосано',
     icon: SealCheck,
     style: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   },
@@ -234,7 +233,6 @@ export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }:
   const otherDrivers = data.drivers.filter(d => !shownDriverIds.has(d.id))
   const rest = data.systems.filter(s => !focusKeys.has(s.key)).sort((a, b) => a.score - b.score)
   const confirmed = data.confirmedCount ?? 0
-  const irisPct = Math.round(data.irisWeight * 100)
 
   return (
     <div className="space-y-6">
@@ -330,9 +328,11 @@ export default function CalibratedInsightPanel({ data, onOpenPlan, onOpenIris }:
         <CollapsibleContent>
           <Card className="mt-2 gap-3 p-4 text-sm leading-relaxed">
             <p>
-              <strong>Основата са вашите отговори.</strong> Ирисът само уточнява картината — тук той тежи{' '}
-              <strong>{irisPct}%</strong> (никога повече от 35%). При неясна снимка тежи по-малко, вместо да
-              гадае.
+              <strong>Това е кръстосан анализ.</strong> Отговорите ви и знаците в ириса не се оценяват поотделно и
+              не се събират накрая — всеки извод минава през двата източника едновременно. Знакът в ириса се
+              тълкува според това, което ни казахте, а отговорите се проверяват спрямо ириса. Където двата сочат
+              едно и също, изводът е най-сигурен. Когато снимката е неясна, анализът стъпва повече на отговорите,
+              вместо да гадае.
             </p>
             <p>
               Всяко око се разчита два пъти независимо.{' '}

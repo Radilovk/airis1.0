@@ -23,6 +23,7 @@
  * (`iris-geometry.ts`) и качеството ѝ се проверява измеримо (`iris-quality.ts`).
  */
 
+import { waterLitresOf, formatLitres } from './water'
 import {
   FINDINGS,
   FINDING_TYPES,
@@ -334,21 +335,72 @@ ${report.signs.map(s => `• ${s.title} → ${s.action}`).join('\n')}
 `
 }
 
+/**
+ * Здравето в три строго отделни нива. Плоският списък смесваше диагнози,
+ * състояния и усещания — моделът не знаеше кое е потвърдено и кое към какво
+ * се отнася.
+ */
+function healthBlock(q: QuestionnaireData): string {
+  // Стари отчети (преди v5) нямат структура — остава плоският запис.
+  if (!q.diagnosisDetails && !q.states && !q.generalSymptoms) {
+    return [
+      `здравен статус: ${(q.healthStatus || []).join(', ') || 'няма посочен'}`,
+      `често усеща: ${(q.symptoms || []).join(', ') || 'нищо от списъка'}`,
+    ].join('\n')
+  }
+  const lines: string[] = []
+  const details = q.diagnosisDetails ?? []
+  const grouped = new Set(details.flatMap(d => d.diagnoses))
+  const loose = (q.diagnoses ?? []).filter(d => !grouped.has(d))
+  if (details.length === 0 && loose.length === 0) {
+    lines.push('ДИАГНОЗИ: няма поставени')
+  } else {
+    lines.push('ДИАГНОЗИ (поставени от лекар):')
+    for (const d of details) {
+      const parts = [
+        d.subtypes.length ? `вид: ${d.subtypes.join(', ')}` : '',
+        d.symptoms.length ? `оплаквания при нея: ${d.symptoms.join(', ')}` : 'без посочени оплаквания',
+        d.treatment ? `лечение: ${d.treatment}` : '',
+      ].filter(Boolean)
+      lines.push(`  • ${d.label}${d.diagnoses.length ? ` (${d.diagnoses.join(', ')})` : ''} — ${parts.join('; ')}`)
+    }
+    for (const d of loose) lines.push(`  • ${d}`)
+  }
+  const st = q.stateDetails ?? {}
+  if ((q.states ?? []).length === 0) {
+    lines.push('СЪСТОЯНИЯ: няма')
+  } else {
+    lines.push('СЪСТОЯНИЯ (не са заболявания):')
+    for (const name of q.states ?? []) {
+      const extra: string[] = []
+      if (/раждане/i.test(name)) {
+        if (st.postpartumStage) extra.push(`време след раждането: ${st.postpartumStage}`)
+        if (st.breastfeeding !== undefined) extra.push(st.breastfeeding ? 'кърми' : 'не кърми')
+      }
+      if (/менопауз/i.test(name) && st.menopauseSymptoms?.length) extra.push(`оплаквания: ${st.menopauseSymptoms.join(', ')}`)
+      if (/вода|целулит/i.test(name) && st.legsSymptoms?.length) extra.push(`оплаквания: ${st.legsSymptoms.join(', ')}`)
+      lines.push(`  • ${name}${extra.length ? ` — ${extra.join('; ')}` : ''}`)
+    }
+  }
+  lines.push(`ДРУГИ УСЕЩАНИЯ (без връзка с диагноза): ${(q.generalSymptoms ?? []).join(', ') || 'няма'}`)
+  return lines.join('\n')
+}
+
 function questionnaireBlock(q: QuestionnaireData): string {
   const bmi = (q.weight / ((q.height / 100) ** 2)).toFixed(1)
   const gender = q.gender === 'male' ? 'мъж' : q.gender === 'female' ? 'жена' : 'друго'
   return [
     `възраст: ${q.age} г | пол: ${gender} | ИТМ: ${bmi} (${q.weight} кг / ${q.height} см)`,
     `цели: ${(q.goals || []).join(', ') || 'няма посочени'}`,
-    `здравен статус: ${(q.healthStatus || []).join(', ') || 'няма посочен'}`,
-    `често усеща: ${(q.symptoms || []).join(', ') || 'нищо от списъка'}`,
+    healthBlock(q),
     `оплаквания: ${q.complaints || 'няма'}`,
+    `тип хранене: ${q.eatingStyle || 'не е посочен'}`,
+    `режим: ${(q.dietaryProfile || []).filter(x => x !== q.eatingStyle).join(', ') || 'не е посочен'}`,
     `хранителни навици: ${(q.dietaryHabits || []).join(', ') || 'няма посочени'}`,
-    `хранителен профил: ${(q.dietaryProfile || []).join(', ') || 'няма'}`,
     `непоносимости: ${q.foodIntolerances || 'няма'} | алергии: ${q.allergies || 'няма'}`,
     `медикаменти: ${q.medications || 'няма'}`,
     `стрес: ${q.stressLevel || 'не е посочен'} | сън: ${q.sleepHours ?? '?'} ч (${q.sleepQuality || '?'})`,
-    `активност: ${q.activityLevel || 'не е посочена'} | вода: ${q.hydration ?? '?'} чаши/ден (~${((q.hydration ?? 0) * 0.25).toFixed(1)} л)`,
+    `активност: ${q.activityLevel || 'не е посочена'} | вода: ${formatLitres(waterLitresOf(q))}/ден`,
     `фамилна анамнеза: ${q.familyHistory || 'няма'}`,
     // medicalConditions е същият текст като complaints (normalizeQuestionnairePayload)
     // — не се праща втори път.
@@ -410,6 +462,9 @@ export function buildInterpretationPrompt(ctx: InterpretationContext): string {
   } else if (p.vegetarian) {
     hardRules.push('НЕ предлагай месо и риба.')
   }
+  const style = ctx.questionnaire.eatingStyle
+  if (style === 'Пескетарианско') hardRules.push('НЕ предлагай месо. Риба и морски храни са позволени.')
+  if (style === 'Предимно растително') hardRules.push('Месото е рядко — основата на менюто е растителна.')
   if (p.glutenFree) hardRules.push('НЕ предлагай пшеница, ръж, ечемик или обикновен овес.')
   if (p.lactoseIntolerant) hardRules.push('НЕ предлагай млечни продукти с лактоза.')
 
@@ -422,9 +477,11 @@ export function buildInterpretationPrompt(ctx: InterpretationContext): string {
 • Ежедневни думи, както говори човек в България. Без латински и медицински
   термини, без англицизми, без канцеларски изрази.
 • Естествен български, не превод от английски. НЕ пиши „подкрепа", „подкрепям",
-  „оптимизиране", „баланс на организма", „холистичен", „благосъстояние",
-  „адресирам проблем". Вместо „подкрепа на черния дроб" → „по-малко натоварване
-  за черния дроб"; вместо „подкрепи съня" → „за по-добър сън".
+  „подкрепящ", „нужда от подкрепа", „оптимизиране", „баланс на организма",
+  „холистичен", „благосъстояние", „адресирам проблем". Казвай какво точно
+  се променя: „подкрепа на червата" → „по-редовна работа на червата";
+  „подкрепа на черния дроб" → „по-малко натоварване за черния дроб";
+  „подкрепи съня" → „за по-дълбок сън"; „имунна подкрепа" → „по-малко настинки".
 • Конкретно: храна, количество, кога. Без общи фрази („хранете се здравословно").
 • Без повторения: всяко нещо се казва веднъж, на едно място. Уговорката „не е
   диагноза" се показва на човека отделно — не я повтаряй в текста. Уговорката
@@ -433,7 +490,17 @@ export function buildInterpretationPrompt(ctx: InterpretationContext): string {
 ═══ РАМКА, КОЯТО НЕ СЕ НАРУШАВА ═══
 • Това НЕ е медицинска диагностика. Никога не назовавай заболяване, не твърдиш
   че нещо „е болно", не предлагаш лечение и не тълкуваш лабораторни стойности.
-• Ирисовият анализ е ПОМОЩЕН инструмент. Основата на плана е въпросникът.
+• Анализът е КРЪСТОСАН: всеки извод стъпва едновременно на отговорите и на
+  ириса — знаците в ириса се тълкуват през отговорите, а отговорите се
+  проверяват спрямо ириса. НЕ пиши проценти, дялове или „тежест" на ириса
+  спрямо въпросника и не ги противопоставяй („според ириса… но въпросникът…").
+  Пиши общия извод.
+• Здравните данни са в три нива — не ги смесвай:
+  ДИАГНОЗИ са потвърдени; оплакванията към тях са ПРОЯВА на диагнозата, не
+  отделен проблем. СЪСТОЯНИЯТА не са болести — не ги наричай така. ДРУГИТЕ
+  УСЕЩАНИЯ са самостоятелни сигнали. Не извеждай нови диагнози от усещания.
+• Споменавай САМО ирисови находки от списъка „ПРИЕТИ ИРИСОВИ НАХОДКИ". Не
+  добавяй знаци, които не са там, и не описвай как изглежда ирисът извън тях.
 • Не изписваш дози на лекарства. Хранителни добавки — само общи ориентири
   и винаги с уговорка да се съгласуват с лекар.
 • Ако въпросникът съдържа тежко състояние или медикаменти, планът е щадящ и
@@ -455,7 +522,7 @@ ${systemsToPromptBlock(scoring)}
 
 ОБЩА ОЦЕНКА: ${scoring.overall}/100
 ПРИОРИТЕТЕН РЕД: ${focusLabels}
-Тежест на ирисовите данни в оценката: ${Math.round(scoring.irisWeight * 100)} %
+Доколко ирисът е разчетен ясно: ${scoring.irisWeight >= 0.22 ? 'ясно' : scoring.irisWeight >= 0.1 ? 'частично' : 'слабо — говори за ирисовите знаци само общо'}
 
 ХРАНИТЕЛНИ ДРАЙВЕРИ (подредени по важност — това е гръбнакът на плана;
 следвай ги, не измисляй нови приоритети):

@@ -1,3 +1,4 @@
+import { waterLitresOf, formatLitres } from './water'
 import type { AnalysisReport } from '@/types'
 
 export function generateReportHTML(report: AnalysisReport): string {
@@ -59,7 +60,7 @@ export function generateReportHTML(report: AnalysisReport): string {
         <div class="lifestyle-item">
           <div class="lifestyle-icon">💧</div>
           <div class="lifestyle-label">Хидратация</div>
-          <div class="lifestyle-value">${report.questionnaireData.hydration} чаши</div>
+          <div class="lifestyle-value">${formatLitres(waterLitresOf(report.questionnaireData))}</div>
           <div class="lifestyle-quality">${report.questionnaireData.hydration >= 8 ? 'Добра' : 'Недостатъчна'}</div>
         </div>
         <div class="lifestyle-item">

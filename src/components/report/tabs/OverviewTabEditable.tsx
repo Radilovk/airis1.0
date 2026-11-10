@@ -1,3 +1,4 @@
+import { waterLitresOf, formatLitres, waterIsEnough, waterIsLow } from '@/lib/water'
 import { useState } from 'react'
 import { useKVWithFallback } from '@/hooks/useKVWithFallback'
 import { Card } from '@/components/ui/card'
@@ -310,9 +311,9 @@ export default function OverviewTabEditable({ report, avgHealth, editorMode = tr
       {
         icon: Drop,
         label: 'Хидратация',
-        value: `${report.questionnaireData.hydration} чаши`,
-        quality: report.questionnaireData.hydration >= 8 ? 'добра' : 'недостатъчна',
-        score: report.questionnaireData.hydration >= 8 ? 'good' : 'needs-attention'
+        value: formatLitres(waterLitresOf(report.questionnaireData)),
+        quality: waterIsEnough(report.questionnaireData) ? 'добра' : 'недостатъчна',
+        score: waterIsEnough(report.questionnaireData) ? 'good' : 'needs-attention'
       },
       {
         icon: Lightning,
@@ -618,7 +619,7 @@ export default function OverviewTabEditable({ report, avgHealth, editorMode = tr
 function calculateGoalAchievability(report: AnalysisReport): number {
   const avgHealth = (report.leftIris.overallHealth + report.rightIris.overallHealth) / 2
   const sleepQuality = report.questionnaireData.sleepQuality
-  const hydration = report.questionnaireData.hydration
+  const hydration = waterLitresOf(report.questionnaireData) * 4
   const activityLevel = report.questionnaireData.activityLevel
   
   let score = avgHealth * 0.4
@@ -643,7 +644,7 @@ function getSupportingFactors(report: AnalysisReport): string[] {
   if (report.questionnaireData.sleepQuality === 'excellent' || report.questionnaireData.sleepQuality === 'good') {
     factors.push('Качествен сън')
   }
-  if (report.questionnaireData.hydration >= 8) {
+  if (waterIsEnough(report.questionnaireData)) {
     factors.push('Добра хидратация')
   }
   if (report.questionnaireData.activityLevel === 'active' || report.questionnaireData.activityLevel === 'very-active') {
@@ -662,7 +663,7 @@ function getLimitingFactors(report: AnalysisReport): string[] {
   if (report.questionnaireData.sleepQuality === 'poor') {
     factors.push('Лошо качество на съня')
   }
-  if (report.questionnaireData.hydration < 6) {
+  if (waterIsLow(report.questionnaireData)) {
     factors.push('Недостатъчна хидратация')
   }
   if (report.questionnaireData.activityLevel === 'sedentary') {

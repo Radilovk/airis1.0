@@ -11,7 +11,16 @@ export interface QuestionnaireData {
   stressLevel: 'low' | 'moderate' | 'high' | 'very-high'
   sleepHours: number
   sleepQuality: 'poor' | 'fair' | 'good' | 'excellent'
+  /**
+   * Наследено поле: прием на вода в ЧАШИ (~250 мл). Новите отговори се пазят в
+   * `waterLitres`; `hydration` се попълва като еквивалент в чаши, за да работят
+   * стари отчети и NutriPlan. За показване — `waterLitresOf` (`lib/water.ts`).
+   */
   hydration: number
+  /** Прием на вода в литри на ден. Липсва в стари отчети. */
+  waterLitres?: number
+  /** Основният тип хранене (всеядно, вегетарианско…). Влиза и първи в `dietaryProfile`. */
+  eatingStyle?: string
   dietaryProfile: string[]
   dietaryHabits: string[]
   foodIntolerances: string
@@ -19,10 +28,47 @@ export interface QuestionnaireData {
   medications: string
   complaints: string
   healthStatus: string[]
-  /** Често усещани симптоми (чеклист). Липсва в стари отчети. */
+  /**
+   * ВСИЧКИ усещания в един списък — за оценките. Липсва в стари отчети.
+   * За модела се ползва структурата отдолу, която пази към какво се отнасят.
+   */
   symptoms?: string[]
+  /** Поставени от лекар диагнози (строг списък). Липсва в стари отчети. */
+  diagnoses?: string[]
+  /** Уточнения по диагноза: вид, оплаквания при нея, лечение. */
+  diagnosisDetails?: DiagnosisDetail[]
+  /** Състояния, които не са заболявания (менопауза, след раждане, задържане на вода…). */
+  states?: string[]
+  /** Уточнения по състоянията. */
+  stateDetails?: StateDetails
+  /** Усещания, които НЕ са свързани с посочена диагноза или състояние. */
+  generalSymptoms?: string[]
   uploadedDocuments?: UploadedDocument[]
   customAnswers?: Record<string, any>
+}
+
+export interface DiagnosisDetail {
+  /** Ключ на групата (`sugar`, `thyroid`…). */
+  key: string
+  /** Име на групата за човек и за модела. */
+  label: string
+  /** Избраните диагнози от тази група. */
+  diagnoses: string[]
+  /** Уточнен вид (напр. „Хашимото“, „Рефлукс или гастрит“). */
+  subtypes: string[]
+  /** Оплаквания, които човекът свързва с тази диагноза. */
+  symptoms: string[]
+  /** Лечение, ако е питано (кръвна захар, холестерол). */
+  treatment?: string
+}
+
+export interface StateDetails {
+  postpartumStage?: string
+  breastfeeding?: boolean
+  /** Оплаквания при менопауза. */
+  menopauseSymptoms?: string[]
+  /** Оплаквания при задържане на вода / целулит. */
+  legsSymptoms?: string[]
 }
 
 export interface UploadedDocument {
@@ -217,6 +263,10 @@ export interface CalibratedAnalysisPayload {
     confirmations?: number
     /** Потвърдена ли е и от другото око. */
     bilateral?: boolean
+    /** Проверка по пикселите на снимката. Липсва в стари отчети. */
+    photoCheck?: 'seen' | 'not_seen' | 'unchecked'
+    /** Измереното място на знака: минута 0–60 и пръстен 0–12 (дробно). */
+    anchor?: { minute: number; ring: number }
   }>
   /**
    * ПОВТОРЯЕМОСТ на разчитането, 0–1. Всяко око се разчита ДВА пъти — веднъж с

@@ -20,6 +20,9 @@ export interface CalibratedReportSummary {
 
 /** Находка, която заслужава да се покаже на снимката и в списъка. */
 export function isPlanRelevantFinding(f: CalibratedAnalysisPayload['findings'][number]): boolean {
+  // Знак, който проверката по снимката не намери, не се показва на клиента:
+  // ако нещо е посочено, то трябва да се вижда.
+  if (f.photoCheck === 'not_seen') return false
   return f.confidence >= 0.6
 }
 
