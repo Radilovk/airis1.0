@@ -656,7 +656,7 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
   }
   if (has(q.healthStatus, 'менопауз') || textHas(anamnesis, 'менопауз'))
     add('metabolic', 0.18, 'менопауза — променен енергиен обмен')
-  if (has(q.dietaryHabits, 'сладк', 'захар', 'газирани', 'бърза храна', 'тестен'))
+  if (has(q.dietaryHabits, 'сладк', 'захар', 'газирани', 'подсладени', 'бърза храна', 'тестен'))
     add('metabolic', 0.22, 'чести бързи въглехидрати в менюто')
   if (has(q.goals, 'отслабв', 'тегло', 'килограм'))
     add('metabolic', 0.15, 'заявена цел, свързана с намаляване на тегло')
@@ -670,7 +670,7 @@ export function questionnaireSignals(q: QuestionnaireData): QuestionnaireSignals
     add('digestive', 0.3, 'описани симптоми от храносмилателния тракт')
   if (q.foodIntolerances && q.foodIntolerances.trim().length > 2)
     add('digestive', 0.22, `непоносимост: ${q.foodIntolerances.slice(0, 40)}`)
-  if (has(q.dietaryHabits, 'нередовн', 'прескач', 'пропуска', 'късно', 'бърза храна'))
+  if (has(q.dietaryHabits, 'нередовн', 'прескач', 'пропуска', 'късно', 'бърза храна', 'похапване'))
     add('digestive', 0.2, 'нередовен режим на хранене')
   if (textHas(anamnesis, 'гастрит', 'рефлукс', 'колит', 'крон', 'цьолиак', 'целиак', 'ибс'))
     add('digestive', 0.3, 'посочено състояние на храносмилателния тракт')

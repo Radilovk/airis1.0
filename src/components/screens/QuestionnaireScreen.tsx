@@ -174,7 +174,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
         JSON.stringify(cleaned.diagnoses) !== JSON.stringify(prev.diagnoses) ||
         JSON.stringify(cleaned.states) !== JSON.stringify(prev.states) ||
         JSON.stringify(cleaned.symptoms) !== JSON.stringify(prev.symptoms) ||
-        cleaned.dietGate !== prev.dietGate ||
+        JSON.stringify(cleaned.dietaryProfile) !== JSON.stringify(prev.dietaryProfile) ||
         cleaned.complaints !== prev.complaints ||
         cleaned.medications !== prev.medications
       if (changed) return cleaned
@@ -189,7 +189,7 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     answers.goals,
     answers.diagnoses,
     answers.states,
-    answers.dietGate,
+    answers.eatingStyle,
   ])
 
   useEffect(() => {

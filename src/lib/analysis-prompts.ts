@@ -394,8 +394,9 @@ function questionnaireBlock(q: QuestionnaireData): string {
     `цели: ${(q.goals || []).join(', ') || 'няма посочени'}`,
     healthBlock(q),
     `оплаквания: ${q.complaints || 'няма'}`,
+    `тип хранене: ${q.eatingStyle || 'не е посочен'}`,
+    `режим: ${(q.dietaryProfile || []).filter(x => x !== q.eatingStyle).join(', ') || 'не е посочен'}`,
     `хранителни навици: ${(q.dietaryHabits || []).join(', ') || 'няма посочени'}`,
-    `хранителен профил: ${(q.dietaryProfile || []).join(', ') || 'няма'}`,
     `непоносимости: ${q.foodIntolerances || 'няма'} | алергии: ${q.allergies || 'няма'}`,
     `медикаменти: ${q.medications || 'няма'}`,
     `стрес: ${q.stressLevel || 'не е посочен'} | сън: ${q.sleepHours ?? '?'} ч (${q.sleepQuality || '?'})`,
@@ -461,6 +462,9 @@ export function buildInterpretationPrompt(ctx: InterpretationContext): string {
   } else if (p.vegetarian) {
     hardRules.push('НЕ предлагай месо и риба.')
   }
+  const style = ctx.questionnaire.eatingStyle
+  if (style === 'Пескетарианско') hardRules.push('НЕ предлагай месо. Риба и морски храни са позволени.')
+  if (style === 'Предимно растително') hardRules.push('Месото е рядко — основата на менюто е растителна.')
   if (p.glutenFree) hardRules.push('НЕ предлагай пшеница, ръж, ечемик или обикновен овес.')
   if (p.lactoseIntolerant) hardRules.push('НЕ предлагай млечни продукти с лактоза.')
 

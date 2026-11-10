@@ -43,7 +43,14 @@ export const QUESTIONNAIRE_CONFIG_VERSION = '5.0'
 export const NO_DIAGNOSIS = 'Нямам диагностицирано заболяване'
 export const NO_STATE = 'Нищо от тези'
 /** Стойности, които изключват всички останали в същия въпрос. */
-const EXCLUSIVE: Record<string, string> = { diagnoses: NO_DIAGNOSIS, states: NO_STATE }
+export const NO_REGIME = 'Не спазвам специален режим'
+export const NO_HABITS = 'Нямам такива навици'
+const EXCLUSIVE: Record<string, string> = {
+  diagnoses: NO_DIAGNOSIS,
+  states: NO_STATE,
+  dietaryProfile: NO_REGIME,
+  dietaryHabits: NO_HABITS,
+}
 
 const MENOPAUSE = 'Менопауза'
 const PREGNANCY = 'Бременност'
@@ -220,15 +227,6 @@ export function needsHealthBlock(ctx: QuestionnaireContext, goals: string[]): bo
   return goals.some(g => /отслаб|наддаван|здрав/i.test(g))
 }
 
-function needsDietBlock(a: Answers): boolean {
-  const ctx = buildQuestionnaireContext(a)
-  const goals = list(a, 'goals')
-  if (needsHealthBlock(ctx, goals)) return true
-  if (realDiagnoses(a).length > 0 || realStates(a).length > 0) return true
-  if (goals.some(g => /отслаб|наддаван|енерг|мускул|сън/i.test(g))) return true
-  return ctx.bmi !== undefined && (ctx.bmi >= 25 || ctx.bmi < 20)
-}
-
 export function shouldAskSleepQuality(a: Answers): boolean {
   const hours = Number(a.sleepHours)
   if (!Number.isFinite(hours)) return false
@@ -393,6 +391,11 @@ export function getFilteredOptions(question: QuestionConfig, answers: Answers, a
     ]
   }
 
+  if (question.id === 'dietaryProfile') {
+    // При веганско хранене „без лактоза“ е излишно.
+    return question.options.filter(o => !(o.value === 'Без лактоза' && answers.eatingStyle === 'Веганско'))
+  }
+
   if (SYMPTOM_QUESTIONS.includes(question.id)) {
     const opts = symptomOptions(question, answers, all)
     if (question.id === 'dxDigestiveSymptoms') {
@@ -473,12 +476,12 @@ function baseVisible(question: QuestionConfig, a: Answers): boolean {
     case 'waterLitres':
       if (!a.activityLevel) return false
       return shouldAskSleepQuality(a) ? a.sleepQuality !== undefined : a.sleepHours !== undefined
-    case 'dietGate':
-      return a.waterLitres !== undefined && !needsDietBlock(a)
+    // Храненето се пита при всички — без филтър „искате ли да добавите“.
+    case 'eatingStyle':
     case 'dietaryProfile':
     case 'dietaryHabits':
     case 'foodRestrictions':
-      return a.waterLitres !== undefined && (needsDietBlock(a) || a.dietGate === 'yes')
+      return a.waterLitres !== undefined
     case 'documents':
       return hasDiagnosis && a.waterLitres !== undefined
     default:
@@ -512,7 +515,7 @@ export function getQuestionSectionLabel(questionId: string): string | undefined 
   if (['activityLevel', 'stressLevel', 'sleepHours', 'sleepQuality', 'waterLitres'].includes(questionId)) {
     return 'Начин на живот'
   }
-  if (['dietGate', 'dietaryProfile', 'dietaryHabits', 'foodRestrictions'].includes(questionId)) return 'Хранене'
+  if (['eatingStyle', 'dietaryProfile', 'dietaryHabits', 'foodRestrictions'].includes(questionId)) return 'Хранене'
   return undefined
 }
 
@@ -521,7 +524,7 @@ export function getQuestionSectionLabel(questionId: string): string | undefined 
 /** Задължителните полета, които не се изчистват, когато са скрити. */
 const KEEP_WHEN_HIDDEN = new Set([
   'name', 'age', 'gender', 'weight', 'height', 'goals', 'diagnoses', 'states',
-  'activityLevel', 'stressLevel', 'sleepHours', 'waterLitres',
+  'activityLevel', 'stressLevel', 'sleepHours', 'waterLitres', 'eatingStyle',
 ])
 
 /** Премахва невалидни избори и изчиства скрити полета. */
@@ -715,8 +718,13 @@ export function normalizeQuestionnairePayload(
         : 'fair',
     hydration: Math.round(waterLitres * 4),
     waterLitres,
-    dietaryProfile: list(clean, 'dietaryProfile'),
-    dietaryHabits: list(clean, 'dietaryHabits'),
+    eatingStyle: clean.eatingStyle ? String(clean.eatingStyle) : undefined,
+    // Типът хранене е първи в профила — защитните правила търсят „веган“/„вегетариан“ тук.
+    dietaryProfile: uniq([
+      ...(clean.eatingStyle ? [String(clean.eatingStyle)] : []),
+      ...list(clean, 'dietaryProfile').filter(v => v !== 'other'),
+    ]),
+    dietaryHabits: list(clean, 'dietaryHabits').filter(v => v !== 'other'),
     foodIntolerances: restrictions,
     allergies: restrictions,
     medications,

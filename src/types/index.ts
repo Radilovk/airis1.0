@@ -19,6 +19,8 @@ export interface QuestionnaireData {
   hydration: number
   /** Прием на вода в литри на ден. Липсва в стари отчети. */
   waterLitres?: number
+  /** Основният тип хранене (всеядно, вегетарианско…). Влиза и първи в `dietaryProfile`. */
+  eatingStyle?: string
   dietaryProfile: string[]
   dietaryHabits: string[]
   foodIntolerances: string

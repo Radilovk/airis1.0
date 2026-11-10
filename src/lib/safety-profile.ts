@@ -253,7 +253,8 @@ export function buildSafetyProfile(q: QuestionnaireData): SafetyProfile {
   const vegetarian = vegan || inList(q.dietaryProfile, 'вегетариан')
   const glutenFree =
     inList(q.dietaryProfile, 'безглутен') || inText(['глутен', 'целиак'], q.foodIntolerances)
-  const lactoseIntolerant = inText(['лактоз', 'млечн'], q.foodIntolerances)
+  const lactoseIntolerant =
+    inList(q.dietaryProfile, 'без лактоза') || inText(['лактоз', 'млечн'], q.foodIntolerances)
 
   const profile: SafetyProfile = {
     pregnancy,
