@@ -11,7 +11,7 @@
  *     се извежда от яркостта и наситеността на самия ирис, а маската се
  *     разширява с ореола.
  *
- *  2. МИГЛИ И СЕНКИ ОТ МИГЛИ. Тънка тъмна линия — изглежда като радиална бразда
+ *  2. МИГЛИ И СЕНКИ ОТ МИГЛИ (изключено по подразбиране — виж DETECT_LASHES). Тънка тъмна линия — изглежда като радиална бразда
  *     или лакуна. Откриват се с морфологичен филтър „черна шапка“ (затваряне
  *     минус изображението: остават тънките тъмни структури). Различителното
  *     правило: миглата ПРЕСИЧА ръба на ириса и продължава навън; браздата и
@@ -56,6 +56,9 @@ export interface ArtifactMap {
 }
 
 const TARGET_R = 220
+
+/** Маскиране на мигли — изключено, докато не се потвърди на реални снимки. */
+export const DETECT_LASHES = false
 
 function percentile(sorted: number[], q: number): number {
   if (!sorted.length) return 0
@@ -104,7 +107,8 @@ export function buildArtifactMap(
   data: Uint8ClampedArray | number[],
   W: number,
   H: number,
-  geo: ArtifactGeometry
+  geo: ArtifactGeometry,
+  options: { lashes?: boolean } = {}
 ): ArtifactMap {
   const scale = Math.min(1, TARGET_R / Math.max(20, geo.limbus.r))
   // Само кутия около ириса (±1.45 радиуса) — морфологията е скъпа.
@@ -231,109 +235,115 @@ export function buildArtifactMap(
   }
   void p98
 
-  // ── 2. мигли и сенки (черна шапка) ──
-  const rad = Math.max(2, Math.round(lr * 0.03))
-  const closed = morph(morph(L, w, h, rad, true), w, h, rad, false)
-  const bh = new Float32Array(n)
-  const bhs: number[] = []
-  for (let y = y0; y <= y1; y += 2) {
-    for (let x = x0; x <= x1; x += 2) {
-      if (!inIris(x, y)) continue
-      const p = y * w + x
-      bhs.push(closed[p] - L[p])
+  // ── 2. мигли и сенки (черна шапка) — ИЗКЛЮЧЕНО по подразбиране ──
+  // Мигли, които пресичат ириса, на снимки отблизо практически не се срещат
+  // (на реалните тестови снимки — нито една). Детекторът е проверен само на
+  // изкуствено око; на реални снимки отбелязваше 0.1–0.3 % от ириса там, където
+  // мигли няма, тоест триеше тъкан. Включва се изрично с `{ lashes: true }`.
+  if (options.lashes ?? DETECT_LASHES) {
+    const rad = Math.max(2, Math.round(lr * 0.03))
+    const closed = morph(morph(L, w, h, rad, true), w, h, rad, false)
+    const bh = new Float32Array(n)
+    const bhs: number[] = []
+    for (let y = y0; y <= y1; y += 2) {
+      for (let x = x0; x <= x1; x += 2) {
+        if (!inIris(x, y)) continue
+        const p = y * w + x
+        bhs.push(closed[p] - L[p])
+      }
     }
-  }
-  for (let p = 0; p < n; p++) bh[p] = closed[p] - L[p]
-  bhs.sort((a, b) => a - b)
-  const med = percentile(bhs, 0.5)
-  const mad = percentile(
-    bhs.map(v => Math.abs(v - med)).sort((a, b) => a - b),
-    0.5
-  )
-  const thr = Math.max(16, med + 4 * 1.4826 * mad)
-  // Двоен праг: миглата е най-контрастна върху светлата склера/кожа; върху
-  // тъмен ирис контрастът ѝ пада. Областта се гради от по-ниския праг, но се
-  // приема само ако съдържа и силни пиксели.
-  const thrLow = Math.max(10, thr * 0.5)
-  const cand = new Uint8Array(n)
-  const strong = new Uint8Array(n)
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const r = rel(x, y)
-      if (r < 0.55 || r > 1.3) continue
-      const v = bh[y * w + x]
-      if (v > thrLow) cand[y * w + x] = 1
-      if (v > thr) strong[y * w + x] = 1
+    for (let p = 0; p < n; p++) bh[p] = closed[p] - L[p]
+    bhs.sort((a, b) => a - b)
+    const med = percentile(bhs, 0.5)
+    const mad = percentile(
+      bhs.map(v => Math.abs(v - med)).sort((a, b) => a - b),
+      0.5
+    )
+    const thr = Math.max(16, med + 4 * 1.4826 * mad)
+    // Двоен праг: миглата е най-контрастна върху светлата склера/кожа; върху
+    // тъмен ирис контрастът ѝ пада. Областта се гради от по-ниския праг, но се
+    // приема само ако съдържа и силни пиксели.
+    const thrLow = Math.max(10, thr * 0.5)
+    const cand = new Uint8Array(n)
+    const strong = new Uint8Array(n)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const r = rel(x, y)
+        if (r < 0.55 || r > 1.3) continue
+        const v = bh[y * w + x]
+        if (v > thrLow) cand[y * w + x] = 1
+        if (v > thr) strong[y * w + x] = 1
+      }
     }
-  }
-  // Свързани области; мигла = пресича окръжността на лимбуса И е по-дълга
-  // навътре, отколкото встрани.
-  const seen = new Uint8Array(n)
-  const stack: number[] = []
-  const comp: number[] = []
-  for (let start = 0; start < n; start++) {
-    if (!cand[start] || seen[start]) continue
-    comp.length = 0
-    stack.push(start)
-    seen[start] = 1
-    while (stack.length) {
-      const p = stack.pop()!
-      comp.push(p)
-      const x = p % w
-      const y = (p / w) | 0
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx
-          const yy = y + dy
-          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue
-          const q = yy * w + xx
-          if (cand[q] && !seen[q]) {
-            seen[q] = 1
-            stack.push(q)
+    // Свързани области; мигла = пресича окръжността на лимбуса И е по-дълга
+    // навътре, отколкото встрани.
+    const seen = new Uint8Array(n)
+    const stack: number[] = []
+    const comp: number[] = []
+    for (let start = 0; start < n; start++) {
+      if (!cand[start] || seen[start]) continue
+      comp.length = 0
+      stack.push(start)
+      seen[start] = 1
+      while (stack.length) {
+        const p = stack.pop()!
+        comp.push(p)
+        const x = p % w
+        const y = (p / w) | 0
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx
+            const yy = y + dy
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue
+            const q = yy * w + xx
+            if (cand[q] && !seen[q]) {
+              seen[q] = 1
+              stack.push(q)
+            }
           }
         }
       }
+      if (comp.length < 4) continue
+      if (!comp.some(p => strong[p])) continue
+      let rMin = Infinity
+      let rMax = -Infinity
+      let inside = 0
+      let outside = 0
+      let aMin = Infinity
+      let aMax = -Infinity
+      const aRef = Math.atan2(((comp[0] / w) | 0) - lcy, (comp[0] % w) - lcx)
+      for (const p of comp) {
+        const x = p % w
+        const y = (p / w) | 0
+        const r = rel(x, y)
+        rMin = Math.min(rMin, r)
+        rMax = Math.max(rMax, r)
+        if (r < 0.97) inside++
+        if (r > 1.03) outside++
+        // ъгъл спрямо първата точка — без скок при ±π
+        let a = Math.atan2(y - lcy, x - lcx) - aRef
+        if (a > Math.PI) a -= 2 * Math.PI
+        if (a < -Math.PI) a += 2 * Math.PI
+        aMin = Math.min(aMin, a)
+        aMax = Math.max(aMax, a)
+      }
+      const radialSpan = rMax - rMin // в радиуси на ириса
+      const tangentialSpan = (aMax - aMin) * Math.min(1, (rMin + rMax) / 2) // дъга в радиуси
+      const crosses = inside >= 2 && outside >= 2
+      if (!crosses || radialSpan < 0.1 || radialSpan < tangentialSpan * 0.8) continue
+      for (const p of comp) {
+        const x = p % w
+        const y = (p / w) | 0
+        // Миглите висят от клепача и не стигат по-навътре от ~30 % от ириса.
+        // Ограничението пази истинска бразда, до която е опрял върхът на мигла.
+        const rr = rel(x, y)
+        if (rr < 1.02 && rr >= 0.7 && mask[p] === ARTIFACT_NONE) mask[p] = ARTIFACT_LASH
+      }
     }
-    if (comp.length < 4) continue
-    if (!comp.some(p => strong[p])) continue
-    let rMin = Infinity
-    let rMax = -Infinity
-    let inside = 0
-    let outside = 0
-    let aMin = Infinity
-    let aMax = -Infinity
-    const aRef = Math.atan2(((comp[0] / w) | 0) - lcy, (comp[0] % w) - lcx)
-    for (const p of comp) {
-      const x = p % w
-      const y = (p / w) | 0
-      const r = rel(x, y)
-      rMin = Math.min(rMin, r)
-      rMax = Math.max(rMax, r)
-      if (r < 0.97) inside++
-      if (r > 1.03) outside++
-      // ъгъл спрямо първата точка — без скок при ±π
-      let a = Math.atan2(y - lcy, x - lcx) - aRef
-      if (a > Math.PI) a -= 2 * Math.PI
-      if (a < -Math.PI) a += 2 * Math.PI
-      aMin = Math.min(aMin, a)
-      aMax = Math.max(aMax, a)
-    }
-    const radialSpan = rMax - rMin // в радиуси на ириса
-    const tangentialSpan = (aMax - aMin) * Math.min(1, (rMin + rMax) / 2) // дъга в радиуси
-    const crosses = inside >= 2 && outside >= 2
-    if (!crosses || radialSpan < 0.1 || radialSpan < tangentialSpan * 0.8) continue
-    for (const p of comp) {
-      const x = p % w
-      const y = (p / w) | 0
-      // Миглите висят от клепача и не стигат по-навътре от ~30 % от ириса.
-      // Ограничението пази истинска бразда, до която е опрял върхът на мигла.
-      const rr = rel(x, y)
-      if (rr < 1.02 && rr >= 0.7 && mask[p] === ARTIFACT_NONE) mask[p] = ARTIFACT_LASH
-    }
+    // Сянката е малко по-широка от самата мигла.
+    const lashGrow = morph(Float32Array.from(mask, v => (v === ARTIFACT_LASH ? 1 : 0)), w, h, 1, true)
+    for (let p = 0; p < n; p++) if (lashGrow[p] > 0 && mask[p] === ARTIFACT_NONE) mask[p] = ARTIFACT_LASH
   }
-  // Сянката е малко по-широка от самата мигла.
-  const lashGrow = morph(Float32Array.from(mask, v => (v === ARTIFACT_LASH ? 1 : 0)), w, h, 1, true)
-  for (let p = 0; p < n; p++) if (lashGrow[p] > 0 && mask[p] === ARTIFACT_NONE) mask[p] = ARTIFACT_LASH
 
   // ── 3. баланс на бялото по склерата ──
   const sclera: Array<[number, number, number]> = []
