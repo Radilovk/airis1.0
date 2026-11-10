@@ -33,6 +33,8 @@ interface Plane {
   lum: Float32Array
   /** Червен канал 0..255 (за зеницата). */
   red: Float32Array
+  /** Син канал — с червения различава кожата (розова) от склерата (бяла). */
+  blue: Float32Array
   /** Отблясък (почти бяло) — там производната не се смята. */
   glare: Uint8Array
   /** Колко пъти е смалено спрямо оригинала. */
@@ -79,6 +81,7 @@ function makePlane(img: HTMLImageElement | HTMLCanvasElement, approxIrisR: numbe
   const d = ctx.getImageData(0, 0, w, h).data
   const lum = new Float32Array(w * h)
   const red = new Float32Array(w * h)
+  const blue = new Float32Array(w * h)
   const glare = new Uint8Array(w * h)
   for (let i = 0, p = 0; i < d.length; i += 4, p++) {
     const r = d[i]
@@ -86,10 +89,21 @@ function makePlane(img: HTMLImageElement | HTMLCanvasElement, approxIrisR: numbe
     const b = d[i + 2]
     lum[p] = 0.299 * r + 0.587 * g + 0.114 * b
     red[p] = r
+    blue[p] = b
+    // Само наистина преексponирано е отблясък. Досега прагът беше 225 и
+    // светлата склера се маркираше като отблясък — ръбът ирис→склера изчезваше.
     const mx = Math.max(r, g, b)
-    if (mx > 225 && mx - Math.min(r, g, b) < 40) glare[p] = 1
+    if (mx >= 248 && mx - Math.min(r, g, b) < 30) glare[p] = 1
   }
-  return { w, h, lum: boxBlur(lum, w, h, 2), red: boxBlur(red, w, h, 2), glare, scale }
+  return {
+    w,
+    h,
+    lum: boxBlur(lum, w, h, 2),
+    red: boxBlur(red, w, h, 2),
+    blue: boxBlur(blue, w, h, 2),
+    glare,
+    scale,
+  }
 }
 
 function boxBlur(src: Float32Array, w: number, h: number, rad: number): Float32Array {
@@ -252,6 +266,8 @@ interface FitOptions {
   seedX: number
   seedY: number
   iterations: number
+  /** Колко лъча изобщо участват (при странични лъчи — по-малко от всички). */
+  eligibleRays?: number
 }
 
 function rng(seed: number) {
@@ -316,7 +332,7 @@ function ransacCircle(pts: EdgePoint[], o: FitOptions): FitCircle | null {
   let total = 0
   for (let k = 0; k < RAYS; k++) total += strongestPerRay[k]
   const strengthShare = total > 0 ? sc.s / total : 0
-  const rayShare = sc.rays / RAYS
+  const rayShare = Math.min(1, sc.rays / (o.eligibleRays ?? RAYS))
   return { ...cur, support: Math.min(1, 0.55 * rayShare + 0.45 * strengthShare) }
 }
 
@@ -411,57 +427,96 @@ function findPupilAround(p: Plane, cx: number, cy: number, rMin: number, rMax: n
   return best
 }
 
+/** Лъч близо до хоризонталата (±55°): там е склерата, клепачите не пречат. */
+function isLateral(ray: number): boolean {
+  return Math.abs(Math.cos((ray / RAYS) * Math.PI * 2)) >= 0.574
+}
+const LATERAL_RAYS = Array.from({ length: RAYS }, (_, k) => k).filter(isLateral).length
+
+/** „Розовост“: червено − синьо. Кожата е розова, склерата — бяла или синкава. */
+function skinness(p: Plane, x: number, y: number): number {
+  const r = sample(p, p.red, x, y)
+  const b = sample(p, p.blue, x, y)
+  return Number.isNaN(r) || Number.isNaN(b) ? NaN : r - b
+}
+
+function median(xs: number[]): number {
+  const v = xs.filter(x => !Number.isNaN(x)).sort((a, b) => a - b)
+  return v.length ? v[v.length >> 1] : NaN
+}
+
+function fitLateral(p: Plane, cx: number, cy: number, rMin: number, rMax: number, maxShift: number, tol: number, iterations: number) {
+  const edges = rayEdges(p, p.lum, cx, cy, rMin * 0.85, rMax * 1.05, 3).filter(q => isLateral(q.ray))
+  return ransacCircle(edges, { rMin, rMax, tol, maxShift, seedX: cx, seedY: cy, iterations, eligibleRays: LATERAL_RAYS })
+}
+
+/**
+ * Лимбусът. Ръбът „ирис → клепач“ изглежда като „ирис → склера“ (тъмно →
+ * светло), затова окръжността се напасва само по страничните лъчи, където
+ * винаги е склерата. Горе и долу ръб се приема само ако отвън е склера (по
+ * цвят, не кожа) — тогава се напасва елипса; ако там са клепачите, вертикалният
+ * радиус остава равен на хоризонталния.
+ */
 function findLimbusAround(p: Plane, cx: number, cy: number, rMin: number, rMax: number, maxShift: number): FitCircle | null {
-  const edges = rayEdges(p, p.lum, cx, cy, rMin * 0.85, rMax * 1.05, 3)
-  let fit = ransacCircle(edges, { rMin, rMax, tol: 0.025, maxShift, seedX: cx, seedY: cy, iterations: 900 })
+  let fit = fitLateral(p, cx, cy, rMin, rMax, maxShift, 0.025, 900)
   if (!fit) return null
   // Втори пас от намерения център — лъчите вече са почти перпендикулярни на ръба.
-  const e2 = rayEdges(p, p.lum, fit.cx, fit.cy, fit.r * 0.8, fit.r * 1.2, 3)
-  const f2 = ransacCircle(e2, {
-    rMin: fit.r * 0.85,
-    rMax: fit.r * 1.15,
-    tol: 0.02,
-    maxShift: fit.r * 0.1,
-    seedX: fit.cx,
-    seedY: fit.cy,
-    iterations: 600,
-  })
+  const f2 = fitLateral(p, fit.cx, fit.cy, fit.r * 0.85, fit.r * 1.15, fit.r * 0.1, 0.02, 600)
   if (f2 && f2.support >= fit.support * 0.85) fit = f2
-  // Лимбусът е ВЪНШНАТА граница: извън него е светлата склера. Вътрешни
-  // концентрични граници (коларета, по-светъл център при хетерохромия,
-  // зеницата) също дават чисти окръжности. Ако навън има по-голяма
-  // концентрична окръжност със склера отвън, тя е лимбусът.
+  // Лимбусът е ВЪНШНАТА граница: вътрешни концентрични граници (коларета,
+  // по-светъл център при хетерохромия, зеницата) също дават чисти окръжности.
+  // Ако навън има по-голяма окръжност със склера отвън, тя е лимбусът.
   for (let guard = 0; guard < 3; guard++) {
     const cur: FitCircle = fit
     const hi = Math.min(cur.r * 3.2, rMax * 1.6)
     if (hi <= cur.r * 1.2) break
-    const outer = rayEdges(p, p.lum, cur.cx, cur.cy, cur.r * 1.15, hi, 3)
-    const bigger = ransacCircle(outer, {
-      rMin: cur.r * 1.2,
-      rMax: hi,
-      tol: 0.025,
-      maxShift: cur.r * 0.25,
-      seedX: cur.cx,
-      seedY: cur.cy,
-      iterations: 700,
-    })
+    const bigger = fitLateral(p, cur.cx, cur.cy, cur.r * 1.2, hi, cur.r * 0.25, 0.025, 700)
     if (!bigger || bigger.support < Math.max(0.35, cur.support * 0.5)) break
-    // Отвън трябва да е по-светло, отколкото непосредствено отвътре.
     const inside = ringMean(p, p.lum, bigger.cx, bigger.cy, bigger.r * 0.85, bigger.r * 0.96)
     const outside = ringMean(p, p.lum, bigger.cx, bigger.cy, bigger.r * 1.05, bigger.r * 1.2)
     if (Number.isNaN(inside) || Number.isNaN(outside) || outside < inside + 10) break
     fit = bigger
   }
-  // Лимбусът често е леко овален (окото гледа малко встрани): окръжността
-  // тогава „ляга“ на две от страните и отмества центъра. Осева елипса върху
-  // ръбовете близо до окръжността връща центъра на място.
-  const e3 = rayEdges(p, p.lum, fit.cx, fit.cy, fit.r * 0.85, fit.r * 1.15, 2)
-  const near = e3.filter(q => Math.abs(Math.hypot(q.x - fit!.cx, q.y - fit!.cy) - fit!.r) <= fit!.r * 0.07)
-  const el = axisEllipse(near, fit.cx, fit.cy)
-  if (el && Math.abs(el.cx - fit.cx) < fit.r * 0.12 && Math.abs(el.cy - fit.cy) < fit.r * 0.12) {
-    const ratio = el.ry / el.rx
-    if (ratio > 0.82 && ratio < 1.18) {
-      fit = { ...fit, cx: el.cx, cy: el.cy, r: el.rx, ry: el.ry }
+
+  // ── форма: елипса, ако горе и долу се вижда склера ──
+  const c0 = fit
+  const all = rayEdges(p, p.lum, c0.cx, c0.cy, c0.r * 0.78, c0.r * 1.15, 4)
+  const lateralNear = all.filter(q => isLateral(q.ray) && Math.abs(Math.hypot(q.x - c0.cx, q.y - c0.cy) - c0.r) <= c0.r * 0.04)
+  // Цветът на склерата — отвън на страничния ръб.
+  const scleraSkin = median(
+    lateralNear.map(q => {
+      const a = (q.ray / RAYS) * Math.PI * 2
+      return skinness(p, c0.cx + Math.cos(a) * c0.r * 1.1, c0.cy + Math.sin(a) * c0.r * 1.1)
+    })
+  )
+  const irisLum = ringMean(p, p.lum, c0.cx, c0.cy, c0.r * 0.6, c0.r * 0.85)
+  const vertical: EdgePoint[] = []
+  if (!Number.isNaN(scleraSkin) && !Number.isNaN(irisLum)) {
+    const byRay = new Map<number, EdgePoint[]>()
+    for (const q of all) {
+      if (isLateral(q.ray)) continue
+      const d = Math.hypot(q.x - c0.cx, q.y - c0.cy)
+      if (d < c0.r * 0.8 || d > c0.r * 1.08) continue
+      const a = (q.ray / RAYS) * Math.PI * 2
+      const ox = c0.cx + Math.cos(a) * (d + c0.r * 0.06)
+      const oy = c0.cy + Math.sin(a) * (d + c0.r * 0.06)
+      const sk = skinness(p, ox, oy)
+      const lum = sample(p, p.lum, ox, oy)
+      // Отвън: светло като склера и не по-розово от нея.
+      if (Number.isNaN(sk) || Number.isNaN(lum) || sk > scleraSkin + 22 || lum < irisLum + 25) continue
+      const list = byRay.get(q.ray) ?? []
+      list.push(q)
+      byRay.set(q.ray, list)
+    }
+    // По един ръб на лъч — най-силният приет.
+    for (const list of byRay.values()) vertical.push(list.sort((a, b) => b.strength - a.strength)[0])
+  }
+  const verticalRays = RAYS - LATERAL_RAYS
+  if (vertical.length >= verticalRays * 0.2 && lateralNear.length >= 20) {
+    const el = axisEllipse([...lateralNear, ...vertical], c0.cx, c0.cy)
+    if (el && Math.hypot(el.cx - c0.cx, el.cy - c0.cy) < c0.r * 0.1) {
+      const ratio = el.ry / el.rx
+      if (ratio > 0.8 && ratio < 1.15) fit = { ...fit, cx: el.cx, cy: el.cy, r: el.rx, ry: el.ry }
     }
   }
   return fit
