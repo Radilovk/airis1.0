@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Разпознаване на зеница и ирис — бенчмарк</title></head>
+<body style="background:#111;color:#ddd;font:12px monospace;padding:12px"><pre id="o">работи…</pre>
+<script type="module">
+/*
+ * 30 синтетични очи с известна истина: 5 цвята ирис (кафяв, тъмнокафяв,
+ * зелен, син, сив) × 6 условия (различен размер и отместване, клепач,
+ * размазване + шум, малък ирис с клепач, овален ирис). Мери грешката в
+ * центъра и радиуса като % от радиуса на ириса и проверява дали увереността
+ * разделя верните от грешните (праг AUTO_ACCEPT_CONFIDENCE).
+ * Пускане: копирайте в public/ и отворете през dev сървъра.
+ */
+import { detectIrisGeometry } from '/src/lib/iris-geometry.ts'
+import { AUTO_ACCEPT_CONFIDENCE } from '/src/lib/iris-autocalibrate.ts'
+function rng(seed){let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/2**32)}
+function eye(o){
+  const {W,H,cx,cy,ri,rp,seed,irisRGB,pupilDark=12,lid=0,glare=true,blur=0,noise=8,scleraRGB=[225,215,205],skin=[200,160,135],ry=1}=o
+  const r=rng(seed), c=document.createElement('canvas'); c.width=W;c.height=H; const x=c.getContext('2d')
+  x.fillStyle=`rgb(${skin})`;x.fillRect(0,0,W,H)
+  x.fillStyle=`rgb(${scleraRGB})`;x.beginPath();x.ellipse(cx,cy,ri*2.3,ri*1.35,0,0,7);x.fill()
+  x.save();x.beginPath();x.ellipse(cx,cy,ri,ri*ry,0,0,7);x.clip()
+  const g=x.createRadialGradient(cx,cy,rp,cx,cy,ri);g.addColorStop(0,`rgb(${irisRGB.map(v=>Math.min(255,v*1.25))})`);g.addColorStop(.8,`rgb(${irisRGB})`);g.addColorStop(1,`rgb(${irisRGB.map(v=>v*.55)})`)
+  x.fillStyle=g;x.fillRect(0,0,W,H)
+  for(let i=0;i<700;i++){const a=r()*6.283,r0=rp+r()*ri*.1,r1=ri*(.6+r()*.4);x.strokeStyle=r()>.5?'rgba(255,255,255,.12)':'rgba(0,0,0,.18)';x.lineWidth=.5+r()*ri*.012;x.beginPath();x.moveTo(cx+Math.cos(a)*r0,cy+Math.sin(a)*r0);x.lineTo(cx+Math.cos(a+(r()-.5)*.08)*r1,cy+Math.sin(a+(r()-.5)*.08)*r1);x.stroke()}
+  for(let i=0;i<8;i++){const a=r()*6.283,rr=rp+(ri-rp)*(.3+r()*.6);x.fillStyle='rgba(0,0,0,.35)';x.beginPath();x.ellipse(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr,ri*.03,ri*.05,a,0,7);x.fill()}
+  x.restore()
+  x.fillStyle=`rgb(${pupilDark},${pupilDark},${pupilDark+3})`;x.beginPath();x.arc(cx,cy,rp,0,7);x.fill()
+  if(glare){x.fillStyle='rgba(255,255,255,.95)';x.beginPath();x.ellipse(cx+rp*.4,cy-rp*.4,rp*.35,rp*.25,-.5,0,7);x.fill()}
+  if(lid>0){x.fillStyle=`rgb(${skin})`;x.beginPath();x.ellipse(cx,cy-ri*(2.05-lid),ri*2.2,ri*1.1,0,0,7);x.fill();x.strokeStyle='rgba(30,20,20,.8)';x.lineWidth=ri*.02;x.stroke()}
+  let out=c
+  if(blur>0){const b=document.createElement('canvas');b.width=W;b.height=H;const bx=b.getContext('2d');bx.filter=`blur(${blur}px)`;bx.drawImage(c,0,0);out=b}
+  const ctx=out.getContext('2d'),id=ctx.getImageData(0,0,W,H),d=id.data
+  for(let i=0;i<d.length;i+=4){const n=(r()-.5)*2*noise;d[i]+=n;d[i+1]+=n;d[i+2]+=n}
+  ctx.putImageData(id,0,0); return out
+}
+const colors={кафяв:[95,60,35],тъмнокафяв:[55,35,22],зелен:[95,115,80],син:[90,120,150],сив:[120,125,130]}
+const cases=[];let seed=1
+for(const [cn,rgb] of Object.entries(colors)) for(const v of [
+  {W:1200,H:1200,cx:600,cy:600,ri:380,rp:110},{W:1600,H:1200,cx:700,cy:560,ri:300,rp:70},
+  {W:1200,H:1600,cx:620,cy:820,ri:420,rp:160,lid:.55},{W:1400,H:1400,cx:760,cy:640,ri:360,rp:95,blur:3,noise:14},
+  {W:1000,H:1000,cx:480,cy:520,ri:200,rp:60,lid:.4},{W:1500,H:1500,cx:750,cy:760,ri:520,rp:120,ry:.94},
+]) cases.push({name:`${cn} ${v.W}x${v.H} ri${v.ri}${v.lid?' клепач':''}${v.blur?' размазан':''}${v.ry?' овален':''}`,o:{...v,irisRGB:rgb,seed:seed++,pupilDark:cn==='тъмнокафяв'?18:12}})
+const rows=[];let ok=0,bad=0,okLow=0,badHigh=0
+for(const k of cases){
+  const g=detectIrisGeometry(eye(k.o)),o=k.o
+  const e=[Math.hypot(g.limbus.cx-o.cx,g.limbus.cy-o.cy),Math.abs(g.limbus.r-o.ri),Math.abs(g.pupil.r-o.rp)].map(v=>v/o.ri*100)
+  const err=Math.max(...e),conf=Math.min(g.pupilConfidence,g.limbusConfidence)
+  if(err<=3){ok++;if(conf<AUTO_ACCEPT_CONFIDENCE)okLow++}else{bad++;if(conf>=AUTO_ACCEPT_CONFIDENCE)badHigh++}
+  rows.push(`${k.name.padEnd(44)} център ${e[0].toFixed(1)}%  лимбус r ${e[1].toFixed(1)}%  зеница r ${e[2].toFixed(1)}%  увереност ${conf.toFixed(2)}`)
+}
+const sum=`верни (≤3 %): ${ok}/${cases.length} · от тях с ниска увереност: ${okLow}\nгрешни: ${bad} · от тях приети автоматично: ${badHigh}`
+document.getElementById('o').textContent=rows.join('\n')+'\n\n'+sum
+window.__done=sum;window.__ok=badHigh===0
+</script></body></html>

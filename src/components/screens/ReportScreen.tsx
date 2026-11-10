@@ -332,27 +332,20 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
               )}
               {isCalibrated ? (
                 <>
-                  <TabsTrigger
-                    value="summary"
-                    className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
-                  >
-                    <Target size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Вашият фокус</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="plan"
-                    className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
-                  >
-                    <ForkKnife size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Хранене и план</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="iris"
-                    className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
-                  >
-                    <Eye size={22} weight="duotone" />
-                    <span className="text-xs font-semibold">Ирисов анализ</span>
-                  </TabsTrigger>
+                  {([
+                    ['summary', '1 · Анализ', Target],
+                    ['iris', '2 · Ирис', Eye],
+                    ['plan', '3 · План', ForkKnife],
+                  ] as const).map(([value, label, Icon]) => (
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="flex flex-col gap-1.5 py-3 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md transition-all"
+                    >
+                      <Icon size={22} weight="duotone" />
+                      <span className="text-xs font-semibold">{label}</span>
+                    </TabsTrigger>
+                  ))}
                 </>
               ) : (
                 <TabsTrigger
@@ -401,7 +394,13 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
                 </TabsContent>
                 <TabsContent value="iris" className="mt-6">
                   <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
-                    <CalibratedIrisReport report={report} />
+                    <CalibratedIrisReport
+                      report={report}
+                      onOpenPlan={() => {
+                        setActiveTab('plan')
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                    />
                   </ErrorBoundary>
                 </TabsContent>
               </>

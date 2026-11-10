@@ -32,6 +32,8 @@
  *  5. Оценка на увереността от контраста на градиента спрямо фона.
  */
 
+import { refineIrisGeometry } from './iris-refine'
+
 export interface Circle {
   cx: number
   cy: number
@@ -787,9 +789,27 @@ export function detectIrisGeometry(img: HTMLImageElement | HTMLCanvasElement): I
   try {
     // Редът е: лимбус → зеница вътре в него. Виж коментара при `coarseLimbus`.
     const limbusSeed = coarseLimbus(smooth)
-    const limbus = refineLimbus(smooth, limbusSeed)
-    const pupil = findPupil(smooth, rgb, limbus)
-    const limbusRy = measureVerticalRadius(smooth, limbus.cx, limbus.cy, limbus.r)
+    let limbus = refineLimbus(smooth, limbusSeed)
+    let pupil = findPupil(smooth, rgb, limbus)
+    let limbusRy = measureVerticalRadius(smooth, limbus.cx, limbus.cy, limbus.r)
+
+    // Прецизен втори пас в по-голяма резолюция (`iris-refine.ts`). Грубият
+    // резултат участва като кандидат със същата мярка — прецизирането не може
+    // да го влоши. Увереността идва от дела съгласни лъчи.
+    let precise: { pupil: number; limbus: number } | null = null
+    const inv0 = 1 / scale
+    const refined = refineIrisGeometry(img, {
+      pupil: { cx: pupil.cx * inv0, cy: pupil.cy * inv0, r: pupil.r * inv0 },
+      limbus: { cx: limbus.cx * inv0, cy: limbus.cy * inv0, r: limbus.r * inv0 },
+      imageWidth: srcW,
+      imageHeight: srcH,
+    })
+    if (refined) {
+      limbus = { ...limbus, cx: refined.limbus.cx * scale, cy: refined.limbus.cy * scale, r: refined.limbus.r * scale }
+      pupil = { ...pupil, cx: refined.pupil.cx * scale, cy: refined.pupil.cy * scale, r: refined.pupil.r * scale }
+      limbusRy = refined.limbus.ry !== undefined ? refined.limbus.ry * scale : undefined
+      precise = { pupil: refined.pupil.support, limbus: refined.limbus.support }
+    }
 
     const lidsWork = detectEyelids(smooth, limbus)
 
@@ -810,18 +830,17 @@ export function detectIrisGeometry(img: HTMLImageElement | HTMLCanvasElement): I
         upper: scaleQuad(lidsWork.upper, inv),
         lower: scaleQuad(lidsWork.lower, inv),
       },
-      pupilConfidence: confidence(
-        edgeContrast(smooth, pupil.cx, pupil.cy, pupil.r),
-        pupil.strength,
-        pupil.profile,
-        0.5
-      ),
-      limbusConfidence: confidence(
-        edgeContrast(smooth, limbus.cx, limbus.cy, limbus.r, LIMBUS_ANGLES),
-        limbus.strength,
-        limbus.profile,
-        0.3
-      ),
+      pupilConfidence:
+        precise?.pupil ??
+        confidence(edgeContrast(smooth, pupil.cx, pupil.cy, pupil.r), pupil.strength, pupil.profile, 0.5),
+      limbusConfidence:
+        precise?.limbus ??
+        confidence(
+          edgeContrast(smooth, limbus.cx, limbus.cy, limbus.r, LIMBUS_ANGLES),
+          limbus.strength,
+          limbus.profile,
+          0.3
+        ),
     }
 
     // Санитарни ограничения: физиологично отношение зеница/ирис е ≈0.15–0.65.

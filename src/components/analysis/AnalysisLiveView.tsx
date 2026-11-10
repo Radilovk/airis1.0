@@ -489,25 +489,6 @@ export default function AnalysisLiveView({
         ))}
       </ol>
 
-      {state.feed.length > 0 && (
-        <div className="rounded-xl bg-slate-950 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-slate-300" aria-live="polite">
-          <AnimatePresence initial={false}>
-            {state.feed.map((f, i) => (
-              <motion.p
-                key={f.id}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: i === 0 ? 1 : Math.max(0.35, 0.85 - i * 0.12), height: 'auto' }}
-                exit={{ opacity: 0 }}
-                className="truncate"
-              >
-                <span className={f.tone === 'ok' ? 'text-emerald-400' : f.tone === 'warn' ? 'text-amber-400' : 'text-sky-400'}>›</span>{' '}
-                {f.text}
-              </motion.p>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
-
       <p className="text-center text-xs text-muted-foreground">Обикновено отнема под минута. Не затваряйте приложението.</p>
     </div>
   )
