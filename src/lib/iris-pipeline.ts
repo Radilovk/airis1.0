@@ -179,6 +179,10 @@ export interface EyeDetection {
   density: FiberDensity
   /** Колко LLM паса са успели (0–5: 2 слоя × 2 шева + конституция). */
   passesOk: number
+  /** Колко от четирите детекторски паса (без конституцията) са успели. */
+  detectionPassesOk: number
+  /** Последната грешка от AI заявка, ако е имало. */
+  lastError?: string
   rejectedCount: number
   /**
    * Измерена повторяемост: какъв дял от находките са се появили и в двата
@@ -466,6 +470,8 @@ export async function detectEye(
   const sideName = prep.side === 'left' ? 'ляв' : 'десен'
   let rejected = 0
   let passesOk = 0
+  let detectionPassesOk = 0
+  let lastError: string | undefined
 
   // Резултатите се държат ПО ПРОЧИТ (по индекс на шева), защото сливането е
   // именно между тях. Смесването им тук би заличило информацията, заради която
@@ -521,6 +527,7 @@ export async function detectEye(
       rejected += rawList.length - normalized.length
       perReading[readingIdx].push(...normalized)
       passesOk++
+      detectionPassesOk++
       onEvent({ kind: 'pass', side: prep.side, layer, reading: readingIdx, status: 'done', accepted: normalized.length })
       addLog(
         'success',
@@ -531,6 +538,7 @@ export async function detectEye(
             : '')
       )
     } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e)
       onEvent({ kind: 'pass', side: prep.side, layer, reading: readingIdx, status: 'fail' })
       addLog(
         'warning',
@@ -653,10 +661,42 @@ export async function detectEye(
     constitution,
     density,
     passesOk,
+    detectionPassesOk,
+    lastError,
     rejectedCount: rejected,
     agreement: merged.agreement,
     confirmedCount: findings.filter(f => f.confirmations === 2).length,
   }
+}
+
+/**
+ * AI моделът не върна нито един прочит на ириса (сървърът без ключ, мрежа,
+ * лимит, грешен модел). Отчетът без находки би изглеждал като „здрав ирис".
+ */
+export class AiUnavailableError extends Error {
+  readonly detail: string
+  constructor(detail: string) {
+    super(`AI моделът не анализира ирисите — ${describeAiFailure(detail)}`)
+    this.name = 'AiUnavailableError'
+    this.detail = detail
+  }
+}
+
+/** Човешко обяснение на най-честите причини. */
+export function describeAiFailure(detail: string): string {
+  if (/GEMINI_API_KEY is not configured/i.test(detail)) {
+    return 'на сървъра на AIRIS не е зададен ключ за Gemini (GEMINI_API_KEY). Нужно е администраторът да го запише в Cloudflare worker-а airis-ai или да въведе собствен ключ в настройките.'
+  }
+  if (/origin not allowed/i.test(detail)) {
+    return 'сървърът на AIRIS не приема заявки от този адрес (ALLOWED_ORIGINS).'
+  }
+  if (/429|rate limit|too many requests|quota/i.test(detail)) {
+    return 'достигнат е лимитът на заявките. Опитайте отново след няколко минути.'
+  }
+  if (/Failed to fetch|NetworkError|timeout|aborted/i.test(detail)) {
+    return 'няма връзка със сървъра. Проверете интернета и опитайте отново.'
+  }
+  return `заявките се провалиха (${detail.slice(0, 200)}).`
 }
 
 function sleep(ms: number) {
@@ -782,6 +822,12 @@ export async function runIrisPipeline(opts: RunPipelineOptions): Promise<IrisPip
       detectEye(leftPrep, callLLM, addLog, (s, p) => onProgress(s, 15 + p * 0.25), delay, onEvent),
       detectEye(rightPrep, callLLM, addLog, (s, p) => onProgress(s, 40 + p * 0.25), delay, onEvent),
     ])
+  }
+
+  // Нито един детекторски пас не е минал → AI не е отговорил. Празен отчет
+  // („без знаци") тук би излъгал клиента, затова анализът спира с причината.
+  if (left.detectionPassesOk + right.detectionPassesOk === 0) {
+    throw new AiUnavailableError(right.lastError ?? left.lastError ?? 'няма отговор')
   }
 
   // ── 2б. проверка по снимката ──────────────────────────────────────────

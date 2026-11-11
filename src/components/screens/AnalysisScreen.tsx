@@ -12,7 +12,7 @@ import { AIRIS_KNOWLEDGE } from '@/lib/airis-knowledge'
 import { MAX_VISION_TOKENS } from '@/lib/image-utils'
 import { executeV9Pipeline } from '@/lib/pipeline-v9'
 import { eyeHealthChecks } from '@/lib/eye-health'
-import { runIrisPipeline, toIrisAnalysis } from '@/lib/iris-pipeline'
+import { runIrisPipeline, toIrisAnalysis, AiUnavailableError } from '@/lib/iris-pipeline'
 import { IrisQualityRejectedError } from '@/lib/iris-quality'
 import { FINDINGS } from '@/lib/iris-map'
 import { shrinkStripForStorage } from '@/lib/iris-unwrap'
@@ -1014,6 +1014,16 @@ ${response}
           if (calibratedError instanceof IrisQualityRejectedError) {
             addLog('error', calibratedError.message)
             setStatus('Анализът е спрян — нужна е нова снимка.')
+            setAnalysisRunning(false)
+            return
+          }
+          // AI не е отговорил на нито един прочит. Наследеният анализ вика същия
+          // модел и би се провалил по същата причина — спираме с ясна грешка,
+          // вместо отчет „без знаци".
+          if (calibratedError instanceof AiUnavailableError) {
+            addLog('error', `${calibratedError.message} (${calibratedError.detail})`)
+            setStatus('Анализът е спрян — AI моделът не отговаря.')
+            setError(calibratedError.message)
             setAnalysisRunning(false)
             return
           }
