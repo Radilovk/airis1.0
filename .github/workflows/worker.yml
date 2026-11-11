@@ -2,7 +2,7 @@ name: Deploy AI worker (airis-ai)
 
 # Публикува worker/airis-ai.js в Cloudflare и записва ключа за Gemini като таен.
 # Нужни тайни в репото (Settings → Secrets and variables → Actions):
-#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, GEMINI_API_KEY
+#   CLOUDFLARE_API_TOKEN (или CF_API_TOKEN), CLOUDFLARE_ACCOUNT_ID, GEMINI_API_KEY
 on:
   push:
     branches:
@@ -20,7 +20,7 @@ jobs:
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy --config wrangler.toml
