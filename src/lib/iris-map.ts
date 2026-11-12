@@ -594,6 +594,14 @@ export function isFindingType(v: unknown): v is FindingType {
 }
 
 /** Околообхватен пръstenен знак — рисува се като пълен пръsten, не секторен клин. */
+/**
+ * Знак без една точка: по тип (нервни пръстени, натриев пръстен…) или защото
+ * е слят от много сектори (пигмент по цялата обиколка — `spread`).
+ */
+export function isRingFinding(f: { type: string; spread?: string }): boolean {
+  return f.spread === 'circumferential' || isCircumferentialFinding(f.type)
+}
+
 export function isCircumferentialFinding(type: FindingType | string): boolean {
   if (!isFindingType(type)) return false
   const def = FINDINGS[type]

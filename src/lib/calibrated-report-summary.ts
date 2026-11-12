@@ -3,7 +3,7 @@
  * в разбираемо обобщение за клиента.
  */
 import type { CalibratedAnalysisPayload } from '@/types'
-import { ringBand, isCircumferentialFinding, boundaryRingNote, sectorsFor } from '@/lib/iris-map'
+import { ringBand, isRingFinding, boundaryRingNote, sectorsFor, FINDINGS, type FindingType } from '@/lib/iris-map'
 
 export type CalibratedVerdict = 'stable' | 'mild' | 'focus'
 
@@ -26,19 +26,92 @@ export function isPlanRelevantFinding(f: CalibratedAnalysisPayload['findings'][n
   return f.confidence >= 0.6
 }
 
+type DisplayFinding = CalibratedAnalysisPayload['findings'][number]
+
+/** Две отметки на снимката по-близо от това са едно място (минути / пръстени). */
+const SAME_PLACE_MINUTES = 2.5
+const SAME_PLACE_RINGS = 1.25
+
+function minuteGap(a: number, b: number): number {
+  const d = Math.abs(a - b) % 60
+  return Math.min(d, 60 - d)
+}
+
 /**
- * Групира находки по сектор + пръstenен пояс + тип.
- * Околообхватните знаци (nerve_rings, sodium_ring …) се сливат по око+тип+пояс.
- * R1 и R2 в STOM стават един маркер — така е в manual.json / RING_BANDS.
+ * Едно и също място на снимката. Моделът често описва един знак с два-три
+ * типа (дефект + изтъняване + бразда) или го отчита в два съседни пръстена,
+ * а проверката по снимката ги закотвя в една и съща най-тъмна клетка. Без
+ * сливане на снимката излизат няколко номера върху една точка.
+ */
+function samePlace(a: DisplayFinding, b: DisplayFinding): boolean {
+  if (a.side !== b.side || isRingFinding(a) || isRingFinding(b)) return false
+  if (a.anchor && b.anchor) {
+    return (
+      minuteGap(a.anchor.minute, b.anchor.minute) <= SAME_PLACE_MINUTES &&
+      Math.abs(a.anchor.ring - b.anchor.ring) <= SAME_PLACE_RINGS
+    )
+  }
+  // Единият е измерен, другият е само зона: зоната покрива измереното място.
+  const pinned = a.anchor ? a : b.anchor ? b : null
+  if (pinned) {
+    const zone = pinned === a ? b : a
+    const anchor = pinned.anchor!
+    const zoneFrom = (zone.sector - 1) * 5
+    const inSector = minuteGap(anchor.minute, zoneFrom + 2.5) <= 2.5 + 0.5
+    return inSector && Math.abs(zone.ring + 0.5 - anchor.ring) <= SAME_PLACE_RINGS + 0.5
+  }
+  // Без измерено място: същият знак в същия сектор и съседен пръстен.
+  return a.type === b.type && a.sector === b.sector && Math.abs(a.ring - b.ring) <= 1
+}
+
+/** Кой от слетите знаци води: потвърденият, после по-сигурният и по-тежкият. */
+function displayRank(f: DisplayFinding): number {
+  const weight = FINDINGS[f.type as FindingType]?.weight ?? 0.5
+  return f.confidence * ((f.confirmations ?? 1) >= 2 ? 1.6 : 1) * (f.bilateral ? 1.25 : 1) * weight
+}
+
+/** Слива знаците на едно място в един — водещият носи останалите в `alsoLabels`. */
+export function mergeSamePlace(findings: DisplayFinding[]): DisplayFinding[] {
+  const ordered = findings.slice().sort((a, b) => displayRank(b) - displayRank(a))
+  const out: DisplayFinding[] = []
+  for (const f of ordered) {
+    const i = out.findIndex(o => samePlace(o, f))
+    if (i < 0) {
+      out.push({ ...f })
+      continue
+    }
+    const lead = out[i]
+    const also = new Set(lead.alsoLabels ?? [])
+    if (f.type !== lead.type) also.add(f.label)
+    for (const l of f.alsoLabels ?? []) if (l !== lead.label) also.add(l)
+    out[i] = {
+      ...lead,
+      confidence: Math.max(lead.confidence, f.confidence),
+      confirmations: Math.max(lead.confirmations ?? 1, f.confirmations ?? 1),
+      bilateral: lead.bilateral || f.bilateral,
+      // Измереното място остава, дори ако водещият знак е само зона.
+      ...(lead.anchor || !f.anchor ? {} : { anchor: f.anchor, photoCheck: f.photoCheck }),
+      ...(also.size ? { alsoLabels: [...also] } : {}),
+    }
+  }
+  return out
+}
+
+/**
+ * Групира находки за показване: първо знаците на едно и също място стават един
+ * (`mergeSamePlace`), после — по сектор + пръстенен пояс + тип.
+ * Околообхватните знаци (nerve_rings, sodium_ring, пигмент по цялата обиколка …)
+ * се сливат по око+тип+пояс. R1 и R2 в STOM стават един маркер — така е в
+ * manual.json / RING_BANDS.
  */
 export function groupFindingsForDisplay(
   findings: CalibratedAnalysisPayload['findings']
 ): CalibratedAnalysisPayload['findings'] {
   const map = new Map<string, CalibratedAnalysisPayload['findings'][number]>()
 
-  for (const f of findings) {
+  for (const f of mergeSamePlace(findings)) {
     const band = ringBand(f.ring)
-    const circum = isCircumferentialFinding(f.type)
+    const circum = isRingFinding(f)
     const key = circum
       ? `${f.side}:${f.type}:${band.key}`
       : `${f.side}:${f.type}:${f.sector}:${band.key}`
@@ -59,7 +132,7 @@ export function findingLocationLabel(
 ): string {
   const band = ringBand(f.ring)
   const parts: string[] = [`${band.label} (${band.pct[0]}–${band.pct[1]}%)`]
-  if (isCircumferentialFinding(f.type)) {
+  if (isRingFinding(f)) {
     parts.unshift('околообхватен пръстен')
   } else if (sectorLabel) {
     parts.push(sectorLabel)

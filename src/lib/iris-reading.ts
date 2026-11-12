@@ -19,7 +19,7 @@ import {
   FINDINGS,
   ringBand,
   sectorsFor,
-  isCircumferentialFinding,
+  isRingFinding,
   systemLabel,
   type FindingType,
   type RingBandKey,
@@ -114,7 +114,7 @@ export function findingAreaKey(f: Finding): SystemKey | undefined {
   const def = FINDINGS[f.type as FindingType]
   if (!def) return undefined
   const weights: Partial<Record<SystemKey, number>> = { ...def.systems }
-  if (!isCircumferentialFinding(def.type)) {
+  if (!isRingFinding(f)) {
     const sector = sectorsFor(f.side)[f.sector - 1]
     for (const [k, w] of Object.entries(sector?.systems ?? {}) as Array<[SystemKey, number]>) {
       weights[k] = (weights[k] ?? 0) + w * 0.8
@@ -194,7 +194,7 @@ export function plainLocation(f: Finding): string {
       : band.key === 'ORG'
         ? 'в средата на ириса'
         : 'по края'
-  if (isCircumferentialFinding(f.type as FindingType)) return `${depth}, по цялата обиколка`
+  if (isRingFinding(f)) return `${depth}, по цялата обиколка`
   // Секторът покрива минути (id−1)·5 … id·5 по часовника на снимката.
   const hour = (f.sector - 0.5) % 12
   const clear = signalStrength(f.confidence) === 'clear'
@@ -285,7 +285,7 @@ export function readFinding(f: Finding): FindingReading {
   const type = f.type as FindingType
   const def = FINDINGS[type]
   const band = ringBand(f.ring)
-  const circumferential = isCircumferentialFinding(type)
+  const circumferential = isRingFinding(f)
   const sector = circumferential ? undefined : sectorsFor(f.side)[f.sector - 1]
   const sideLabel = f.side === 'left' ? 'Ляв ирис' : 'Десен ирис'
   // Секторът носи смисъл само в органната зона; във вътрешните пояси и по
@@ -297,6 +297,7 @@ export function readFinding(f: Finding): FindingReading {
   const reliability: string[] = [STRENGTH_LABEL[strength]]
   if ((f.confirmations ?? 1) >= 2) reliability.push('потвърден при повторен прочит')
   if (f.bilateral) reliability.push('и в двете очи')
+  if (f.alsoLabels?.length) reliability.push(`на същото място: ${f.alsoLabels.join(', ').toLowerCase()}`)
 
   return {
     title: visibleLabel(f),

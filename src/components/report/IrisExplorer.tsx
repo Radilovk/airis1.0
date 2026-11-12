@@ -10,7 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
 import { findingOverlayPath, irisPoint } from '@/lib/iris-coords'
-import { isCircumferentialFinding, sectorsFor, RING_BANDS } from '@/lib/iris-map'
+import { isRingFinding, sectorsFor, RING_BANDS } from '@/lib/iris-map'
 import { groupFindingsForDisplay, isPlanRelevantFinding } from '@/lib/calibrated-report-summary'
 import { readFinding, rankKeySigns, isConfirmedFinding, type SignalStrength } from '@/lib/iris-reading'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
@@ -88,9 +88,28 @@ interface Mark {
 function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Overlay): Mark[] {
   const span = ov.lr - ov.pr
   const ringPx = span / 12
+  // Пръстенът няма една точка: стрелката му сочи там, където по обиколката е
+  // най-свободно от другите знаци (иначе всички пръстени сочеха горе вдясно,
+  // върху знака там).
+  const taken = findings
+    .filter(f => !isRingFinding(f))
+    .map(f => (f.anchor ? f.anchor.minute : (f.sector - 0.5) * 5))
+  const freeMinute = () => {
+    let best = 7.5
+    let bestGap = -1
+    for (let m = 1.25; m < 60; m += 2.5) {
+      const gap = taken.length ? Math.min(...taken.map(t => Math.min(Math.abs(t - m), 60 - Math.abs(t - m)))) : 60
+      if (gap > bestGap + 0.01) {
+        best = m
+        bestGap = gap
+      }
+    }
+    taken.push(best)
+    return best
+  }
   const base = findings.map((f, index) => {
     const strength = readFinding(f).strength
-    const circum = isCircumferentialFinding(f.type)
+    const circum = isRingFinding(f)
     let minute: number
     let ring: number
     let shape: Mark['shape']
@@ -99,8 +118,7 @@ function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Ov
       ring = f.anchor.ring
       shape = 'circle'
     } else if (circum) {
-      // Пръстенът няма една точка — стрелката сочи горе вдясно по него.
-      minute = 7.5
+      minute = freeMinute()
       ring = f.ring + 0.5
       shape = 'region'
     } else {
@@ -500,6 +518,7 @@ function FindingList({
             <span className="block truncate text-[12px] text-muted-foreground">
               {r.area ?? r.zone}
               {f.bilateral ? ' · и в двете очи' : ''}
+              {f.alsoLabels?.length ? ` · + ${f.alsoLabels.join(', ').toLowerCase()}` : ''}
             </span>
           </span>
           {confirmed && (

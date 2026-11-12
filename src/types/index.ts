@@ -267,6 +267,10 @@ export interface CalibratedAnalysisPayload {
     photoCheck?: 'seen' | 'not_seen' | 'unchecked'
     /** Измереното място на знака: минута 0–60 и пръстен 0–12 (дробно). */
     anchor?: { minute: number; ring: number }
+    /** Пигмент по цялата обиколка (слят от много сектори) — пръстен, не точка. */
+    spread?: 'circumferential'
+    /** Други знаци, отчетени на същото място (слети при показването). */
+    alsoLabels?: string[]
   }>
   /**
    * ПОВТОРЯЕМОСТ на разчитането, 0–1. Всяко око се разчита ДВА пъти — веднъж с

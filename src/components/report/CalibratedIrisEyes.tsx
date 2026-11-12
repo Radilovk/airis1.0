@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Eye } from '@phosphor-icons/react'
 import { fitImageInSquare } from '@/lib/image-utils'
 import { cellCenterInView, findingOverlayPath, ringTopCenterInView } from '@/lib/iris-coords'
-import { sectorsFor, isCircumferentialFinding } from '@/lib/iris-map'
+import { sectorsFor, isRingFinding } from '@/lib/iris-map'
 import { isPlanRelevantFinding, groupFindingsForDisplay, findingLocationLabel } from '@/lib/calibrated-report-summary'
 import type { AnalysisReport, CalibratedAnalysisPayload, IrisGeometrySnapshot } from '@/types'
 
@@ -99,13 +99,13 @@ function IrisEyePanel({
             <circle cx={overlay.cx} cy={overlay.cy} r={overlay.lr} fill="none" stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="6 4" />
             <circle cx={overlay.cx} cy={overlay.cy} r={overlay.pr} fill="none" stroke="#38bdf8" strokeWidth={1.5} />
             {eyeFindings.map((f, i) => {
-              const pt = isCircumferentialFinding(f.type)
+              const pt = isRingFinding(f)
                 ? ringTopCenterInView(f.ring, geometry, VIEW)
                 : cellCenterInView(f.sector, f.ring, geometry, VIEW)
               return (
                 <g key={`m-${f.type}-${f.sector}-${f.ring}-${i}`}>
                   <circle cx={pt.x} cy={pt.y} r={activeIdx === i ? 7 : 5} fill="#ef4444" stroke="#fff" strokeWidth={1.5} />
-                  {!isCircumferentialFinding(f.type) && (
+                  {!isRingFinding(f) && (
                     <text x={pt.x} y={pt.y - 10} textAnchor="middle" fill="#fff" fontSize={9} fontWeight="bold" stroke="#000" strokeWidth={0.3}>
                       {f.sector}
                     </text>
@@ -127,7 +127,7 @@ function IrisEyePanel({
         ) : (
           eyeFindings.map((f, i) => {
             const sector = sectorsFor(side)[f.sector - 1]
-            const circum = isCircumferentialFinding(f.type)
+            const circum = isRingFinding(f)
             return (
               <li
                 key={`${f.type}-${f.sector}-${f.ring}-${i}`}

@@ -4,7 +4,7 @@
  */
 import type { IrisGeometrySnapshot } from '@/types'
 import { fitImageInSquare } from './image-utils'
-import { ringBand, isCircumferentialFinding, type RingBandDef } from './iris-map'
+import { ringBand, isRingFinding, type RingBandDef } from './iris-map'
 
 /**
  * Точка в ириса по модела „гумен лист“ — същият, по който се разгъва лентата
@@ -130,11 +130,11 @@ export function fullRingAnnulusPath(ring: number, geometry: IrisGeometrySnapshot
 
 /** Избира overlay path: околообхватна дъга или секторен клин по пояс. */
 export function findingOverlayPath(
-  finding: { type: string; sector: number; ring: number },
+  finding: { type: string; sector: number; ring: number; spread?: string },
   geometry: IrisGeometrySnapshot,
   viewSize: number
 ): string {
-  if (isCircumferentialFinding(finding.type)) {
+  if (isRingFinding(finding)) {
     const band = ringBand(finding.ring)
     const spansFullBand =
       finding.type === 'sodium_ring' ||
