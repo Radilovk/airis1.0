@@ -41,6 +41,12 @@ import {
   type QualityReport,
 } from './iris-quality'
 import {
+  measureCollaretteFromDataUrl,
+  meanCollaretteRing,
+  DEFAULT_COLLARETTE_T,
+  type CollaretteMeasure,
+} from './collarette'
+import {
   readabilityToPhysical,
   stripSectorToPhysical,
   unwrapAnalysisFromDataUrl,
@@ -170,6 +176,11 @@ export interface EyePreparation {
   strips: Record<StripLayer, UnwrapResult>
   /** Двата независими прочита с различен шев. Виж `mergeSeamReadings`. */
   readings: AnalysisViews['readings']
+  /**
+   * Измерената коларета (`collarette.ts`): по физически сектори, дял от пътя
+   * зеница→лимбус. Поясите на находките се броят от нея.
+   */
+  collarette: CollaretteMeasure
 }
 
 export interface EyeDetection {
@@ -385,8 +396,23 @@ export async function prepareEye(
     )
   }
 
+  // Коларетата на този ирис — зоните (стомах, черва, органи) се броят от нея,
+  // както при Jensen и Deck, а не по фиксиран процент.
+  const collarette = await measureCollaretteFromDataUrl(iris.dataUrl, geometry).catch(
+    (): CollaretteMeasure => ({ t: Array(12).fill(DEFAULT_COLLARETTE_T), confidence: 0, source: 'default' })
+  )
+  addLog(
+    'info',
+    collarette.source === 'measured'
+      ? `[Подготовка ${name}] Коларета: средно ${Math.round((meanCollaretteRing(collarette) / 12) * 100)} % от пътя ` +
+          `зеница→лимбус (${Math.round(Math.min(...collarette.t) * 100)}–${Math.round(Math.max(...collarette.t) * 100)} % по сектори)`
+      : `[Подготовка ${name}] Коларетата не се различава ясно — зоните по класическата 1/3`
+  )
+
   addLog('info', `[Подготовка ${name}] Пречертаване на лентата...`)
-  const views = await unwrapAnalysisFromDataUrl(iris.dataUrl, geometry, side)
+  const views = await unwrapAnalysisFromDataUrl(iris.dataUrl, geometry, side, {
+    collaretteRing: meanCollaretteRing(collarette),
+  })
   // `strips` остава с шев на 12:00 — за конституцията, за показване и за
   // историята. Детекцията ползва `views.readings`.
   const strips: Record<StripLayer, UnwrapResult> = {
@@ -451,6 +477,7 @@ export async function prepareEye(
     flash,
     strips,
     readings: views.readings,
+    collarette,
   }
 }
 
@@ -500,6 +527,7 @@ export async function detectEye(
       qualityScore: prep.qualityScore,
       flash: prep.flash,
       stretch: strip.stretch,
+      collarette: prep.collarette.source === 'measured' ? prep.collarette : undefined,
     })
 
     try {
@@ -519,6 +547,7 @@ export async function detectEye(
       })
 
       const normalized = normalizeFindings(physical, prep.side, {
+        collaretteRings: prep.collarette.t.map(t => t * 12),
         readability: readabilityToPhysical(strip.readability, view.rotationSectors),
         partialCells: strip.partialCells.map(c => ({
           sector: stripSectorToPhysical(c.sector, view.rotationSectors),

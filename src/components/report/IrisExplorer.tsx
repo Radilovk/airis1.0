@@ -85,7 +85,7 @@ interface Mark {
  * кръга. Номерът никога не стои върху самия знак — иначе закрива точно това,
  * което човекът трябва да види.
  */
-function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Overlay): Mark[] {
+function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Overlay, collarette?: number[]): Mark[] {
   const span = ov.lr - ov.pr
   const ringPx = span / 12
   // Пръстенът няма една точка: стрелката му сочи там, където по обиколката е
@@ -138,7 +138,7 @@ function layoutMarks(findings: Finding[], geometry: IrisGeometrySnapshot, ov: Ov
       x,
       y,
       r: Math.max(7, ringPx * 1.15),
-      path: shape === 'region' ? findingOverlayPath(f, geometry, VIEW) : undefined,
+      path: shape === 'region' ? findingOverlayPath(f, geometry, VIEW, collarette) : undefined,
     }
   })
 
@@ -194,10 +194,12 @@ function EyeStage({
   onSelect,
   showZones,
   showMarks,
+  collarette,
 }: {
   side: Side
   dataUrl: string
   geometry?: IrisGeometrySnapshot
+  collarette?: number[]
   findings: Finding[]
   active: number | null
   onSelect: (i: number | null) => void
@@ -205,7 +207,10 @@ function EyeStage({
   showMarks: boolean
 }) {
   const ov = useOverlay(geometry)
-  const marks = useMemo(() => (ov && geometry ? layoutMarks(findings, geometry, ov) : []), [findings, geometry, ov])
+  const marks = useMemo(
+    () => (ov && geometry ? layoutMarks(findings, geometry, ov, collarette) : []),
+    [findings, geometry, ov, collarette]
+  )
   const [hoverSector, setHoverSector] = useState<number | null>(null)
   const sectors = sectorsFor(side)
   const hovered = hoverSector ? sectors[hoverSector - 1] : null
@@ -639,6 +644,7 @@ export default function IrisExplorer({ report }: { report: AnalysisReport }) {
                 side={side}
                 dataUrl={image?.dataUrl ?? ''}
                 geometry={image?.geometry}
+                collarette={cal.collarette?.[side]}
                 findings={list}
                 active={active}
                 onSelect={setActive}

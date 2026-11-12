@@ -4,7 +4,7 @@
  */
 import type { IrisGeometrySnapshot } from '@/types'
 import { fitImageInSquare } from './image-utils'
-import { ringBand, isRingFinding, type RingBandDef } from './iris-map'
+import { ringBand, bandRingsAt, isRingFinding, type RingBandDef, type RingBandKey } from './iris-map'
 
 /**
  * Точка в ириса по модела „гумен лист“ — същият, по който се разгъва лентата
@@ -130,13 +130,24 @@ export function fullRingAnnulusPath(ring: number, geometry: IrisGeometrySnapshot
 
 /** Избира overlay path: околообхватна дъга или секторен клин по пояс. */
 export function findingOverlayPath(
-  finding: { type: string; sector: number; ring: number; spread?: string; sectors?: number[] },
+  finding: { type: string; sector: number; ring: number; spread?: string; sectors?: number[]; band?: string },
   geometry: IrisGeometrySnapshot,
-  viewSize: number
+  viewSize: number,
+  /** Измерената коларета по сектори (дял зеница→лимбус). Поясите се рисуват спрямо нея. */
+  collarette?: number[]
 ): string {
+  // Поясът на находката в даден сектор: по измерената коларета, ако я има.
+  const ringsIn = (sector: number): [number, number] =>
+    finding.band
+      ? bandRingsAt(finding.band as RingBandKey, collarette ? collarette[sector - 1] * 12 : undefined)
+      : ringBand(finding.ring).rings
+  const wedge = (sector: number) => {
+    const [r0, r1] = ringsIn(sector)
+    return bandPolygon(geometry, viewSize, (sector - 1) * 5, sector * 5, r0, r1 + 1)
+  }
   // Слят модел по много сектори — клиновете на точно тези сектори.
   if (finding.sectors?.length) {
-    return finding.sectors.map(s => sectorBandWedgePath(s, finding.ring, geometry, viewSize)).join(' ')
+    return finding.sectors.map(wedge).join(' ')
   }
   if (isRingFinding(finding)) {
     const band = ringBand(finding.ring)
@@ -147,7 +158,7 @@ export function findingOverlayPath(
     if (spansFullBand) return fullBandAnnulusPath(band, geometry, viewSize)
     return fullRingAnnulusPath(finding.ring, geometry, viewSize)
   }
-  return sectorBandWedgePath(finding.sector, finding.ring, geometry, viewSize)
+  return wedge(finding.sector)
 }
 
 /** Точка на 12:00 по пръстена — за маркер при околообхватни находки. */

@@ -22,18 +22,21 @@
 import { waterLitresOf, formatLitres } from './water'
 import {
   FINDINGS,
+  PRIORITY_ZONES,
   zoneBoost,
   SYSTEMS,
   resolveFindingType,
   minuteToSector,
   priorityZonesFor,
-  ringBand,
-  isBoundaryRing,
+  bandAt,
+  findingBand,
+  isBoundaryRingAt,
   isCircumferentialFinding,
   BOUNDARY_RING_WEIGHT,
   sectorsFor,
   systemLabel,
   type FindingType,
+  type RingBandKey,
   type Side,
   type SystemKey,
 } from './iris-map'
@@ -77,6 +80,11 @@ export interface NormalizedFinding {
   spread?: 'circumferential'
   /** При слят модел (много радиални бразди) — секторите, в които се вижда. */
   sectors?: number[]
+  /**
+   * Поясът (стомах, черва/коларета, органи…) по измерената коларета на ТОЗИ
+   * ирис. Без него — по фиксирания процент на пръстена (`ringBand`).
+   */
+  band?: RingBandKey
   /**
    * Проверка по пикселите на снимката (`finding-verify.ts`): има ли на това
    * място измеримо отклонение от околната тъкан. 'not_seen' — моделът е
@@ -211,8 +219,13 @@ function asSize(v: unknown): FindingSize {
  * заличен отблясък.
  */
 export interface CellReadability {
-  readability: number[][]
-  partialCells: Array<{ sector: number; ring: number }>
+  readability?: number[][]
+  partialCells?: Array<{ sector: number; ring: number }>
+  /**
+   * Измерената коларета по физически сектори 1..12 (индекс 0..11), в пръстени
+   * (дробно, 0–12). Поясите на находките се броят от нея (`bandAt`).
+   */
+  collaretteRings?: number[]
 }
 
 export function normalizeFindings(
@@ -253,15 +266,25 @@ export function normalizeFindings(
     ring = Math.round(ring)
     if (ring < 0 || ring > 11) continue
 
-    // находка извън физически смисления пръстенен обхват = халюцинация
-    if (ring < def.validRings[0] || ring > def.validRings[1]) continue
+    // Поясът — спрямо коларетата на този ирис, ако е измерена.
+    const collaretteRing = cells?.collaretteRings?.[sector - 1]
+    const band = bandAt(ring, collaretteRing)
+
+    // находка извън физически смисления пръстенен обхват = халюцинация.
+    // Деформацията на коларетата е там, където е самата коларета: до един
+    // пръстен навън от измереното ѝ място.
+    const validTo =
+      type === 'collarette_deform' && collaretteRing !== undefined
+        ? Math.max(def.validRings[1], Math.floor(collaretteRing) + 1)
+        : def.validRings[1]
+    if (ring < def.validRings[0] || ring > validTo) continue
 
     const confidence = Math.max(0, Math.min(1, Number(o.confidence ?? 0.6)))
     if (confidence < 0.45) continue
 
     const size = asSize(o.size)
     const centreMinute = (sector - 1) * 5 + 2.5
-    const zones = priorityZonesFor(side, centreMinute, ring)
+    const zones = priorityZonesFor(side, centreMinute, ring, band.key)
 
     const boost = zoneBoost(zones)
 
@@ -277,7 +300,7 @@ export function normalizeFindings(
       (partialKeys.has(`${sector}:${ring}`) ? 0.6 : 1)
 
     const boundaryFactor =
-      isBoundaryRing(ring) && !isCircumferentialFinding(type) ? BOUNDARY_RING_WEIGHT : 1
+      isBoundaryRingAt(ring, collaretteRing) && !isCircumferentialFinding(type) ? BOUNDARY_RING_WEIGHT : 1
 
     const load =
       typeWeight(def.weight) * SIZE_WEIGHT[size] * confidence * boost * readableFactor * boundaryFactor
@@ -292,6 +315,7 @@ export function normalizeFindings(
       note: typeof o.note === 'string' ? o.note.slice(0, 80) : undefined,
       priorityZones: zones.map(z => z.key),
       load,
+      ...(collaretteRing !== undefined ? { band: band.key } : {}),
     })
   }
 
@@ -330,7 +354,7 @@ export function irisLoadBySystem(findings: NormalizedFinding[]): Record<SystemKe
 
   for (const f of findings) {
     const sectorDef = sectorsFor(f.side)[f.sector - 1]
-    const band = ringBand(f.ring)
+    const band = findingBand(f)
     const def = FINDINGS[f.type]
 
     // събиране на теглата от трите източника
@@ -382,8 +406,8 @@ const WIDESPREAD_LOAD = 0.35
 const CENTRAL_BANDS = new Set(['IPB', 'STOM', 'ANW'])
 const CENTRAL_WIDESPREAD_SECTORS = 4
 
-function pigmentZone(ring: number): string {
-  const key = ringBand(ring).key
+function pigmentZone(f: { ring: number; band?: string }): string {
+  const key = findingBand(f).key
   return CENTRAL_BANDS.has(key) ? 'CENTRAL' : key
 }
 
@@ -394,7 +418,7 @@ export function collapseWidespreadPigment(findings: NormalizedFinding[]): {
   const groups = new Map<string, NormalizedFinding[]>()
   for (const f of findings) {
     if (!PIGMENT_TYPES.has(f.type)) continue
-    const k = `${f.side}:${pigmentZone(f.ring)}`
+    const k = `${f.side}:${pigmentZone(f)}`
     const list = groups.get(k)
     if (list) list.push(f)
     else groups.set(k, [f])
@@ -481,8 +505,10 @@ export function collapseRadialPattern(findings: NormalizedFinding[]): {
       spread: 'circumferential',
       confidence: Math.max(...list.map(f => f.confidence)),
       confirmations: Math.max(...list.map(f => f.confirmations ?? 1)),
-      // Една предразположеност, не сума от бразди: тежестта на най-силната.
-      load: lead.load,
+      // Една предразположеност, не сума от бразди: тежестта на най-силната, без
+      // усилването за приоритетната зона на нейния сектор — знакът не е там.
+      load: lead.load / zoneBoost(PRIORITY_ZONES.filter(z => lead.priorityZones.includes(z.key))),
+      priorityZones: [],
       photoCheck: undefined,
       anchor: undefined,
     })
@@ -506,7 +532,7 @@ const BILATERAL_BOOST = 1.25
 
 function dominantSystems(f: NormalizedFinding): SystemKey[] {
   const sectorDef = sectorsFor(f.side)[f.sector - 1]
-  const band = ringBand(f.ring)
+  const band = findingBand(f)
   const w = emptyLoad()
   for (const [k, v] of Object.entries(sectorDef.systems)) w[k as SystemKey] += v
   for (const [k, v] of Object.entries(band.systems)) w[k as SystemKey] += v * 0.7
@@ -521,7 +547,7 @@ export function applyBilateralCorroboration(findings: NormalizedFinding[]): Norm
   if (left.length === 0 || right.length === 0) return findings
 
   const meta = new Map<NormalizedFinding, { band: string; systems: SystemKey[] }>()
-  for (const f of findings) meta.set(f, { band: ringBand(f.ring).key, systems: dominantSystems(f) })
+  for (const f of findings) meta.set(f, { band: findingBand(f).key, systems: dominantSystems(f) })
 
   return findings.map(f => {
     const mine = meta.get(f)!
@@ -599,7 +625,7 @@ export function mergeSeamReadings(
     for (let i = 0; i < b.length; i++) {
       if (usedB.has(i)) continue
       const fb = b[i]
-      if (ringBand(fb.ring).key !== ringBand(fa.ring).key) continue
+      if (findingBand(fb).key !== findingBand(fa).key) continue
       const d = sectorDistance(fa.sector, fb.sector)
       if (d > 1) continue
       if (d < bestDist) { bestDist = d; matchIdx = i }
@@ -935,7 +961,7 @@ export function computeScores(input: ScoringInput): ScoringResult {
     const relevant = findings
       .filter(f => {
         const sectorDef = sectorsFor(f.side)[f.sector - 1]
-        const band = ringBand(f.ring)
+        const band = findingBand(f)
         return (
           (sectorDef.systems[def.key] ?? 0) > 0 ||
           (band.systems[def.key] ?? 0) > 0 ||

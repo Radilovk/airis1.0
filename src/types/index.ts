@@ -228,6 +228,11 @@ export interface AnalysisReport {
 export interface CalibratedAnalysisPayload {
   /** Средно качество на двете снимки, 0–100. */
   imageQuality: number
+  /**
+   * Измерената коларета на всяко око: по сектори 1..12, дял от пътя
+   * зеница→лимбус. Липсва, ако не е ясна или в стари отчети.
+   */
+  collarette?: { left?: number[]; right?: number[] }
   /** Среден дял четима площ в лентите, 0–1. */
   stripCoverage: number
   /** Тежестта, с която ирисът е повлиял на оценките, 0–1. */
@@ -273,6 +278,8 @@ export interface CalibratedAnalysisPayload {
     sectors?: number[]
     /** Други знаци, отчетени на същото място (слети при показването). */
     alsoLabels?: string[]
+    /** Поясът по измерената коларета (STOM, ANW, ORG…). Липсва в стари отчети. */
+    band?: string
   }>
   /**
    * ПОВТОРЯЕМОСТ на разчитането, 0–1. Всяко око се разчита ДВА пъти — веднъж с

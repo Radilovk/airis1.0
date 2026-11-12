@@ -22,10 +22,13 @@ function IrisEyePanel({
   geometry,
   findings,
   maxPerEye,
+  collarette,
 }: {
   side: 'left' | 'right'
   dataUrl: string
   geometry?: IrisGeometrySnapshot
+  /** Измерената коларета по сектори — поясите се рисуват спрямо нея. */
+  collarette?: number[]
   findings: CalibratedAnalysisPayload['findings']
   /** Ако е зададено — ограничава броя маркери; по подразбиране — всички значими. */
   maxPerEye?: number
@@ -71,7 +74,7 @@ function IrisEyePanel({
             {eyeFindings.map((f, i) => (
               <path
                 key={`w-${f.type}-${f.sector}-${f.ring}-${i}`}
-                d={findingOverlayPath(f, geometry, VIEW)}
+                d={findingOverlayPath(f, geometry, VIEW, collarette)}
                 fill={loadColor(f.confidence)}
                 stroke={activeIdx === i ? '#fff' : 'rgba(255,255,255,0.35)'}
                 strokeWidth={activeIdx === i ? 2 : 1}
@@ -176,6 +179,7 @@ export default function CalibratedIrisEyes({
           side="left"
           dataUrl={report.leftIrisImage?.dataUrl ?? ''}
           geometry={report.leftIrisImage?.geometry}
+          collarette={cal.collarette?.left}
           findings={cal.findings}
           maxPerEye={maxPerEye}
         />
@@ -183,6 +187,7 @@ export default function CalibratedIrisEyes({
           side="right"
           dataUrl={report.rightIrisImage?.dataUrl ?? ''}
           geometry={report.rightIrisImage?.geometry}
+          collarette={cal.collarette?.right}
           findings={cal.findings}
           maxPerEye={maxPerEye}
         />

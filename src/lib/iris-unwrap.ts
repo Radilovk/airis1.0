@@ -45,13 +45,18 @@
 
 import { artifactAt, artifactMapFor, ARTIFACT_NONE } from './photo-artifacts'
 import type { IrisGeometry } from './iris-geometry'
-import { RING_BANDS, sectorsFor, type Side } from './iris-map'
+import { RING_BANDS, bandRingsAt, sectorsFor, type Side } from './iris-map'
 
 export type StripLayer = 'base' | 'structure' | 'pigment'
 
 export interface UnwrapOptions {
   /** Кой филтър да се приложи преди изчертаване на мрежата. */
   layer?: StripLayer
+  /**
+   * Измерената коларета (среден пръстен, 0–12). Надписите на поясите вляво
+   * (STOM / ANW / ORG) се слагат спрямо нея, а не по фиксиран процент.
+   */
+  collaretteRing?: number
   /** Ширина на полето с ирисова тъкан, px. По подразбиране 1440. */
   plotWidth?: number
   /**
@@ -648,7 +653,7 @@ export function unwrapIris(
   const rawDataUrl = options.includeRaw ? rawCanvas.toDataURL('image/jpeg', quality) : ''
 
   const dataUrl = drawCalibrationGrid(
-    rawCanvas, side, layer, readability, isPartial, quality, [ring0, ring1]
+    rawCanvas, side, layer, readability, isPartial, quality, [ring0, ring1], options.collaretteRing
   )
 
   return {
@@ -726,7 +731,8 @@ function drawCalibrationGrid(
   readability: number[][],
   isPartial: boolean[][],
   quality: number,
-  ringRange: [number, number]
+  ringRange: [number, number],
+  collaretteRing?: number
 ): string {
   const [ring0, ring1] = ringRange
   const ringCount = ring1 - ring0 + 1
@@ -897,7 +903,8 @@ function drawCalibrationGrid(
   // 8. Пръстенни групи (IPB / ANW / ORG / LYM / SCU) — най-вляво
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  for (const band of RING_BANDS) {
+  for (const def of RING_BANDS) {
+    const band = { key: def.key, rings: bandRingsAt(def.key, collaretteRing) }
     if (band.rings[1] < ring0 || band.rings[0] > ring1) continue
     const y0 = yOf(Math.max(band.rings[0], ring0))
     const y1 = yOf(Math.min(band.rings[1], ring1) + 1)

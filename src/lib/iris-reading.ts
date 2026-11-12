@@ -17,7 +17,7 @@
 import type { CalibratedAnalysisPayload, FiberDensity } from '@/types'
 import {
   FINDINGS,
-  ringBand,
+  findingBand,
   sectorsFor,
   isRingFinding,
   systemLabel,
@@ -226,7 +226,7 @@ const DIR4 = ['горе', 'вдясно', 'долу', 'вляво']
  * надхвърля сигурността.
  */
 export function plainLocation(f: Finding): string {
-  const band = ringBand(f.ring)
+  const band = findingBand(f)
   const depth =
     band.key === 'IPB' || band.key === 'STOM' || band.key === 'ANW'
       ? 'около зеницата'
@@ -326,7 +326,7 @@ function cleanAppearance(text: string): string {
 export function readFinding(f: Finding): FindingReading {
   const type = f.type as FindingType
   const def = FINDINGS[type]
-  const band = ringBand(f.ring)
+  const band = findingBand(f)
   const circumferential = isRingFinding(f)
   const sector = circumferential ? undefined : sectorsFor(f.side)[f.sector - 1]
   const sideLabel = f.side === 'left' ? 'Ляв ирис' : 'Десен ирис'
