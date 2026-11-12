@@ -55,6 +55,7 @@ import {
 } from './analysis-prompts'
 import {
   collapseWidespreadPigment,
+  collapseRadialPattern,
   computeScores,
   mergeSeamReadings,
   normalizeFindings,
@@ -583,7 +584,16 @@ export async function detectEye(
       `[Детекция ${sideName}] ${widespread.collapsed} пигментни находки по обиколката са слети в една — цвят на ириса`
     )
   }
-  const collected = widespread.findings
+  // Много радиални бразди са предразположеност, не отделни органи (виж
+  // collapseRadialPattern — как ги четат атласите).
+  const radial = collapseRadialPattern(widespread.findings)
+  if (radial.collapsed > 0) {
+    addLog(
+      'info',
+      `[Детекция ${sideName}] ${radial.collapsed} радиални бразди в много сектори са слети в един знак — предразположеност`
+    )
+  }
+  const collected = radial.findings
   onEvent({
     kind: 'merge',
     side: prep.side,

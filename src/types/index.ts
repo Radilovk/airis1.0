@@ -269,6 +269,8 @@ export interface CalibratedAnalysisPayload {
     anchor?: { minute: number; ring: number }
     /** Пигмент по цялата обиколка (слят от много сектори) — пръстен, не точка. */
     spread?: 'circumferential'
+    /** При слят модел (много радиални бразди) — секторите, в които се вижда. */
+    sectors?: number[]
     /** Други знаци, отчетени на същото място (слети при показването). */
     alsoLabels?: string[]
   }>

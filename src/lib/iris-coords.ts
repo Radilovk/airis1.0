@@ -130,10 +130,14 @@ export function fullRingAnnulusPath(ring: number, geometry: IrisGeometrySnapshot
 
 /** Избира overlay path: околообхватна дъга или секторен клин по пояс. */
 export function findingOverlayPath(
-  finding: { type: string; sector: number; ring: number; spread?: string },
+  finding: { type: string; sector: number; ring: number; spread?: string; sectors?: number[] },
   geometry: IrisGeometrySnapshot,
   viewSize: number
 ): string {
+  // Слят модел по много сектори — клиновете на точно тези сектори.
+  if (finding.sectors?.length) {
+    return finding.sectors.map(s => sectorBandWedgePath(s, finding.ring, geometry, viewSize)).join(' ')
+  }
   if (isRingFinding(finding)) {
     const band = ringBand(finding.ring)
     const spansFullBand =

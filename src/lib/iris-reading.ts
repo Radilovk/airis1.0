@@ -172,7 +172,45 @@ const GLOSS: Record<FindingType, string> = {
 }
 
 /** Иридологичното име на знака, предпазливо при по-слаб знак. */
+/** Слят модел: много радиални бразди в едно око (`collapseRadialPattern`). */
+export function isRadialPattern(f: Finding): boolean {
+  return f.type === 'radial_furrow' && f.spread === 'circumferential'
+}
+
+/** Пигментът около коларетата по цялата обиколка — цветът на смесения ирис. */
+export function isCentralPigment(f: Finding): boolean {
+  return f.type === 'pigment_diffuse' && f.spread === 'circumferential' && f.ring <= 4
+}
+
+/**
+ * Знаците, които атласите четат на ниво „конституция/предразположеност", а не
+ * като отделен орган: описание, значение и обяснение за клиента.
+ */
+function patternText(f: Finding): { title: string; meaning: string; gloss: string } | null {
+  if (isRadialPattern(f)) {
+    return {
+      title: 'Радиални бразди в много сектори',
+      meaning:
+        'Много радиални бразди се четат като предразположеност на нервната система: напрежението лесно ' +
+        'се отразява на съня и на храносмилането. Не сочат към отделен орган.',
+      gloss: 'Тъмни линии като спици на колело, в много части на ириса.',
+    }
+  }
+  if (isCentralPigment(f)) {
+    return {
+      title: 'Пигмент около коларетата',
+      meaning:
+        'Смесен (зелено-кафяв) тип ирис: пигментът около коларетата е част от цвета му, не петно. ' +
+        'В школата на Deck този тип се свързва с натоварване на черния дроб и жлъчката.',
+      gloss: 'Оранжево-кафяв пръстен около зеницата, по цялата обиколка.',
+    }
+  }
+  return null
+}
+
 export function visibleLabel(f: Finding): string {
+  const pattern = patternText(f)
+  if (pattern) return pattern.title
   const pair = VISIBLE[f.type as FindingType]
   if (!pair) return f.label
   return signalStrength(f.confidence) === 'clear' ? pair[0] : pair[1]
@@ -194,6 +232,9 @@ export function plainLocation(f: Finding): string {
       : band.key === 'ORG'
         ? 'в средата на ириса'
         : 'по края'
+  if (f.sectors?.length) {
+    return f.sectors.length >= 10 ? 'почти по цялата обиколка' : `в ${f.sectors.length} от 12-те сектора`
+  }
   if (isRingFinding(f)) return `${depth}, по цялата обиколка`
   // Секторът покрива минути (id−1)·5 … id·5 по часовника на снимката.
   const hour = (f.sector - 0.5) % 12
@@ -306,9 +347,9 @@ export function readFinding(f: Finding): FindingReading {
     zone,
     mapReference: sector?.reference,
     appearance: def ? cleanAppearance(def.appearanceUnwrapped) : '',
-    meaning: CLIENT_MEANING[type] ?? def?.meaning ?? '',
+    meaning: patternText(f)?.meaning ?? CLIENT_MEANING[type] ?? def?.meaning ?? '',
     area: findingArea(f),
-    gloss: GLOSS[type],
+    gloss: patternText(f)?.gloss ?? GLOSS[type],
     bandMeaning: BAND_MEANING[band.key],
     support: SUPPORT[type] ?? 'Наблюдение и общ здравословен режим.',
     ophthalmicNote: OPHTHALMIC_NOTE[type],

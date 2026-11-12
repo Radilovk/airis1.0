@@ -880,6 +880,7 @@ ${response}
         photoCheck: f.photoCheck,
         anchor: f.anchor,
         ...(f.spread ? { spread: f.spread } : {}),
+        ...(f.sectors ? { sectors: f.sectors } : {}),
       })),
       // Смалени копия: пълните ленти (≈780 KB всяка) се ползват САМО за
       // заявките към модела и остават в паметта. В отчета влизат намалени
