@@ -866,6 +866,10 @@ ${response}
         action: d.action,
         source: d.source,
       })),
+      collarette: {
+        ...(result.preparation.left.collarette.source === 'measured' ? { left: result.preparation.left.collarette.t } : {}),
+        ...(result.preparation.right.collarette.source === 'measured' ? { right: result.preparation.right.collarette.t } : {}),
+      },
       findings: [...result.left.findings, ...result.right.findings].map(f => ({
         side: f.side,
         type: f.type,
@@ -879,6 +883,9 @@ ${response}
         bilateral: f.bilateral,
         photoCheck: f.photoCheck,
         anchor: f.anchor,
+        ...(f.spread ? { spread: f.spread } : {}),
+        ...(f.sectors ? { sectors: f.sectors } : {}),
+        ...(f.band ? { band: f.band } : {}),
       })),
       // Смалени копия: пълните ленти (≈780 KB всяка) се ползват САМО за
       // заявките към модела и остават в паметта. В отчета влизат намалени

@@ -45,6 +45,8 @@ export interface VerifiableFinding {
   type: string
   sector: number
   ring: number
+  /** Слят знак по много сектори — няма една точка, не се проверява по петно. */
+  spread?: 'circumferential'
 }
 
 export interface VerifyGeometry {
@@ -241,7 +243,9 @@ function patchScore(p: PatchStat, s: RingStat, dir: Direction): number {
 /** Проверява една находка спрямо готовата мрежа. */
 export function verifyAgainstGrid(f: VerifiableFinding, grid: PatchStat[][]): FindingVerdict {
   const type = f.type as FindingType
-  if (isCircumferentialFinding(type) || UNCHECKABLE.has(type)) return { check: 'unchecked', score: 0 }
+  if (isCircumferentialFinding(type) || UNCHECKABLE.has(type) || f.spread === 'circumferential') {
+    return { check: 'unchecked', score: 0 }
+  }
   const dir = DIRECTION[type] ?? 'any'
   const stats = grid.map(ringStats)
 
@@ -352,7 +356,7 @@ export function artifactShareAt(
   geo: ArtifactGeometry,
   map: ArtifactMap
 ): { share: number; kind?: 'glare' | 'lash' } {
-  if (isCircumferentialFinding(f.type as FindingType)) return { share: 0 }
+  if (isCircumferentialFinding(f.type as FindingType) || f.spread === 'circumferential') return { share: 0 }
   const g = { pupil: { cx: geo.pupil.cx ?? geo.limbus.cx, cy: geo.pupil.cy ?? geo.limbus.cy, r: geo.pupil.r }, limbus: geo.limbus }
   let total = 0
   let glare = 0

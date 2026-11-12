@@ -29,6 +29,7 @@ import {
   FINDING_TYPES,
   PRIORITY_ZONES,
   RING_BANDS,
+  bandRingsAt,
   sectorsFor,
   type Side,
 } from './iris-map'
@@ -66,11 +67,25 @@ function priorityZoneBlock(side: Side): string {
   }).join('\n')
 }
 
-function ringBandBlock(): string {
-  return RING_BANDS.map(
-    b =>
-      `  R${b.rings[0]}${b.rings[0] === b.rings[1] ? '' : `–R${b.rings[1]}`} = ${b.key} (${b.label})`
-  ).join('\n')
+function ringBandBlock(collaretteRing?: number): string {
+  return RING_BANDS.map(b => {
+    const [r0, r1] = bandRingsAt(b.key, collaretteRing)
+    return `  R${r0}${r0 === r1 ? '' : `–R${r1}`} = ${b.key} (${b.label})`
+  }).join('\n')
+}
+
+/** Измерената коларета — моделът да знае къде е вътрешната зона на ТОЗИ ирис. */
+function collaretteBlock(t: number[] | undefined): string {
+  if (!t?.length) return ''
+  const rings = t.map(v => v * 12)
+  const mean = rings.reduce((a, b) => a + b, 0) / rings.length
+  const lo = Math.min(...rings)
+  const hi = Math.max(...rings)
+  return `
+  ▸ КОЛАРЕТАТА на това око е ИЗМЕРЕНА по снимката: средно в R${Math.round(mean)}
+    (между R${Math.floor(lo)} и R${Math.floor(hi)} по сектори). Вътре в нея са стомахът и
+    червата, отвън — органите. Поясите по-горе вече са поставени спрямо нея.
+    Деформация на коларетата (collarette_deform) търси там, където е тя.`
 }
 
 export interface DetectionPromptContext {
@@ -98,6 +113,8 @@ export interface DetectionPromptContext {
    * спекуларна площ В ЗЕНИЦАТА (`metrics.pupilSpecular`).
    */
   flash?: boolean
+  /** Измерената коларета (дял зеница→лимбус по сектори), ако е ясна. */
+  collarette?: { t: number[] }
 }
 
 /**
@@ -187,7 +204,7 @@ export function buildDetectionPrompt(ctx: DetectionPromptContext): string {
     R11 = ДОЛНИЯТ ред = лимбусът (външният ръб на ириса).
 
   ▸ Пръстенни пояси:
-${ringBandBlock()}
+${ringBandBlock(ctx.collarette ? (ctx.collarette.t.reduce((a, b) => a + b, 0) / ctx.collarette.t.length) * 12 : undefined)}${collaretteBlock(ctx.collarette?.t)}
 
 НИКОГА не брой линии и не интерполирай позиция. ЗА ВСЯКА НАХОДКА ПРОЧЕТИ
 НАПРАВО НОМЕРА НА КОЛОНАТА И НОМЕРА НА РЕДА, В КОИТО ТЯ ЛЕЖИ.

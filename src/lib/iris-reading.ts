@@ -17,9 +17,9 @@
 import type { CalibratedAnalysisPayload, FiberDensity } from '@/types'
 import {
   FINDINGS,
-  ringBand,
+  findingBand,
   sectorsFor,
-  isCircumferentialFinding,
+  isRingFinding,
   systemLabel,
   type FindingType,
   type RingBandKey,
@@ -114,7 +114,7 @@ export function findingAreaKey(f: Finding): SystemKey | undefined {
   const def = FINDINGS[f.type as FindingType]
   if (!def) return undefined
   const weights: Partial<Record<SystemKey, number>> = { ...def.systems }
-  if (!isCircumferentialFinding(def.type)) {
+  if (!isRingFinding(f)) {
     const sector = sectorsFor(f.side)[f.sector - 1]
     for (const [k, w] of Object.entries(sector?.systems ?? {}) as Array<[SystemKey, number]>) {
       weights[k] = (weights[k] ?? 0) + w * 0.8
@@ -172,7 +172,46 @@ const GLOSS: Record<FindingType, string> = {
 }
 
 /** Иридологичното име на знака, предпазливо при по-слаб знак. */
+/** Слят модел: много радиални бразди в едно око (`collapseRadialPattern`). */
+export function isRadialPattern(f: Finding): boolean {
+  return f.type === 'radial_furrow' && f.spread === 'circumferential'
+}
+
+/** Пигментът около коларетата по цялата обиколка — цветът на смесения ирис. */
+export function isCentralPigment(f: Finding): boolean {
+  return f.type === 'pigment_diffuse' && f.spread === 'circumferential' && f.ring <= 4
+}
+
+/**
+ * Знаците, които атласите четат на ниво „конституция/предразположеност", а не
+ * като отделен орган: описание, значение и обяснение за клиента.
+ */
+function patternText(f: Finding): { title: string; meaning: string; gloss: string } | null {
+  if (isRadialPattern(f)) {
+    return {
+      title: 'Радиални бразди в много сектори',
+      meaning:
+        'Много радиални бразди се четат като предразположеност, не като знак на отделен орган. Школата на ' +
+        'Deck ги свързва с вегетативната нервна система (напрежение, спазъм), Jensen — с бавен чревен ' +
+        'транзит, чиито последици стигат до зоните, през които минават.',
+      gloss: 'Тъмни линии като спици на колело, в много части на ириса.',
+    }
+  }
+  if (isCentralPigment(f)) {
+    return {
+      title: 'Пигмент около коларетата',
+      meaning:
+        'Смесен (зелено-кафяв) тип ирис: пигментът около коларетата е част от цвета му, не петно. ' +
+        'В школата на Deck този тип се свързва с натоварване на черния дроб и жлъчката.',
+      gloss: 'Оранжево-кафяв пръстен около зеницата, по цялата обиколка.',
+    }
+  }
+  return null
+}
+
 export function visibleLabel(f: Finding): string {
+  const pattern = patternText(f)
+  if (pattern) return pattern.title
   const pair = VISIBLE[f.type as FindingType]
   if (!pair) return f.label
   return signalStrength(f.confidence) === 'clear' ? pair[0] : pair[1]
@@ -187,14 +226,17 @@ const DIR4 = ['горе', 'вдясно', 'долу', 'вляво']
  * надхвърля сигурността.
  */
 export function plainLocation(f: Finding): string {
-  const band = ringBand(f.ring)
+  const band = findingBand(f)
   const depth =
     band.key === 'IPB' || band.key === 'STOM' || band.key === 'ANW'
       ? 'около зеницата'
       : band.key === 'ORG'
         ? 'в средата на ириса'
         : 'по края'
-  if (isCircumferentialFinding(f.type as FindingType)) return `${depth}, по цялата обиколка`
+  if (f.sectors?.length) {
+    return f.sectors.length >= 10 ? 'почти по цялата обиколка' : `в ${f.sectors.length} от 12-те сектора`
+  }
+  if (isRingFinding(f)) return `${depth}, по цялата обиколка`
   // Секторът покрива минути (id−1)·5 … id·5 по часовника на снимката.
   const hour = (f.sector - 0.5) % 12
   const clear = signalStrength(f.confidence) === 'clear'
@@ -284,8 +326,8 @@ function cleanAppearance(text: string): string {
 export function readFinding(f: Finding): FindingReading {
   const type = f.type as FindingType
   const def = FINDINGS[type]
-  const band = ringBand(f.ring)
-  const circumferential = isCircumferentialFinding(type)
+  const band = findingBand(f)
+  const circumferential = isRingFinding(f)
   const sector = circumferential ? undefined : sectorsFor(f.side)[f.sector - 1]
   const sideLabel = f.side === 'left' ? 'Ляв ирис' : 'Десен ирис'
   // Секторът носи смисъл само в органната зона; във вътрешните пояси и по
@@ -297,6 +339,7 @@ export function readFinding(f: Finding): FindingReading {
   const reliability: string[] = [STRENGTH_LABEL[strength]]
   if ((f.confirmations ?? 1) >= 2) reliability.push('потвърден при повторен прочит')
   if (f.bilateral) reliability.push('и в двете очи')
+  if (f.alsoLabels?.length) reliability.push(`на същото място: ${f.alsoLabels.join(', ').toLowerCase()}`)
 
   return {
     title: visibleLabel(f),
@@ -305,9 +348,9 @@ export function readFinding(f: Finding): FindingReading {
     zone,
     mapReference: sector?.reference,
     appearance: def ? cleanAppearance(def.appearanceUnwrapped) : '',
-    meaning: CLIENT_MEANING[type] ?? def?.meaning ?? '',
+    meaning: patternText(f)?.meaning ?? CLIENT_MEANING[type] ?? def?.meaning ?? '',
     area: findingArea(f),
-    gloss: GLOSS[type],
+    gloss: patternText(f)?.gloss ?? GLOSS[type],
     bandMeaning: BAND_MEANING[band.key],
     support: SUPPORT[type] ?? 'Наблюдение и общ здравословен режим.',
     ophthalmicNote: OPHTHALMIC_NOTE[type],
