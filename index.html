@@ -2,9 +2,19 @@
 <html lang="bg">
 <head>
   <script>
-    // Стари връзки към приложението (напр. връщане от NutriPlan с ?from=…) идват
-    // на корена — препращаме ги към приложението със същите параметри.
-    if (location.search) location.replace('app.html' + location.search + location.hash)
+    // Вход от NutriPlan (?from=nutriplan) показва лендинга, не въпросника: запомняме откъде идваме
+    // (за текста на бутона в доклада, същият ключ като в nutriplan-handoff.ts) и чистим адреса.
+    // Други връзки към приложението (напр. връщане с ?view=…) идват на корена — препращаме ги
+    // към приложението със същите параметри.
+    (function () {
+      var p = new URLSearchParams(location.search)
+      if (p.get('from') === 'nutriplan') {
+        try { sessionStorage.setItem('airis_from', 'nutriplan') } catch (e) { /* без запис */ }
+        p.delete('from')
+      }
+      if (Array.from(p.keys()).length) location.replace('app.html' + location.search + location.hash)
+      else if (location.search) history.replaceState(null, '', location.pathname + location.hash)
+    })()
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
