@@ -243,7 +243,7 @@ export default function AboutAirisScreen({ onBack }: AboutAirisScreenProps) {
               ириса и орган — не е потвърдена в контролирани проучвания. Когато иридолози гледат снимки, без да знаят
               кой е болен, разпознават болните колкото при случаен избор (източниците са по-долу).
             </p>
-            <p>Затова в airis:</p>
+            <p>Затова в IrisMap:</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>анализът е кръстосан: знаците в ириса се тълкуват през отговорите от въпросника и обратно — нито един източник не решава сам;</li>
               <li>текстът не назовава заболявания и не тълкува изследвания;</li>
@@ -265,7 +265,7 @@ export default function AboutAirisScreen({ onBack }: AboutAirisScreenProps) {
             <p>Проверка срещу реални диагнози не е правена.</p>
           </Section>
 
-          <Section id="limits" title="Какво airis не прави" icon={ShieldCheck} open={!!open.limits} onToggle={toggle}>
+          <Section id="limits" title="Какво IrisMap не прави" icon={ShieldCheck} open={!!open.limits} onToggle={toggle}>
             <ul className="list-disc space-y-1 pl-5">
               <li>не поставя диагнози и не назначава лечение;</li>
               <li>не заменя лекар, нито очен преглед;</li>

@@ -22,6 +22,18 @@ import { RECOMMENDED_GEMINI_MODEL, geminiThinkingConfig, resolveGeminiModel } fr
 import { geminiEndpoint } from '@/lib/ai-proxy'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
+// Езикът на клиента (public/i18n.js): текстът, който човек чете, на неговия език. Затворените
+// списъци и стойностите, по които кодът разпознава отговора, остават точно както са зададени.
+const AI_LANG_NAMES: Record<string, string> = { en: 'English', de: 'German', es: 'Spanish', fr: 'French', it: 'Italian',
+  pt: 'Portuguese (Brazilian)', tr: 'Turkish', pl: 'Polish', ro: 'Romanian', ru: 'Russian' }
+function languageDirective(): string {
+  const lang = (window as unknown as { EatologixI18n?: { lang?: string } }).EatologixI18n?.lang || 'bg'
+  const name = AI_LANG_NAMES[lang]
+  if (!name) return ''
+  return `\n\nLANGUAGE: Write every text the person will read (explanations, advice, food names, plan, summaries) in ${name}, addressing them politely. ` +
+    `Keep JSON keys, field names, codes, numbers and any value that must come from a fixed list in the instructions exactly as written there. The product name is IrisMap.`
+}
+
 /** Таван за една LLM заявка. Детекцията е ~10–20 s, планът — до минута. */
 const LLM_TIMEOUT_MS = 120_000
 
@@ -207,9 +219,9 @@ export default function AnalysisScreen({
       }
       
       parts.push({
-        text: jsonMode 
+        text: (jsonMode
           ? `${prompt}\n\nВърни САМО валиден JSON обект, без допълнителен текст.`
-          : prompt
+          : prompt) + languageDirective()
       })
       
       const thinkingConfig = geminiThinkingConfig(model)
