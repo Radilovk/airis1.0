@@ -781,5 +781,6 @@
   "Състояния": "Affections",
   "Как се чувствате": "Comment vous sentez-vous",
   "Здраве": "Santé"
- }
+ },
+ "patterns": []
 }
