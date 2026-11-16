@@ -1,5 +1,5 @@
 {
- "_comment": "IrisMap — приложението (app.html). Ръчен превод; дългите текстове на доклада — irismap-auto.json.",
+ "_comment": "IrisMap — приложението (app.html). Ръчен превод; дългите текстове на доклада — irismap-auto.json. [Spanish: автоматичен превод, gemini-3.6-flash]",
  "strings": {
   "Възникна грешка": "Se ha producido un error",
   "Съжаляваме, нещо се обърка при показване на доклада.": "Lo sentimos, algo ha fallado al mostrar el informe.",
