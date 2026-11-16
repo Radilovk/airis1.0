@@ -31,11 +31,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Адресът на сайта: с собствен домейн (irismap.app) пътят е „/“, без него — „/airis1.0/“.
+      - name: Pages base path
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
           GITHUB_PAGES: true
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

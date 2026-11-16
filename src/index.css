@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 
 @layer base {
-  /* Палитрата е на Eatologix (EyeLogix е модул на системата): тюркоаз + зелен акцент.
+  /* Палитрата е на Eatologix (IrisMap е модул на системата): тюркоаз + зелен акцент.
      Tailwind v4 оставя border-color = currentColor; без това всяка карта получава
      черна рамка вместо меката --border. */
   *, ::after, ::before, ::backdrop {
