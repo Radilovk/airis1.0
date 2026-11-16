@@ -724,10 +724,10 @@ export class AiUnavailableError extends Error {
 /** Човешко обяснение на най-честите причини. */
 export function describeAiFailure(detail: string): string {
   if (/GEMINI_API_KEY is not configured/i.test(detail)) {
-    return 'на сървъра на EyeLogix не е зададен ключ за Gemini (GEMINI_API_KEY). Нужно е администраторът да го запише в Cloudflare worker-а airis-ai или да въведе собствен ключ в настройките.'
+    return 'на сървъра на IrisMap не е зададен ключ за Gemini (GEMINI_API_KEY). Нужно е администраторът да го запише в Cloudflare worker-а airis-ai или да въведе собствен ключ в настройките.'
   }
   if (/origin not allowed/i.test(detail)) {
-    return 'сървърът на EyeLogix не приема заявки от този адрес (ALLOWED_ORIGINS).'
+    return 'сървърът на IrisMap не приема заявки от този адрес (ALLOWED_ORIGINS).'
   }
   if (/429|rate limit|too many requests|quota/i.test(detail)) {
     return 'достигнат е лимитът на заявките. Опитайте отново след няколко минути.'

@@ -126,12 +126,12 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
 
   const handleShare = () => {
     const shareText = isCalibrated
-      ? 'Направих си персонален план за хранене по ириса и въпросника в EyeLogix.'
+      ? 'Направих си персонален план за хранене по ириса и въпросника в IrisMap.'
       : `Завърших иридологичен анализ! Общо здраве: ${avgHealth}/100. Получих ${report.recommendations.length} персонализирани препоръки.`
     
     if (navigator.share) {
       navigator.share({
-        title: 'EyeLogix — ирисов анализ',
+        title: 'IrisMap — ирисов анализ',
         text: shareText,
       }).then(() => {
         toast.success('Споделено успешно')

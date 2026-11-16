@@ -7,7 +7,11 @@ const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.GITHUB_PAGES === 'true' ? '/airis1.0/' : '/',
+  // GitHub Pages: с собствения домейн (irismap.app) сайтът е в корена; без него — в /airis1.0/.
+  // PAGES_BASE_PATH идва от actions/configure-pages ('' при собствен домейн).
+  base: process.env.GITHUB_PAGES === 'true'
+    ? (process.env.PAGES_BASE_PATH !== undefined ? `${process.env.PAGES_BASE_PATH}/` : '/airis1.0/')
+    : '/',
   plugins: [
     react(),
     tailwindcss(),
