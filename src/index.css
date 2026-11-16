@@ -2,7 +2,8 @@
 @import "tw-animate-css";
 
 @layer base {
-  /* Tailwind v4 оставя border-color = currentColor; без това всяка карта получава
+  /* Палитрата е на Eatologix (EyeLogix е модул на системата): тюркоаз + зелен акцент.
+     Tailwind v4 оставя border-color = currentColor; без това всяка карта получава
      черна рамка вместо меката --border. */
   *, ::after, ::before, ::backdrop {
     border-color: var(--color-border, currentColor);
@@ -18,33 +19,33 @@
 }
 
 :root {
-  --background: oklch(0.98 0.01 230);
-  --foreground: oklch(0.25 0.02 240);
+  --background: oklch(0.985 0.012 190);
+  --foreground: oklch(0.25 0.03 210);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.02 240);
+  --card-foreground: oklch(0.25 0.03 210);
   
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.02 240);
+  --popover-foreground: oklch(0.25 0.03 210);
 
-  --primary: oklch(0.55 0.15 230);
+  --primary: oklch(0.55 0.095 205);
   --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.85 0.08 220);
-  --secondary-foreground: oklch(0.25 0.02 240);
+  --secondary: oklch(0.91 0.06 185);
+  --secondary-foreground: oklch(0.25 0.03 210);
 
-  --muted: oklch(0.93 0.02 230);
-  --muted-foreground: oklch(0.50 0.05 240);
+  --muted: oklch(0.945 0.02 190);
+  --muted-foreground: oklch(0.50 0.04 210);
 
-  --accent: oklch(0.70 0.18 45);
+  --accent: oklch(0.72 0.19 150);
   --accent-foreground: oklch(1 0 0);
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(1 0 0);
 
-  --border: oklch(0.88 0.02 230);
-  --input: oklch(0.88 0.02 230);
-  --ring: oklch(0.55 0.15 230);
+  --border: oklch(0.89 0.025 190);
+  --input: oklch(0.89 0.025 190);
+  --ring: oklch(0.55 0.095 205);
 
   --radius: 0.75rem;
 }

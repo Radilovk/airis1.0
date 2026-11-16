@@ -150,7 +150,7 @@ export default function AnalysisScreen({
     const maxTokens = modelStrategy?.maxTokens ?? 4000
     const topP = modelStrategy?.topP ?? 0.9
     
-    addLog('info', `🔑 ${apiKey?.trim() ? 'Собствен ключ' : 'AIRIS сървър'}: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
+    addLog('info', `🔑 ${apiKey?.trim() ? 'Собствен ключ' : 'EyeLogix сървър'}: ${provider} / ${model}${imageDataUrl ? ' (с изображение)' : ''} (temp=${temperature}, maxTokens=${maxTokens}, topP=${topP})`)
     
     if (provider === 'openai') {
       // Build content array - text + optional image
@@ -985,7 +985,7 @@ ${response}
       const apiKey = finalConfig.apiKey || ''
       const usePipelineV9 = finalConfig.usePipelineV9 ?? true
       // Ключ не е задължителен — без него заявките минават през сървъра на AIRIS.
-      addLog('info', apiKey.trim() ? '🔑 Собствен API ключ' : '🔑 AI през сървъра на AIRIS')
+      addLog('info', apiKey.trim() ? '🔑 Собствен API ключ' : '🔑 AI през сървъра на EyeLogix')
       
       const actualModel = configuredModel
       const actualProvider = provider
