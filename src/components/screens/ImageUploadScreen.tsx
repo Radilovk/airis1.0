@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { CheckCircle, ArrowRight, X, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown } from '@phosphor-icons/react'
+import { CheckCircle, ArrowRight, X, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown, Camera, ArrowCounterClockwise, Warning } from '@phosphor-icons/react'
 import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -78,6 +78,12 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   
   const leftInputRef = useRef<HTMLInputElement>(null)
   const rightInputRef = useRef<HTMLInputElement>(null)
+  const bothInputRef = useRef<HTMLInputElement>(null)
+  // Окото не става за анализ → искаме нова снимка (с причината), без ръчни стъпки.
+  const [retake, setRetake] = useState<{ left?: string; right?: string }>({})
+  // Двете очи са готови → анализът тръгва сам след кратко отброяване (може да се спре).
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const autoStartRef = useRef<'idle' | 'running' | 'stopped' | 'done'>(isReanalysis ? 'stopped' : 'idle')
   const fileReaderRef = useRef<FileReader | null>(null)
 
   useEffect(() => {
@@ -655,6 +661,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       if (!isMountedRef.current) return
       const sideName = savedSide === 'left' ? 'Лявото' : 'Дясното'
       if (auto?.confident) {
+        setRetake(r => ({ ...r, [savedSide]: undefined }))
         const target = savedSide === 'left' ? leftImageRef : rightImageRef
         if (target.current) target.current = { ...target.current, geometry: auto.geometry, quality: auto.quality }
         setImagesVersion(v => v + 1)
@@ -662,10 +669,15 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           description: 'Зеницата и ирисът са намерени автоматично. Ако нещо не е наред — „Коригирай“.',
         })
       } else {
-        toast.info(`${sideName} око: проверете кръговете`, {
-          description: auto?.reason ?? 'Разпознаването не е сигурно.',
+        // Снимката не става за сигурен анализ → нова снимка на същото око, с причината.
+        // Ръчните кръгове остават само като резервен вариант („Нагласи ръчно“).
+        const why = auto?.reason ?? 'Не намерихме ясно зеницата и ириса на тази снимка.'
+        setRetake(r => ({ ...r, [savedSide]: why }))
+        toast.warning(`${sideName} око: нужна е нова снимка`, {
+          description: why,
+          duration: 10000,
+          action: { label: 'Снимай отново', onClick: () => askRetake(savedSide) },
         })
-        setCalibrating({ side: savedSide, dataUrl: image.dataUrl })
       }
     } catch (error) {
       uploadDiagnostics.log('CROP_SAVE_ERROR', 'error', {
@@ -922,12 +934,29 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     setCalibrating({ side, dataUrl: image.dataUrl })
   }
 
+  /** Нова снимка на едно око: махаме негодната и отваряме избора (докосването е на човека). */
+  const askRetake = (side: 'left' | 'right') => {
+    if (side === 'left') leftImageRef.current = null
+    else rightImageRef.current = null
+    setRetake(r => ({ ...r, [side]: undefined }))
+    setImagesVersion(v => v + 1)
+    const input = side === 'left' ? leftInputRef.current : rightInputRef.current
+    input?.click()
+  }
+
+  /** Една снимка — двете очи: AI ги намира и разпределя; иначе отива в първото празно място. */
+  const handleBothFile = (file: File) => {
+    const side: 'left' | 'right' = !leftImageRef.current ? 'left' : !rightImageRef.current ? 'right' : 'left'
+    void handleFileSelect(side, file)
+  }
+
   const removeImage = (side: 'left' | 'right') => {
     if (side === 'left') {
       leftImageRef.current = null
     } else {
       rightImageRef.current = null
     }
+    setRetake(r => ({ ...r, [side]: undefined }))
     setImagesVersion(v => v + 1)
   }
 
@@ -947,6 +976,34 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   const rightReady = !!right?.geometry
   // Следващата стъпка е винаги една: първо лявото око, после дясното, после анализ.
   const step = !leftReady ? 0 : !rightReady ? 1 : 2
+  const bothReady = leftReady && rightReady && !isProcessing && !calibrating && !isSaving
+
+  useEffect(() => {
+    if (!bothReady) {
+      if (autoStartRef.current === 'running') { autoStartRef.current = 'idle'; setCountdown(null) }
+      return
+    }
+    if (autoStartRef.current !== 'idle') return
+    autoStartRef.current = 'running'
+    setCountdown(3)
+  }, [bothReady])
+
+  useEffect(() => {
+    if (countdown === null || autoStartRef.current !== 'running') return
+    if (countdown <= 0) {
+      autoStartRef.current = 'done'
+      setCountdown(null)
+      void handleNext()
+      return
+    }
+    const t = setTimeout(() => setCountdown(c => (c === null ? null : c - 1)), 1000)
+    return () => clearTimeout(t)
+  })
+
+  const stopAutoStart = () => {
+    autoStartRef.current = 'stopped'
+    setCountdown(null)
+  }
 
   return (
     <>
@@ -963,7 +1020,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
             <p className="text-muted-foreground">
               {isReanalysis
                 ? 'Ще използваме предишните ви отговори от въпросника.'
-                : 'Зеницата и ирисът се разпознават автоматично. Ако кръговете не са точни — „Коригирай“.'}
+                : 'Една снимка на двете очи е достатъчна — намираме ги, центрираме и проверяваме сами. Анализът започва автоматично.'}
             </p>
           </motion.div>
 
@@ -996,6 +1053,42 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
             </Card>
           )}
 
+          {(!left || !right) && !isProcessing && (
+            <Card className="mb-6 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-5">
+              <input ref={bothInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleBothFile(f); e.target.value = '' }} />
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15">
+                  <Camera size={30} weight="duotone" className="text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">{!left && !right ? 'Една снимка — двете очи' : (!left ? 'Остава лявото око' : 'Остава дясното око')}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {!left && !right
+                      ? 'Снимайте двете очи наведнъж, отблизо и на светло. Може и всяко поотделно.'
+                      : 'Снимайте го отблизо — намира се и се проверява само.'}
+                  </p>
+                </div>
+                <Button size="lg" className="h-12 w-full gap-2 sm:w-auto" onClick={() => bothInputRef.current?.click()}>
+                  <Camera size={20} weight="bold" /> {!left && !right ? 'Снимай очите' : 'Снимай'}
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {countdown !== null && (
+            <Card className="mb-6 flex items-center gap-4 border-primary/40 bg-primary/10 p-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-bold tabular-nums text-primary-foreground">
+                {countdown}
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold">Двете очи са разпознати</p>
+                <p className="text-sm text-muted-foreground">Анализът започва автоматично.</p>
+              </div>
+              <Button variant="outline" onClick={stopAutoStart}>Спри</Button>
+            </Card>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {(['left', 'right'] as const).map((side, i) => (
               <motion.div
@@ -1014,6 +1107,8 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                   onDrop={e => !isProcessing && handleDrop(side, e)}
                   onCalibrate={() => openCalibrator(side)}
                   onRemove={() => removeImage(side)}
+                  retakeReason={retake[side]}
+                  onRetake={() => askRetake(side)}
                 />
               </motion.div>
             ))}
@@ -1027,13 +1122,13 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           >
             {left && right && (!leftReady || !rightReady) && (
               <p className="text-sm text-muted-foreground sm:mr-auto">
-                Потвърдете кръговете на {!leftReady ? 'лявото' : 'дясното'} око, за да е точен анализът.
+                {!leftReady ? 'Нужна е нова снимка на лявото око.' : 'Нужна е нова снимка на дясното око.'}
               </p>
             )}
             <Button
               size="lg"
               onClick={handleNext}
-              disabled={!left || !right || isProcessing || editingSide !== null || isSaving}
+              disabled={!leftReady || !rightReady || isProcessing || editingSide !== null || isSaving || countdown !== null}
               className="gap-2"
             >
               {isSaving ? 'Запазване...' : 'Започни анализ'}
@@ -1160,6 +1255,8 @@ function EyeSlot({
   onDrop,
   onCalibrate,
   onRemove,
+  retakeReason,
+  onRetake,
 }: {
   side: 'left' | 'right'
   image: IrisImage | null
@@ -1170,6 +1267,8 @@ function EyeSlot({
   onDrop: (e: React.DragEvent) => void
   onCalibrate: () => void
   onRemove: () => void
+  retakeReason?: string
+  onRetake: () => void
 }) {
   const label = side === 'left' ? 'Ляво око' : 'Дясно око'
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1214,14 +1313,29 @@ function EyeSlot({
             <img src={image.dataUrl} alt={label} className="absolute inset-0 h-full w-full object-contain" />
             {image.geometry && <DetectedOverlay geometry={image.geometry} />}
           </button>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant={image.geometry ? 'outline' : 'default'} className="gap-1.5" onClick={onCalibrate}>
-              <Crosshair size={16} weight="bold" /> {image.geometry ? 'Коригирай' : 'Настрой'}
-            </Button>
-            <Button variant="outline" className="gap-1.5 text-rose-600 hover:text-rose-700" onClick={onRemove}>
-              <X size={16} weight="bold" /> Премахни
-            </Button>
-          </div>
+          {retakeReason && !image.geometry ? (
+            <div className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-950">
+              <p className="flex items-start gap-2 text-sm">
+                <Warning size={18} weight="fill" className="mt-0.5 shrink-0 text-amber-600" />
+                <span><strong>Нужна е нова снимка.</strong> {retakeReason}</span>
+              </p>
+              <Button className="mt-3 h-11 w-full gap-2" onClick={onRetake} disabled={disabled}>
+                <ArrowCounterClockwise size={18} weight="bold" /> Снимай отново
+              </Button>
+              <button type="button" onClick={onCalibrate} className="mt-2 w-full text-center text-xs font-medium text-amber-900/80 underline underline-offset-2">
+                или нагласи кръговете ръчно
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button variant="outline" className="gap-1.5" onClick={onCalibrate}>
+                <Crosshair size={16} weight="bold" /> {image.geometry ? 'Коригирай' : 'Настрой'}
+              </Button>
+              <Button variant="outline" className="gap-1.5 text-rose-600 hover:text-rose-700" onClick={onRemove}>
+                <X size={16} weight="bold" /> Премахни
+              </Button>
+            </div>
+          )}
         </>
       )}
     </Card>
