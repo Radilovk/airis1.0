@@ -1,5 +1,6 @@
 /**
- * airis-ai — прокси към Gemini за AIRIS.
+ * airis-ai — прокси към Gemini за AIRIS. ЗАТВОРЕНО: отговаря 410 (виж по-долу); заявките минават
+ * през aidiet /api/iris/gemini с билет за анализ.
  *
  * Приложението е статичен сайт (GitHub Pages): всичко в него е публично и
  * ключ в кода може да бъде изваден от всеки. Затова ключът стои тук, като
@@ -65,6 +66,10 @@ export default {
     if (!allowed) return json(403, 'origin not allowed')
     if (request.method !== 'POST') return json(405, 'method not allowed', corsHeaders)
 
+    // Затворено (ноември 2026): отвореното прокси пропускаше всеки, който подправи Origin.
+    // IrisMap вече минава през сървъра на Eatologix с „билет за анализ“ (aidiet/iris-gate.js).
+    return json(410, 'IrisMap uses a new server — reload the page. / Обновете страницата.', corsHeaders)
+    // eslint-disable-next-line no-unreachable
     const match = url.pathname.match(PATH_RE)
     if (!match) return json(404, 'not found', corsHeaders)
     if (!env.GEMINI_API_KEY) return json(503, 'GEMINI_API_KEY is not configured', corsHeaders)

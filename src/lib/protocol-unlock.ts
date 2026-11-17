@@ -1,12 +1,14 @@
 /**
  * protocol-unlock.ts — платеният протокол на IrisMap (препоръките: хранене, добавки, режим).
  *
- * Политиката (aidiet/docs/FINANCIAL_POLICY.md): снимките, разпознаването и анализът са безплатни;
- * протоколът — еднократно плащане за анализ (Stripe Checkout през worker-а на Eatologix).
+ * Политиката (aidiet/docs/FINANCIAL_STRATEGY.md): снимките, разпознаването и анализът са безплатни;
+ * протоколът — еднократно плащане за анализ (Stripe Checkout през worker-а на Eatologix);
+ * контролно разчитане (следващ протокол от същото устройство) — по-ниската цена.
  * Отключването се помни на устройството и на сървъра (KV iris_unlock:<id>) — друг браузър
  * или изчистен кеш го взима обратно с проверка по идентификатора на анализа.
  */
 import type { AnalysisReport } from '@/types'
+import { deviceId } from '@/lib/ai-proxy'
 
 const WORKER = 'https://aidiet.radilov-k.workers.dev'
 const LOCAL = 'irismap_unlocked'
@@ -22,13 +24,17 @@ export function isUnlocked(report: AnalysisReport): boolean {
   return !!report.demo || !!report.protocolUnlocked || localSet().has(report.id)
 }
 
-export interface BillingStatus { ready: boolean; mode: 'test' | 'live'; price: number }
+/** recheck: устройството вече е взело протокол → контролното разчитане е по-евтино (решава сървърът). */
+export interface BillingStatus { ready: boolean; mode: 'test' | 'live'; price: number; recheck: boolean }
 let statusMemo: Promise<BillingStatus> | null = null
 export function billingStatus(): Promise<BillingStatus> {
-  statusMemo ??= fetch(`${WORKER}/api/billing/status`)
+  statusMemo ??= fetch(`${WORKER}/api/billing/status?deviceId=${encodeURIComponent(deviceId())}`)
     .then(r => r.json())
-    .then(d => ({ ready: !!d.ready, mode: d.mode === 'live' ? 'live' : 'test', price: Number(d?.prices?.products?.iris_protocol?.price) || 9.99 } as BillingStatus))
-    .catch(() => ({ ready: false, mode: 'test', price: 9.99 } as BillingStatus))
+    .then(d => {
+      const id = d?.irisProduct === 'iris_recheck' ? 'iris_recheck' : 'iris_protocol'
+      return { ready: !!d.ready, mode: d.mode === 'live' ? 'live' : 'test', recheck: id === 'iris_recheck', price: Number(d?.prices?.products?.[id]?.price) || 9.99 } as BillingStatus
+    })
+    .catch(() => ({ ready: false, mode: 'test', price: 9.99, recheck: false } as BillingStatus))
   return statusMemo
 }
 
@@ -61,7 +67,7 @@ export async function startProtocolCheckout(reportId: string): Promise<string | 
   try {
     const r = await fetch(`${WORKER}/api/billing/checkout`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product: 'iris_protocol', analysisId: reportId, returnUrl: location.origin + location.pathname + `?report=${encodeURIComponent(reportId)}` }),
+      body: JSON.stringify({ product: 'iris_protocol', analysisId: reportId, deviceId: deviceId(), returnUrl: location.origin + location.pathname + `?report=${encodeURIComponent(reportId)}` }),
     })
     const d = await r.json()
     if (d?.url) { location.href = d.url; return null }
@@ -81,7 +87,7 @@ export async function confirmFromUrl(): Promise<string | null> {
   try {
     const r = await fetch(`${WORKER}/api/billing/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: paid }) })
     const d = await r.json()
-    if (d?.ok && d.product === 'iris_protocol' && d.analysisId) { markUnlocked(d.analysisId); return d.analysisId }
+    if (d?.ok && String(d.product).startsWith('iris_') && d.analysisId) { markUnlocked(d.analysisId); return d.analysisId }
   } catch { /* без връзка — проверката по id ще го хване */ }
   return null
 }

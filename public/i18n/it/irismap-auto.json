@@ -1702,6 +1702,15 @@
   "Протоколът е отключен": "Il protocollo è sbloccato",
   "Препоръките са в раздела „План“.": "Le raccomandazioni si trovano nella sezione «Piano».",
   "Изтеглянето на пълния доклад е с протокола": "Il download del report completo è incluso nel protocollo",
-  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "L'analisi è gratuita — sblocchi il protocollo per scaricarlo."
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "L'analisi è gratuita — sblocchi il protocollo per scaricarlo.",
+  "Отбележете съгласието — после натиснете пак.": "Esprima il consenso — poi prema di nuovo.",
+  "Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.": "Lettura di controllo: ha già ottenuto un protocollo, quindi questa ha un prezzo ridotto.",
+  "Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "Acconsento allo sblocco del protocollo subito dopo il pagamento e comprendo che, per i contenuti digitali, si perde il diritto di recesso di 14 giorni.",
+  "Плащане със Stripe. Еднократно, без абонамент.": "Pagamento con Stripe. Una tantum, senza abbonamento.",
+  "Няма връзка със сървъра. Проверете интернета и опитайте пак.": "Nessuna connessione al server. Verifichi la connessione a Internet e riprovi.",
+  "Анализът не може да започне в момента. Опитайте по-късно.": "Impossibile avviare l'analisi al momento. Riprovi più tardi.",
+  "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Le analisi gratuite per oggi sono esaurite. Riprovi domani.",
+  "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "L'analisi gratuita è disponibile una volta a settimana per dispositivo. Una lettura di controllo anticipata è disponibile con il protocollo.",
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Troppe analisi da questa rete oggi. Riprovi domani."
  }
 }

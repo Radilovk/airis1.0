@@ -13,6 +13,7 @@ export default function ProtocolLock({ report }: { report: AnalysisReport }) {
   const [status, setStatus] = useState<BillingStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [agree, setAgree] = useState(false)
   useEffect(() => { void billingStatus().then(setStatus) }, [])
 
   const p = report.detailedPlan
@@ -22,6 +23,7 @@ export default function ProtocolLock({ report }: { report: AnalysisReport }) {
   const price = (status?.price ?? 9.99).toFixed(2).replace('.', ',') + ' €'
 
   const buy = async () => {
+    if (!agree) { setErr('Отбележете съгласието — после натиснете пак.'); return }
     setBusy(true); setErr(null)
     const e = await startProtocolCheckout(report.id)
     if (e) { setErr(e); setBusy(false) }
@@ -40,7 +42,9 @@ export default function ProtocolLock({ report }: { report: AnalysisReport }) {
         <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><LockKey size={26} weight="fill" /></span>
         <div>
           <h3 className="text-xl font-bold">Вашият личен протокол</h3>
-          <p className="text-sm text-muted-foreground">Анализът е безплатен. Протоколът се отключва еднократно за този анализ.</p>
+          <p className="text-sm text-muted-foreground">
+            {status?.recheck ? 'Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.' : 'Анализът е безплатен. Протоколът се отключва еднократно за този анализ.'}
+          </p>
         </div>
       </div>
       <ul className="mb-5 space-y-3">
@@ -48,6 +52,10 @@ export default function ProtocolLock({ report }: { report: AnalysisReport }) {
         <Row icon={Pill} title="Добавки" text={supps ? `${supps} добавки — дозировка, кога и колко време` : 'Дозировка, кога и колко време'} />
         <Row icon={Moon} title="Режим" text={routine ? `${routine} конкретни стъпки за сън, движение и стрес` : 'Сън, движение и стрес — конкретни стъпки'} />
       </ul>
+      <label className="mb-4 flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+        <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" checked={agree} onChange={e => { setAgree(e.target.checked); setErr(null) }} />
+        <span>Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.</span>
+      </label>
       <Button size="lg" className="h-12 w-full gap-2" onClick={buy} disabled={busy || status?.ready === false}>
         <CheckCircle size={20} weight="bold" />
         {status?.ready === false ? 'Скоро' : `Отключете протокола — ${price}`}
@@ -55,7 +63,7 @@ export default function ProtocolLock({ report }: { report: AnalysisReport }) {
       {err && <p className="mt-3 text-sm text-rose-600">{err}</p>}
       <p className="mt-3 text-center text-xs text-muted-foreground">
         {status?.mode === 'test' && status.ready ? 'Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване. ' : ''}
-        Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.
+        Плащане със Stripe. Еднократно, без абонамент.
       </p>
     </Card>
   )

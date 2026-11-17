@@ -1702,6 +1702,15 @@
   "Протоколът е отключен": "Protocolul este deblocat",
   "Препоръките са в раздела „План“.": "Recomandările sunt în secțiunea „Plan”.",
   "Изтеглянето на пълния доклад е с протокола": "Descărcarea raportului complet este inclusă în protocol",
-  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Analiza este gratuită — deblocați protocolul pentru a-l descărca."
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Analiza este gratuită — deblocați protocolul pentru a-l descărca.",
+  "Отбележете съгласието — после натиснете пак.": "Bifați acordul — apoi apăsați din nou.",
+  "Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.": "Interpretare de control: ați primit deja un protocol, de aceea acesta este la un preț redus.",
+  "Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "Sunt de acord ca protocolul să fie deblocat imediat după plată și înțeleg că, pentru conținutul digital, îmi pierd dreptul de retragere de 14 zile.",
+  "Плащане със Stripe. Еднократно, без абонамент.": "Plată prin Stripe. Plată unică, fără abonament.",
+  "Няма връзка със сървъра. Проверете интернета и опитайте пак.": "Nicio conexiune la server. Verificați conexiunea la internet și încercați din nou.",
+  "Анализът не може да започне в момента. Опитайте по-късно.": "Analiza nu poate începe în acest moment. Încercați mai târziu.",
+  "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Analizele gratuite pentru astăzi s-au epuizat. Încercați mâine.",
+  "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Analiza gratuită este o dată pe săptămână pe dispozitiv. Interpretare de control mai devreme — cu protocolul.",
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Prea multe analize din această rețea astăzi. Încercați mâine."
  }
 }
