@@ -13,8 +13,10 @@
         p.delete('from')
       }
       if (p.has('edit')) return // редакция на текста/снимките (wording-editor.js) — остава на лендинга
-      if (Array.from(p.keys()).length) location.replace('app.html' + location.search + location.hash)
-      else if (location.search) history.replaceState(null, '', location.pathname + location.hash)
+      // Език и рекламни етикети (utm_*, fbclid, gclid) остават на лендинга; другите параметри са за приложението.
+      var forApp = Array.from(p.keys()).filter(function (k) { return k !== 'lang' && !/^(utm_|fbclid$|gclid$|msclkid$)/.test(k) })
+      if (forApp.length) location.replace('app.html' + location.search + location.hash)
+      else if (location.search) { var q = p.toString(); history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash) } // без ?from, с ?lang
     })()
   </script>
   <meta charset="UTF-8" />
@@ -23,13 +25,16 @@
     <script src="media-slot.js?v=2" defer></script>
     <script src="wording-editor.js?v=5" defer></script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>IrisMap — личен протокол по ирисите | Eatologix</title>
+  <title>IrisMap — личен протокол по ирисите</title>
   <meta name="description" content="Очите ви са уникални и показват от какво има нужда тялото ви. По снимка на двата ви ириса съставяме личен протокол за хранене, добавки и режим." />
   <meta name="theme-color" content="#04181C" />
   <link rel="icon" type="image/svg+xml" href="brand/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png" />
   <link rel="apple-touch-icon" href="brand/apple-touch-icon.png" />
-  <meta property="og:site_name" content="IrisMap · Eatologix" />
+  <meta property="og:site_name" content="IrisMap" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://irismap.app/" />
+  <link rel="canonical" href="https://irismap.app/" />
   <meta property="og:title" content="Очите ви са уникални. И показват от какво има нужда тялото ви." />
   <meta property="og:description" content="Личен протокол за хранене, добавки и режим — по двата ви ириса." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,6 +211,27 @@
     .links { margin-top: 28px; font-size: 14px; }
     .links a { color: rgba(238,242,244,.8); text-decoration: underline; text-underline-offset: 3px; display: inline-block; min-height: 44px; line-height: 44px; }
     .foot { margin-top: 40px; font-size: 12px; color: rgba(238,242,244,.45); line-height: 1.6; }
+
+    /* ---------- футър: самостоятелен сайт irismap.app, модул на Eatologix ---------- */
+    .site-foot { background: #021013; color: rgba(238,242,244,.78); padding: 48px 0 calc(110px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(255,255,255,.06); }
+    .site-foot .wrap { max-width: 960px; }
+    .sf-brand .logo { margin-bottom: 10px; }
+    .sf-tag { font-family: 'Lora', Georgia, serif; font-style: italic; font-size: 16px; color: rgba(238,242,244,.7); }
+    .sf-about { margin-top: 10px; font-size: 14px; line-height: 1.6; color: rgba(238,242,244,.55); max-width: 30em; }
+    .sf-lang { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; font-size: 14px; color: rgba(238,242,244,.6); }
+    .sf-lang select { background: rgba(255,255,255,.08); color: #F2F5F7; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; font: 600 14px 'Manrope', sans-serif; padding: 0 12px; height: 40px; }
+    .sf-lang select option { color: #14212B; }
+    .sf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 16px; margin-top: 34px; }
+    .sf-cols h2 { font-family: 'Manrope', sans-serif; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(238,242,244,.45); margin: 0 0 8px; }
+    .sf-cols ul { list-style: none; margin: 0; padding: 0; }
+    .sf-cols a { display: inline-flex; flex-direction: column; min-height: 40px; justify-content: center; color: rgba(238,242,244,.85); text-decoration: none; font-size: 15px; font-weight: 600; }
+    .sf-cols a small { font-size: 12px; font-weight: 500; color: rgba(238,242,244,.45); }
+    .sf-cols a:hover { color: #fff; }
+    .sf-bottom { margin-top: 34px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); font-size: 12.5px; line-height: 1.6; color: rgba(238,242,244,.45); display: grid; gap: 6px; }
+    @media (min-width: 860px) {
+      .site-foot .sf-top { display: grid; grid-template-columns: 1.2fr 2fr; gap: 48px; }
+      .sf-cols { grid-template-columns: repeat(4, 1fr); margin-top: 0; }
+    }
 
     /* ---------- лепкав бутон ---------- */
     .sticky {
@@ -412,6 +438,56 @@
     </div>
   </section>
 </main>
+
+<!-- Футър: IrisMap е самостоятелен сайт (irismap.app) и модул на платформата Eatologix -->
+<footer class="site-foot" role="contentinfo">
+  <div class="wrap">
+    <div class="sf-top">
+      <div class="sf-brand">
+        <a class="logo" href="./" aria-label="IrisMap"><img src="brand/mark.svg" alt="" width="30" height="30"><span class="wm">IRIS<span class="lx"><b style="color:#08B5B9">M</b><b style="color:#06C3AA">A</b><b style="color:#07CF61">P</b></span></span></a>
+        <p class="sf-tag">Очите ви показват от какво има нужда тялото.</p>
+        <p class="sf-about">Личен протокол за хранене, добавки и режим по снимка на двата ириса. Модул на платформата Eatologix — работи и самостоятелно.</p>
+        <label class="sf-lang">Език <select data-lang-picker aria-label="Език / Language"></select></label>
+      </div>
+      <nav class="sf-cols" aria-label="Карта на сайта">
+        <div>
+          <h2>IrisMap</h2>
+          <ul>
+            <li><a href="app.html?start=analysis">Направете анализ</a></li>
+            <li><a href="app.html?start=demo">Примерен доклад</a></li>
+            <li><a href="app.html?view=history">Моите анализи</a></li>
+            <li><a href="app.html?view=about">За IrisMap</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Платформата</h2>
+          <ul>
+            <li><a href="https://eatologix.com/?stay=1">Eatologix<small>личен хранителен план</small></a></li>
+            <li><a href="https://emoeat.app/">EmoEat<small>емоционално хранене</small></a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Помощ</h2>
+          <ul>
+            <li><a href="https://eatologix.com/help.html">Въпроси и отговори</a></li>
+            <li><a href="https://eatologix.com/?stay=1#contact">Контакт</a></li>
+          </ul>
+        </div>
+        <div>
+          <h2>Правни</h2>
+          <ul>
+            <li><a href="https://eatologix.com/privacy-policy.html">Поверителност</a></li>
+            <li><a href="https://eatologix.com/terms.html">Условия за ползване</a></li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+    <div class="sf-bottom">
+      <p>© 2026 IrisMap · irismap.app · част от Eatologix</p>
+      <p>Насоки за хранене и начин на живот, не медицинска услуга. Не замества консултация с лекар.</p>
+    </div>
+  </div>
+</footer>
 
 <div class="sticky" id="sticky"><a class="btn btn-primary" href="app.html?start=analysis" data-cta="sticky">Искам своя протокол</a></div>
 

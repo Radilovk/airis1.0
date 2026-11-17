@@ -1062,7 +1062,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                   <Camera size={30} weight="duotone" className="text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold">{!left && !right ? 'Една снимка — двете очи' : `Остава ${!left ? 'лявото' : 'дясното'} око`}</p>
+                  <p className="font-semibold">{!left && !right ? 'Една снимка — двете очи' : (!left ? 'Остава лявото око' : 'Остава дясното око')}</p>
                   <p className="text-sm text-muted-foreground">
                     {!left && !right
                       ? 'Снимайте двете очи наведнъж, отблизо и на светло. Може и всяко поотделно.'
@@ -1122,7 +1122,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           >
             {left && right && (!leftReady || !rightReady) && (
               <p className="text-sm text-muted-foreground sm:mr-auto">
-                Нужна е нова снимка на {!leftReady ? 'лявото' : 'дясното'} око.
+                {!leftReady ? 'Нужна е нова снимка на лявото око.' : 'Нужна е нова снимка на дясното око.'}
               </p>
             )}
             <Button
