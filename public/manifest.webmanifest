@@ -1,0 +1,17 @@
+{
+  "name": "IrisMap — ирисов анализ",
+  "short_name": "IrisMap",
+  "description": "Личен протокол за хранене, добавки и режим по снимка на двата ириса. Модул на Eatologix.",
+  "id": "./app.html",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EEFDFC",
+  "theme_color": "#04181C",
+  "lang": "bg",
+  "icons": [
+    { "src": "brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

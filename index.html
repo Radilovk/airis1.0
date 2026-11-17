@@ -31,6 +31,7 @@
   <link rel="icon" type="image/svg+xml" href="brand/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png" />
   <link rel="apple-touch-icon" href="brand/apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <meta property="og:site_name" content="IrisMap" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://irismap.app/" />
@@ -211,6 +212,17 @@
     .links { margin-top: 28px; font-size: 14px; }
     .links a { color: rgba(238,242,244,.8); text-decoration: underline; text-underline-offset: 3px; display: inline-block; min-height: 44px; line-height: 44px; }
     .foot { margin-top: 40px; font-size: 12px; color: rgba(238,242,244,.45); line-height: 1.6; }
+
+    /* ---------- приложението на телефона ---------- */
+    .get-app { display: grid; gap: 14px; margin-top: 22px; }
+    .get-app .card { border-radius: 22px; padding: 20px; background: #fff; border: 1px solid rgba(3,147,156,.14); box-shadow: 0 10px 30px -18px rgba(3,40,48,.35); }
+    .get-app h3 { font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 800; margin: 0 0 4px; color: var(--ink); }
+    .get-app p { margin: 0; font-size: 14.5px; line-height: 1.55; color: #4A5E63; }
+    .get-app ol { margin: 10px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.6; color: #4A5E63; }
+    .get-app .btn { margin-top: 14px; width: 100%; }
+    .get-app .btn-ghost { color: var(--ink); border-color: rgba(3,147,156,.3); background: transparent; }
+    .get-app .hint { margin-top: 8px; font-size: 12.5px; color: #6B7F84; }
+    @media (min-width: 760px) { .get-app { grid-template-columns: 1fr 1fr; } }
 
     /* ---------- футър: самостоятелен сайт irismap.app, модул на Eatologix ---------- */
     .site-foot { background: #021013; color: rgba(238,242,244,.78); padding: 48px 0 calc(110px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(255,255,255,.06); }
@@ -426,6 +438,60 @@
     </div>
   </section>
 
+  <!-- 7б. ПРИЛОЖЕНИЕТО: IrisMap на телефона + Eatologix за Android -->
+  <section id="app">
+    <div class="wrap reveal">
+      <p class="eyebrow">Приложението</p>
+      <h2>IrisMap на телефона ви.</h2>
+      <p style="margin-top:10px;font-size:16px;color:#4A5E63">Отваря се от иконата на началния екран, на цял екран — без браузър.</p>
+      <div class="get-app">
+        <div class="card">
+          <h3>Приложение IrisMap</h3>
+          <p data-os="android">Android: с едно докосване, направо от тази страница.</p>
+          <p data-os="ios" hidden>iPhone и iPad: от Safari, на началния екран.</p>
+          <ol data-os="ios" hidden><li>Бутон „Сподели“ в Safari</li><li>„Добави към началния екран“</li><li>Отворете IrisMap от иконата</li></ol>
+          <a class="btn btn-primary" id="installIris" href="app.html" data-os="android">Инсталирайте IrisMap</a>
+          <p class="hint" id="installHint" hidden>Ако бутонът не отвори прозорец: меню ⋮ в Chrome → „Инсталирай приложение“.</p>
+        </div>
+        <div class="card">
+          <h3>Eatologix за Android</h3>
+          <p>Пълното приложение на платформата — хранителен план с известия и достъп до IrisMap и EmoEat.</p>
+          <a class="btn btn-ghost" id="apkDownload" href="https://github.com/Radilovk/aidiet/releases/latest/download/NutriPlan.apk" download>Свалете приложението (APK)</a>
+          <p class="hint">След свалянето: разрешете инсталация от този източник, отворете файла и потвърдете.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+    /* Инсталиране: Android/Chrome — системният прозорец (beforeinstallprompt); iPhone — стъпките за Safari. */
+    (function () {
+      var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      if (ios) document.querySelectorAll('[data-os]').forEach(function (el) { el.hidden = el.getAttribute('data-os') !== 'ios' })
+      var btn = document.getElementById('installIris'), hint = document.getElementById('installHint'), deferred = null
+      window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e })
+      if (btn) btn.addEventListener('click', function (e) {
+        if (!deferred) { if (!window.matchMedia('(display-mode: standalone)').matches) { hint.hidden = false } return }
+        e.preventDefault(); deferred.prompt(); deferred = null
+      })
+      /* APK: най-новият build по номер (както в Eatologix), а не „latest“ на GitHub. */
+      var apk = document.getElementById('apkDownload')
+      if (!apk || !window.fetch) return
+      fetch('https://api.github.com/repos/Radilovk/aidiet/releases?per_page=30', { headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { return r.ok ? r.json() : [] })
+        .then(function (list) {
+          var best = null
+          ;(list || []).forEach(function (rel) {
+            var m = /^v-build(\d+)-/.exec(rel.tag_name || '')
+            if (!m || rel.draft || rel.prerelease) return
+            var a = (rel.assets || []).filter(function (x) { return /^NutriPlan-v[\d.]+\.apk$/.test(x.name) })[0]
+            if (a && (!best || Number(m[1]) > best.n)) best = { n: Number(m[1]), url: a.browser_download_url, name: a.name }
+          })
+          if (best) { apk.href = best.url; apk.setAttribute('download', best.name) }
+        })
+        .catch(function () {})
+    })()
+  </script>
+
   <!-- 8. ФИНАЛ -->
   <section class="dark final">
     <div class="wrap reveal">
@@ -433,7 +499,7 @@
       <h2>Очите ви вече показват<br>от какво имате нужда.<br><em>Нека го прочетем.</em></h2>
       <div class="ctas"><a class="btn btn-primary" href="app.html?start=analysis" data-cta="final">Искам своя протокол</a></div>
       <p class="micro">около 7 минути · само с телефон · резултатът е веднага</p>
-      <p class="links"><a href="app.html?start=demo">Примерен доклад</a> · <a href="app.html?view=history">Моите анализи</a> · <a href="app.html?view=about">За IrisMap</a></p>
+      <p class="links"><a href="app.html?start=demo">Примерен доклад</a> · <a href="app.html?view=history">Моите анализи</a> · <a href="app.html?view=about">За IrisMap</a> · <a href="#app">Приложението</a></p>
       <p class="foot">IrisMap (част от Eatologix) предлага насоки за хранене и начин на живот, основани на иридологичен анализ. Не е медицинско изделие и не замества консултация с лекар.</p>
     </div>
   </section>
@@ -457,6 +523,7 @@
             <li><a href="app.html?start=demo">Примерен доклад</a></li>
             <li><a href="app.html?view=history">Моите анализи</a></li>
             <li><a href="app.html?view=about">За IrisMap</a></li>
+            <li><a href="#app">Приложението</a></li>
           </ul>
         </div>
         <div>
