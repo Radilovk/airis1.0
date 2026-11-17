@@ -11,6 +11,7 @@ import { cropEyesFromPhoto } from '@/lib/eye-crop'
 import { autoFrameIris, type AutoFrameFail } from '@/lib/iris-autoframe'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
+import { loadLastImages, type LastIrisImages } from '@/lib/form-memory'
 import type { IrisGeometrySnapshot, IrisImage } from '@/types'
 
 // Compression and size limit constants
@@ -85,6 +86,23 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
   const leftInputRef = useRef<HTMLInputElement>(null)
   const rightInputRef = useRef<HTMLInputElement>(null)
   const bothInputRef = useRef<HTMLInputElement>(null)
+  // Снимките от последния анализ (с намерената геометрия) — може да се ползват отново с едно докосване.
+  const [lastImages, setLastImages] = useState<LastIrisImages | null>(null)
+  useEffect(() => {
+    if (initialLeft || initialRight) return
+    let alive = true
+    void loadLastImages().then(v => { if (alive && v?.left?.geometry && v?.right?.geometry) setLastImages(v) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const applyLastImages = () => {
+    if (!lastImages) return
+    leftImageRef.current = lastImages.left
+    rightImageRef.current = lastImages.right
+    setRetake({})
+    setLastImages(null)
+    setImagesVersion(v => v + 1)
+  }
   // Окото не става за анализ → искаме нова снимка (с причината), без ръчни стъпки.
   const [retake, setRetake] = useState<{ left?: string; right?: string }>({})
   // Двете очи са готови → анализът тръгва сам след кратко отброяване (може да се спре).
@@ -847,6 +865,20 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           </motion.div>
 
           <UploadStepper step={step} />
+
+          {lastImages && !left && !right && !isProcessing && (
+            <Card className="mb-4 flex flex-row items-center gap-3 border-primary/30 p-3">
+              <div className="flex shrink-0 -space-x-3">
+                <img src={lastImages.left.dataUrl} alt="" className="size-12 rounded-full border-2 border-card object-cover" />
+                <img src={lastImages.right.dataUrl} alt="" className="size-12 rounded-full border-2 border-card object-cover" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Снимките от последния анализ</p>
+                <p className="text-xs text-muted-foreground">{new Date(lastImages.savedAt).toLocaleDateString()}</p>
+              </div>
+              <Button size="sm" onClick={applyLastImages}>Използвай същите</Button>
+            </Card>
+          )}
 
           {(!left || !right) && !isProcessing && (
             <Card className="mb-6 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-5">
