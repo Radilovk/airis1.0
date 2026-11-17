@@ -1711,6 +1711,8 @@
   "Анализът не може да започне в момента. Опитайте по-късно.": "L'analyse ne peut pas démarrer pour le moment. Réessayez plus tard.",
   "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Les analyses gratuites pour aujourd'hui sont épuisées. Réessayez demain.",
   "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "L'analyse gratuite est limitée à une par semaine et par appareil. Lecture de contrôle plus tôt — avec le protocole.",
-  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Trop d'analyses effectuées depuis ce réseau aujourd'hui. Réessayez demain."
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Trop d'analyses effectuées depuis ce réseau aujourd'hui. Réessayez demain.",
+  "Проверката, че не сте робот, не мина. Презаредете страницата и опитайте пак.": "La vérification que vous n'êtes pas un robot a échoué. Rechargez la page et réessayez.",
+  "Проверка, че не сте робот": "Vérification que vous n'êtes pas un robot"
  }
 }

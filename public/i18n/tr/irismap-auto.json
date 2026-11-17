@@ -1711,6 +1711,8 @@
   "Анализът не може да започне в момента. Опитайте по-късно.": "Analiz şu anda başlatılamıyor. Lütfen daha sonra tekrar deneyin.",
   "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Bugünkü ücretsiz analizler tükendi. Lütfen yarın tekrar deneyin.",
   "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Ücretsiz analiz cihaz başına haftada bir kezdir. Daha erken kontrol analizi — protokol ile.",
-  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Bugün bu ağdan çok fazla analiz yapıldı. Lütfen yarın tekrar deneyin."
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Bugün bu ağdan çok fazla analiz yapıldı. Lütfen yarın tekrar deneyin.",
+  "Проверката, че не сте робот, не мина. Презаредете страницата и опитайте пак.": "Robot olmadığınızı doğrulama başarısız oldu. Sayfayı yenileyip tekrar deneyin.",
+  "Проверка, че не сте робот": "Robot olmadığınızı doğrulama"
  }
 }

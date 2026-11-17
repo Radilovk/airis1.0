@@ -1711,6 +1711,8 @@
   "Анализът не може да започне в момента. Опитайте по-късно.": "Analiza nu poate începe în acest moment. Încercați mai târziu.",
   "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Analizele gratuite pentru astăzi s-au epuizat. Încercați mâine.",
   "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Analiza gratuită este o dată pe săptămână pe dispozitiv. Interpretare de control mai devreme — cu protocolul.",
-  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Prea multe analize din această rețea astăzi. Încercați mâine."
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Prea multe analize din această rețea astăzi. Încercați mâine.",
+  "Проверката, че не сте робот, не мина. Презаредете страницата и опитайте пак.": "Verificarea că nu sunteți robot a eșuat. Reîncărcați pagina și încercați din nou.",
+  "Проверка, че не сте робот": "Verificare că nu sunteți robot"
  }
 }
