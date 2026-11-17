@@ -1,27 +1,33 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { CheckCircle, ArrowRight, X, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown, Camera, ArrowCounterClockwise, Warning } from '@phosphor-icons/react'
+import { CheckCircle, ArrowRight, X, Crosshair, Eye, ImageSquare, Lightbulb, CaretDown, ArrowCounterClockwise, Warning } from '@phosphor-icons/react'
 import PhotoGuide from '@/components/PhotoGuide'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { autoCalibrate } from '@/lib/iris-autocalibrate'
-import IrisCalibrator from '@/components/iris/IrisCalibrator'
 import { loadFaceTracker } from '@/lib/face-tracker'
 import { cropEyesFromPhoto } from '@/lib/eye-crop'
-import { autoFrameIris } from '@/lib/iris-autoframe'
+import { autoFrameIris, type AutoFrameFail } from '@/lib/iris-autoframe'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
-import type { QualityReport } from '@/lib/iris-quality'
 import type { IrisGeometrySnapshot, IrisImage } from '@/types'
 
 // Compression and size limit constants
 // Iris images need ≥1600px width to preserve fine medical detail (lacunae, crypts, radial lines).
 // Размерът, до който се свива снимката на окото.
 export const IRIS_MAX_DIMENSION = 1600
-const SECOND_PASS_THRESHOLD_BYTES = 3 * 1024 * 1024 // 3 MB – only re-compress truly large files
-const MAX_FINAL_SIZE_BYTES = 5 * 1024 * 1024        // 5 MB – supports 1600px JPEG at q=0.92
-const MAX_FINAL_SIZE_KB = 5120
+// Окото се изрязва в пълна резолюция (до 4096 px, JPEG 0.95) — без смаляване.
+const MAX_FINAL_SIZE_BYTES = 8 * 1024 * 1024
+const MAX_FINAL_SIZE_KB = 8192
+
+/** Защо окото не можа да се изреже — обяснение към човека и какво да направи. */
+const FRAME_FAIL_TEXT: Record<AutoFrameFail, string> = {
+  unreadable: 'Снимката не може да се отвори. Изберете друга снимка от галерията.',
+  not_found: 'Не намерихме окото на тази снимка. Изберете снимка, на която окото е отблизо, на фокус и при добра светлина.',
+  too_small: 'Окото е твърде далеч — ирисът е малък и детайлите се губят. Изберете по-близка снимка, на която окото заема голяма част от кадъра.',
+  cut_off: 'Ирисът е отрязан от края на снимката. Изберете снимка, на която цялото око е в кадъра.',
+}
 
 interface ImageUploadScreenProps {
   /**
@@ -117,71 +123,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       }
     }
   }, [])
-
-  const compressImage = async (dataUrl: string, maxWidth: number = IRIS_MAX_DIMENSION, quality: number = 0.92): Promise<string> => {
-    const startTime = performance.now()
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      img.onload = () => {
-        try {
-          const originalWidth = img.width
-          const originalHeight = img.height
-          const canvas = document.createElement('canvas')
-          let width = img.width
-          let height = img.height
-          
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width
-            width = maxWidth
-          }
-          
-          canvas.width = width
-          canvas.height = height
-          
-          const ctx = canvas.getContext('2d', { alpha: false })
-          if (!ctx) {
-            reject(new Error('Не може да се създаде canvas context'))
-            return
-          }
-          
-          // Enable high-quality image smoothing for better resizing
-          ctx.imageSmoothingEnabled = true
-          ctx.imageSmoothingQuality = 'high'
-          
-          // Fill with white background for better JPEG compression
-          ctx.fillStyle = '#FFFFFF'
-          ctx.fillRect(0, 0, width, height)
-          
-          ctx.drawImage(img, 0, 0, width, height)
-          
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
-          const endTime = performance.now()
-          const duration = Math.round(endTime - startTime)
-          
-          const inputSizeKB = Math.round(dataUrl.length / 1024)
-          const outputSizeKB = Math.round(compressedDataUrl.length / 1024)
-          const reductionPercent = Math.round(((inputSizeKB - outputSizeKB) / inputSizeKB) * 100)
-          
-          console.log(`📸 [COMPRESS] ========== Compression Details ==========`)
-          console.log(`📸 [COMPRESS] Dimensions: ${originalWidth}×${originalHeight} → ${width}×${height}`)
-          console.log(`📸 [COMPRESS] Quality: ${quality}`)
-          console.log(`📸 [COMPRESS] Size: ${inputSizeKB} KB → ${outputSizeKB} KB (${reductionPercent}% reduction)`)
-          console.log(`📸 [COMPRESS] Duration: ${duration}ms`)
-          console.log(`📸 [COMPRESS] ================================================`)
-          
-          resolve(compressedDataUrl)
-        } catch (error) {
-          console.error('❌ [COMPRESS] Грешка при компресия:', error)
-          reject(error)
-        }
-      }
-      img.onerror = () => {
-        console.error('❌ [COMPRESS] Грешка при зареждане на изображението')
-        reject(new Error('Грешка при зареждане на изображението'))
-      }
-      img.src = dataUrl
-    })
-  }
 
   /**
    * Опашка за снимки, които чакат реда си: другото око от снимка на двете очи.
@@ -291,7 +232,9 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         if (eyes) {
           uploadDiagnostics.log('AI_EYES_FOUND', 'success', { side, eyes: eyes.map(e => ({ side: e.side, irisPx: e.irisPx })) })
           const mine = eyes.find(e => e.side === side)
-          const others = eyes.filter(e => e.side !== side && !(e.side === 'left' ? leftImageRef.current : rightImageRef.current))
+          // Другото око от същата снимка — само ако за него не е избрана отделна снимка.
+          const others = eyes.filter(e => e.side !== side && !(e.side === 'left' ? leftImageRef.current : rightImageRef.current)
+            && !photoQueueRef.current.some(q => q.side === e.side))
           photoQueueRef.current.push(...others.map(e => ({ side: e.side, file: e.file })))
           if (others.length && mine) toast.info('На снимката са и двете очи — изрязахме всяко поотделно.')
           const smallest = Math.min(...eyes.map(e => e.irisPx))
@@ -310,109 +253,29 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           source = mine.dataUrl
         }
 
-        const originalSizeKB = Math.round(dataUrl.length / 1024)
-        console.log(`📸 [UPLOAD] Оригинален размер на изображението: ${originalSizeKB} KB`)
-        console.log(`📸 [UPLOAD] Оригинален файл: ${file.name}, тип: ${file.type}, размер: ${Math.round(file.size / 1024)} KB`)
-        
-        uploadDiagnostics.log('COMPRESS_START_1ST_PASS', 'start', {
-          originalSizeKB,
-          originalFileSize: Math.round(file.size / 1024),
-          fileName: file.name,
-          fileType: file.type,
-          side
+        if (!isMountedRef.current) return
+        // Окото се намира и изрязва от ОРИГИНАЛА в пълна резолюция (без смаляване).
+        // Ако не става — нова снимка, с обяснение защо. Ръчно нагласяне няма.
+        const framed = await autoFrameIris(source).catch(() => ({ fail: 'unreadable' as AutoFrameFail }))
+        uploadDiagnostics.log('AUTO_FRAME', 'dataUrl' in framed ? 'success' : 'info', {
+          side,
+          result: 'dataUrl' in framed ? `ok ${framed.confidence.toFixed(2)}` : framed.fail,
         })
-        // First pass: High quality at max IRIS_MAX_DIMENSION – preserves iris detail for AI analysis
-        let compressedDataUrl = await compressImage(source, IRIS_MAX_DIMENSION, 0.92)
-        const afterFirstPassKB = Math.round(compressedDataUrl.length / 1024)
-        uploadDiagnostics.log('COMPRESS_END_1ST_PASS', 'success', {
-          compressedSizeKB: afterFirstPassKB,
-          reductionPercent: Math.round(((originalSizeKB - afterFirstPassKB) / originalSizeKB) * 100)
-        })
-        
-        console.log(`📸 [UPLOAD] Компресиран размер (1st pass): ${afterFirstPassKB} KB (намаление: ${Math.round(((originalSizeKB - afterFirstPassKB) / originalSizeKB) * 100)}%)`)
-        
-        // Second pass: Only if very large (>1MB), use slightly lower quality (0.88 = still very good quality)
-        if (compressedDataUrl.length > SECOND_PASS_THRESHOLD_BYTES) {
-          console.warn('⚠️ [UPLOAD] Изображението е все още голямо, допълнителна компресия...')
-          uploadDiagnostics.log('COMPRESS_START_2ND_PASS', 'start', {
-            currentSizeKB: afterFirstPassKB
-          })
-          compressedDataUrl = await compressImage(compressedDataUrl, IRIS_MAX_DIMENSION, 0.88)
-          const afterSecondPassKB = Math.round(compressedDataUrl.length / 1024)
-          uploadDiagnostics.log('COMPRESS_END_2ND_PASS', 'success', {
-            finalSizeKB: afterSecondPassKB,
-            totalReductionPercent: Math.round(((originalSizeKB - afterSecondPassKB) / originalSizeKB) * 100)
-          })
-          console.log(`📸 [UPLOAD] Допълнително компресиран (2nd pass): ${afterSecondPassKB} KB (общо намаление: ${Math.round(((originalSizeKB - afterSecondPassKB) / originalSizeKB) * 100)}%)`)
-        }
-        
-        const finalSizeKB = Math.round(compressedDataUrl.length / 1024)
-        console.log(`📸 [UPLOAD] ========== FINAL COMPRESSION RESULT ==========`)
-        console.log(`📸 [UPLOAD] Original: ${originalSizeKB} KB → Final: ${finalSizeKB} KB`)
-        console.log(`📸 [UPLOAD] Total reduction: ${Math.round(((originalSizeKB - finalSizeKB) / originalSizeKB) * 100)}%`)
-        console.log(`📸 [UPLOAD] Checking against limit: ${finalSizeKB} KB vs ${MAX_FINAL_SIZE_KB} KB max`)
-        
-        // Allow up to 5MB – supports 1600px JPEG at q=0.92 for high-detail iris images
-        if (compressedDataUrl.length > MAX_FINAL_SIZE_BYTES) {
-          uploadDiagnostics.log('COMPRESS_ERROR_TOO_LARGE', 'error', {
-            finalSizeKB,
-            maxSizeKB: MAX_FINAL_SIZE_KB,
-            originalSizeKB,
-            fileName: file.name,
-            fileType: file.type,
-            side
-          })
-          console.error(`❌ [UPLOAD] Изображението е твърде голямо дори след компресия! (${finalSizeKB} KB > ${MAX_FINAL_SIZE_KB} KB)`)
-          toast.error(`Изображението е твърде голямо (${finalSizeKB} KB). Моля, опитайте с по-малка снимка или по-ниска резолюция.`)
+        if (!('dataUrl' in framed)) {
+          if (side === 'left') leftImageRef.current = null
+          else rightImageRef.current = null
+          setRetake(r => ({ ...r, [side]: FRAME_FAIL_TEXT[framed.fail] }))
+          setImagesVersion(v => v + 1)
           setIsProcessing(false)
           return
         }
-        
-        console.log(`✅ [UPLOAD] Compression successful! Final size ${finalSizeKB} KB is within limit.`)
-        
-        if (!isMountedRef.current) {
-          uploadDiagnostics.log('COMPONENT_UNMOUNTED_AFTER_COMPRESS', 'warning')
-          console.warn('⚠️ [UPLOAD] Компонентът е unmounted, прекъсване')
-          return
-        }
-
-        uploadDiagnostics.log('OPEN_CROP_EDITOR', 'success', {
-          side,
-          imageSizeKB: Math.round(compressedDataUrl.length / 1024)
-        })
-        console.log(`✅ [UPLOAD] Изображението е готово за crop редактиране`)
-        // Окото се търси автоматично. При уверено откриване снимката се
-        // центрира сама и ръчният редактор се прескача. Търси се в ПЪЛНАТА
-        // резолюция: смалена до 1600 px снимка губи по-голямата част от
-        // пикселите на ириса, ако окото не е запълвало кадъра.
-        const framed = await autoFrameIris(source).catch(() => null)
-        uploadDiagnostics.log('AUTO_FRAME', framed ? 'success' : 'info', {
-          side,
-          confidence: framed?.confidence ?? 0,
-        })
-
         if (editingSideRef.current || calibratingRef.current) {
-          // Другото око е в процес — това изчаква реда си, вместо да го изтрие.
-          pendingCropRef.current = framed
-            ? { side, dataUrl: framed.dataUrl, auto: true }
-            : { side, dataUrl: compressedDataUrl }
-          uploadDiagnostics.log('CROP_QUEUED', 'info', { side })
-          toast.info(
-            `${side === 'left' ? 'Лявата' : 'Дясната'} снимка е приета — ще се отвори веднага след другата.`
-          )
+          pendingCropRef.current = { side, dataUrl: framed.dataUrl, auto: true }
           setIsProcessing(false)
           return
         }
-        if (framed) {
-          setIsProcessing(false)
-          await handleCropSave(framed.dataUrl, side)
-          return
-        }
-        // Окото не е намерено уверено за изрязване — разпознаването върви върху
-        // цялата снимка. Ръчно изрязване вече няма: ако и тогава не е сигурно,
-        // се отваря един екран с кръговете.
         setIsProcessing(false)
-        await handleCropSave(compressedDataUrl, side)
+        await handleCropSave(framed.dataUrl, side)
       } catch (error) {
         uploadDiagnostics.log('FILE_PROCESSING_ERROR', 'error', {
           side,
@@ -535,8 +398,8 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_START', 'start', {
         sizeBefore: Math.round(croppedDataUrl.length / 1024)
       })
-      // First pass: High quality at IRIS_MAX_DIMENSION – preserves iris detail for AI analysis
-      const finalImage = await compressImage(croppedDataUrl, IRIS_MAX_DIMENSION, 0.92)
+      // Без смаляване: изрезът вече е в пълна резолюция и JPEG 0.95.
+      const finalImage = croppedDataUrl
       uploadDiagnostics.log('CROP_COMPRESS_1ST_PASS_SUCCESS', 'success', {
         sizeAfter: Math.round(finalImage.length / 1024)
       })
@@ -553,7 +416,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
           finalSize: Math.round(finalImage.length / 1024),
           activeSide
         })
-        toast.error(`Изображението е твърде голямо (${Math.round(finalImage.length / 1024)} KB). Моля, опитайте с по-малка снимка или по-ниска резолюция.`)
+        toast.error('Снимката е необичайно голяма. Изберете снимка от галерията на телефона (не скенер или RAW файл).')
         setIsProcessing(false)
         setEditingSide(null)
         return
@@ -671,12 +534,14 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
       } else {
         // Снимката не става за сигурен анализ → нова снимка на същото око, с причината.
         // Ръчните кръгове остават само като резервен вариант („Нагласи ръчно“).
-        const why = auto?.reason ?? 'Не намерихме ясно зеницата и ириса на тази снимка.'
+        const why = auto?.reason && !/кръг/i.test(auto.reason)
+          ? auto.reason
+          : 'Зеницата и ръбът на ириса не се виждат достатъчно ясно (размазване, отблясък или клепач). Изберете по-ясна снимка, отблизо и при добра светлина.'
         setRetake(r => ({ ...r, [savedSide]: why }))
-        toast.warning(`${sideName} око: нужна е нова снимка`, {
+        toast.warning(`${sideName} око: нужна е по-ясна снимка`, {
           description: why,
           duration: 10000,
-          action: { label: 'Снимай отново', onClick: () => askRetake(savedSide) },
+          action: { label: 'Избери друга', onClick: () => askRetake(savedSide) },
         })
       }
     } catch (error) {
@@ -836,13 +701,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         const missing = !leftImage.geometry ? 'left' : 'right'
         uploadDiagnostics.log('HANDLE_NEXT_MISSING_GEOMETRY', 'warning', { missing })
         setIsSaving(false)
-        toast.error(
-          `${missing === 'left' ? 'Левият' : 'Десният'} ирис не е настроен. Отворете настройката на снимката.`
-        )
-        setCalibrating({
-          side: missing as 'left' | 'right',
-          dataUrl: missing === 'left' ? leftImage.dataUrl : rightImage.dataUrl,
-        })
+        toast.error(missing === 'left' ? 'Лявото око не е разпознато. Изберете по-ясна снимка.' : 'Дясното око не е разпознато. Изберете по-ясна снимка.')
         return
       }
 
@@ -885,55 +744,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
   }
 
-  /** Потвърдена калибрация → геометрията се закача за снимката. */
-  const handleCalibrationConfirm = (geometry: IrisGeometrySnapshot, quality: QualityReport) => {
-    if (!calibrating) return
-    const target = calibrating.side === 'left' ? leftImageRef : rightImageRef
-    if (target.current) {
-      target.current = {
-        ...target.current,
-        geometry,
-        quality: {
-          verdict: quality.verdict,
-          score: quality.score,
-          issueCodes: quality.issues.map(i => i.code),
-        },
-      }
-    }
-    setCalibrating(null)
-    setImagesVersion(v => v + 1)
-    toast.success(
-      `${calibrating.side === 'left' ? 'Ляв' : 'Десен'} ирис е настроен · качество ${quality.score}/100`
-    )
-  }
-
-  /** „Друга снимка" → изчистваме текущата и връщаме потребителя към избора. */
-  const handleCalibrationRetake = () => {
-    if (!calibrating) return
-    const side = calibrating.side
-    if (side === 'left') leftImageRef.current = null
-    else rightImageRef.current = null
-    setCalibrating(null)
-    setImagesVersion(v => v + 1)
-    setTimeout(() => {
-      const input = side === 'left' ? leftInputRef.current : rightInputRef.current
-      input?.click()
-    }, 120)
-  }
-
-  /** Затваряне без потвърждение — снимката остава, но без геометрия. */
-  const handleCalibrationCancel = () => {
-    setCalibrating(null)
-    toast.info('Настройката е отложена. Анализът изисква настроена снимка.')
-  }
-
-  /** Повторно отваряне на калибратора за вече качена снимка. */
-  const openCalibrator = (side: 'left' | 'right') => {
-    const image = side === 'left' ? leftImageRef.current : rightImageRef.current
-    if (!image) return
-    setCalibrating({ side, dataUrl: image.dataUrl })
-  }
-
   /** Нова снимка на едно око: махаме негодната и отваряме избора (докосването е на човека). */
   const askRetake = (side: 'left' | 'right') => {
     if (side === 'left') leftImageRef.current = null
@@ -944,10 +754,21 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     input?.click()
   }
 
-  /** Една снимка — двете очи: AI ги намира и разпределя; иначе отива в първото празно място. */
-  const handleBothFile = (file: File) => {
-    const side: 'left' | 'right' = !leftImageRef.current ? 'left' : !rightImageRef.current ? 'right' : 'left'
-    void handleFileSelect(side, file)
+  /**
+   * Галерията се отваря ВЕДНЪЖ: първата избрана снимка е лявото око, втората — дясното
+   * (телефоните подават снимките в реда на избиране). Една снимка → първото празно място;
+   * ако на нея са двете очи (снимка на лицето), AI ги намира и разпределя сам.
+   */
+  const handlePickedFiles = (list: FileList | null) => {
+    const files = Array.from(list ?? []).filter(f => f.type.startsWith('image/'))
+    if (!files.length) return
+    if (files.length > 2) toast.info('Взехме първите две снимки: лявото и дясното око.')
+    const jobs: { side: 'left' | 'right'; file: File }[] = files.length >= 2
+      ? [{ side: 'left', file: files[0] }, { side: 'right', file: files[1] }]
+      : [{ side: !leftImageRef.current ? 'left' : !rightImageRef.current ? 'right' : 'left', file: files[0] }]
+    for (const j of jobs) setRetake(r => ({ ...r, [j.side]: undefined }))
+    photoQueueRef.current.push(...jobs)
+    setImagesVersion(v => v + 1)
   }
 
   const removeImage = (side: 'left' | 'right') => {
@@ -998,7 +819,8 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
     }
     const t = setTimeout(() => setCountdown(c => (c === null ? null : c - 1)), 1000)
     return () => clearTimeout(t)
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleNext се взима пресен при всяка стъпка
+  }, [countdown])
 
   const stopAutoStart = () => {
     autoStartRef.current = 'stopped'
@@ -1020,16 +842,47 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
             <p className="text-muted-foreground">
               {isReanalysis
                 ? 'Ще използваме предишните ви отговори от въпросника.'
-                : 'Една снимка на двете очи е достатъчна — намираме ги, центрираме и проверяваме сами. Анализът започва автоматично.'}
+                : 'Изберете от галерията две снимки наведнъж: първо на лявото, после на дясното око. Окото се намира, изрязва и нагласява само. Анализът започва автоматично.'}
             </p>
           </motion.div>
 
           <UploadStepper step={step} />
 
+          {(!left || !right) && !isProcessing && (
+            <Card className="mb-6 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-5">
+              {/* Галерия, не камера: без `capture`, само снимки. `multiple` — двете очи с едно отваряне. */}
+              <input ref={bothInputRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={e => { handlePickedFiles(e.target.files); e.target.value = '' }} />
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 sm:mx-0">
+                  <ImageSquare size={30} weight="duotone" className="text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-center font-semibold sm:text-left">
+                    {!left && !right ? 'Изберете двете снимки от галерията' : !left ? 'Остава лявото око' : 'Остава дясното око'}
+                  </p>
+                  {!left && !right ? (
+                    <ol className="mt-2 space-y-1 text-sm text-muted-foreground">
+                      <li><strong className="text-foreground">1.</strong> <span>Изберете снимка на вашето ляво око.</span></li>
+                      <li><strong className="text-foreground">2.</strong> <span>После изберете снимка на вашето дясно око.</span></li>
+                      <li className="text-xs">Галерията се отваря веднъж — докоснете двете снимки една след друга, в този ред.</li>
+                    </ol>
+                  ) : (
+                    <p className="mt-1 text-center text-sm text-muted-foreground sm:text-left">
+                      {!left ? 'Изберете снимка на вашето ляво око.' : 'Изберете снимка на вашето дясно око.'}
+                    </p>
+                  )}
+                </div>
+                <Button size="lg" className="h-12 w-full gap-2 sm:w-auto" onClick={() => bothInputRef.current?.click()}>
+                  <ImageSquare size={20} weight="bold" /> {!left && !right ? 'Избери двете снимки' : 'Избери снимка'}
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* Отворено, докато няма снимки — указанията трябват ПРЕДИ снимането. */}
           <details
             key={left || right ? 'has-photo' : 'empty'}
-            open={!left && !right}
             className="group mb-6 rounded-2xl border bg-card px-4 py-3"
           >
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-semibold">
@@ -1049,29 +902,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
               <div className="flex items-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
                 <p className="text-sm font-medium">Търсим окото и го центрираме…</p>
-              </div>
-            </Card>
-          )}
-
-          {(!left || !right) && !isProcessing && (
-            <Card className="mb-6 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-5">
-              <input ref={bothInputRef} type="file" accept="image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleBothFile(f); e.target.value = '' }} />
-              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15">
-                  <Camera size={30} weight="duotone" className="text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold">{!left && !right ? 'Една снимка — двете очи' : (!left ? 'Остава лявото око' : 'Остава дясното око')}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {!left && !right
-                      ? 'Снимайте двете очи наведнъж, отблизо и на светло. Може и всяко поотделно.'
-                      : 'Снимайте го отблизо — намира се и се проверява само.'}
-                  </p>
-                </div>
-                <Button size="lg" className="h-12 w-full gap-2 sm:w-auto" onClick={() => bothInputRef.current?.click()}>
-                  <Camera size={20} weight="bold" /> {!left && !right ? 'Снимай очите' : 'Снимай'}
-                </Button>
               </div>
             </Card>
           )}
@@ -1105,7 +935,7 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
                   galleryRef={side === 'left' ? leftInputRef : rightInputRef}
                   onFile={file => handleFileSelect(side, file)}
                   onDrop={e => !isProcessing && handleDrop(side, e)}
-                  onCalibrate={() => openCalibrator(side)}
+                  onCalibrate={() => {}}
                   onRemove={() => removeImage(side)}
                   retakeReason={retake[side]}
                   onRetake={() => askRetake(side)}
@@ -1138,16 +968,6 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
         </div>
       </div>
 
-      {calibrating && (
-        <IrisCalibrator
-          key={`${calibrating.side}-${calibrating.dataUrl.length}`}
-          imageDataUrl={calibrating.dataUrl}
-          side={calibrating.side}
-          onConfirm={handleCalibrationConfirm}
-          onRetake={handleCalibrationRetake}
-          onCancel={handleCalibrationCancel}
-        />
-      )}
     </>
   )
 }
@@ -1159,9 +979,11 @@ export default function ImageUploadScreen({ onComplete, initialLeft = null, init
 function CalibrationStatus({
   image,
   onOpen,
+  needsRetake,
 }: {
   image: IrisImage | null
   onOpen: () => void
+  needsRetake?: boolean
 }) {
   if (!image) return null
 
@@ -1182,7 +1004,7 @@ function CalibrationStatus({
       className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors hover:brightness-[0.97] ${tone}`}
     >
       {calibrated ? <CheckCircle size={14} weight="fill" /> : <Crosshair size={14} weight="bold" />}
-      {calibrated ? `Готово${q ? ` · ${q.score}/100` : ''}` : 'Провери кръговете'}
+      {calibrated ? `Готово${q ? ` · ${q.score}/100` : ''}` : needsRetake ? 'Нужна е по-ясна снимка' : 'Проверяваме…'}
     </button>
   )
 }
@@ -1285,7 +1107,7 @@ function EyeSlot({
     >
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-lg font-semibold">{label}</h3>
-        {image && <CalibrationStatus image={image} onOpen={onCalibrate} />}
+        {image && <CalibrationStatus image={image} onOpen={onCalibrate} needsRetake={!!retakeReason} />}
       </div>
 
       {/* Без `capture`: той отваря опростения режим на камерата (на много
@@ -1293,13 +1115,21 @@ function EyeSlot({
           Без него телефонът предлага галерия или камера по избор. */}
       <input ref={galleryRef} type="file" accept="image/*" className="hidden" disabled={disabled} onChange={pick} />
 
+      {!image && retakeReason && (
+        <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-950">
+          <p className="flex items-start gap-2 text-sm">
+            <Warning size={18} weight="fill" className="mt-0.5 shrink-0 text-amber-600" />
+            <span><strong>Нужна е по-ясна снимка.</strong> {retakeReason}</span>
+          </p>
+        </div>
+      )}
       {!image ? (
         <div className="rounded-2xl border-2 border-dashed border-border p-5 text-center">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <Eye size={34} weight="duotone" className="text-primary" />
           </div>
           <p className="mb-4 text-sm text-muted-foreground">
-            Снимайте окото с <strong className="text-foreground">обичайната камера</strong> на телефона, после изберете снимката тук. Окото се намира и изрязва само.
+            Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.
           </p>
           <Button size="lg" className="h-12 w-full gap-2" disabled={disabled} onClick={() => galleryRef.current?.click()}>
             <ImageSquare size={20} weight="bold" /> Избери снимка
@@ -1309,27 +1139,24 @@ function EyeSlot({
       ) : (
         <>
           {/* Снимката с намерените граници — човекът вижда какво е разпознато. */}
-          <button type="button" onClick={onCalibrate} className="relative block h-60 w-full overflow-hidden rounded-2xl bg-black">
+          <div className="relative block h-60 w-full overflow-hidden rounded-2xl bg-black">
             <img src={image.dataUrl} alt={label} className="absolute inset-0 h-full w-full object-contain" />
             {image.geometry && <DetectedOverlay geometry={image.geometry} />}
-          </button>
+          </div>
           {retakeReason && !image.geometry ? (
             <div className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-amber-950">
               <p className="flex items-start gap-2 text-sm">
                 <Warning size={18} weight="fill" className="mt-0.5 shrink-0 text-amber-600" />
-                <span><strong>Нужна е нова снимка.</strong> {retakeReason}</span>
+                <span><strong>Нужна е по-ясна снимка.</strong> {retakeReason}</span>
               </p>
               <Button className="mt-3 h-11 w-full gap-2" onClick={onRetake} disabled={disabled}>
-                <ArrowCounterClockwise size={18} weight="bold" /> Снимай отново
+                <ArrowCounterClockwise size={18} weight="bold" /> Избери друга снимка
               </Button>
-              <button type="button" onClick={onCalibrate} className="mt-2 w-full text-center text-xs font-medium text-amber-900/80 underline underline-offset-2">
-                или нагласи кръговете ръчно
-              </button>
             </div>
           ) : (
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button variant="outline" className="gap-1.5" onClick={onCalibrate}>
-                <Crosshair size={16} weight="bold" /> {image.geometry ? 'Коригирай' : 'Настрой'}
+              <Button variant="outline" className="gap-1.5" onClick={onRetake} disabled={disabled}>
+                <ImageSquare size={16} weight="bold" /> Смени
               </Button>
               <Button variant="outline" className="gap-1.5 text-rose-600 hover:text-rose-700" onClick={onRemove}>
                 <X size={16} weight="bold" /> Премахни

@@ -24,6 +24,16 @@ export interface AutoFrameResult {
   confidence: number
 }
 
+/** Защо окото не е изрязано — за обяснението към човека. */
+export type AutoFrameFail = 'unreadable' | 'not_found' | 'too_small' | 'cut_off'
+
+/**
+ * Изрезът е в ПЪЛНАТА резолюция на снимката (без смаляване). Таванът е само
+ * границата на canvas в мобилните браузъри (iOS: ~16 MP) — достига се едва при
+ * макро снимка, в която ирисът е над ~2300 px.
+ */
+export const AUTOFRAME_MAX_SIDE = 4096
+
 function loadImage(dataUrl: string): Promise<HTMLImageElement | null> {
   return new Promise(resolve => {
     const img = new Image()
@@ -33,25 +43,25 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement | null> {
   })
 }
 
-export async function autoFrameIris(dataUrl: string, maxSide = 1600): Promise<AutoFrameResult | null> {
+export async function autoFrameIris(dataUrl: string, maxSide = AUTOFRAME_MAX_SIDE): Promise<AutoFrameResult | { fail: AutoFrameFail }> {
   const img = await loadImage(dataUrl)
-  if (!img) return null
+  if (!img) return { fail: 'unreadable' }
   const W = img.naturalWidth
   const H = img.naturalHeight
-  if (!W || !H) return null
+  if (!W || !H) return { fail: 'unreadable' }
 
   const geo = detectIrisGeometry(img)
   const confidence = Math.min(geo.pupilConfidence, geo.limbusConfidence)
-  if (confidence < AUTOFRAME_MIN_CONFIDENCE) return null
+  if (confidence < AUTOFRAME_MIN_CONFIDENCE) return { fail: 'not_found' }
 
   const r = geo.limbus.r
   // Ирис, по-малък от 6 % от кадъра, е снимка от твърде далеч — изрязването би
   // дало размазана картинка. Тогава човекът трябва да реши сам.
-  if (r < Math.min(W, H) * 0.06) return null
+  if (r < Math.min(W, H) * 0.06) return { fail: 'too_small' }
   // Ирисът трябва да е изцяло в кадъра (с малък толеранс за клепачите).
   const tol = r * 0.08
   if (geo.limbus.cx - r < -tol || geo.limbus.cy - r < -tol || geo.limbus.cx + r > W + tol || geo.limbus.cy + r > H + tol) {
-    return null
+    return { fail: 'cut_off' }
   }
 
   const side = Math.min(Math.max(W, H), Math.round(2 * r * FRAME_MARGIN))
@@ -67,10 +77,10 @@ export async function autoFrameIris(dataUrl: string, maxSide = 1600): Promise<Au
   canvas.width = out
   canvas.height = out
   const ctx = canvas.getContext('2d')
-  if (!ctx) return null
+  if (!ctx) return { fail: 'unreadable' }
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, out, out)
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(img, sx, sy, side, side, 0, 0, out, out)
-  return { dataUrl: canvas.toDataURL('image/jpeg', 0.92), confidence }
+  return { dataUrl: canvas.toDataURL('image/jpeg', 0.95), confidence }
 }
