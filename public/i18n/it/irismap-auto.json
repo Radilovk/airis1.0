@@ -1679,6 +1679,11 @@
   "Окото е твърде далеч — ирисът е малък и детайлите се губят. Изберете по-близка снимка, на която окото заема голяма част от кадъра.": "L'occhio è troppo lontano: l'iride è piccola e i dettagli vanno persi. Selezioni una foto più ravvicinata, in cui l'occhio occupi gran parte dell'inquadratura.",
   "Ирисът е отрязан от края на снимката. Изберете снимка, на която цялото око е в кадъра.": "L'iride è tagliata dal bordo della foto. Selezioni una foto in cui l'intero occhio sia nell'inquadratura.",
   "После изберете снимка на вашето дясно око.": "Poi selezioni una foto del Suo occhio destro.",
-  "Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.": "Selezioni una foto dell'occhio dalla galleria. L'occhio viene rilevato, ritagliato e regolato automaticamente."
+  "Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.": "Selezioni una foto dell'occhio dalla galleria. L'occhio viene rilevato, ritagliato e regolato automaticamente.",
+  "Продължавате откъдето спряхте — отговорите са запазени.": "Riprenda da dove ha interrotto — le risposte sono salvate.",
+  "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "Abbiamo precompilato le risposte della Sua ultima analisi. Le verifichi e prosegua.",
+  "Започни на чисто": "Ricomincia da capo",
+  "Снимките от последния анализ": "Foto dell'ultima analisi",
+  "Използвай същите": "Usi le stesse"
  }
 }

@@ -1679,6 +1679,11 @@
   "Окото е твърде далеч — ирисът е малък и детайлите се губят. Изберете по-близка снимка, на която окото заема голяма част от кадъра.": "The eye is too far away — the iris is small and details are lost. Please select a closer photo where the eye fills most of the frame.",
   "Ирисът е отрязан от края на снимката. Изберете снимка, на която цялото око е в кадъра.": "The iris is cut off at the edge of the photo. Please select a photo where the entire eye is in the frame.",
   "После изберете снимка на вашето дясно око.": "Then select a photo of your right eye.",
-  "Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.": "Select an eye photo from the gallery. The eye is detected, cropped, and adjusted automatically."
+  "Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.": "Select an eye photo from the gallery. The eye is detected, cropped, and adjusted automatically.",
+  "Продължавате откъдето спряхте — отговорите са запазени.": "Pick up where you left off — your answers are saved.",
+  "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "We've filled in the answers from your last analysis. Review them and continue.",
+  "Започни на чисто": "Start fresh",
+  "Снимките от последния анализ": "Photos from your last analysis",
+  "Използвай същите": "Use the same"
  }
 }
