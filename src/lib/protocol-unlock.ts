@@ -32,6 +32,21 @@ export function billingStatus(): Promise<BillingStatus> {
   return statusMemo
 }
 
+/**
+ * Включено ли е заплащането за този посетител: в реалния режим — за всички;
+ * в тестовия — само за тестери (адрес с ?billing=test; ?billing=off го маха).
+ * Докато плащането не е включено, протоколът е отворен — никой не остава без препоръки.
+ */
+export function testerFlag(): boolean {
+  try {
+    const q = new URLSearchParams(location.search).get('billing')
+    if (q === 'test') localStorage.setItem('irismap_billing_test', '1')
+    if (q === 'off') localStorage.removeItem('irismap_billing_test')
+    return localStorage.getItem('irismap_billing_test') === '1'
+  } catch { return false }
+}
+export const paywallActive = (s: BillingStatus) => s.ready && (s.mode === 'live' || testerFlag())
+
 /** Отключен ли е на сървъра (друго устройство / изчистен браузър). */
 export async function checkServerUnlock(id: string): Promise<boolean> {
   try {
