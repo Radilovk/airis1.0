@@ -8,6 +8,7 @@ import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
 import AppHeader from '@/components/AppHeader'
 import { saveLastImages } from '@/lib/form-memory'
+import { confirmFromUrl } from '@/lib/protocol-unlock'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -439,6 +440,28 @@ function App() {
     if (ENTRY.demo) void handleViewDemo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Връщане от плащането на протокола (?paid=…&report=<id>): потвърждение и отваряне на доклада.
+  const [openReportId, setOpenReportId] = useState<string | null>(() => {
+    try { return new URL(location.href).searchParams.get('report') } catch { return null }
+  })
+  useEffect(() => {
+    void confirmFromUrl().then(id => {
+      if (id) {
+        toast.success('Протоколът е отключен', { description: 'Препоръките са в раздела „План“.' })
+        setOpenReportId(id)
+        setHistory(current => (current || []).map(r => (r.id === id ? { ...r, protocolUnlocked: true } : r)))
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (!openReportId || !history?.length) return
+    const r = history.find(x => x.id === openReportId)
+    if (r) { setOpenReportId(null); handleViewReport(r) }
+    try { const u = new URL(location.href); u.searchParams.delete('report'); history && window.history.replaceState(null, '', u.pathname + u.search + u.hash) } catch { /* стар браузър */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openReportId, history])
 
   const handleStartFromReport = () => {
     setAnalysisReport(null)

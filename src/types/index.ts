@@ -222,6 +222,8 @@ export interface AnalysisReport {
   calibrated?: CalibratedAnalysisPayload
   /** Примерен доклад с демо данни — не се записва в историята. */
   demo?: boolean
+  /** Платеният протокол (препоръките) е отключен — еднократно плащане или включен в Plus. */
+  protocolUnlocked?: boolean
 }
 
 /** Резултатът от калибрирания анализ, запазен в отчета. */
