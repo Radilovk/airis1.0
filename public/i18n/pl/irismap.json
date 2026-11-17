@@ -780,7 +780,42 @@
   "Диагнози": "Diagnozy",
   "Състояния": "Schorzenia",
   "Как се чувствате": "Jak się Pan/Pani czuje",
-  "Здраве": "Zdrowie"
+  "Здраве": "Zdrowie",
+  "Мария (пример)": "Maria (przykład)",
+  "Очи:": "Oczy:"
  },
- "patterns": []
+ "patterns": [
+  [
+   "^(\\d+) ключови знака в ириса$",
+   "$1 kluczowych znaków w tęczówce"
+  ],
+  [
+   "^(\\d+) ключов знак в ириса$",
+   "$1 kluczowy znak w tęczówce"
+  ],
+  [
+   "^· (\\d+) потвърдени$",
+   "· $1 potwierdzonych"
+  ],
+  [
+   "^· (\\d+) потвърден$",
+   "· $1 potwierdzonych"
+  ],
+  [
+   "^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4}) г\\.$",
+   "$1.$2.$3"
+  ],
+  [
+   "^Кои знаци се търсят в ириса \\((\\d+)\\)$",
+   "Jakie znaki są poszukiwane w tęczówce ($1)"
+  ],
+  [
+   "^Още (\\d+) по-слаби знак[а]?$",
+   "Jeszcze $1 słabszych znaków"
+  ],
+  [
+   "^(\\d+) от (\\d+)$",
+   "$1 z $2"
+  ]
+ ]
 }
