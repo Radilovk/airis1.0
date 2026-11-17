@@ -1684,6 +1684,24 @@
   "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "Am completat răspunsurile din ultima dumneavoastră analiză. Verificați-le și continuați.",
   "Започни на чисто": "Începeți de la capăt",
   "Снимките от последния анализ": "Fotografiile de la ultima analiză",
-  "Използвай същите": "Folosiți-le pe aceleași"
+  "Използвай същите": "Folosiți-le pe aceleași",
+  "Вашият личен протокол": "Protocolul dumneavoastră personal",
+  "Анализът е безплатен. Протоколът се отключва еднократно за този анализ.": "Analiza este gratuită. Protocolul se deblochează o singură dată pentru această analiză.",
+  "Хранене": "Nutriție",
+  "Добавки": "Suplimente",
+  "Режим": "Stil de viață",
+  "Какво да включите и какво да ограничите": "Ce să includeți și ce să limitați",
+  "Дозировка, кога и колко време": "Dozaj, când și pentru cât timp",
+  "Сън, движение и стрес — конкретни стъпки": "Somn, mișcare și stres — pași concreți",
+  "Скоро": "În curând",
+  "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Mod test: card 4242 4242 4242 4242, fără debitare reală.",
+  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Plată prin Stripe. În abonamentul lunar Eatologix Plus este inclus un protocol pe lună.",
+  "Плащането още се подготвя. Опитайте по-късно.": "Plata se pregătește încă. Încercați mai târziu.",
+  "Плащането не тръгна. Опитайте пак.": "Plata nu a reușit. Încercați din nou.",
+  "Няма връзка. Опитайте пак.": "Fără conexiune. Încercați din nou.",
+  "Протоколът е отключен": "Protocolul este deblocat",
+  "Препоръките са в раздела „План“.": "Recomandările sunt în secțiunea „Plan”.",
+  "Изтеглянето на пълния доклад е с протокола": "Descărcarea raportului complet este inclusă în protocol",
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Analiza este gratuită — deblocați protocolul pentru a-l descărca."
  }
 }

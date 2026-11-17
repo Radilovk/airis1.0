@@ -1684,6 +1684,24 @@
   "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "We've filled in the answers from your last analysis. Review them and continue.",
   "Започни на чисто": "Start fresh",
   "Снимките от последния анализ": "Photos from your last analysis",
-  "Използвай същите": "Use the same"
+  "Използвай същите": "Use the same",
+  "Вашият личен протокол": "Your Personal Protocol",
+  "Анализът е безплатен. Протоколът се отключва еднократно за този анализ.": "The analysis is free. The protocol is unlocked once for this analysis.",
+  "Хранене": "Nutrition",
+  "Добавки": "Supplements",
+  "Режим": "Lifestyle",
+  "Какво да включите и какво да ограничите": "What to include and what to limit",
+  "Дозировка, кога и колко време": "Dosage, timing, and duration",
+  "Сън, движение и стрес — конкретни стъпки": "Sleep, movement, and stress — specific steps",
+  "Скоро": "Coming soon",
+  "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Test mode: card 4242 4242 4242 4242, no real charge.",
+  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Pay via Stripe. One protocol per month is included with the monthly Eatologix Plus plan.",
+  "Плащането още се подготвя. Опитайте по-късно.": "Payment is being prepared. Please try again later.",
+  "Плащането не тръгна. Опитайте пак.": "Payment failed. Please try again.",
+  "Няма връзка. Опитайте пак.": "No connection. Please try again.",
+  "Протоколът е отключен": "Protocol Unlocked",
+  "Препоръките са в раздела „План“.": "Recommendations are in the \"Plan\" section.",
+  "Изтеглянето на пълния доклад е с протокола": "Downloading the full report comes with the protocol.",
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "The analysis is free — unlock the protocol to download it."
  }
 }

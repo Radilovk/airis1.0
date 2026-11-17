@@ -1684,6 +1684,24 @@
   "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "Wir haben die Antworten aus Ihrer letzten Analyse übernommen. Überprüfen Sie diese und fahren Sie fort.",
   "Започни на чисто": "Neu beginnen",
   "Снимките от последния анализ": "Fotos der letzten Analyse",
-  "Използвай същите": "Dieselben verwenden"
+  "Използвай същите": "Dieselben verwenden",
+  "Вашият личен протокол": "Ihr persönliches Protokoll",
+  "Анализът е безплатен. Протоколът се отключва еднократно за този анализ.": "Die Analyse ist kostenlos. Das Protokoll wird einmalig für diese Analyse freigeschaltet.",
+  "Хранене": "Ernährung",
+  "Добавки": "Nahrungsergänzung",
+  "Режим": "Lebensstil",
+  "Какво да включите и какво да ограничите": "Was Sie integrieren und was Sie meiden sollten",
+  "Дозировка, кога и колко време": "Dosierung, Einnahmezeitpunkt und Dauer",
+  "Сън, движение и стрес — конкретни стъпки": "Schlaf, Bewegung und Stress — konkrete Schritte",
+  "Скоро": "Demnächst",
+  "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Testmodus: Karte 4242 4242 4242 4242, keine echte Abbuchung.",
+  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Zahlung mit Stripe. Im monatlichen Eatologix Plus ist ein Protokoll pro Monat enthalten.",
+  "Плащането още се подготвя. Опитайте по-късно.": "Zahlung wird vorbereitet. Bitte versuchen Sie es später erneut.",
+  "Плащането не тръгна. Опитайте пак.": "Zahlung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+  "Няма връзка. Опитайте пак.": "Keine Verbindung. Bitte versuchen Sie es erneut.",
+  "Протоколът е отключен": "Protokoll freigeschaltet",
+  "Препоръките са в раздела „План“.": "Die Empfehlungen finden Sie im Bereich „Plan“.",
+  "Изтеглянето на пълния доклад е с протокола": "Der Download des vollständigen Berichts ist mit dem Protokoll verfügbar.",
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Die Analyse ist kostenlos — schalten Sie das Protokoll frei, um es herunterzuladen."
  }
 }
