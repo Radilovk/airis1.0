@@ -7,8 +7,8 @@ import { toast } from 'sonner'
 import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
 import AppHeader from '@/components/AppHeader'
-import { saveLastImages } from '@/lib/form-memory'
-import { confirmFromUrl } from '@/lib/protocol-unlock'
+import { saveLastImages, loadLastImages, loadLastAnswers } from '@/lib/form-memory'
+import { confirmFromUrl, redeemPassFromUrl, resumeRequested, clearResume, irisStatus, formatPrice, EATOLOGIX_PROFILE, type IrisStatus } from '@/lib/iris-billing'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -27,6 +27,7 @@ const loadReportScreen = () => import('@/components/screens/ReportScreen')
 const AnalysisScreen = lazy(loadAnalysisScreen)
 const ReportScreen = lazy(loadReportScreen)
 const HistoryScreen = lazy(() => import('@/components/screens/HistoryScreen'))
+const PayScreen = lazy(() => import('@/components/screens/PayScreen'))
 const AdminScreen = lazy(() => import('@/components/screens/AdminScreen'))
 const AdminPasswordDialog = lazy(() => import('@/components/admin/AdminPasswordDialog'))
 
@@ -52,7 +53,7 @@ const LoadingScreen = () => (
   </div>
 )
 
-type Screen = 'questionnaire' | 'upload' | 'analysis' | 'report' | 'history' | 'settings' | 'about' | 'diagnostics'
+type Screen = 'questionnaire' | 'upload' | 'pay' | 'analysis' | 'report' | 'history' | 'settings' | 'about' | 'diagnostics'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -102,6 +103,9 @@ function App() {
   const [history, setHistory] = useKVWithFallback<AnalysisReport[]>('analysis-history', [])
   const screenTransitionLockRef = useRef(false)
   const [isReanalysis, setIsReanalysis] = useState(false)
+  // Цената преди въпросника — да не е изненада след снимките.
+  const [payInfo, setPayInfo] = useState<IrisStatus | null>(null)
+  useEffect(() => { void irisStatus().then(setPayInfo) }, [currentScreen === 'questionnaire'])
 
   useEffect(() => {
     errorLogger.info('APP_MOUNT', 'Application mounted successfully')
@@ -354,7 +358,9 @@ function App() {
       uploadDiagnostics.log('APP_TRANSITION_TO_ANALYSIS', 'start')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Transitioning to analysis screen')
       console.log('🚀 [APP] Transitioning to analysis screen...')
-      setCurrentScreen('analysis')
+      // Платен анализ без кредит (плащане или пропуск от плана) → първо екранът за плащане.
+      const pay = await irisStatus()
+      setCurrentScreen(pay.payRequired && pay.credit === 0 ? 'pay' : 'analysis')
       uploadDiagnostics.log('APP_TRANSITION_COMPLETE', 'success')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Screen transition completed')
       console.log('✅ [APP] Screen transition successful')
@@ -441,27 +447,38 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Връщане от плащането на протокола (?paid=…&report=<id>): потвърждение и отваряне на доклада.
-  const [openReportId, setOpenReportId] = useState<string | null>(() => {
-    try { return new URL(location.href).searchParams.get('report') } catch { return null }
-  })
+  // Връщане от плащането (?paid=…&resume=analysis): кредитът е записан → анализът продължава
+  // със запомнените отговори и снимки. Пропуск от Eatologix (?pass=…): анализът е включен в плана.
   useEffect(() => {
-    void confirmFromUrl().then(id => {
-      if (id) {
-        toast.success('Протоколът е отключен', { description: 'Препоръките са в раздела „План“.' })
-        setOpenReportId(id)
-        setHistory(current => (current || []).map(r => (r.id === id ? { ...r, protocolUnlocked: true } : r)))
+    void (async () => {
+      const pass = await redeemPassFromUrl()
+      if (pass?.ok) toast.success('Анализът е включен в плана ви', { description: 'Попълнете въпросника и качете снимките — без плащане.' })
+      else if (pass) toast.error(pass.message || 'Пропускът не мина')
+      const paid = await confirmFromUrl()
+      if (!resumeRequested()) return
+      clearResume()
+      const st = await irisStatus()
+      if (!paid && st.credit === 0) {
+        toast.info('Плащането още не е потвърдено. Ако сте платили, опитайте след минута.')
+        return
       }
-    })
+      // Отговорите от IndexedDB се зареждат асинхронно — затова и последните от паметта на въпросника.
+      const last = await loadLastImages()
+      const answers = await loadLastAnswers()
+      if (answers) setQuestionnaireData(() => answers)
+      if (last?.left?.dataUrl && last?.right?.dataUrl && answers) {
+        leftIrisRef.current = last.left
+        rightIrisRef.current = last.right
+        setImagesReady(true)
+        toast.success('Платено — започваме анализа')
+        setTimeout(() => setCurrentScreen('analysis'), 50)
+      } else {
+        toast.success('Платено', { description: 'Качете снимките, за да започне анализът.' })
+        setTimeout(() => setCurrentScreen('upload'), 50)
+      }
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  useEffect(() => {
-    if (!openReportId || !history?.length) return
-    const r = history.find(x => x.id === openReportId)
-    if (r) { setOpenReportId(null); handleViewReport(r) }
-    try { const u = new URL(location.href); u.searchParams.delete('report'); history && window.history.replaceState(null, '', u.pathname + u.search + u.hash) } catch { /* стар браузър */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openReportId, history])
 
   const handleStartFromReport = () => {
     setAnalysisReport(null)
@@ -573,6 +590,16 @@ function App() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
           >
+            {payInfo && (payInfo.credit > 0 || payInfo.payRequired) && (
+              <div className="mx-auto mt-4 max-w-3xl px-4">
+                <p className="rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
+                  {payInfo.credit > 0
+                    ? 'Анализът ви е платен — попълнете въпросника и качете снимките.'
+                    : <>Анализът е {formatPrice(payInfo.price)} — плащате след снимките. С план от Eatologix е включен:{' '}
+                      <a className="font-semibold text-primary underline" href={EATOLOGIX_PROFILE} target="_blank" rel="noopener">отворете IrisMap от профила си</a>.</>}
+                </p>
+              </div>
+            )}
             <QuestionnaireScreen onComplete={handleQuestionnaireComplete} initialData={questionnaireData || null} />
           </motion.div>
         )}
@@ -590,6 +617,19 @@ function App() {
             />
           </motion.div>
         )}
+        {currentScreen === 'pay' && (
+          <motion.div
+            key="pay"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Suspense fallback={<LoadingScreen />}>
+              <PayScreen onBack={() => setCurrentScreen('upload')} />
+            </Suspense>
+          </motion.div>
+        )}
         {currentScreen === 'analysis' && leftIrisRef.current && rightIrisRef.current && (
           <motion.div
             key="analysis"
@@ -604,6 +644,7 @@ function App() {
                 leftIris={leftIrisRef.current}
                 rightIris={rightIrisRef.current}
                 onComplete={handleAnalysisComplete}
+                onPaymentRequired={() => setCurrentScreen('pay')}
               />
             </Suspense>
           </motion.div>

@@ -94,6 +94,9 @@ export async function humanToken(): Promise<string> {
   })
 }
 
+/** Тестер на плащането (?billing=test в iris-billing.ts) — сървърът иска плащане и от него. */
+const testerOn = () => { try { return localStorage.getItem('irismap_billing_test') === '1' } catch { return false } }
+
 /** Билет за един анализ. Хвърля IrisTicketError с обяснение за човека при отказ. */
 export async function acquireIrisTicket(): Promise<void> {
   const turnstile = await humanToken()
@@ -101,7 +104,7 @@ export async function acquireIrisTicket(): Promise<void> {
   try {
     r = await fetch(`${SERVER}/api/iris/ticket`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deviceId: deviceId(), turnstile }),
+      body: JSON.stringify({ deviceId: deviceId(), turnstile, tester: testerOn() }),
     })
   } catch {
     throw new IrisTicketError('network', 'Няма връзка със сървъра. Проверете интернета и опитайте пак.')

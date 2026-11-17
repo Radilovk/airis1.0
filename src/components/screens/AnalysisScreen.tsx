@@ -19,7 +19,7 @@ import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 import { RECOMMENDED_GEMINI_MODEL, geminiThinkingConfig, resolveGeminiModel } from '@/lib/ai-models'
-import { geminiEndpoint, acquireIrisTicket } from '@/lib/ai-proxy'
+import { geminiEndpoint, acquireIrisTicket, IrisTicketError } from '@/lib/ai-proxy'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 // Езикът на клиента (public/i18n.js): текстът, който човек чете, на неговия език. Затворените
@@ -51,6 +51,8 @@ interface AnalysisScreenProps {
   leftIris: IrisImage
   rightIris: IrisImage
   onComplete: (report: AnalysisReport) => void
+  /** Анализът се плаща и няма кредит (сървърът върна 402) → екранът за плащане. */
+  onPaymentRequired?: () => void
 }
 
 interface LogEntry {
@@ -63,7 +65,8 @@ export default function AnalysisScreen({
   questionnaireData,
   leftIris,
   rightIris,
-  onComplete
+  onComplete,
+  onPaymentRequired
 }: AnalysisScreenProps) {
   const [progress, setProgress] = useState(0)
   const [liveState, dispatchLive] = useLiveState()
@@ -1004,6 +1007,11 @@ ${response}
         try {
           await acquireIrisTicket()
         } catch (ticketError) {
+          if (ticketError instanceof IrisTicketError && ticketError.code === 'payment' && onPaymentRequired) {
+            setAnalysisRunning(false)
+            onPaymentRequired()
+            return
+          }
           const msg = ticketError instanceof Error ? ticketError.message : 'Анализът не може да започне в момента.'
           addLog('error', msg)
           setStatus(msg)
