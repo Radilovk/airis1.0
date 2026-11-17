@@ -1711,6 +1711,8 @@
   "Анализът не може да започне в момента. Опитайте по-късно.": "The analysis cannot start right now. Try again later.",
   "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Today's free analyses have been used up. Try again tomorrow.",
   "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Free analysis is once a week per device. Get an earlier follow-up reading — with the protocol.",
-  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Too many analyses from this network today. Try again tomorrow."
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Too many analyses from this network today. Try again tomorrow.",
+  "Проверката, че не сте робот, не мина. Презаредете страницата и опитайте пак.": "The robot check failed. Refresh the page and try again.",
+  "Проверка, че не сте робот": "Robot check"
  }
 }

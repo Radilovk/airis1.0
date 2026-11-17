@@ -34,13 +34,74 @@ export class IrisTicketError extends Error {
   constructor(public code: string, message: string, public next?: number) { super(message) }
 }
 
+// ── Turnstile: безплатният анализ е само за хора ─────────────────────────
+// Ключът идва от сървъра; без ключ проверката е изключена и нищо не се зарежда.
+type Turnstile = {
+  render: (el: HTMLElement, o: Record<string, unknown>) => string
+  remove: (id: string) => void
+}
+let siteKeyP: Promise<string> | null = null
+let scriptP: Promise<Turnstile> | null = null
+function siteKey(): Promise<string> {
+  siteKeyP ??= fetch(`${SERVER}/api/turnstile/config`).then(r => r.json()).then(d => d?.siteKey || '').catch(() => '')
+  return siteKeyP
+}
+function loadTurnstile(): Promise<Turnstile> {
+  const w = window as unknown as { turnstile?: Turnstile }
+  scriptP ??= new Promise<Turnstile>((resolve, reject) => {
+    if (w.turnstile) return resolve(w.turnstile)
+    const s = document.createElement('script')
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    s.async = true
+    s.onload = () => (w.turnstile ? resolve(w.turnstile) : reject(new Error('turnstile')))
+    s.onerror = () => { scriptP = null; reject(new Error('turnstile')) }
+    document.head.appendChild(s)
+  })
+  return scriptP
+}
+/** Жетон за едно изпращане ('' — проверката е изключена или не се зареди). */
+export async function humanToken(): Promise<string> {
+  const key = await siteKey()
+  if (!key) return ''
+  let ts: Turnstile
+  try { ts = await loadTurnstile() } catch { return '' }
+  return new Promise<string>(resolve => {
+    const box = document.createElement('div')
+    box.setAttribute('role', 'dialog')
+    box.setAttribute('aria-label', 'Проверка, че не сте робот')
+    box.style.cssText = 'position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10060;display:none'
+    document.body.appendChild(box)
+    let id: string | null = null
+    let done = false
+    const finish = (t: string) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      try { if (id) ts.remove(id) } catch { /* вече махнат */ }
+      box.remove()
+      resolve(t)
+    }
+    const timer = setTimeout(() => finish(''), 60000)
+    id = ts.render(box, {
+      sitekey: key,
+      appearance: 'interaction-only',
+      language: (document.documentElement.lang || 'auto').slice(0, 2),
+      callback: (t: string) => finish(t),
+      'error-callback': () => { finish(''); return true },
+      'before-interactive-callback': () => { box.style.display = 'block' },
+      'after-interactive-callback': () => { box.style.display = 'none' },
+    })
+  })
+}
+
 /** Билет за един анализ. Хвърля IrisTicketError с обяснение за човека при отказ. */
 export async function acquireIrisTicket(): Promise<void> {
+  const turnstile = await humanToken()
   let r: Response
   try {
     r = await fetch(`${SERVER}/api/iris/ticket`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deviceId: deviceId() }),
+      body: JSON.stringify({ deviceId: deviceId(), turnstile }),
     })
   } catch {
     throw new IrisTicketError('network', 'Няма връзка със сървъра. Проверете интернета и опитайте пак.')
