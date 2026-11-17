@@ -1679,6 +1679,11 @@
   "Окото е твърде далеч — ирисът е малък и детайлите се губят. Изберете по-близка снимка, на която окото заема голяма част от кадъра.": "Oko znajduje się zbyt daleko — tęczówka jest mała i szczegóły zanikają. Proszę wybrać zdjęcie z bliższa, na którym oko zajmuje większą część kadru.",
   "Ирисът е отрязан от края на снимката. Изберете снимка, на която цялото око е в кадъра.": "Tęczówka jest obcięta przy krawędzi zdjęcia. Proszę wybrać zdjęcie, na którym całe oko znajduje się w kadrze.",
   "После изберете снимка на вашето дясно око.": "Następnie proszę wybrać zdjęcie prawego oka.",
-  "Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.": "Proszę wybrać zdjęcie oka z galerii. Oko zostanie automatycznie wykryte, przycięte i dopasowane."
+  "Изберете снимка на окото от галерията. Окото се намира, изрязва и нагласява само.": "Proszę wybrać zdjęcie oka z galerii. Oko zostanie automatycznie wykryte, przycięte i dopasowane.",
+  "Продължавате откъдето спряхте — отговорите са запазени.": "Kontynuujesz od miejsca, w którym przerwano — odpowiedzi zostały zapisane.",
+  "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "Uzupełniliśmy odpowiedzi z Pana/Pani ostatniej analizy. Proszę je sprawdzić i kontynuować.",
+  "Започни на чисто": "Zacznij od nowa",
+  "Снимките от последния анализ": "Zdjęcia z ostatniej analizy",
+  "Използвай същите": "Użyj tych samych"
  }
 }

@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import type { QuestionnaireData, QuestionConfig, QuestionnaireConfig, UploadedDocument } from '@/types'
 import { defaultQuestions } from '@/lib/defaultQuestions'
+import { loadDraft, saveDraft, clearDraft, loadLastAnswers, saveLastAnswers } from '@/lib/form-memory'
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
 import {
   getVisibleQuestions,
@@ -80,6 +81,22 @@ function revealOnFocus(e: React.FocusEvent<HTMLElement>) {
   window.setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
 }
 
+/** Запазени данни → отговори във въпросника (суровите — ако са от същата версия). */
+function answersFromData(data: QuestionnaireData): Record<string, any> {
+  const raw = data.customAnswers
+  if (raw && raw.flowVersion === QUESTIONNAIRE_CONFIG_VERSION) {
+    return { ...raw, uploadedDocuments: data.uploadedDocuments || [] }
+  }
+  return {
+    ...data,
+    diagnoses: undefined,
+    healthStatus: undefined,
+    symptoms: undefined,
+    customAnswers: data.customAnswers || {},
+    uploadedDocuments: data.uploadedDocuments || []
+  }
+}
+
 export default function QuestionnaireScreen({ onComplete, initialData }: QuestionnaireScreenProps) {
   const [questionnaireConfig] = useKVWithFallback<QuestionnaireConfig>('questionnaire-config', {
     questions: defaultQuestions,
@@ -92,31 +109,60 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
     return cfg.questions.length > 0 ? cfg.questions : defaultQuestions
   }, [questionnaireConfig])
 
-  const [answers, setAnswers] = useState<Record<string, any>>(() => {
-    if (initialData) {
-      // Суровите отговори от същата версия на въпросника се възстановяват
-      // напълно (диагнози, уточнения, състояния). По-стари — само общите полета.
-      const raw = initialData.customAnswers
-      if (raw && raw.flowVersion === QUESTIONNAIRE_CONFIG_VERSION) {
-        return { ...raw, uploadedDocuments: initialData.uploadedDocuments || [] }
-      }
-      return {
-        ...initialData,
-        diagnoses: undefined,
-        healthStatus: undefined,
-        symptoms: undefined,
-        customAnswers: initialData.customAnswers || {},
-        uploadedDocuments: initialData.uploadedDocuments || []
-      }
-    }
-    return {}
-  })
+  const [answers, setAnswers] = useState<Record<string, any>>(() => (initialData ? answersFromData(initialData) : {}))
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [otherValues, setOtherValues] = useState<Record<string, string>>({})
   const [showOther, setShowOther] = useState<Record<string, boolean>>({})
   const [uploadedFiles, setUploadedFiles] = useState<UploadedDocument[]>(
     initialData?.uploadedDocuments || []
   )
+
+  // Памет между посещенията: черновата (излизане по средата) или отговорите от последния
+  // анализ. Пише се едва след като е прочетена, за да не се презапише с празно.
+  const [memory, setMemory] = useState<'draft' | 'last' | null>(null)
+  const [hydrated, setHydrated] = useState(!!initialData)
+  useEffect(() => {
+    if (initialData) return
+    let alive = true
+    void (async () => {
+      const draft = await loadDraft()
+      if (!alive) return
+      if (draft && draft.version === QUESTIONNAIRE_CONFIG_VERSION && Object.keys(draft.answers || {}).length) {
+        setAnswers(draft.answers as Record<string, any>)
+        setOtherValues(draft.otherValues || {})
+        setShowOther(draft.showOther || {})
+        setUploadedFiles((draft.uploadedDocuments || []) as UploadedDocument[])
+        setCurrentQuestionIndex(Math.max(0, draft.index || 0))
+        setMemory('draft')
+      } else {
+        const last = await loadLastAnswers()
+        if (!alive) return
+        if (last) {
+          setAnswers(answersFromData(last))
+          setUploadedFiles(last.uploadedDocuments || [])
+          setMemory('last')
+        }
+      }
+      setHydrated(true)
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (!hydrated) return
+    const t = setTimeout(() => {
+      void saveDraft({
+        version: QUESTIONNAIRE_CONFIG_VERSION, answers, otherValues, showOther,
+        uploadedDocuments: uploadedFiles, index: currentQuestionIndex, savedAt: new Date().toISOString(),
+      })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [hydrated, answers, otherValues, showOther, uploadedFiles, currentQuestionIndex])
+  const startFresh = () => {
+    setAnswers({}); setOtherValues({}); setShowOther({}); setUploadedFiles([]); setCurrentQuestionIndex(0)
+    setMemory(null)
+    void clearDraft()
+  }
 
   const visibleQuestions = useMemo(
     () => getVisibleQuestions(allQuestions, answers),
@@ -307,7 +353,11 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
       }
     }
 
-    onComplete(normalizeQuestionnairePayload(mergedAnswers, uploadedFiles, allQuestions))
+    const payload = normalizeQuestionnairePayload(mergedAnswers, uploadedFiles, allQuestions)
+    // Помни се за следващия анализ; черновата вече не трябва.
+    void saveLastAnswers(payload)
+    void clearDraft()
+    onComplete(payload)
   }
 
   const handleCheckboxChange = (questionId: string, value: string, checked: boolean) => {
@@ -697,6 +747,19 @@ export default function QuestionnaireScreen({ onComplete, initialData }: Questio
           </div>
           <Progress value={progress} className="h-1.5 [&>*]:transition-transform [&>*]:duration-300" />
         </motion.div>
+
+        {memory && (
+          <div className="mb-4 flex items-start gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-3 text-sm">
+            <p className="flex-1">
+              {memory === 'draft'
+                ? 'Продължавате откъдето спряхте — отговорите са запазени.'
+                : 'Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.'}
+            </p>
+            <button type="button" onClick={startFresh} className="shrink-0 font-semibold text-primary underline underline-offset-2">
+              Започни на чисто
+            </button>
+          </div>
+        )}
 
         <Card className="border-0 shadow-lg shadow-primary/5 p-5 md:p-8">
           <AnimatePresence mode="wait">

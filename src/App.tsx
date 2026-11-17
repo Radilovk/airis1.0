@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
 import AppHeader from '@/components/AppHeader'
+import { saveLastImages } from '@/lib/form-memory'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -323,6 +324,8 @@ function App() {
       uploadDiagnostics.log('APP_SAVING_TO_REFS', 'start')
       errorLogger.info('APP_IMAGES_COMPLETE', 'Saving images to refs...')
       leftIrisRef.current = left
+      // Помнят се за следващия анализ („Използвай същите снимки“).
+      void saveLastImages(left, right)
       rightIrisRef.current = right
       uploadDiagnostics.log('APP_SAVED_TO_REFS', 'success')
       
