@@ -19,7 +19,7 @@ import { shrinkStripForStorage } from '@/lib/iris-unwrap'
 import { DEFAULT_AI_PROMPT, DEFAULT_IRIDOLOGY_MANUAL } from '@/lib/default-prompts'
 import { DEFAULT_PIPELINE_CONFIG } from '@/lib/github-api'
 import { RECOMMENDED_GEMINI_MODEL, geminiThinkingConfig, resolveGeminiModel } from '@/lib/ai-models'
-import { geminiEndpoint } from '@/lib/ai-proxy'
+import { geminiEndpoint, acquireIrisTicket } from '@/lib/ai-proxy'
 import type { QuestionnaireData, IrisImage, AnalysisReport, IrisAnalysis, AIModelConfig, Recommendation, AIPromptTemplate, IridologyManual, AIModelStrategy, PipelineConfig, CalibratedAnalysisPayload, SupplementRecommendation } from '@/types'
 
 // Езикът на клиента (public/i18n.js): текстът, който човек чете, на неговия език. Затворените
@@ -998,6 +998,20 @@ ${response}
       const usePipelineV9 = finalConfig.usePipelineV9 ?? true
       // Ключ не е задължителен — без него заявките минават през сървъра на AIRIS.
       addLog('info', apiKey.trim() ? '🔑 Собствен API ключ' : '🔑 AI през сървъра на IrisMap')
+
+      // Билет за анализа (защита от злоупотреба: 1 безплатен на седмица на устройство, общ дневен таван).
+      if (!apiKey.trim()) {
+        try {
+          await acquireIrisTicket()
+        } catch (ticketError) {
+          const msg = ticketError instanceof Error ? ticketError.message : 'Анализът не може да започне в момента.'
+          addLog('error', msg)
+          setStatus(msg)
+          setError(msg)
+          setAnalysisRunning(false)
+          return
+        }
+      }
       
       const actualModel = configuredModel
       const actualProvider = provider
