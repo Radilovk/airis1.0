@@ -1702,6 +1702,15 @@
   "Протоколът е отключен": "Protokoll freigeschaltet",
   "Препоръките са в раздела „План“.": "Die Empfehlungen finden Sie im Bereich „Plan“.",
   "Изтеглянето на пълния доклад е с протокола": "Der Download des vollständigen Berichts ist mit dem Protokoll verfügbar.",
-  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Die Analyse ist kostenlos — schalten Sie das Protokoll frei, um es herunterzuladen."
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Die Analyse ist kostenlos — schalten Sie das Protokoll frei, um es herunterzuladen.",
+  "Отбележете съгласието — после натиснете пак.": "Stimmen Sie zu — und tippen Sie erneut.",
+  "Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.": "Kontrollanalyse: Sie haben bereits ein Protokoll erhalten, daher ist dieses günstiger.",
+  "Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "Ich stimme zu, dass das Protokoll sofort nach der Zahlung freigeschaltet wird, und verstehe, dass ich bei digitalen Inhalten mein 14-tägiges Widerrufsrecht verliere.",
+  "Плащане със Stripe. Еднократно, без абонамент.": "Zahlung über Stripe. Einmalig, kein Abonnement.",
+  "Няма връзка със сървъра. Проверете интернета и опитайте пак.": "Keine Verbindung zum Server. Überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+  "Анализът не може да започне в момента. Опитайте по-късно.": "Die Analyse kann derzeit nicht gestartet werden. Versuchen Sie es später erneut.",
+  "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Die kostenlosen Analysen für heute sind aufgebraucht. Versuchen Sie es morgen erneut.",
+  "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Eine kostenlose Analyse ist einmal pro Woche pro Gerät möglich. Eine frühere Kontrollanalyse erhalten Sie mit dem Protokoll.",
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Zu viele Analysen aus diesem Netzwerk heute. Versuchen Sie es morgen erneut."
  }
 }

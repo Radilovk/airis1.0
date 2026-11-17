@@ -1702,6 +1702,15 @@
   "Протоколът е отключен": "Protocole débloqué",
   "Препоръките са в раздела „План“.": "Les recommandations se trouvent dans la section « Plan ».",
   "Изтеглянето на пълния доклад е с протокола": "Le téléchargement du rapport complet est inclus avec le protocole.",
-  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "L'analyse est gratuite — débloquez le protocole pour le télécharger."
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "L'analyse est gratuite — débloquez le protocole pour le télécharger.",
+  "Отбележете съгласието — после натиснете пак.": "Cochez la case d'acceptation — puis appuyez à nouveau.",
+  "Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.": "Lecture de contrôle : vous avez déjà obtenu un protocole, celui-ci est donc à prix réduit.",
+  "Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "J'accepte que le protocole soit débloqué immédiatement après le paiement et je comprends que je renonce à mon droit de rétractation de 14 jours pour ce contenu numérique.",
+  "Плащане със Stripe. Еднократно, без абонамент.": "Paiement via Stripe. Paiement unique, sans abonnement.",
+  "Няма връзка със сървъра. Проверете интернета и опитайте пак.": "Pas de connexion au serveur. Vérifiez votre connexion Internet et réessayez.",
+  "Анализът не може да започне в момента. Опитайте по-късно.": "L'analyse ne peut pas démarrer pour le moment. Réessayez plus tard.",
+  "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Les analyses gratuites pour aujourd'hui sont épuisées. Réessayez demain.",
+  "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "L'analyse gratuite est limitée à une par semaine et par appareil. Lecture de contrôle plus tôt — avec le protocole.",
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Trop d'analyses effectuées depuis ce réseau aujourd'hui. Réessayez demain."
  }
 }

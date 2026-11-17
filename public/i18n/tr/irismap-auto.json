@@ -1702,6 +1702,15 @@
   "Протоколът е отключен": "Protokolün kilidi açıldı",
   "Препоръките са в раздела „План“.": "Öneriler „Plan“ bölümündedir.",
   "Изтеглянето на пълния доклад е с протокола": "Tam raporu indirme imkanı protokole dahildir",
-  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Analiz ücretsizdir — indirmek için protokolün kilidini açın."
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Analiz ücretsizdir — indirmek için protokolün kilidini açın.",
+  "Отбележете съгласието — после натиснете пак.": "Onayınızı işaretleyin — ardından tekrar basın.",
+  "Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.": "Kontrol analizi: Daha önce bir protokol aldığınız için bu işlem indirimli fiyattadır.",
+  "Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "Protokolün ödemeden hemen sonra açılmasını onaylıyorum ve dijital içeriklerde 14 günlük cayma hakkımı kaybettiğimi kabul ediyorum.",
+  "Плащане със Stripe. Еднократно, без абонамент.": "Stripe ile ödeme. Tek seferlik, abonelik yok.",
+  "Няма връзка със сървъра. Проверете интернета и опитайте пак.": "Sunucu bağlantısı yok. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+  "Анализът не може да започне в момента. Опитайте по-късно.": "Analiz şu anda başlatılamıyor. Lütfen daha sonra tekrar deneyin.",
+  "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Bugünkü ücretsiz analizler tükendi. Lütfen yarın tekrar deneyin.",
+  "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Ücretsiz analiz cihaz başına haftada bir kezdir. Daha erken kontrol analizi — protokol ile.",
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Bugün bu ağdan çok fazla analiz yapıldı. Lütfen yarın tekrar deneyin."
  }
 }

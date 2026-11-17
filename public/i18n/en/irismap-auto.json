@@ -1702,6 +1702,15 @@
   "Протоколът е отключен": "Protocol Unlocked",
   "Препоръките са в раздела „План“.": "Recommendations are in the \"Plan\" section.",
   "Изтеглянето на пълния доклад е с протокола": "Downloading the full report comes with the protocol.",
-  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "The analysis is free — unlock the protocol to download it."
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "The analysis is free — unlock the protocol to download it.",
+  "Отбележете съгласието — после натиснете пак.": "Check the consent box — then tap again.",
+  "Контролно разчитане: вече сте взели протокол, затова този е на по-ниска цена.": "Follow-up reading: you have already received a protocol, so this one is available at a lower price.",
+  "Съгласен съм протоколът да се отключи веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "I agree to have the protocol unlocked immediately after payment and understand that I waive my 14-day right of withdrawal for digital content.",
+  "Плащане със Stripe. Еднократно, без абонамент.": "Payment via Stripe. One-time payment, no subscription.",
+  "Няма връзка със сървъра. Проверете интернета и опитайте пак.": "No server connection. Check your internet connection and try again.",
+  "Анализът не може да започне в момента. Опитайте по-късно.": "The analysis cannot start right now. Try again later.",
+  "Безплатните анализи за днес са изчерпани. Опитайте утре.": "Today's free analyses have been used up. Try again tomorrow.",
+  "Безплатният анализ е веднъж на седмица на устройство. Контролно разчитане по-рано — с протокола.": "Free analysis is once a week per device. Get an earlier follow-up reading — with the protocol.",
+  "Твърде много анализи от тази мрежа днес. Опитайте утре.": "Too many analyses from this network today. Try again tomorrow."
  }
 }
