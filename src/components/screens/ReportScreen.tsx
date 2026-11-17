@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import ProtocolLock from '@/components/report/ProtocolLock'
+import { isUnlocked, checkServerUnlock, billingStatus, paywallActive } from '@/lib/protocol-unlock'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
@@ -83,6 +85,17 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
       return false
     }
   })
+  // Платеният протокол (табът „План“): отключен ли е — локално или на сървъра.
+  const [unlocked, setUnlocked] = useState(() => isUnlocked(report))
+  const [payOn, setPayOn] = useState(false)   // заплащането е включено (реален режим или тестер)
+  useEffect(() => { void billingStatus().then(st => setPayOn(paywallActive(st))) }, [])
+  const locked = payOn && !unlocked
+  useEffect(() => {
+    if (unlocked) return
+    let alive = true
+    void checkServerUnlock(report.id).then(ok => { if (alive && ok) setUnlocked(true) })
+    return () => { alive = false }
+  }, [report.id, unlocked])
   const showUrgentGate = !report.demo && eyeHealth?.ran === true && eyeHealth.referral === 'urgent' && !urgentAcked
   
   const handleSaveToHistory = () => {
@@ -102,6 +115,11 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
   }
 
   const handleExport = async () => {
+    if (locked) {
+      toast.info('Изтеглянето на пълния доклад е с протокола', { description: 'Анализът е безплатен — отключете протокола, за да го изтеглите.' })
+      setActiveTab('plan')
+      return
+    }
     try {
       const { generateComprehensiveReportHTML } = await import('@/lib/html-export-comprehensive')
       const htmlContent = generateComprehensiveReportHTML(report)
@@ -414,7 +432,7 @@ export default function ReportScreen({ report, onRestart, onReanalyze, onStartAn
 
             <TabsContent value="plan" className="mt-6">
               <ErrorBoundary fallbackRender={({ error }) => <ErrorFallback error={error} />}>
-                <PlanTab report={report} />
+                {locked ? <ProtocolLock report={report} /> : <PlanTab report={report} />}
               </ErrorBoundary>
             </TabsContent>
           </Tabs>

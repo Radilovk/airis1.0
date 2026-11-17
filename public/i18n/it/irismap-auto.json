@@ -1684,6 +1684,24 @@
   "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "Abbiamo precompilato le risposte della Sua ultima analisi. Le verifichi e prosegua.",
   "Започни на чисто": "Ricomincia da capo",
   "Снимките от последния анализ": "Foto dell'ultima analisi",
-  "Използвай същите": "Usi le stesse"
+  "Използвай същите": "Usi le stesse",
+  "Вашият личен протокол": "Il Suo protocollo personalizzato",
+  "Анализът е безплатен. Протоколът се отключва еднократно за този анализ.": "L'analisi è gratuita. Il protocollo si sblocca una sola volta per questa analisi.",
+  "Хранене": "Alimentazione",
+  "Добавки": "Integratori",
+  "Режим": "Stile di vita",
+  "Какво да включите и какво да ограничите": "Cosa includere e cosa limitare",
+  "Дозировка, кога и колко време": "Dosaggio, quando e per quanto tempo",
+  "Сън, движение и стрес — конкретни стъпки": "Sonno, attività fisica e stress — azioni concrete",
+  "Скоро": "Prossimamente",
+  "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Modalità di test: carta 4242 4242 4242 4242, nessun addebito reale.",
+  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Pagamento con Stripe. Nel piano mensile Plus di Eatologix è incluso un protocollo al mese.",
+  "Плащането още се подготвя. Опитайте по-късно.": "Il pagamento è ancora in preparazione. Riprovi più tardi.",
+  "Плащането не тръгна. Опитайте пак.": "Il pagamento non è andato a buon fine. Riprovi.",
+  "Няма връзка. Опитайте пак.": "Nessuna connessione. Riprovi.",
+  "Протоколът е отключен": "Il protocollo è sbloccato",
+  "Препоръките са в раздела „План“.": "Le raccomandazioni si trovano nella sezione «Piano».",
+  "Изтеглянето на пълния доклад е с протокола": "Il download del report completo è incluso nel protocollo",
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "L'analisi è gratuita — sblocchi il protocollo per scaricarlo."
  }
 }

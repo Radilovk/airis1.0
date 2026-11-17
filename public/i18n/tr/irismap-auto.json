@@ -1684,6 +1684,24 @@
   "Попълнихме отговорите от последния ви анализ. Проверете ги и продължете.": "Son analizinizdeki yanıtları doldurduk. Kontrol edin ve devam edin.",
   "Започни на чисто": "Sıfırdan başlayın",
   "Снимките от последния анализ": "Son analizdeki fotoğraflar",
-  "Използвай същите": "Aynılarını kullanın"
+  "Използвай същите": "Aynılarını kullanın",
+  "Вашият личен протокол": "Kişisel Protokolünüz",
+  "Анализът е безплатен. Протоколът се отключва еднократно за този анализ.": "Analiz ücretsizdir. Bu analize ait protokolün kilidi tek seferlik açılır.",
+  "Хранене": "Beslenme",
+  "Добавки": "Takviyeler",
+  "Режим": "Yaşam Tarzı",
+  "Какво да включите и какво да ограничите": "Neleri eklemeli, neleri kısıtlamalısınız",
+  "Дозировка, кога и колко време": "Dozaj, ne zaman ve ne kadar süre",
+  "Сън, движение и стрес — конкретни стъпки": "Uyku, hareket ve stres — somut adımlar",
+  "Скоро": "Yakında",
+  "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Test modu: kart 4242 4242 4242 4242, gerçek bir ödeme alınmaz.",
+  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Stripe ile ödeme. Eatologix Plus aylık planına ayda bir protokol dahildir.",
+  "Плащането още се подготвя. Опитайте по-късно.": "Ödeme henüz hazırlanıyor. Daha sonra tekrar deneyin.",
+  "Плащането не тръгна. Опитайте пак.": "Ödeme gerçekleşmedi. Tekrar deneyin.",
+  "Няма връзка. Опитайте пак.": "Bağlantı yok. Tekrar deneyin.",
+  "Протоколът е отключен": "Protokolün kilidi açıldı",
+  "Препоръките са в раздела „План“.": "Öneriler „Plan“ bölümündedir.",
+  "Изтеглянето на пълния доклад е с протокола": "Tam raporu indirme imkanı protokole dahildir",
+  "Анализът е безплатен — отключете протокола, за да го изтеглите.": "Analiz ücretsizdir — indirmek için protokolün kilidini açın."
  }
 }
