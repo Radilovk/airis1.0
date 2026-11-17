@@ -19,8 +19,9 @@
 }
 
 :root {
-  --background: oklch(0.985 0.012 190);
-  --foreground: oklch(0.25 0.03 210);
+  /* Цветовете на Eatologix (questionnaire2 / design-system.css) */
+  --background: #EEFDFC;
+  --foreground: #0F2F2E;
 
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.25 0.03 210);
@@ -28,7 +29,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.25 0.03 210);
 
-  --primary: oklch(0.55 0.095 205);
+  --primary: #05737D;
   --primary-foreground: oklch(1 0 0);
 
   --secondary: oklch(0.91 0.06 185);
@@ -45,9 +46,9 @@
 
   --border: oklch(0.89 0.025 190);
   --input: oklch(0.89 0.025 190);
-  --ring: oklch(0.55 0.095 205);
+  --ring: #03909C;
 
-  --radius: 0.75rem;
+  --radius: 1rem;
 }
 
 @theme {
@@ -89,3 +90,13 @@
 @media (prefers-reduced-motion: reduce) {
   .iris-spin, .iris-spin-fast, .iris-breathe, .iris-pulse { animation: none; }
 }
+
+/* Лентата за напредък — градиентът на Eatologix */
+.ix-progress {
+  background: linear-gradient(90deg, #05737D, #6ee7b7, #05737D);
+  background-size: 200% 100%;
+  animation: ix-progress 3s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(3, 147, 156, 0.3);
+}
+@keyframes ix-progress { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .ix-progress { animation: none; } }

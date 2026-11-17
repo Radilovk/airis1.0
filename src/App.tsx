@@ -6,6 +6,7 @@ import { shrinkDataUrlToLimit, MAX_EYE_IMAGE_BYTES } from '@/lib/image-utils'
 import { toast } from 'sonner'
 import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
+import AppHeader from '@/components/AppHeader'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -533,6 +534,10 @@ function App() {
         </Suspense>
       )}
       {isAdminScreen && adminOk && <QuickDebugPanel />}
+      {/* Горната лента като в Eatologix; докладът има собствена лента с действия. */}
+      {currentScreen !== 'report' && !isAdminScreen && (
+        <AppHeader onHistory={currentScreen === 'history' ? undefined : () => setCurrentScreen('history')} />
+      )}
       <AnimatePresence mode="wait">
         {currentScreen === 'questionnaire' && (
           <motion.div
