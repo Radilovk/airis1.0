@@ -268,6 +268,28 @@
     .pulse { transform-box: fill-box; transform-origin: center; animation: pulse 2.4s ease-out infinite; }
     @keyframes pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(2.4); } }
     @media (min-width: 720px) { section { padding: 88px 0; } h2 { font-size: 36px; } }
+  
+    /* Научна основа */
+    .sci-card { padding: 24px 22px 20px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(4,24,28,.06); }
+    .sci-title { font-size: clamp(21px, 2.6vw, 28px) !important; line-height: 1.22; margin-top: 4px; }
+    .sci-pillars { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .sci-pillars li { padding: 12px 14px; border-radius: 14px; background: rgba(3,144,156,.07); border: 1px solid rgba(3,144,156,.18); }
+    .sci-pillars b { display: block; font-size: 16px; font-weight: 800; color: var(--teal); white-space: nowrap; }
+    @media (max-width: 380px) { .sci-pillars b { font-size: 14.5px; } }
+    .sci-pillars span { display: block; margin-top: 2px; font-size: 13.5px; color: var(--muted); line-height: 1.35; }
+    .sci-more { margin-top: 16px; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(3,144,156,.4); background: transparent; color: var(--teal); font: inherit; font-weight: 700; cursor: pointer; }
+    @media (max-width: 760px) { .sci-pillars { grid-template-columns: 1fr 1fr; } }
+    .sci-dialog { width: min(640px, calc(100vw - 24px)); max-height: min(86vh, 900px); padding: 0; border: 0; border-radius: 22px; background: var(--paper); color: var(--text); box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+    .sci-dialog::backdrop { background: rgba(4,24,28,.55); backdrop-filter: blur(3px); }
+    .sci-dialog-in { position: relative; padding: 26px 22px 24px; overflow: auto; max-height: inherit; }
+    .sci-dialog h2 { font-size: 22px; padding-right: 44px; margin: 0; }
+    .sci-dialog h3 { margin-top: 20px; font-size: 15px; }
+    .sci-close { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(3,144,156,.1); color: inherit; font-size: 24px; line-height: 1; cursor: pointer; }
+    .sci-dl dt { margin-top: 12px; font-weight: 800; color: var(--teal); }
+    .sci-dl dd { margin: 3px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+    .sci-refs { margin: 8px 0 0 18px; padding: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+    .sci-refs li { margin-bottom: 8px; }
+
   </style>
 </head>
 <body>
@@ -411,6 +433,47 @@
     </div>
   </section>
 
+  <!-- Научна основа: 4 опори; подробностите и източниците — в прозореца. -->
+  <section id="science" style="padding-top:8px">
+    <div class="wrap reveal">
+      <div class="sci-card">
+        <p class="eyebrow">Научна основа</p>
+        <h2 class="sci-title">Стъпваме на утвърдените школи и на компютърното зрение.</h2>
+        <ul class="sci-pillars">
+          <li><b>Jensen</b><span>Топографската карта на ириса</span></li>
+          <li><b>Deck</b><span>Конституционни типове и зони</span></li>
+          <li><b>Daugman</b><span>Разгъване на ириса, както в биометрията</span></li>
+          <li><b>ISO/IEC 29794-6</b><span>Качество на снимката на ириса</span></li>
+        </ul>
+        <button type="button" class="sci-more" data-sci-open aria-haspopup="dialog">Източници и методология</button>
+      </div>
+    </div>
+  </section>
+  <dialog class="sci-dialog" id="sciDialog" aria-labelledby="sciDialogTitle">
+    <div class="sci-dialog-in">
+      <button type="button" class="sci-close" data-sci-close aria-label="Затвори">×</button>
+      <h2 id="sciDialogTitle">Източници и методология</h2>
+      <dl class="sci-dl">
+        <dt>Топографска карта</dt>
+        <dd>Зоните се четат по картата на Bernard Jensen — огледално за двете очи, с органите, които имат проекция само в едното.</dd>
+        <dt>Конституция и зони</dt>
+        <dd>Конституционните типове и деленето спрямо коларетата следват школата на Josef Deck, допълнени от трудовете на Farida Sharan.</dd>
+        <dt>Компютърно зрение</dt>
+        <dd>Окото се намира и ирисът се „разгъва“ в правоъгълна карта по модела на John Daugman — основата на ирисовото разпознаване в биометрията.</dd>
+        <dt>Качество на снимката</dt>
+        <dd>Острота, размер на ириса, отблясъци и клепач се проверяват по показателите на стандарта за ирисови изображения; неизползваема снимка се връща с конкретна причина.</dd>
+      </dl>
+      <h3>Публикации и стандарти</h3>
+      <ol class="sci-refs">
+        <li>Jensen B. <i>Iridology: The Science and Practice in the Healing Arts</i>, Vol. II. Bernard Jensen Enterprises; 1982.</li>
+        <li>Deck J. <i>Grundlagen der Irisdiagnostik</i>. Ettlingen; 1965.</li>
+        <li>Sharan F. <i>Iridology: A Complete Guide to Diagnosing through the Iris and to Related Forms of Treatment</i>. Thorsons; 1989.</li>
+        <li>Daugman J. How iris recognition works. <i>IEEE Trans Circuits Syst Video Technol</i>. 2004;14(1):21–30.</li>
+        <li>ISO/IEC 29794-6:2015. Information technology — Biometric sample quality — Part 6: Iris image data.</li>
+      </ol>
+    </div>
+  </dialog>
+
   <!-- 6. ДОВЕРИЕ: честност = сила -->
   <section>
     <div class="wrap reveal">
@@ -525,6 +588,7 @@
             <li><a href="app.html?start=demo">Примерен доклад</a></li>
             <li><a href="app.html?view=history">Моите анализи</a></li>
             <li><a href="app.html?view=about">За IrisMap</a></li>
+            <li><a href="#science">Научна основа</a></li>
             <li><a href="#app">Приложението</a></li>
           </ul>
         </div>
@@ -763,6 +827,15 @@
   const sync = () => sticky.classList.toggle('on', heroGone && !finalVisible)
   new IntersectionObserver(([e]) => { heroGone = !e.isIntersecting && e.boundingClientRect.top < 0; sync() }).observe(heroCta)
   new IntersectionObserver(([e]) => { finalVisible = e.isIntersecting; sync() }).observe(finalCta)
+</script>
+<script>
+(function () {
+  var d = document.getElementById('sciDialog');
+  if (!d) return;
+  document.querySelectorAll('[data-sci-open]').forEach(function (b) { b.addEventListener('click', function () { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }); });
+  d.querySelector('[data-sci-close]').addEventListener('click', function () { d.close ? d.close() : d.removeAttribute('open'); });
+  d.addEventListener('click', function (e) { if (e.target === d) d.close(); });
+})();
 </script>
 </body>
 </html>
