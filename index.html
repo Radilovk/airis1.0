@@ -27,7 +27,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>IrisMap — личен протокол по ирисите</title>
   <meta name="description" content="Очите ви са уникални и показват от какво има нужда тялото ви. По снимка на двата ви ириса съставяме личен протокол за хранене, добавки и режим." />
-  <meta name="theme-color" content="#04181C" />
+  <meta name="theme-color" content="#050F0E" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#EEF4F2" media="(prefers-color-scheme: light)" />
   <link rel="icon" type="image/svg+xml" href="brand/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png" />
   <link rel="apple-touch-icon" href="brand/apple-touch-icon.png" />
@@ -268,6 +269,107 @@
     .pulse { transform-box: fill-box; transform-origin: center; animation: pulse 2.4s ease-out infinite; }
     @keyframes pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(2.4); } }
     @media (min-width: 720px) { section { padding: 88px 0; } h2 { font-size: 36px; } }
+
+    /* ==========================================================================
+       „Светлина · Стъкло · Спокойствие“ — визуалният език на Eatologix (тюркоаз).
+       Дълбок фон със светлина отзад (без редуване на черни и бели ленти), матово стъкло,
+       плътен бутон в един тон (без преливане към лайм). Тъмна и светла тема — по системата.
+       ========================================================================== */
+    :root {
+      color-scheme: dark light;
+      --bg: #050F0E;
+      --text: #EAF6F2;
+      --muted: #9DB5AF;
+      --line: rgba(255,255,255,.08);
+      --card: rgba(16,34,33,.70);
+      --card-solid: #0F1F1E;
+      --hi: rgba(255,255,255,.10);
+      --shadow: 0 0 0 .5px rgba(0,0,0,.5), 0 14px 34px -18px rgba(0,0,0,.7);
+      --chrome: rgba(22,38,37,.55);
+      --accent: #3FDCCF;                 /* етикети и акценти (вместо лайма) */
+      --accent-em: #5FE6E3;
+      --teal: #3FDCCF;
+      --amber: #5FE6E3;
+      --amber-deep: #3FDCCF;
+      --fill: linear-gradient(160deg, #3FE6DE 0%, #14BDB7 100%);
+      --on-fill: #03201F;
+      --aura-a: rgba(10,140,150,.70); --aura-b: rgba(14,159,91,.40); --aura-c: rgba(11,95,134,.45);
+      --blur: blur(24px) saturate(160%);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #EEF4F2;
+        --text: #0E2A27;
+        --muted: #4E6B66;
+        --line: rgba(14,42,39,.08);
+        --card: rgba(255,255,255,.76);
+        --card-solid: #FFFFFF;
+        --hi: rgba(255,255,255,.95);
+        --shadow: 0 1px 2px rgba(14,42,39,.04), 0 12px 32px -18px rgba(14,60,55,.28);
+        --chrome: rgba(255,255,255,.62);
+        --accent: #05737D;
+        --accent-em: #05737D;
+        --teal: #05737D;
+        --amber: #05737D;
+        --amber-deep: #05737D;
+        --fill: linear-gradient(155deg, #086C77 0%, #065862 100%);
+        --on-fill: #FFFFFF;
+        --aura-a: rgba(111,216,210,.42); --aura-b: rgba(147,230,182,.30); --aura-c: rgba(167,211,238,.30);
+      }
+    }
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+      :root { --card: var(--card-solid); --chrome: var(--card-solid); --blur: none; }
+    }
+    html { background: var(--bg); }
+    body { background: transparent; color: var(--text); }
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(closest-side, var(--aura-a), transparent) -65vmax -70vmax / 130vmax 130vmax no-repeat,
+        radial-gradient(closest-side, var(--aura-b), transparent) calc(100% + 70vmax) 18vh / 110vmax 110vmax no-repeat,
+        radial-gradient(closest-side, var(--aura-c), transparent) -55vmax calc(100% + 75vmax) / 110vmax 110vmax no-repeat;
+    }
+    /* лентите се сливат в един фон */
+    .hero, .dark, .site-foot { background: transparent; color: var(--text); }
+    .hero .sub, .dark .lead, .layer p, .proof-row span, .micro, .final .micro, .links a, .foot,
+    .sf-tag, .sf-about, .sf-lang, .sf-cols a small, .sf-bottom, .sf-cols h2 { color: var(--muted); }
+    .nav a.small, .logo, .proof-row strong, .sf-cols a, .sf-cols a:hover { color: var(--text); }
+    .logo .wm { color: var(--text); }
+    .eyebrow, .dark .eyebrow { color: var(--accent); }
+    .hero h1 em, .final h2 em { color: var(--accent-em); }
+    .proof-row, .sf-bottom { border-color: var(--line); }
+    .site-foot { border-top: 1px solid var(--line); }
+    .nav select.lang, .sf-lang select { background: var(--chrome); color: var(--text); border: 1px solid var(--line); }
+    /* бутони: един тон, тъмен ръб + отблясък */
+    .btn-primary { background: var(--fill); color: var(--on-fill); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 .5px rgba(0,0,0,.35), 0 14px 32px -12px rgba(8,140,140,.55); }
+    .btn-ghost, .get-app .btn-ghost { color: var(--text); border: 1px solid var(--line); background: var(--chrome); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+    /* стъклени карти */
+    .vrow, .layer, .doc, .trust-item, .get-app .card, .equation {
+      background: var(--card); border: 1px solid var(--line);
+      -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+      box-shadow: inset 0 1px 0 var(--hi), var(--shadow);
+    }
+    .vrow .no { background: transparent; color: var(--muted); }
+    .layer .n { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+    .equation .op { color: var(--accent); }
+    .block { border-bottom-color: var(--line); }
+    .doc-head { border-bottom-color: var(--line); }
+    .block h4 .ic { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .chip { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+    .chip.less { background: rgba(251,191,36,.12); color: #D97706; }
+    .step .dot { background: var(--card); color: var(--accent); border: 1px solid var(--line); box-shadow: inset 0 1px 0 var(--hi); }
+    .step:not(:last-child)::after { background: var(--line); }
+    .get-app h3 { color: var(--text); }
+    .get-app p, .get-app ol, .get-app .hint { color: var(--muted); }
+    .iris-wrap::before { background: radial-gradient(circle, rgba(3,144,156,.55), rgba(11,95,134,.14) 55%, transparent 72%); }
+    .tag b { color: var(--accent-em); }
+    .sticky { background: var(--chrome); border-top: 1px solid var(--line); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); }
+    details { border-bottom-color: var(--line); }
+    summary::after { color: var(--accent); }
+    @media (prefers-color-scheme: light) {
+      .tag { background: rgba(255,255,255,.82); color: var(--text); border-color: var(--line); }
+      .chip.less { color: #B45309; }
+    }
   </style>
 </head>
 <body>
@@ -445,7 +547,7 @@
     <div class="wrap reveal">
       <p class="eyebrow">Приложението</p>
       <h2>IrisMap на телефона ви.</h2>
-      <p style="margin-top:10px;font-size:16px;color:#4A5E63">Отваря се от иконата на началния екран, на цял екран — без браузър.</p>
+      <p style="margin-top:10px;font-size:16px;color:var(--muted)">Отваря се от иконата на началния екран, на цял екран — без браузър.</p>
       <div class="get-app">
         <div class="card">
           <h3>Приложение IrisMap</h3>
