@@ -555,7 +555,8 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    // Без собствен фон: отзад е светлината (body::before в index.css)
+    <div className="min-h-screen">
       <Toaster position="top-center" />
       {/* Бутонът за диагностика стои над съдържанието — показва се само в служебните екрани. */}
       {isAdminScreen && !adminOk && (
