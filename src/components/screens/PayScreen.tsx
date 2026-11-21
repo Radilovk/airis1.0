@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { LockKey, Eye, ForkKnife, Pill, Moon, CheckCircle, ArrowLeft } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { irisStatus, startAnalysisCheckout, formatPrice, EATOLOGIX_PROFILE, testerFlag } from '@/lib/iris-billing'
+import { irisStatus, startAnalysisCheckout, formatPrice, NUTRIIN_PROFILE, testerFlag } from '@/lib/iris-billing'
 
 /**
  * Преди анализа, когато се плаща: какво ще получи човекът, цената и двата пътя —
- * плащане (6,99 €) или анализът, включен в плана на Eatologix (пропуск от профила там).
+ * плащане (6,99 €) или анализът, включен в плана на Nutriin (пропуск от профила там).
  * Снимките и отговорите остават на устройството — след плащането анализът продължава с тях.
  */
 export default function PayScreen({ onBack }: { onBack: () => void }) {
@@ -61,13 +61,13 @@ export default function PayScreen({ onBack }: { onBack: () => void }) {
         {err && <p className="mt-3 text-sm text-rose-600">{err}</p>}
         <p className="mt-3 text-center text-xs text-muted-foreground">
           {test ? 'Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване. ' : ''}
-          Плащане със Stripe. Еднократно, без абонамент. Сумата се приспада от първия ви план в Eatologix до 30 дни.
+          Плащане със Stripe. Еднократно, без абонамент. Сумата се приспада от първия ви план в Nutriin до 30 дни.
         </p>
         <div className="mt-5 rounded-2xl border border-primary/25 bg-primary/5 p-4">
-          <p className="text-sm font-semibold">Имате план в Eatologix?</p>
+          <p className="text-sm font-semibold">Имате план в Nutriin?</p>
           <p className="mt-1 text-sm text-muted-foreground">Анализът е включен — един на 4 седмици. Отворете IrisMap от профила си там („Ирисов анализ“) и продължете без плащане.</p>
-          <a className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-primary" href={EATOLOGIX_PROFILE} target="_blank" rel="noopener">
-            Към профила в Eatologix
+          <a className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-primary" href={NUTRIIN_PROFILE} target="_blank" rel="noopener">
+            Към профила в Nutriin
           </a>
         </div>
       </Card>

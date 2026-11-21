@@ -1695,7 +1695,7 @@
   "Сън, движение и стрес — конкретни стъпки": "Sommeil, activité et stress — actions concrètes",
   "Скоро": "Bientôt",
   "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Mode test : carte 4242 4242 4242 4242, aucun débit réel.",
-  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Paiement via Stripe. L'abonnement mensuel Eatologix Plus inclut un protocole par mois.",
+  "Плащане със Stripe. В месечния Plus на Nutriin един протокол на месец е включен.": "Paiement via Stripe. L'abonnement mensuel Nutriin Plus inclut un protocole par mois.",
   "Плащането още се подготвя. Опитайте по-късно.": "Le paiement est en cours de préparation. Réessayez plus tard.",
   "Плащането не тръгна. Опитайте пак.": "Le paiement n'a pas abouti. Réessayez.",
   "Няма връзка. Опитайте пак.": "Pas de connexion. Réessayez.",
@@ -1720,10 +1720,10 @@
   "Разчитане на двата ириса": "Lecture des deux iris",
   "Зони, знаци и какво показват — с карта на всяко око": "Zones, signes et leur signification — avec la carte de chaque œil",
   "Съгласен съм анализът да започне веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "J'accepte que l'analyse commence immédiatement après le paiement et je reconnais perdre mon droit de rétractation de 14 jours pour les contenus numériques.",
-  "Плащане със Stripe. Еднократно, без абонамент. Сумата се приспада от първия ви план в Eatologix до 30 дни.": "Paiement via Stripe. Achat unique, sans abonnement. Le montant sera déduit de votre premier programme Eatologix dans un délai de 30 jours.",
-  "Имате план в Eatologix?": "Vous avez un programme Eatologix ?",
-  "Анализът е включен — един на 4 седмици. Отворете IrisMap от профила си там („Ирисов анализ“) и продължете без плащане.": "L'analyse est incluse — une toutes les 4 semaines. Ouvrez IrisMap depuis votre profil Eatologix (« Analyse de l'iris ») et continuez sans payer.",
-  "Към профила в Eatologix": "Accéder au profil Eatologix",
+  "Плащане със Stripe. Еднократно, без абонамент. Сумата се приспада от първия ви план в Nutriin до 30 дни.": "Paiement via Stripe. Achat unique, sans abonnement. Le montant sera déduit de votre premier programme Nutriin dans un délai de 30 jours.",
+  "Имате план в Nutriin?": "Vous avez un programme Nutriin ?",
+  "Анализът е включен — един на 4 седмици. Отворете IrisMap от профила си там („Ирисов анализ“) и продължете без плащане.": "L'analyse est incluse — une toutes les 4 semaines. Ouvrez IrisMap depuis votre profil Nutriin (« Analyse de l'iris ») et continuez sans payer.",
+  "Към профила в Nutriin": "Accéder au profil Nutriin",
   "Анализът ви е платен — попълнете въпросника и качете снимките.": "Votre analyse est réglée — complétez le questionnaire et téléchargez vos photos.",
   "отворете IrisMap от профила си": "ouvrez IrisMap depuis votre profil",
   "Анализът е включен в плана ви": "L'analyse est incluse dans votre programme",
@@ -1733,8 +1733,8 @@
   "Платено — започваме анализа": "Payé — lancement de l'analyse",
   "Платено": "Payé",
   "Качете снимките, за да започне анализът.": "Téléchargez les photos pour démarrer l'analyse.",
-  "Пропускът не мина. Отворете IrisMap отново от профила си в Eatologix.": "Le pass n'a pas été validé. Rouvrez IrisMap depuis votre profil Eatologix.",
-  "Пропускът е изтекъл или вече е използван. Отвори IrisMap отново от профила си в Eatologix.": "Le pass a expiré ou a déjà été utilisé. Rouvrez IrisMap depuis votre profil Eatologix.",
-  "Анализът е 6,99 € — или включен в плана на Eatologix.": "L'analyse est à 6,99 € — ou incluse dans votre programme Eatologix."
+  "Пропускът не мина. Отворете IrisMap отново от профила си в Nutriin.": "Le pass n'a pas été validé. Rouvrez IrisMap depuis votre profil Nutriin.",
+  "Пропускът е изтекъл или вече е използван. Отвори IrisMap отново от профила си в Nutriin.": "Le pass a expiré ou a déjà été utilisé. Rouvrez IrisMap depuis votre profil Nutriin.",
+  "Анализът е 6,99 € — или включен в плана на Nutriin.": "L'analyse est à 6,99 € — ou incluse dans votre programme Nutriin."
  }
 }
