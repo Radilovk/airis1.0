@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 
 @layer base {
-  /* Палитрата е на Eatologix (IrisMap е модул на системата): тюркоаз + зелен акцент.
+  /* Палитрата е на Nutriin (IrisMap е модул на системата): тюркоаз + зелен акцент.
      Tailwind v4 оставя border-color = currentColor; без това всяка карта получава
      черна рамка вместо меката --border. */
   *, ::after, ::before, ::backdrop {
@@ -19,8 +19,8 @@
 }
 
 :root {
-  /* Цветовете на Eatologix (questionnaire2 / design-system.css) */
-  --background: #EEF4F2;               /* „Светлина · Стъкло“: фонът на Eatologix */
+  /* Цветовете на Nutriin (questionnaire2 / design-system.css) */
+  --background: #EEF4F2;               /* „Светлина · Стъкло“: фонът на Nutriin */
   --foreground: #0E2A27;
 
   --card: rgba(255, 255, 255, 0.76);   /* матово стъкло — замъгляването е долу */
@@ -91,7 +91,7 @@
   .iris-spin, .iris-spin-fast, .iris-breathe, .iris-pulse { animation: none; }
 }
 
-/* Лентата за напредък — градиентът на Eatologix */
+/* Лентата за напредък — градиентът на Nutriin */
 .ix-progress {
   background: linear-gradient(90deg, #05737D, #6ee7b7, #05737D);
   background-size: 200% 100%;
@@ -101,7 +101,7 @@
 @keyframes ix-progress { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .ix-progress { animation: none; } }
 
-/* ── „Светлина · Стъкло · Спокойствие“ — визуалният език на Eatologix ─────────────
+/* ── „Светлина · Стъкло · Спокойствие“ — визуалният език на Nutriin ─────────────
    Дълбок (тук: светъл ментов) фон с меки петна светлина отзад; картите са матово стъкло
    с тънък ръб и отблясък по горния ръб; лентите са прозрачни. Цветът живее в светлината. */
 html { background: var(--background); }

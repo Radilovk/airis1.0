@@ -8,7 +8,7 @@ import QuestionnaireScreen from '@/components/screens/QuestionnaireScreen'
 import ImageUploadScreen from '@/components/screens/ImageUploadScreen'
 import AppHeader from '@/components/AppHeader'
 import { saveLastImages, loadLastImages, loadLastAnswers } from '@/lib/form-memory'
-import { confirmFromUrl, redeemPassFromUrl, resumeRequested, clearResume, irisStatus, formatPrice, EATOLOGIX_PROFILE, type IrisStatus } from '@/lib/iris-billing'
+import { confirmFromUrl, redeemPassFromUrl, resumeRequested, clearResume, irisStatus, formatPrice, NUTRIIN_PROFILE, type IrisStatus } from '@/lib/iris-billing'
 import QuickDebugPanel from '@/components/QuickDebugPanel'
 import { errorLogger } from '@/lib/error-logger'
 import { uploadDiagnostics } from '@/lib/upload-diagnostics'
@@ -448,7 +448,7 @@ function App() {
   }, [])
 
   // Връщане от плащането (?paid=…&resume=analysis): кредитът е записан → анализът продължава
-  // със запомнените отговори и снимки. Пропуск от Eatologix (?pass=…): анализът е включен в плана.
+  // със запомнените отговори и снимки. Пропуск от Nutriin (?pass=…): анализът е включен в плана.
   useEffect(() => {
     void (async () => {
       const pass = await redeemPassFromUrl()
@@ -578,7 +578,7 @@ function App() {
         </Suspense>
       )}
       {isAdminScreen && adminOk && <QuickDebugPanel />}
-      {/* Горната лента като в Eatologix; докладът има собствена лента с действия. */}
+      {/* Горната лента като в Nutriin; докладът има собствена лента с действия. */}
       {currentScreen !== 'report' && !isAdminScreen && (
         <AppHeader onHistory={currentScreen === 'history' ? undefined : () => setCurrentScreen('history')} />
       )}
@@ -596,8 +596,8 @@ function App() {
                 <p className="rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
                   {payInfo.credit > 0
                     ? 'Анализът ви е платен — попълнете въпросника и качете снимките.'
-                    : <>Анализът е {formatPrice(payInfo.price)} — плащате след снимките. С план от Eatologix е включен:{' '}
-                      <a className="font-semibold text-primary underline" href={EATOLOGIX_PROFILE} target="_blank" rel="noopener">отворете IrisMap от профила си</a>.</>}
+                    : <>Анализът е {formatPrice(payInfo.price)} — плащате след снимките. С план от Nutriin е включен:{' '}
+                      <a className="font-semibold text-primary underline" href={NUTRIIN_PROFILE} target="_blank" rel="noopener">отворете IrisMap от профила си</a>.</>}
                 </p>
               </div>
             )}

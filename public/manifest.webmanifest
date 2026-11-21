@@ -1,7 +1,7 @@
 {
   "name": "IrisMap — ирисов анализ",
   "short_name": "IrisMap",
-  "description": "Личен протокол за хранене, добавки и режим по снимка на двата ириса. Модул на Eatologix.",
+  "description": "Личен протокол за хранене, добавки и режим по снимка на двата ириса. Модул на Nutriin.",
   "id": "./app.html",
   "start_url": "./app.html",
   "scope": "./",
