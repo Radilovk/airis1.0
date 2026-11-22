@@ -39,7 +39,7 @@ jobs:
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MODEL: ${{ inputs.model || 'gemini-3.6-flash' }}
-      PRODUCT: 'IrisMap, an iris-analysis app that gives a personal nutrition, supplement and lifestyle protocol (part of Eatologix)'
+      PRODUCT: 'IrisMap, an iris-analysis app that gives a personal nutrition, supplement and lifestyle protocol (part of Nutriin)'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

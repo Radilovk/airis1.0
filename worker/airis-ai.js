@@ -67,7 +67,7 @@ export default {
     if (request.method !== 'POST') return json(405, 'method not allowed', corsHeaders)
 
     // Затворено (ноември 2026): отвореното прокси пропускаше всеки, който подправи Origin.
-    // IrisMap вече минава през сървъра на Eatologix с „билет за анализ“ (aidiet/iris-gate.js).
+    // IrisMap вече минава през сървъра на Nutriin с „билет за анализ“ (aidiet/iris-gate.js).
     return json(410, 'IrisMap uses a new server — reload the page. / Обновете страницата.', corsHeaders)
     // eslint-disable-next-line no-unreachable
     const match = url.pathname.match(PATH_RE)

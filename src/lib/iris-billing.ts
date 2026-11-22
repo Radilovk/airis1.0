@@ -1,10 +1,10 @@
 /**
  * iris-billing.ts — плащането на анализа в IrisMap (aidiet/docs/FINANCIAL_POLICY.md).
  *
- *  - Анализът (разчитане + насоки) е 6,99 € — плаща се преди него (Stripe през worker-а на Eatologix)
+ *  - Анализът (разчитане + насоки) е 6,99 € — плаща се преди него (Stripe през worker-а на Nutriin)
  *    и дава кредит за един анализ на това устройство.
- *  - С план от Eatologix е включен: профилът там дава пропуск (?pass=…) → кредит на устройството.
- *  - Платеното се приспада от първия план в Eatologix до 30 дни: ваучер (?voucher=… към цените).
+ *  - С план от Nutriin е включен: профилът там дава пропуск (?pass=…) → кредит на устройството.
+ *  - Платеното се приспада от първия план в Nutriin до 30 дни: ваучер (?voucher=… към цените).
  *  - Докато плащането е в тестов режим, плаща се само от тестери (?billing=test; ?billing=off го маха);
  *    останалите имат безплатния анализ веднъж на седмица.
  */
@@ -12,8 +12,8 @@ import { deviceId } from '@/lib/ai-proxy'
 
 const WORKER = 'https://aidiet.radilov-k.workers.dev'
 const VOUCHER = 'irismap_voucher'
-export const PRICING_URL = 'https://eatologix.com/pricing.html'
-export const EATOLOGIX_PROFILE = 'https://eatologix.com/profile.html'
+export const PRICING_URL = 'https://nutriin.app/pricing.html'
+export const NUTRIIN_PROFILE = 'https://nutriin.app/profile.html'
 
 export function testerFlag(): boolean {
   try {
@@ -77,7 +77,7 @@ export async function confirmFromUrl(): Promise<boolean> {
   return false
 }
 
-/** Пропуск от Eatologix (?pass=…): анализът е включен в плана. → { ok } или съобщение. */
+/** Пропуск от Nutriin (?pass=…): анализът е включен в плана. → { ok } или съобщение. */
 export async function redeemPassFromUrl(): Promise<{ ok: boolean; message?: string } | null> {
   const pass = new URLSearchParams(location.search).get('pass')
   if (!pass) return null
@@ -85,7 +85,7 @@ export async function redeemPassFromUrl(): Promise<{ ok: boolean; message?: stri
   try {
     const r = await fetch(`${WORKER}/api/iris/redeem`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pass, deviceId: deviceId() }) })
     const d = await r.json()
-    return d?.ok ? { ok: true } : { ok: false, message: d?.message || 'Пропускът не мина. Отворете IrisMap отново от профила си в Eatologix.' }
+    return d?.ok ? { ok: true } : { ok: false, message: d?.message || 'Пропускът не мина. Отворете IrisMap отново от профила си в Nutriin.' }
   } catch {
     return { ok: false, message: 'Няма връзка. Опитайте пак.' }
   }

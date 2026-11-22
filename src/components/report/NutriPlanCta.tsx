@@ -29,7 +29,7 @@ export default function NutriPlanCta({ report }: { report: AnalysisReport }) {
     const link = voucher ? { ...made, url: made.url + (made.url.includes('?') ? '&' : '?') + `voucher=${voucher.code}` } : made
     // Съобщението се вижда само ако остава в този раздел (новият раздел е отпред).
     const usePopup = popup && !popup.closed
-    if (!link.withData && !usePopup) toast.info('Няма връзка с Eatologix — отваряме въпросника без данните от анализа')
+    if (!link.withData && !usePopup) toast.info('Няма връзка с Nutriin — отваряме въпросника без данните от анализа')
     if (usePopup) popup.location.href = link.url
     else window.location.assign(link.url)
     setBusy(false)
@@ -43,11 +43,11 @@ export default function NutriPlanCta({ report }: { report: AnalysisReport }) {
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-bold">
-            {returning ? 'Върни резултата в Eatologix' : 'Хранителен план по този анализ'}
+            {returning ? 'Върни резултата в Nutriin' : 'Хранителен план по този анализ'}
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Eatologix превръща насоките в седмично меню с количества, следи напредъка и адаптира плана всяка седмица.
-            С вас отиват обобщението на анализа и отговорите от въпросника — без снимките на очите. В Eatologix
+            Nutriin превръща насоките в седмично меню с количества, следи напредъка и адаптира плана всяка седмица.
+            С вас отиват обобщението на анализа и отговорите от въпросника — без снимките на очите. В Nutriin
             решавате дали да ги добавите към профила си.
           </p>
           {voucher && !returning && (
@@ -56,7 +56,7 @@ export default function NutriPlanCta({ report }: { report: AnalysisReport }) {
             </p>
           )}
           <Button onClick={go} disabled={busy} className="mt-4 h-11 w-full gap-2 sm:w-auto">
-            {returning ? 'Добави в Eatologix' : 'Продължи в Eatologix'}
+            {returning ? 'Добави в Nutriin' : 'Продължи в Nutriin'}
             <ArrowRight size={18} />
           </Button>
         </div>

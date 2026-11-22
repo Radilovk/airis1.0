@@ -15,8 +15,8 @@ import { CONSTITUTIONS } from '@/lib/iris-map'
 import { constitutionKey } from '@/lib/iris-reading'
 
 const NUTRIPLAN_HANDOFF_URL = 'https://aidiet.radilov-k.workers.dev/api/handoff'
-// Eatologix (бивш NutriPlan): собственият домейн; сървърът може да върне и стария адрес на сайта.
-const NUTRIPLAN_SITE = 'https://eatologix.com'
+// Nutriin (бивш NutriPlan): собственият домейн; сървърът може да върне и стария адрес на сайта.
+const NUTRIPLAN_SITE = 'https://nutriin.app'
 const NUTRIPLAN_SITES = [NUTRIPLAN_SITE, 'https://biocode.website']
 const FROM_KEY = 'airis_from'
 
@@ -26,7 +26,7 @@ export function rememberEntrySource(): void {
     const from = new URLSearchParams(window.location.search).get('from')
     if (from === 'nutriplan') sessionStorage.setItem(FROM_KEY, 'nutriplan')
   } catch {
-    // без sessionStorage бутонът просто остава „Продължи в Eatologix“
+    // без sessionStorage бутонът просто остава „Продължи в Nutriin“
   }
 }
 

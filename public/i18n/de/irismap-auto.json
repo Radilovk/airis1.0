@@ -1695,7 +1695,7 @@
   "Сън, движение и стрес — конкретни стъпки": "Schlaf, Bewegung und Stress — konkrete Schritte",
   "Скоро": "Demnächst",
   "Тестов режим: карта 4242 4242 4242 4242, без истинско таксуване.": "Testmodus: Karte 4242 4242 4242 4242, keine echte Abbuchung.",
-  "Плащане със Stripe. В месечния Plus на Eatologix един протокол на месец е включен.": "Zahlung mit Stripe. Im monatlichen Eatologix Plus ist ein Protokoll pro Monat enthalten.",
+  "Плащане със Stripe. В месечния Plus на Nutriin един протокол на месец е включен.": "Zahlung mit Stripe. Im monatlichen Nutriin Plus ist ein Protokoll pro Monat enthalten.",
   "Плащането още се подготвя. Опитайте по-късно.": "Zahlung wird vorbereitet. Bitte versuchen Sie es später erneut.",
   "Плащането не тръгна. Опитайте пак.": "Zahlung fehlgeschlagen. Bitte versuchen Sie es erneut.",
   "Няма връзка. Опитайте пак.": "Keine Verbindung. Bitte versuchen Sie es erneut.",
@@ -1720,10 +1720,10 @@
   "Разчитане на двата ириса": "Auswertung beider Iren",
   "Зони, знаци и какво показват — с карта на всяко око": "Zonen, Zeichen und deren Bedeutung – mit Karte für jedes Auge",
   "Съгласен съм анализът да започне веднага след плащането и разбирам, че за цифрово съдържание губя правото на отказ от 14 дни.": "Ich stimme zu, dass die Analyse sofort nach der Zahlung beginnt, und verstehe, dass ich bei digitalen Inhalten mein 14-tägiges Widerrufsrecht verliere.",
-  "Плащане със Stripe. Еднократно, без абонамент. Сумата се приспада от първия ви план в Eatologix до 30 дни.": "Zahlung mit Stripe. Einmalig, kein Abonnement. Der Betrag wird innerhalb von 30 Tagen auf Ihren ersten Eatologix-Plan angerechnet.",
-  "Имате план в Eatologix?": "Haben Sie einen Plan bei Eatologix?",
+  "Плащане със Stripe. Еднократно, без абонамент. Сумата се приспада от първия ви план в Nutriin до 30 дни.": "Zahlung mit Stripe. Einmalig, kein Abonnement. Der Betrag wird innerhalb von 30 Tagen auf Ihren ersten Nutriin-Plan angerechnet.",
+  "Имате план в Nutriin?": "Haben Sie einen Plan bei Nutriin?",
   "Анализът е включен — един на 4 седмици. Отворете IrisMap от профила си там („Ирисов анализ“) и продължете без плащане.": "Die Analyse ist enthalten – eine alle 4 Wochen. Öffnen Sie IrisMap über Ihr dortiges Profil („Iris-Analyse“) und fahren Sie ohne Zahlung fort.",
-  "Към профила в Eatologix": "Zum Eatologix-Profil",
+  "Към профила в Nutriin": "Zum Nutriin-Profil",
   "Анализът ви е платен — попълнете въпросника и качете снимките.": "Ihre Analyse wurde bezahlt – füllen Sie den Fragebogen aus und laden Sie die Fotos hoch.",
   "отворете IrisMap от профила си": "öffnen Sie IrisMap über Ihr Profil",
   "Анализът е включен в плана ви": "Die Analyse ist in Ihrem Plan enthalten",
@@ -1733,8 +1733,8 @@
   "Платено — започваме анализа": "Bezahlt – wir starten die Analyse",
   "Платено": "Bezahlt",
   "Качете снимките, за да започне анализът.": "Laden Sie die Fotos hoch, um die Analyse zu starten.",
-  "Пропускът не мина. Отворете IrisMap отново от профила си в Eatologix.": "Zugang fehlgeschlagen. Öffnen Sie IrisMap erneut über Ihr Eatologix-Profil.",
-  "Пропускът е изтекъл или вече е използван. Отвори IrisMap отново от профила си в Eatologix.": "Der Zugang ist abgelaufen oder wurde bereits verwendet. Öffnen Sie IrisMap erneut über Ihr Eatologix-Profil.",
-  "Анализът е 6,99 € — или включен в плана на Eatologix.": "Die Analyse kostet 6,99 € – oder ist im Eatologix-Plan enthalten."
+  "Пропускът не мина. Отворете IrisMap отново от профила си в Nutriin.": "Zugang fehlgeschlagen. Öffnen Sie IrisMap erneut über Ihr Nutriin-Profil.",
+  "Пропускът е изтекъл или вече е използван. Отвори IrisMap отново от профила си в Nutriin.": "Der Zugang ist abgelaufen oder wurde bereits verwendet. Öffnen Sie IrisMap erneut über Ihr Nutriin-Profil.",
+  "Анализът е 6,99 € — или включен в плана на Nutriin.": "Die Analyse kostet 6,99 € – oder ist im Nutriin-Plan enthalten."
  }
 }
